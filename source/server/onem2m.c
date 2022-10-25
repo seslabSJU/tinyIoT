@@ -9,10 +9,6 @@
 #include <math.h>
 #include <ctype.h>
 #include <malloc.h>
-#define TREE_VIEWER_DATASIZE 65536
-#define MAX_PROPERTY_SIZE 32768
-#define MAX_URI_SIZE 256
-#define EXPIRE_TIME -3600*24*365*2
 
 int Validate_oneM2M_Standard() {
 	int ret = 1;
@@ -29,92 +25,49 @@ int Validate_oneM2M_Standard() {
 	return ret;
 }
 
-Node* Parse_URI(RT *rt) {
+Node* Parse_URI(Node *cb, char *uri, Operation *op) {
 	fprintf(stderr,"Parse_URI \x1b[33m%s\x1b[0m...",uri);
 	char uri_array[MAX_URI_SIZE];
 	char *uri_parse = uri_array;
-	Node *node = NULL;
-
 	strcpy(uri_array, uri);
-	
-	uri_parse = strtok(uri_parse, "/");
-	
-	int viewer = 0, test = 0, la_ol = 0;
-	
-	if(uri_parse != NULL) {
-		if(!strcmp("test", uri_parse)) test = 1;
-		else if(!strcmp("viewer", uri_parse)) viewer = 1;
-		
-		if(test || viewer) uri_parse = strtok(NULL, "/");
-	}
-	
-	if(uri_parse != NULL && !strcmp("TinyIoT", uri_parse)) node = rt->root;
-	
-	while(uri_parse != NULL && node) {
-		char *cin_ri;
-		if((cin_ri = strstr(uri_parse, "4-20")) != NULL) {
-			fprintf(stderr,"OK\n\x1b[43mRetrieve CIN By Ri\x1b[0m\n");
-			Retrieve_CIN_Ri(cin_ri);
-			return NULL;
-		}
-	
-		if(!strcmp("la", uri_parse) || !strcmp("latest", uri_parse)) {
-			while(node->siblingRight) {
-				if(node->ty == t_CIN && node->siblingRight->ty != t_CIN) break;
-				node = node->siblingRight;
-			}
-			la_ol = 1;
-		} else if(!strcmp("ol", uri_parse) || !strcmp("oldest", uri_parse)) {
-			while(node) {
-				if(node->ty == t_CIN) break;
-				node = node->siblingRight;
-			}
-			la_ol = 1;
-		}
-		
-		if(!la_ol)
-		{
-			while(node) {
-				if(!strcmp(node->rn,uri_parse)) break;
-				node = node->siblingRight;
-			}
-		}
 
-		la_ol = 0;
-		
-		uri_parse = strtok(NULL, "/");
-		
-		if(uri_parse == NULL) break;
-		
-		if(!strcmp(uri_parse, "cinperiod")) {
-			fprintf(stderr,"OK\n\x1b[43mRetrieve CIN in Period\x1b[0m\n");
-			CIN_in_period(node);
-			return NULL;
-		}
-		
-		if(node) node = node->child;
-	}
-	
-	if(node) {
-		if(viewer) {
-			fprintf(stderr,"OK\n\x1b[43mTree Viewer API\x1b[0m\n");
-			Tree_Viewer_API(node);
-			return NULL;
-		} else if(test) {
-			fprintf(stderr,"OK\n\x1b[43mObject Test API\x1b[0m\n");
-			Object_Test_API(node);
-			return NULL;
-		}
-	} else if(!node) {
-		fprintf(stderr,"Invalid\n");
-		HTTP_400;
-		printf("{\"m2m:dbg\": \"invalid object\"}");
+	char uri_strtok[64][MAX_URI_SIZE] = {"\0", };
+	int index_s = 0, index_e = 0;
+
+	uri_parse = strtok(uri_array, "/");
+	if(uri_parse) {
+		strcpy(uri_strtok[index_e++], uri_parse);
+	} else {
 		return NULL;
 	}
-	
-	fprintf(stderr,"OK\n");
 
-	return node;
+	while(uri_parse) {
+		uri_parse = strtok(NULL, "/");
+		if(uri_parse) {
+			strcpy(uri_strtok[index_e++], uri_parse);
+		}
+	}
+
+	index_e--;
+
+	if(!strcmp(uri_strtok[0], "viewer")) {
+		*op = o_VIEWER; index_s++;
+	} else if(!strcmp(uri_strtok[index_e], "la") || !strcmp(uri_strtok[index_e], "latest")) {
+		*op = o_LA; index_e--;
+	} else if(!strcmp(uri_strtok[index_e], "ol") || !strcmp(uri_strtok[index_e], "oldest")) {
+		*op = o_OL; index_e--;
+	} else if(strstr(uri_strtok[index_e], "4-20")) {
+		*op = o_CIN_RI; Retrieve_CIN_Ri(uri_strtok[index_e]); return NULL;
+	}
+
+	strcpy(uri_array,"/\0");
+
+	for(int i=index_s; i<=index_e; i++) {
+		strcat(uri_array,uri_strtok[i]);
+		strcat(uri_array,"/");
+	}
+
+	return Find_Node_by_URI(cb, uri_array);
 }
 
 Operation Parse_Operation(){
@@ -143,16 +96,15 @@ int duplicate_resource_check(Node *pnode) {
 }
 
 void Retrieve_CIN_Ri(char *ri) {
+	fprintf(stderr,"OK\n\x1b[43mRetrieve CIN By Ri\x1b[0m\n");
 	CIN* gcin = Get_CIN(ri);
 	
 	if(gcin) {
 		char *res_json = CIN_to_json(gcin);
 		HTTP_200_JSON;
 		printf("%s",res_json);
-		free(res_json);
-		Free_CIN(gcin);
-		res_json = NULL;
-		gcin = NULL;
+		free(res_json); res_json = NULL;
+		Free_CIN(gcin); gcin = NULL;
 	} else {
 		fprintf(stderr,"There is no such CIN ri = %s\n",ri);
 		HTTP_400;
@@ -194,10 +146,8 @@ void CIN_in_period(Node *pnode) {
 			CIN* gcin = Get_CIN(cin->ri);
 			char *res_json = CIN_to_json(gcin);
 			printf("%s\n",res_json);
-			free(res_json);
-			Free_CIN(gcin);
-			res_json = NULL;
-			gcin = NULL;
+			free(res_json); res_json = NULL;
+			Free_CIN(gcin); gcin = NULL;
 		}
 		cin = cin->siblingRight;
 	}
@@ -210,14 +160,16 @@ void CIN_in_period(Node *pnode) {
 }
 
 void Tree_Viewer_API(Node *node) {
-	char *viewer_data = (char *)calloc(TREE_VIEWER_DATASIZE, sizeof(char));
-	strcpy(viewer_data,"[");
+	fprintf(stderr,"\x1b[43mTree Viewer API\x1b[0m\n");
+	char arr_viewer_data[MAX_TREE_VIEWER_SIZE] = "[";
+	char *viewer_data = arr_viewer_data;
 	
 	Node *p = node;
 	while(p = p->parent) {
 		char *json = Node_to_json(p);
 		strcat(viewer_data,",");
 		strcat(viewer_data,json);
+		free(json); json = NULL;
 	}
 	
 	int cinSize = 1;
@@ -229,57 +181,51 @@ void Tree_Viewer_API(Node *node) {
 	
 	Tree_data(node, &viewer_data, cinSize);
 	strcat(viewer_data,"]\0");
-	char res[TREE_VIEWER_DATASIZE] = "";
+	char res[MAX_TREE_VIEWER_SIZE] = "";
 	int index = 0;
 	
-	for(int i=0; i<TREE_VIEWER_DATASIZE; i++) {
+	for(int i=0; i<MAX_TREE_VIEWER_SIZE; i++) {
 		if(i == 1) continue;
 		if(is_JSON_Valid_Char(viewer_data[i])) {
 			res[index++] = viewer_data[i];
 		}
 	}
 	
-	fprintf(stderr,"TreeViewerAPI Content-Size : %ld\n",strlen(res));
+	fprintf(stderr,"Tree_Viewer_API Content-Size : %ld\n",strlen(res));
 
 	HTTP_200_CORS;
 	printf("%s",res);
-	free(viewer_data);
-	viewer_data = NULL;
 }
 
-void Tree_data(Node *node, char **viewer_data, int cin_num) {
-	if(node->ty == t_CIN) {
-		Node *cinLatest = Get_CIN_Pi(node->pi);
-		
-		Node *p = cinLatest;
-		
-		cinLatest = Latest_CINs(cinLatest, cin_num);
-		
-		while(cinLatest) {
-			char *json = Node_to_json(cinLatest);
-			strcat(*viewer_data, ",");
-			strcat(*viewer_data, json);
-			Node *right = cinLatest->siblingRight;
-			Free_Node(cinLatest);
-			cinLatest = right;
-		}
-		return;
-	}
-	
+void Tree_data(Node *node, char **viewer_data, int cin_size) {
 	char *json = Node_to_json(node);
+
 	strcat(*viewer_data, ",");
 	strcat(*viewer_data, json);
-	
-	node = node->child;
-	
-	while(node) {
-		Tree_data(node, viewer_data, cin_num);
-		if(node->ty == t_CIN) {
-			while(node->siblingRight && node->siblingRight->ty != t_Sub) {
-				node = node->siblingRight;
-			}
+	free(json); json = NULL;
+
+	Node *child = node->child;
+	while(child) {
+		Tree_data(child, viewer_data, cin_size);
+		child = child->siblingRight;
+	}
+
+	if(node->ty != t_Sub && node->ty != t_ACP) {
+		Node *cin_list = Get_CIN_Pi(node->ri);
+
+		if(cin_list) cin_list = Latest_CINs(cin_list, cin_size);
+
+		Node *p = cin_list;
+
+		while(p) {
+			json = Node_to_json(p);
+			strcat(*viewer_data, ",");
+			strcat(*viewer_data, json);
+			free(json); json = NULL;
+			p = p->siblingRight;
+			Free_Node(cin_list);
+			cin_list = p;			
 		}
-		node = node->siblingRight;
 	}
 }
 
@@ -295,8 +241,7 @@ Node *Latest_CINs(Node* cinList, int num) {
 	
 	for(int i=0; i < cnt-num; i++) {
 		head = head->siblingRight;
-		Free_Node(head->siblingLeft);
-		head->siblingLeft = NULL;
+		Free_Node(head->siblingLeft); head->siblingLeft = NULL;
 	}
 	
 	return head;
@@ -329,6 +274,7 @@ ObjectType Parse_ObjectType() {
 	int objType = atoi(ct+3);
 	
 	switch(objType) {
+	case 1 : ty = t_ACP; break;
 	case 2 : ty = t_AE; break;
 	case 3 : ty = t_CNT; break;
 	case 4 : ty = t_CIN; break;
@@ -342,91 +288,207 @@ ObjectType Parse_ObjectType() {
 ObjectType Parse_ObjectType_Body() {
 	ObjectType ty;
 	
-	char *cse, *ae, *cnt, *sub;
+	char *cse, *ae, *cnt, *sub, *acp;
 	
 	cse = strstr(payload, "m2m:cse");
 	ae = strstr(payload, "m2m:ae");
 	cnt = strstr(payload, "m2m:cnt");
 	sub = strstr(payload, "m2m:sub");
+	acp = strstr(payload, "m2m:acp");
 	
 	if(cse) ty = t_CSE;
 	else if(ae) ty = t_AE;
 	else if(cnt) ty = t_CNT;
 	else if(sub) ty = t_Sub;
+	else if(acp) ty = t_ACP;
 	
 	return ty;
 }
 
-Node* Create_Node(char *ri, char *rn, char *pi, char *nu, char *sur, int net, ObjectType ty){
-	Node* node = (Node*)malloc(sizeof(Node));
-	
-	if(strcmp(rn,"") && strcmp(rn,"TinyIoT")) {
-		fprintf(stderr,"\nCreate Tree Node\n[rn] %s\n[ri] %s...", rn, ri);
-	}
-	
-	node->rn = (char*)malloc((strlen(rn) + 1) * sizeof(char));
-	node->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
-	node->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
-	node->nu = (char*)malloc((strlen(nu) + 1) * sizeof(char));
-	node->sur = (char*)calloc((strlen(sur) + 1), sizeof(char));
-	
+Node* Create_Node(void *obj, ObjectType ty){
+	Node* node = NULL;
 
-	strcpy(node->sur, sur);
-	strcpy(node->rn, rn);
-	strcpy(node->ri, ri);
-	strcpy(node->pi, pi);
-	strcpy(node->nu, nu);
-	
-	node->net = net;
-	node->ty = ty;
-	node->cinSize = 0;
+	switch(ty) {
+	case t_CSE: node = Create_CSE_Node((CSE*)obj); break;
+	case t_AE: node = Create_AE_Node((AE*)obj); break;
+	case t_CNT: node = Create_CNT_Node((CNT*)obj); break;
+	case t_CIN: node = Create_CIN_Node((CIN*)obj); break;
+	case t_Sub: node = Create_Sub_Node((Sub*)obj); break;
+	case t_ACP: node = Create_ACP_Node((ACP*)obj); break;
+	}
 
 	node->parent = NULL;
 	node->child = NULL;
 	node->siblingLeft = NULL;
 	node->siblingRight = NULL;
 	
-	if(strcmp(rn,"") && strcmp(rn,"TinyIoT")) fprintf(stderr,"OK\n");
+	fprintf(stderr,"OK\n");
 	
+	return node;
+}
+
+Node* Create_CSE_Node(CSE *cse) {
+	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",cse->rn, cse->ri);
+
+	Node* node = calloc(1, sizeof(Node));
+
+	node->rn = (char*)malloc((strlen(cse->rn) + 1) * sizeof(char));
+	node->ri = (char*)malloc((strlen(cse->ri) + 1) * sizeof(char));
+	node->pi = (char*)malloc((strlen(cse->pi) + 1) * sizeof(char));
+	
+	strcpy(node->rn, cse->rn);
+	strcpy(node->ri, cse->ri);
+	strcpy(node->pi, cse->pi);
+
+	node->ty = t_CSE;
+	node->cinSize = 0;
+
+	return node;
+}
+
+Node* Create_AE_Node(AE *ae) {
+	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",ae->rn, ae->ri);
+
+	Node* node = calloc(1, sizeof(Node));
+
+	node->rn = (char*)malloc((strlen(ae->rn) + 1) * sizeof(char));
+	node->ri = (char*)malloc((strlen(ae->ri) + 1) * sizeof(char));
+	node->pi = (char*)malloc((strlen(ae->pi) + 1) * sizeof(char));
+	
+	strcpy(node->rn, ae->rn);
+	strcpy(node->ri, ae->ri);
+	strcpy(node->pi, ae->pi);
+
+	node->ty = t_AE;
+	node->cinSize = 0;
+
+	return node;
+}
+
+Node* Create_CNT_Node(CNT *cnt) {
+	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",cnt->rn, cnt->ri);
+
+	Node* node = calloc(1, sizeof(Node));
+
+	node->rn = (char*)malloc((strlen(cnt->rn) + 1) * sizeof(char));
+	node->ri = (char*)malloc((strlen(cnt->ri) + 1) * sizeof(char));
+	node->pi = (char*)malloc((strlen(cnt->pi) + 1) * sizeof(char));
+	
+	strcpy(node->rn, cnt->rn);
+	strcpy(node->ri, cnt->ri);
+	strcpy(node->pi, cnt->pi);
+
+	if(cnt->acpi) {
+		node->acpi = (char*)malloc((strlen(cnt->acpi) + 1) * sizeof(char));
+		strcpy(node->acpi, cnt->acpi);
+	}
+	
+
+	node->ty = t_CNT;
+	node->cinSize = 0;
+
+	return node;
+}
+
+Node* Create_CIN_Node(CIN *cin) {
+	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",cin->rn, cin->ri);
+
+	Node* node = calloc(1, sizeof(Node));
+
+	node->rn = (char*)malloc((strlen(cin->rn) + 1) * sizeof(char));
+	node->ri = (char*)malloc((strlen(cin->ri) + 1) * sizeof(char));
+	node->pi = (char*)malloc((strlen(cin->pi) + 1) * sizeof(char));
+	
+	strcpy(node->rn, cin->rn);
+	strcpy(node->ri, cin->ri);
+	strcpy(node->pi, cin->pi);
+
+	node->ty = t_CIN;
+	node->cinSize = 0;
+
+	return node;
+}
+
+Node* Create_Sub_Node(Sub *sub) {
+	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",sub->rn, sub->ri);
+
+	Node* node = calloc(1, sizeof(Node));
+
+	node->rn = (char*)malloc((strlen(sub->rn) + 1) * sizeof(char));
+	node->ri = (char*)malloc((strlen(sub->ri) + 1) * sizeof(char));
+	node->pi = (char*)malloc((strlen(sub->pi) + 1) * sizeof(char));
+	node->nu = (char*)malloc((strlen(sub->nu) + 1) * sizeof(char));
+	node->sur = (char*)malloc((strlen(sub->sur) + 1) * sizeof(char));
+	
+	strcpy(node->rn, sub->rn);
+	strcpy(node->ri, sub->ri);
+	strcpy(node->pi, sub->pi);
+	strcpy(node->nu, sub->nu);
+	strcpy(node->sur, sub->sur);
+
+	node->ty = t_Sub;
+	node->cinSize = 0;
+	node->net = net_to_bit(sub->net);
+
+	return node;
+}
+
+Node* Create_ACP_Node(ACP *acp) {
+	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",acp->rn, acp->ri);
+
+	Node* node = calloc(1, sizeof(Node));
+
+	node->rn = (char*)malloc((strlen(acp->rn) + 1) * sizeof(char));
+	node->ri = (char*)malloc((strlen(acp->ri) + 1) * sizeof(char));
+	node->pi = (char*)malloc((strlen(acp->pi) + 1) * sizeof(char));
+	node->pv_acor = (char*)malloc((strlen(acp->pv_acor) + 1) * sizeof(char));
+	node->pv_acop = (char*)malloc((strlen(acp->pv_acop) + 1) * sizeof(char));
+	node->pvs_acor = (char*)malloc((strlen(acp->pvs_acor) + 1) * sizeof(char));
+	node->pvs_acop = (char*)malloc((strlen(acp->pvs_acop) + 1) * sizeof(char));
+
+	strcpy(node->rn, acp->rn);
+	strcpy(node->ri, acp->ri);
+	strcpy(node->pi, acp->pi);
+	strcpy(node->pv_acor, acp->pv_acor);
+	strcpy(node->pv_acop, acp->pv_acop);
+	strcpy(node->pvs_acor, acp->pvs_acor);
+	strcpy(node->pvs_acop, acp->pvs_acop);
+
+	node->ty = t_ACP;
+	node->cinSize = 0;
+
 	return node;
 }
 
 int Add_child(Node *parent, Node *child) {
 	Node *node = parent->child;
 	child->parent = parent;
-	
-	if(child->ty == t_CIN) parent->cinSize++;
-	
-	if(child->ty != t_CIN) fprintf(stderr,"\nAdd Child\n[P] %s\n[C] %s...",parent->rn, child->rn);
+
+	fprintf(stderr,"\nAdd Child\n[P] %s\n[C] %s...",parent->rn, child->rn);
 	
 	if(!node) {
 		parent->child = child;
 	} else if(node) {
-		if(child->ty < node->ty) {
+		while(node->siblingRight && node->siblingRight->ty <= child->ty) { 	
+				node = node->siblingRight;
+		}
+
+		if(parent->child == node && child->ty < node->ty) {
 			parent->child = child;
 			child->siblingRight = node;
 			node->siblingLeft = child;
 		} else {
-			while(node->siblingRight && node->siblingRight->ty <= child->ty) { 
-				if(node->ty == t_CIN && node->siblingRight->ty == t_CIN && child->ty == t_CIN) {
-					Node *right = node->siblingRight->siblingRight;
-					Free_Node(node->siblingRight);
-					node->siblingRight = right;
-					break;
-				}
-				node = node->siblingRight;
-			}
-			
 			if(node->siblingRight) {
 				node->siblingRight->siblingLeft = child;
 				child->siblingRight = node->siblingRight;
 			}
+
 			node->siblingRight = child;
 			child->siblingLeft = node;
 		}
 	}
 	
-	if(child->ty != t_CIN) fprintf(stderr,"OK\n");
+	fprintf(stderr,"OK\n");
 	
 	return 1;
 }
@@ -451,10 +513,10 @@ void Delete_Node_Object(Node *node, int flag) {
 		break;
 	case t_CNT : 
 		Delete_CNT(node->ri); 
-		char *noti_json = (char*)malloc(sizeof("Deleted") + 1);
-		strcpy(noti_json, "Deleted");
-		Notify_Object(node->child,noti_json,sub_2); 
-		free(noti_json);
+		char *noti_json = (char*)malloc(sizeof("resource is deleted successfully") + 1);
+		strcpy(noti_json, "resource is deleted successfully");
+		Notify_Object(node->child,noti_json,noti_event_2); 
+		free(noti_json); noti_json = NULL;
 		break;
 	case t_Sub :
 		Delete_Sub(node->ri);
@@ -462,16 +524,22 @@ void Delete_Node_Object(Node *node, int flag) {
 	}
 	
 	fprintf(stderr,"Free_Node : %s...",node->rn);
-	Free_Node(node);
+	Free_Node(node); node = NULL;
 	fprintf(stderr,"OK\n");
-	node = NULL;
 }
 
 void Free_Node(Node *node) {
 	free(node->ri);
 	free(node->rn);
 	free(node->pi);
-	free(node);
+	if(node->nu) free(node->nu);
+	if(node->sur) free(node->sur);
+	if(node->acpi) free(node->acpi);
+	if(node->pv_acop) free(node->pv_acop);
+	if(node->pv_acor) free(node->pv_acor);
+	if(node->pvs_acor) free(node->pvs_acor);
+	if(node->pvs_acop) free(node->pvs_acop);
+	free(node); node = NULL;
 }
 
 char *Get_LocalTime(int diff) {
@@ -522,7 +590,8 @@ void Init_CSE(CSE* cse) {
 	
 	cse->ty = t_CSE;
 	
-	free(ct);
+	free(ct); ct = NULL;
+	free(ri); ri = NULL;
 }
 
 void Init_AE(AE* ae, char *pi) {
@@ -563,10 +632,10 @@ void Init_AE(AE* ae, char *pi) {
 	
 	ae->ty = t_AE;
 	
-	if(m_aei) free(aei);
-	free(ct);
-	free(et);
-	free(ri);
+	if(m_aei) {free(aei); aei = NULL;}
+	free(ct); ct = NULL;
+	free(et); et = NULL;
+	free(ri); ri = NULL;
 }
 
 void Init_CNT(CNT* cnt, char *pi) {
@@ -575,9 +644,17 @@ void Init_CNT(CNT* cnt, char *pi) {
 	char *ri = resource_identifier(t_CNT, ct);
 	char tmp[MAX_PROPERTY_SIZE];
 	
-	strcpy(tmp,cnt->rn);
-	cnt->rn = (char*)malloc((strlen(cnt->rn) + 1) * sizeof(char));
-	strcpy(cnt->rn,tmp);
+	if(cnt->rn) {
+		strcpy(tmp,cnt->rn);
+		cnt->rn = (char*)malloc((strlen(cnt->rn) + 1) * sizeof(char));
+		strcpy(cnt->rn,tmp);
+	}
+
+	if(cnt->acpi) {
+		strcpy(tmp,cnt->acpi);
+		cnt->acpi = (char*)malloc((strlen(cnt->acpi) + 1) * sizeof(char));
+		strcpy(cnt->acpi,tmp);
+	}
 	
 	cnt->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
 	cnt->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
@@ -595,9 +672,9 @@ void Init_CNT(CNT* cnt, char *pi) {
 	cnt->cni = 0;
 	cnt->cbs = 0;
 	
-	free(ct);
-	free(et);
-	free(ri);
+	free(ct); ct = NULL;
+	free(et); et = NULL;
+	free(ri); ri = NULL;
 }
 
 void Init_CIN(CIN* cin, char *pi) {
@@ -627,9 +704,9 @@ void Init_CIN(CIN* cin, char *pi) {
 	cin->st = 0;
 	cin->cs = strlen(cin->con);
 	
-	free(ct);
-	free(et);
-	free(ri);
+	free(ct); ct = NULL;
+	free(et); et = NULL;
+	free(ri); ri = NULL;
 }
 
 void Init_Sub(Sub* sub, char *pi) {
@@ -660,15 +737,43 @@ void Init_Sub(Sub* sub, char *pi) {
 	sub->ty = t_Sub;
 	sub->nct = 0;
 
-	free(ct);
-	free(et);
-	free(ri);
+	free(ct); ct = NULL;
+	free(et); et = NULL;
+	free(ri); ri = NULL;
+}
+
+void Init_ACP(ACP* acp, char *pi) {
+	char *ct = Get_LocalTime(0);
+	char *et = Get_LocalTime(EXPIRE_TIME);
+	char *ri = resource_identifier(t_ACP, ct);
+	char tmp[MAX_PROPERTY_SIZE];
+	
+	strcpy(tmp,acp->rn);
+	acp->rn = (char*)malloc((strlen(acp->rn) + 1) * sizeof(char));
+	strcpy(acp->rn,tmp);
+	
+	acp->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
+	acp->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
+	acp->et = (char*)malloc((strlen(et) + 1) * sizeof(char));
+	acp->ct = (char*)malloc((strlen(ct) + 1) * sizeof(char));
+	acp->lt = (char*)malloc((strlen(ct) + 1) * sizeof(char));
+	strcpy(acp->ri, ri);
+	strcpy(acp->pi, pi);
+	strcpy(acp->et, et);
+	strcpy(acp->ct, ct);
+	strcpy(acp->lt, ct);
+	
+	acp->ty = t_ACP;
+	
+	free(ct); ct = NULL;
+	free(et); et = NULL;
+	free(ri); ri = NULL;
 }
 
 void Set_AE_Update(AE* after) {
 	char *rn = Get_JSON_Value_char("rn", payload);
 	char *api = Get_JSON_Value_char("api", payload);
-	bool rr = Get_JSON_Value_bool("rr", payload);
+	int rr = Get_JSON_Value_bool("rr", payload);
 
 	if(rn) {
 		free(after->rn);
@@ -682,7 +787,7 @@ void Set_AE_Update(AE* after) {
 		strcpy(after->api, api);
 	}
 
-	if(rr) {
+	if(rr != -1) {
 		after->rr = rr;
 	}
 }
@@ -690,11 +795,18 @@ void Set_AE_Update(AE* after) {
 
 void Set_CNT_Update(CNT* after) {
 	char *rn = Get_JSON_Value_char("rn", payload);
+	char *acpi = Get_JSON_Value_char("acpi", payload);
 
 	if(rn) {
 		free(after->rn);
 		after->rn = (char*)malloc((strlen(rn) + 1) * sizeof(char));
 		strcpy(after->rn, rn);
+	}
+
+	if(acpi) {
+		if(after->acpi) free(after->acpi);
+		after->acpi = (char*)malloc((strlen(acpi) + 1) * sizeof(char)); 
+		strcpy(after->acpi, acpi);
 	}
 }
 
@@ -709,58 +821,72 @@ void Set_Sub_Update(Sub* after) {
 }
 
 void Free_CSE(CSE *cse) {
-	free(cse->ct);
-	free(cse->lt);
-	free(cse->rn);
-	free(cse->ri);
-	free(cse->csi);
-	free(cse->pi);
-	free(cse);
+	if(cse->ct) free(cse->ct);
+	if(cse->lt) free(cse->lt);
+	if(cse->rn) free(cse->rn);
+	if(cse->ri) free(cse->ri);
+	if(cse->csi) free(cse->csi);
+	if(cse->pi) free(cse->pi);
+	free(cse); cse = NULL;
 }
 
 void Free_AE(AE *ae) {
-	free(ae->et);
-	free(ae->ct);
-	free(ae->lt);
-	free(ae->rn);
-	free(ae->ri);
-	free(ae->pi);
-	free(ae->api);
-	free(ae->aei);
-	free(ae);
+	if(ae->et) free(ae->et);
+	if(ae->ct) free(ae->ct);
+	if(ae->lt) free(ae->lt);
+	if(ae->rn) free(ae->rn);
+	if(ae->ri) free(ae->ri);
+	if(ae->pi) free(ae->pi);
+	if(ae->api) free(ae->api);
+	if(ae->aei) free(ae->aei);
+	free(ae); ae = NULL;
 }
 
 void Free_CNT(CNT *cnt) {
-	free(cnt->et);
-	free(cnt->ct);
-	free(cnt->lt);
-	free(cnt->rn);
-	free(cnt->ri);
-	free(cnt->pi);
-	free(cnt);
+	if(cnt->et) free(cnt->et);
+	if(cnt->ct) free(cnt->ct);
+	if(cnt->lt) free(cnt->lt);
+	if(cnt->rn) free(cnt->rn);
+	if(cnt->ri) free(cnt->ri);
+	if(cnt->pi) free(cnt->pi);
+	free(cnt); cnt = NULL;
 }
 
 void Free_CIN(CIN* cin) {
-	free(cin->et);
-	free(cin->ct);
-	free(cin->lt);
-	free(cin->rn);
-	free(cin->ri);
-	free(cin->pi);
-	free(cin->con);
-	free(cin);
+	if(cin->et) free(cin->et);
+	if(cin->ct) free(cin->ct);
+	if(cin->lt) free(cin->lt);
+	if(cin->rn) free(cin->rn);
+	if(cin->ri) free(cin->ri);
+	if(cin->pi) free(cin->pi);
+	if(cin->con) free(cin->con);
+	free(cin); cin = NULL;
 }
 
 void Free_Sub(Sub* sub) {
-	free(sub->et);
-	free(sub->ct);
-	free(sub->lt);
-	free(sub->rn);
-	free(sub->ri);
-	free(sub->pi);
-	free(sub->nu);
-	free(sub->net);
-	free(sub);
+	if(sub->et) free(sub->et);
+	if(sub->ct) free(sub->ct);
+	if(sub->lt) free(sub->lt);
+	if(sub->rn) free(sub->rn);
+	if(sub->ri) free(sub->ri);
+	if(sub->pi) free(sub->pi);
+	if(sub->nu) free(sub->nu);
+	if(sub->net) free(sub->net);
+	free(sub); sub = NULL;
+}
+
+void Free_ACP(ACP* acp) {
+	if(acp->et) free(acp->et);
+	if(acp->ct) free(acp->ct);
+	if(acp->lt) free(acp->lt);
+	if(acp->rn) free(acp->rn);
+	if(acp->ri) free(acp->ri);
+	if(acp->pi) free(acp->pi);
+	if(acp->pv_acor) free(acp->pv_acor);
+	if(acp->pv_acop) free(acp->pv_acop);
+	if(acp->pvs_acor) free(acp->pvs_acor);
+	if(acp->pvs_acop) free(acp->pvs_acop);
+	free(acp); acp = NULL;
 }
 
 void Notify_Object(Node *node, char *res_json, Net net) {
@@ -769,15 +895,15 @@ void Notify_Object(Node *node, char *res_json, Net net) {
 		if(node->ty == t_Sub && (net & node->net) == net) {
 			char *noti_json = Noti_to_json(node->sur, (int)log2((double)net ) + 1, res_json);
 			char *res = Send_HTTP_Packet(node->nu, noti_json);
-			free(noti_json);
-			free(res);
+			free(noti_json); noti_json = NULL;
+			free(res); res = NULL;
 		}
 		node = node->siblingRight;
 	}
 }
 
-void Remove_Invalid_Char_JSON(char* json) {
-	int size = (int)malloc_usable_size(json);
+void Remove_Invalid_Char_JSON(char* json) { 
+	int size = (int)malloc_usable_size(json); // segmentation fault if json memory not in heap (malloc)
 	int index = 0;
 
 	for(int i=0; i<size; i++) {
@@ -814,6 +940,7 @@ char *resource_identifier(ObjectType ty, char *ct) {
 		case t_CNT : strcpy(ri, "3-"); break;
 		case t_CIN : strcpy(ri, "4-"); break;
 		case t_Sub : strcpy(ri, "23-"); break;
+		case t_ACP : strcpy(ri, "1-"); break;
 	}
 
 	strcat(ri, ct);
@@ -901,4 +1028,74 @@ char *Send_HTTP_Packet(char* target, char *post_data) {
     }
 
     return data.data;
+}
+
+int Get_acop(Node *node) {
+	if(!node->acpi) {
+		return ALL_ACOP;
+	}
+
+	char *origin = request_header("X-M2M-Origin");
+	if(!origin) return 0;
+
+	Node *cb = node;
+	while(cb->parent) cb = cb->parent;
+
+	char *acpi, arr_acpi[MAX_PROPERTY_SIZE];
+
+	strcpy(arr_acpi, node->acpi);
+
+	char *pv_acor, *pv_acop, arr_pv_acor[1024], arr_pv_acop[1024], arr_acp_uri[512][1024] = {"\0", };
+	int ret = 0, cnt = 0, uri_cnt = 0;
+	char *acp_uri = strtok(arr_acpi, ",");
+
+	while(acp_uri) {
+		strcpy(arr_acp_uri[uri_cnt++],acp_uri);
+		acp_uri = strtok(NULL, ",");
+	}
+
+	for(int i=0; i<uri_cnt; i++) {
+		Node *acp = Find_Node_by_URI(cb, arr_acp_uri[i]);
+
+		if(acp) {
+			cnt = 0;
+			strcpy(arr_pv_acor, acp->pv_acor);
+			strcpy(arr_pv_acop, acp->pv_acop);
+			pv_acor = strtok(arr_pv_acor, ",");
+
+			while(pv_acor) {
+				if(!strcmp(pv_acor, origin)) break;
+				pv_acor = strtok(NULL, ",");
+				cnt++;
+			}
+
+			pv_acop = strtok(arr_pv_acop, ",");
+			for(int j=0; j<cnt; j++) pv_acop = strtok(NULL,",");
+
+			if(pv_acop) ret = (ret | atoi(pv_acop));
+		}
+	}
+
+	return ret;
+}
+
+Node *Find_Node_by_URI(Node *cse, char *node_uri) {
+	Node *node = cse;
+
+	node_uri = strtok(node_uri, "/");
+
+	if(!node_uri) return NULL;
+
+	while(node) {
+		while(node) {
+			if(!strcmp(node->rn, node_uri)) break;
+			node = node->siblingRight;
+		}
+		
+		node_uri = strtok(NULL, "/");
+		if(!node_uri) break;
+		node = node->child;
+	}
+
+	return node;
 }

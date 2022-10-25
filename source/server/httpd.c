@@ -194,7 +194,7 @@ void respond(int slot) {
     prot = strtok(NULL, " \t\r\n");
 
     if(!uri) {
-      fprintf(stderr,"URI NULL Error!\n");
+      fprintf(stderr,"URI NULL Error\n");
       return;
     }
 

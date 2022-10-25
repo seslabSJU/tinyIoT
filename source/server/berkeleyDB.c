@@ -885,6 +885,100 @@ int Store_Sub(Sub *sub_object) {
     return 1;
 }
 
+int Store_ACP(ACP *acp_object) {
+    char* DATABASE = "ACP_type3.db";
+
+    DB* dbp;    // db handle
+    DBC* dbcp;
+    int ret;        // template value
+
+    DBT key_ri;
+    DBT data;  // storving key and real data
+
+
+    // if input == NULL
+    if (acp_object->ri == NULL) {
+        fprintf(stderr, "ri is NULL\n");
+        return 0;
+    }
+    if (acp_object->rn == NULL) acp_object->rn = "";
+    if (acp_object->pi == NULL) acp_object->pi = "NULL";
+    if (acp_object->ty == '\0') acp_object->ty = -1;
+    if (acp_object->ct == NULL) acp_object->ct = "";
+    if (acp_object->lt == NULL) acp_object->lt = "";
+    if (acp_object->et == NULL) acp_object->et = "";
+
+   if (acp_object->pv_acor == NULL) acp_object->pv_acor = "";       
+   if (acp_object->pv_acop == NULL) acp_object->pv_acop = ""; 
+   if (acp_object->pvs_acop == NULL) acp_object->pvs_acor = ""; 
+   if (acp_object->pvs_acop == NULL) acp_object->pvs_acop = ""; 
+  
+    ret = db_create(&dbp, NULL, 0);
+    if (ret) {
+        fprintf(stderr, "db_create : %s\n", db_strerror(ret));
+        fprintf(stderr, "File ERROR\n");
+        return 0;
+    }
+
+    /*Set duplicate*/
+    ret = dbp->set_flags(dbp, DB_DUP);
+    if (ret != 0) {
+        dbp->err(dbp, ret, "Attempt to set DUPSORT flag failed.");
+        fprintf(stderr, "Flag Set ERROR\n");
+        dbp->close(dbp, 0);
+        return(ret);
+    }
+
+    /*DB Open*/
+    ret = dbp->open(dbp, NULL, DATABASE, NULL, DB_BTREE, DB_CREATE, 0664);
+    if (ret) {
+        dbp->err(dbp, ret, "%s", DATABASE);
+        fprintf(stderr, "DB Open ERROR\n");
+        return 0;
+    }
+
+    /*
+  * The DB handle for a Btree database supporting duplicate data
+  * items is the argument; acquire a cursor for the database.
+  */
+    if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
+        dbp->err(dbp, ret, "DB->cursor");
+        fprintf(stderr, "Cursor ERROR");
+        return 0;
+    }
+
+    /* keyand data must initialize */
+    memset(&key_ri, 0, sizeof(DBT));
+    memset(&data, 0, sizeof(DBT));
+
+    /* initialize the data to be the first of two duplicate records. */
+    key_ri.data = acp_object->ri;
+    key_ri.size = strlen(acp_object->ri) + 1;
+
+    /* List data excluding 'ri' as strings using delimiters. */
+    char str[200]= "\0";
+    //strcat(str,acp_object->rn);
+    sprintf(str, "%s,%s,%s,%s,%s,%d,%s,%s,%s,%s",
+            acp_object->rn,acp_object->pi,acp_object->ct,acp_object->lt,acp_object->et,
+            acp_object->ty,acp_object->pv_acor,acp_object->pv_acop,acp_object->pvs_acor,acp_object->pvs_acop);
+
+    //char* attribute_list[11] = {"ri","rn","pi","ct","lt","et","ty","pv_acor","pv_acop","pvs_acor","pvs_acop"};
+
+
+    data.data = str;
+    data.size = strlen(str) + 1;
+
+    /* input DB */
+    if ((ret = dbcp->put(dbcp, &key_ri, &data, DB_KEYLAST)) != 0)
+        dbp->err(dbp, ret, "db->cursor");
+
+    /* DB close */
+    dbcp->close(dbcp);
+    dbp->close(dbp, 0); 
+
+    return 1;
+}
+
 CSE* Get_CSE() {
     fprintf(stderr, "[Get CSE]...");
 
@@ -1128,6 +1222,8 @@ CNT* Get_CNT(char* ri) {
 
     //store CNT
     CNT* new_cnt = (CNT*)malloc(sizeof(CNT));
+    //delete_this
+    new_cnt->acpi = NULL;
 
     char* database = "CNT.db";
 
@@ -1276,7 +1372,7 @@ return new_cnt;
 }
 
 CIN* Get_CIN(char* ri) {
-    fprintf(stderr,"[Get CIN] %s...", ri);
+    fprintf(stderr,"[Get CIN] ri = %s...", ri);
 
     //store CIN
     CIN* new_cin = (CIN*)malloc(sizeof(CIN));
@@ -1321,6 +1417,7 @@ CIN* Get_CIN(char* ri) {
     memset(&data, 0, sizeof(data));
 
     int idx = 0;
+    int cnt = 0;
     // žî¹øÂ° CINÀÎÁö Ã£±â À§ÇÑ Ä¿Œ­
     DBC* dbcp0;
     if ((ret = dbp->cursor(dbp, NULL, &dbcp0, 0)) != 0) {
@@ -1332,11 +1429,17 @@ CIN* Get_CIN(char* ri) {
         if (strncmp(key.data, "ri", key.size) == 0) {
             idx++;
             if (strncmp(data.data, ri, data.size) == 0) {
+                cnt++;
                 new_cin->ri = malloc(data.size);
                 strcpy(new_cin->ri, data.data);
                 break;
             }
         }
+    }
+    if (cnt == 0) {
+        fprintf(stderr, "Data not exist\n");
+        free(new_cin);
+        return NULL;
     }
 
     int cin_rn = 0;
@@ -1412,20 +1515,21 @@ CIN* Get_CIN(char* ri) {
             }
         }
     }
-    //fprintf(stderr,"[%d]\n",idx);
+    //printf("[%d]\n",idx);
 
     if (ret != DB_NOTFOUND) {
         dbp->err(dbp, ret, "DBcursor->get");
-        fprintf(stderr,"Cursor ERROR\n");
+        printf("Cursor ERROR\n");
         exit(0);
     }
+
+    fprintf(stderr,"OK\n");
 
 err:    if (close_dbc && (ret = dbcp->close(dbcp)) != 0)
 dbp->err(dbp, ret, "DBcursor->close");
 if (close_db && (ret = dbp->close(dbp, 0)) != 0)
 fprintf(stderr,
     "%s: DB->close: %s\n", database, db_strerror(ret));
-fprintf(stderr,"OK\n");
 return new_cin;
 }
 
@@ -1483,10 +1587,9 @@ Sub* Get_Sub(char* ri) {
     if (cnt == 0 || flag==0) {
         fprintf(stderr, "Data not exist\n");
         return NULL;
-        exit(1);
+        //exit(1);
     }
-
-
+    
     new_sub->pi = malloc(data.size);
     strcpy(new_sub->pi, data.data);
 
@@ -1636,7 +1739,7 @@ int Update_AE_DB(AE* ae_object) {
     if ((ret = dbp->cursor(dbp, NULL, &dbcp0, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
         return 0;
-        exit(1);
+        //exit(1);
     }
     while ((ret = dbcp0->get(dbcp0, &key, &data, DB_NEXT)) == 0) {
         if (strncmp(key.data, "ri", key.size) == 0) {
@@ -1651,7 +1754,7 @@ int Update_AE_DB(AE* ae_object) {
     if (cnt == 0) {
         fprintf(stderr, "Data not exist\n");
         return 0;
-        exit(1);
+        //exit(1);
     }
 
     int cnt_rn = 0,cnt_pi = 0,cnt_et = 0,cnt_lt = 0,cnt_ct = 0,cnt_api = 0,cnt_aei = 0;
@@ -1818,7 +1921,7 @@ int Update_CNT_DB(CNT* cnt_object) {
     if (cnt == 0) {
         fprintf(stderr, "Data not exist\n");
         return 0;
-        exit(1);
+        //exit(1);
     }
 
     int cnt_rn = 0;
@@ -2389,7 +2492,6 @@ int Delete_CIN(char* ri) {
     int cin_st = 0;
     int cin_cs = 0;
     int cin_con = 0;
-    int cin_csi = 0;
 
     if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
@@ -2430,12 +2532,6 @@ int Delete_CIN(char* ri) {
         if (strncmp(key.data, "con", key.size) == 0) {
             cin_con++;
             if (cin_con == idx) {
-                dbcp->del(dbcp, 0);
-            }
-        }
-        if (strncmp(key.data, "csi", key.size) == 0) {
-            cin_csi++;
-            if (cin_csi == idx) {
                 dbcp->del(dbcp, 0);
             }
         }
@@ -2604,7 +2700,7 @@ Node* Get_All_AE() {
     if (cnt == 0) {
         fprintf(stderr, "Data not exist\n");
         return NULL;
-        exit(1);
+        //exit(1);
     }
 
     // cnt °³ŒöžžÅ­ µ¿ÀûÇÒŽç
@@ -2707,7 +2803,7 @@ Node* Get_All_CNT() {
     if (cnt == 0) {
         fprintf(stderr, "Data not exist\n");
         return NULL;
-        exit(1);
+        //exit(1);
     }
 
     // cnt °³ŒöžžÅ­ µ¿ÀûÇÒŽç
@@ -2716,12 +2812,15 @@ Node* Get_All_CNT() {
     Node* node_pi;
     Node* node_rn;
     Node* node_ty;
+    Node* node_acpi;
 
-    node_ri = node_pi = node_rn = node_ty = head;
+    node_acpi = node_ri = node_pi = node_rn = node_ty = head;
 
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
         if (strncmp(key.data, "pi", key.size) == 0) {
             node_pi->pi = malloc(data.size);
+            //delete this
+            node_pi->acpi = NULL;
             strcpy(node_pi->pi, data.data);
             node_pi->siblingRight = (Node *)calloc(1,sizeof(Node));
             node_pi->siblingRight->siblingLeft = node_pi;
@@ -2742,6 +2841,11 @@ Node* Get_All_CNT() {
             node_ty->ty = *(int*)data.data;
             node_ty = node_ty->siblingRight;
         }
+        /*
+        if (strncmp(key.data, "acpi", key.size) == 0) {
+            node_acpi->acpi = data.data;
+            node_acpi = node_acpi->siblingRight;
+        }*/
     }
 
     if(node_pi->siblingLeft) node_pi->siblingLeft->siblingRight = NULL;
@@ -2810,7 +2914,7 @@ Node* Get_All_CIN() {
     if (cnt == 0) {
         fprintf(stderr, "Data not exist\n");
         return NULL;
-        exit(1);
+        //exit(1);
     }
 
     // cnt °³ŒöžžÅ­ µ¿ÀûÇÒŽç
@@ -2860,6 +2964,129 @@ Node* Get_All_CIN() {
 	
     fprintf(stderr,"OK\n");	
 	
+    return head;
+}
+
+Node* Get_All_Sub(){
+    char* database = "SUB.db";
+
+    DB* dbp;
+    DBC* dbcp;
+    DBT key, data;
+    int ret;
+
+    /* Open the database. */
+    if ((ret = db_create(&dbp, NULL, 0)) != 0) {
+        fprintf(stderr,
+            "%s: db_create: %s\n", database, db_strerror(ret));
+        return 0;
+    }
+
+    ret = dbp->open(dbp, NULL, database, NULL, DB_BTREE, DB_CREATE, 0664);
+    if (ret) {
+        dbp->err(dbp, ret, "%s", database);
+        exit(1);
+    }
+
+    /* Acquire a cursor for the database. */
+    if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
+        dbp->err(dbp, ret, "DB->cursor");
+        exit(1);
+    }
+
+    /* Initialize the key/data return pair. */
+    memset(&key, 0, sizeof(key));
+    memset(&data, 0, sizeof(data));
+
+    int cnt = 0;
+    int idx = 0;
+    int cnt_sub = 0;
+
+    DBC* dbcp0;
+    if ((ret = dbp->cursor(dbp, NULL, &dbcp0, 0)) != 0) {
+        dbp->err(dbp, ret, "DB->cursor");
+        exit(1);
+    }
+    while ((ret = dbcp0->get(dbcp0, &key, &data, DB_NEXT)) == 0) {
+        cnt++;
+    }
+    if (cnt == 0) {
+        fprintf(stderr, "Data not exist\n");
+        return NULL;
+    }
+
+    int struct_size = 10;
+    cnt = cnt / struct_size;
+    char* tmp;
+
+
+    Node* head = (Node*)calloc(cnt, sizeof(Node));
+    Node* node;
+    node = head;
+    //node_ri = node_pi = node_rn = node_nu = node_sub_bit = head;
+    
+    while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
+        switch (idx) {
+            case 0:
+                node->ty = t_Sub;
+                node->ri = malloc(data.size);
+                strcpy(node->ri, data.data);
+
+                node->siblingRight = (Node*)malloc(sizeof(Node));
+                node->siblingRight->siblingLeft = node;
+
+                idx++;
+                break;
+            case 1:
+                node->rn = malloc(data.size);
+                strcpy(node->rn, data.data);
+
+                idx++;
+                break;
+            case 2:
+                node->nu = malloc(data.size);
+                strcpy(node->nu, data.data);
+
+                idx++;
+                break;
+            case 3:
+                //tmp = malloc(data.size);
+                //strcpy(tmp, data.data);
+                node->net = net_to_bit(data.data);
+
+                //node->net = malloc(data.size);
+                //strcpy(node->net, data.data);
+
+                idx++;
+                break;
+            case 4:
+                node->sur = malloc(data.size);
+                strcpy(node->sur, data.data);
+
+                idx++;
+                break;
+            case 5:
+                node->pi = malloc(key.size);
+                strcpy(node->pi, key.data);
+
+                node = node->siblingRight;
+                idx++;
+                break;
+            default:
+                idx++;
+                if (idx == struct_size) idx = 0;
+        }
+    }
+
+    node->siblingLeft->siblingRight = NULL;
+    free(node);
+    node = NULL;
+
+    /* DB close */
+    dbcp->close(dbcp0);
+    dbcp->close(dbcp);
+    dbp->close(dbp, 0);
+
     return head;
 }
 
@@ -2928,7 +3155,7 @@ Node* Get_CIN_Period(char* start_time, char* end_time) {
     if (cnt == 0) {
         fprintf(stderr, "Data not exist\n");
         return NULL;
-        exit(1);
+        //exit(1);
     }
     //fprintf(stderr, "<%d>\n", cnt);
 
@@ -2955,7 +3182,7 @@ Node* Get_CIN_Period(char* start_time, char* end_time) {
     if (idx == 0) {
         fprintf(stderr, "Data not exist\n");
         return NULL;
-        exit(1);
+        //exit(1);
     }
     //for (int i = 0; i < cnt; i++) printf("%d ", arr[i]);
 
@@ -3070,9 +3297,9 @@ Node* Get_CIN_Pi(char* pi) {
         }
     }
     if (cnt == 0) {
-        fprintf(stderr, "Data not exist\n");
+        //fprintf(stderr, "Data not exist\n");
         return NULL;
-        exit(1);
+        //exit(1);
     }
 
     //¿ÀºêÁ§Æ® °³ŒöžžÅ­ µ¿ÀûÇÒŽç
@@ -3100,9 +3327,9 @@ Node* Get_CIN_Pi(char* pi) {
         sum += arr[i];
     }
     if (sum == 0) {
-        fprintf(stderr, "Data not exist\n");
+        //fprintf(stderr, "Data not exist\n");
         return NULL;
-        exit(1);
+        //exit(1);
     }
 
     Node* head = (Node *)calloc(1,sizeof(Node));

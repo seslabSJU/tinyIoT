@@ -7,7 +7,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <time.h>
-#include "onem2m.h"
 
 #define MAX_VALUE 10000
 #define BASIC_VALUE 200

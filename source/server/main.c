@@ -5,7 +5,7 @@
 #include <time.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "zeroconf.h"
+#include "onem2m.h"
 
 #define CHUNK_SIZE 1024 // read 1024 bytes at a time
 
@@ -15,38 +15,46 @@
 #define NOT_FOUND_HTML "/404.html"
 #define MAX_PAYLOAD_SIZE 16384
 
-RT *rt;
+ResourceTree *rt;
 
 int main(int c, char **v) {
-	fprintf(stderr,"PID : %d\n",getpid());
 	init();
  	char *port = c == 1 ? "3000" : v[1];
 
-	serve_forever(port);
-    
+	serve_forever(port); // main oneM2M operation logic in void route()    
+
 	return 0;
 }
 
 void route() {
-	if(Label_To_URI(uri)) {
-		uri = Label_To_URI(uri);
-	}
+    double start, end;
 
-	Node* pnode = Parse_URI(rt);
+    start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
+
+	//if(Label_To_URI(uri)) { uri = Label_To_URI(uri);}
+
+	Operation op = o_NONE;
+
+	Node* pnode = Parse_URI(rt->cb, uri, &op); // return tree node by URI
 	if(!pnode) {
+		if(op != o_CIN_RI) { 
+			fprintf(stderr,"Invalid\n");
+			HTTP_404;
+			printf("{\"m2m:dbg\": \"URI is invalid\"}");
+		}
 		return;
-	}
-
-	fprintf(stderr,"rn : %s\n",pnode->rn);
+	} else {
+		fprintf(stderr,"OK\n");
+	} 
 
 	if(payload && payload_size > MAX_PAYLOAD_SIZE) {
-		HTTP_406;
-		fprintf(stderr,"Request Payload Too Large\n");
-		printf("{\"m2m:dbg\": \"request data is too large\"}");
+		fprintf(stderr,"Request payload too large\n");
+		HTTP_413;
+		printf("{\"m2m:dbg\": \"payload is too large\"}");
 		return;
 	}
 
-	Operation op = Parse_Operation();
+	if(op == o_NONE) op = Parse_Operation(); // parse operation by HTTP method
 	
 	switch(op) {
 	
@@ -61,6 +69,9 @@ void route() {
 		
 	case o_DELETE:
 		Delete_Object(pnode); break;
+
+	case o_VIEWER:
+		Tree_Viewer_API(pnode); break;
 	
 	case o_OPTIONS:
 		HTTP_200_JSON;
@@ -69,7 +80,11 @@ void route() {
 	
 	default:
 		HTTP_500;
+		printf("{\"m2m:dbg\": \"unexpected server error\"}");
 	}
+
+	end = (((double)clock()) / CLOCKS_PER_SEC); // runtime check - end
+    fprintf(stderr,"Run time :%lf\n", (end-start)); 
 }
 
 void init() {
@@ -82,30 +97,40 @@ void init() {
 	} else {
 		cse = Get_CSE();
 	}
-	rt = (RT *)malloc(sizeof(rt));
- 	rt->root = Create_Node(cse->ri, cse->rn, cse->pi, "\0", "\0", 0, t_CSE);
- 	Free_CSE(cse);
- 	cse = NULL;
+	rt = (ResourceTree *)malloc(sizeof(rt));
+ 	rt->cb = Create_Node(cse, t_CSE);
+ 	Free_CSE(cse); cse = NULL;
  	Restruct_ResourceTree();
 }
 
 void Create_Object(Node *pnode) {
+	if((Get_acop(pnode) & acop_Create) != acop_Create) {
+		fprintf(stderr,"Originator has no privilege\n");
+		HTTP_403;
+		printf("{\"m2m:dbg\": \"originator has no privilege\"}");
+		return;
+	}
+
 	if(!payload) {
 		HTTP_500;
-		fprintf(stderr,"Request Empty\n");
-		printf("{\"m2m:dbg\": \"request body empty\"}"); // Need oneM2M WireShark packet Check
+		fprintf(stderr,"Request body empty\n");
+		printf("{\"m2m:dbg\": \"request body empty\"}"); 
 		return;
 	}
 
 	if(duplicate_resource_check(pnode)) {
 		HTTP_209_JSON;
-		fprintf(stderr,"Resource Duplicate Error\n");
+		fprintf(stderr,"Resource duplicate error\n");
 		printf("{\"m2m:dbg\": \"resource is already exist\"}");
 		return;
 	}
 
-	ObjectType ty = Parse_ObjectType();
+	ObjectType ty = Parse_ObjectType(); // parse object type by payload json key -> "m2m:??"
 	switch(ty) {
+
+	case t_CSE :
+		/*No Definition such request*/
+		break;
 		
 	case t_AE :
 		fprintf(stderr,"\x1b[42mCreate AE\x1b[0m\n");
@@ -126,18 +151,27 @@ void Create_Object(Node *pnode) {
 		fprintf(stderr,"\x1b[42mCreate Sub\x1b[0m\n");
 		Create_Sub(pnode);
 		break;
-
-	case t_CSE :
-		/*No Definition such request*/
+	
+	case t_ACP :
+		fprintf(stderr,"\x1b[42mCreate ACP\x1b[0m\n");
+		Create_ACP(pnode);
+		break;
 
 	default :
-		fprintf(stderr,"Resource Type Error (Content-Type Header Invalid)\n");
+		fprintf(stderr,"Resource type error (Content-Type Header Invalid)\n");
 		HTTP_400;
 		printf("{\"m2m:dbg\": \"resource type error (Content-Type header invalid)\"}");
 	}	
 }
 
 void Retrieve_Object(Node *pnode) {
+	if((Get_acop(pnode) & acop_Retrieve) != acop_Retrieve) {
+		fprintf(stderr,"Originator has no privilege\n");
+		HTTP_403;
+		printf("{\"m2m:dbg\": \"originator has no privilege\"}");
+		return;
+	}
+
 	switch(pnode->ty) {
 		
 	case t_CSE :
@@ -163,44 +197,74 @@ void Retrieve_Object(Node *pnode) {
 		fprintf(stderr,"\x1b[43mRetrieve CIN\x1b[0m\n");
 		Retrieve_CIN(pnode);
 		break;
+
 	case t_Sub :
 		fprintf(stderr,"\x1b[43mRetrieve Sub\x1b[0m\n");
 		Retrieve_Sub(pnode);			
+		break;
+
+	case t_ACP :
+		fprintf(stderr,"\x1b[43mRetrieve ACP\x1b[0m\n");
+		//Retrieve_ACP(pnode);			
 		break;
 	}	
 }
 
 void Update_Object(Node *pnode) {
+	if((Get_acop(pnode) & acop_Update) != acop_Update) {
+		fprintf(stderr,"Originator has no privilege\n");
+		HTTP_403;
+		printf("{\"m2m:dbg\": \"originator has no privilege\"}");
+		return;
+	}
+
 	if(!payload) {
 		HTTP_500;
-		fprintf(stderr,"Request Empty Error\n");
+		fprintf(stderr,"Request body empty error\n");
 		printf("{\"m2m:dbg\": \"request body empty\"\n}");
+		return;
+	}
+
+	if(duplicate_resource_check(pnode->parent)) {
+		HTTP_209_JSON;
+		fprintf(stderr,"Resource duplicate error\n");
+		printf("{\"m2m:dbg\": \"resource \"rn\" is duplicated\"}");
 		return;
 	}
 
 	ObjectType ty = Parse_ObjectType_Body();
 	
 	if(ty != pnode->ty) {
-		fprintf(stderr,"Update Resource Type Error\n");
+		fprintf(stderr,"Update resource type error\n");
 		HTTP_400;
 		printf("{\"m2m:dbg\": \"resource type error\"}");
 		return;
 	}
 	
 	switch(ty) {
-	
+
 	case t_CSE :
+		/*No Definition such request*/
 		break;
+
 	case t_AE :
 		fprintf(stderr,"\x1b[45mUpdate AE\x1b[0m\n");
 		Update_AE(pnode);
 		break;
+
 	case t_CNT :
 		fprintf(stderr,"\x1b[45mUpdate CNT\x1b[0m\n");
 		Update_CNT(pnode);
+		break;
+
 	case t_Sub :
 		fprintf(stderr,"\x1b[45mUpdate Sub\x1b[0m\n");
 		Update_Sub(pnode);
+		break;
+	
+	case t_ACP :
+		fprintf(stderr,"\x1b[45mUpdate ACP\x1b[0m\n");
+		//Update_ACP(pnode);
 		break;
 	}
 }
@@ -217,21 +281,18 @@ void Create_AE(Node *pnode) {
 	if(result != 1) { 
 		HTTP_500;
 		printf("{\"m2m:dbg\": \"DB store fail\"}");
-		Free_AE(ae);
-		ae = NULL;
+		Free_AE(ae); ae = NULL;
 		return;
 	}
 	
-	Node* node = Create_Node(ae->ri, ae->rn, ae->pi, "\0", "\0", 0, t_AE);
+	Node* node = Create_Node(ae, t_AE);
 	Add_child(pnode,node);
 	
 	char *res_json = AE_to_json(ae);
 	HTTP_201_JSON;
 	printf("%s", res_json);
-	free(res_json);
-	Free_AE(ae);
-	res_json = NULL;
-	ae = NULL;
+	free(res_json); res_json = NULL;
+	Free_AE(ae); ae = NULL;
 }
 
 void Create_CNT(Node *pnode) {
@@ -246,21 +307,18 @@ void Create_CNT(Node *pnode) {
 	if(result != 1) { 
 		HTTP_500;
 		printf("{\"m2m:dbg\": \"DB store fail\"}");
-		Free_CNT(cnt);
-		cnt = NULL;
+		Free_CNT(cnt); cnt = NULL;
 		return;
 	}
 	
-	Node* node = Create_Node(cnt->ri, cnt->rn, cnt->pi, "\0", "\0", 0, t_CNT);
+	Node* node = Create_Node(cnt, t_CNT);
 	Add_child(pnode,node);
 	
 	char *res_json = CNT_to_json(cnt);
 	HTTP_201_JSON;
 	printf("%s", res_json);
-	free(res_json);
-	Free_CNT(cnt);
-	res_json = NULL;
-	cnt = NULL;
+	free(res_json); res_json = NULL; 
+	Free_CNT(cnt); cnt = NULL;
 }
 
 void Create_CIN(Node *pnode) {
@@ -270,6 +328,7 @@ void Create_CIN(Node *pnode) {
 		return;
 	}
 	Init_CIN(cin,pnode->ri);
+
 	int result = Store_CIN(cin);
 	if(result != 1) { 
 		HTTP_500;
@@ -279,16 +338,13 @@ void Create_CIN(Node *pnode) {
 		return;
 	}
 	
-	Node* node = Create_Node(cin->ri, cin->rn, cin->pi, "\0", "\0", 0, t_CIN);
-	Add_child(pnode,node);
 	char *res_json = CIN_to_json(cin);
 	HTTP_201_JSON;
 	printf("%s", res_json);
-	Notify_Object(pnode->child, res_json, sub_3);
-	free(res_json);
-	Free_CIN(cin);
-	res_json = NULL;
-	cin = NULL;
+	Notify_Object(pnode->child, res_json, noti_event_3);
+	free(res_json); res_json = NULL; 
+	Free_CIN(cin); cin = NULL;
+	pnode->cinSize++;
 }
 
 void Create_Sub(Node *pnode) {
@@ -303,23 +359,46 @@ void Create_Sub(Node *pnode) {
 	if(result != 1) { 
 		HTTP_500;
 		printf("{\"m2m:dbg\": \"DB store fail\"}");
-		Free_Sub(sub);
-		sub = NULL;
+		Free_Sub(sub); sub = NULL;
 		return;
 	}
 	
-	Node* node = Create_Node(sub->ri, sub->rn, sub->pi, sub->nu, sub->sur, net_to_bit(sub->net), t_Sub);
+	Node* node = Create_Node(sub, t_Sub);
 	Add_child(pnode,node);
 	
 	char *res_json = Sub_to_json(sub);
 	HTTP_201_JSON;
 	printf("%s", res_json);
 	char *res = Send_HTTP_Packet(sub->nu, res_json);
-	free(res);
-	free(res_json);
-	Free_Sub(sub);
-	res_json = NULL;
-	sub = NULL;
+	free(res); res = NULL;
+	free(res_json); res_json = NULL;
+	Free_Sub(sub); sub = NULL;
+}
+
+void Create_ACP(Node *pnode) {
+	ACP* acp = JSON_to_ACP(payload);
+	if(!acp) {
+		Response_JSON_Parse_Error();
+		return;
+	}
+	Init_ACP(acp, pnode->ri);
+	
+	int result = Store_ACP(acp);
+	if(result != 1) { 
+		HTTP_500;
+		printf("{\"m2m:dbg\": \"DB store fail\"}");
+		Free_ACP(acp); acp = NULL;
+		return;
+	}
+	
+	Node* node = Create_Node(acp, t_ACP);
+	Add_child(pnode,node);
+	
+	char *res_json = ACP_to_json(acp);
+	HTTP_201_JSON;
+	printf("%s", res_json);
+	free(res_json); res_json = NULL; 
+	Free_ACP(acp); acp = NULL;
 }
 
 void Retrieve_CSE(Node *pnode){
@@ -328,10 +407,8 @@ void Retrieve_CSE(Node *pnode){
 	char *res_json = CSE_to_json(gcse);
 	HTTP_200_JSON;
 	printf("%s", res_json);
-	free(res_json);
-	Free_CSE(gcse);
-	res_json = NULL;
-	gcse = NULL;
+	free(res_json); res_json = NULL; 
+	Free_CSE(gcse); gcse = NULL;
 }
 
 void Retrieve_AE(Node *pnode){
@@ -340,10 +417,8 @@ void Retrieve_AE(Node *pnode){
 	char *res_json = AE_to_json(gae);
 	HTTP_200_JSON;
 	printf("%s", res_json);
-	free(res_json);
-	Free_AE(gae);
-	res_json = NULL;
-	gae = NULL;
+	free(res_json); res_json = NULL;
+	Free_AE(gae); gae = NULL;
 }
 
 void Retrieve_CNT(Node *pnode){
@@ -352,10 +427,8 @@ void Retrieve_CNT(Node *pnode){
 	char *res_json = CNT_to_json(gcnt);
 	HTTP_200_JSON;
 	printf("%s", res_json);
-	free(res_json);
-	Free_CNT(gcnt);
-	res_json = NULL;
-	gcnt = NULL;
+	free(res_json); res_json = NULL;
+	Free_CNT(gcnt); gcnt = NULL;
 }
 
 void Retrieve_CIN(Node *pnode){
@@ -363,10 +436,8 @@ void Retrieve_CIN(Node *pnode){
 	char *res_json = CIN_to_json(gcin);
 	HTTP_200_JSON;
 	printf("%s", res_json);
-	free(res_json);
-	Free_CIN(gcin);
-	res_json = NULL;
-	gcin = NULL;
+	free(res_json); res_json = NULL; 
+	Free_CIN(gcin); gcin = NULL;
 }
 
 void Retrieve_Sub(Node *pnode){
@@ -374,10 +445,8 @@ void Retrieve_Sub(Node *pnode){
 	char *res_json = Sub_to_json(gsub);
 	HTTP_200_JSON;
 	printf("%s", res_json);
-	free(res_json);
-	Free_Sub(gsub);
-	res_json = NULL;
-	gsub = NULL;
+	free(res_json); res_json = NULL; 
+	Free_Sub(gsub); gsub = NULL;
 }
 
 void Update_AE(Node *pnode) {
@@ -388,8 +457,7 @@ void Update_AE(Node *pnode) {
 	if(result != 1) { 
 		HTTP_500;
 		printf("{\"m2m:dbg\": \"DB update fail\"}");
-		Free_AE(after);
-		after = NULL;
+		Free_AE(after); after = NULL;
 		return;
 	}
 	
@@ -400,10 +468,8 @@ void Update_AE(Node *pnode) {
 	char *res_json = AE_to_json(after);
 	HTTP_200_JSON;
 	printf("%s", res_json);
-	free(res_json);
-	Free_AE(after);
-	res_json = NULL;
-	after = NULL;
+	free(res_json); res_json = NULL; 
+	Free_AE(after); after = NULL;
 }
 
 void Update_CNT(Node *pnode) {
@@ -414,8 +480,7 @@ void Update_CNT(Node *pnode) {
 	if(result != 1) { 
 		HTTP_500;
 		printf("{\"m2m:dbg\": \"DB update fail\"}");
-		Free_CNT(after);
-		after = NULL;
+		Free_CNT(after); after = NULL;
 		return;
 	}
 	
@@ -426,11 +491,9 @@ void Update_CNT(Node *pnode) {
 	char *res_json = CNT_to_json(after);
 	HTTP_200_JSON;
 	printf("%s", res_json);
-	Notify_Object(pnode->child, res_json, sub_1);
-	free(res_json);
-	Free_CNT(after);
-	res_json = NULL;
-	after = NULL;
+	Notify_Object(pnode->child, res_json, noti_event_1);
+	free(res_json); res_json = NULL;
+	Free_CNT(after); after = NULL;
 }
 
 void Update_Sub(Node *pnode) {
@@ -441,8 +504,7 @@ void Update_Sub(Node *pnode) {
 	if(result != 1) { 
 		HTTP_500;
 		printf("{\"m2m:dbg\": \"DB update fail\"}");
-		Free_Sub(after);
-		after = NULL;
+		Free_Sub(after); after = NULL;
 		return;
 	}
 	
@@ -453,10 +515,8 @@ void Update_Sub(Node *pnode) {
 	char *res_json = Sub_to_json(after);
 	HTTP_200_JSON;
 	printf("%s", res_json);
-	free(res_json);
-	Free_Sub(after);
-	res_json = NULL;
-	after = NULL;
+	free(res_json); res_json = NULL;
+	Free_Sub(after); after = NULL;
 }
 
 void Delete_Object(Node* pnode) {
@@ -464,7 +524,7 @@ void Delete_Object(Node* pnode) {
 	Delete_Node_Object(pnode,1);
 	pnode = NULL;
 	HTTP_200_JSON;
-	printf("{\"m2m:dbg\": \"resource deleted succesessfully\"}");
+	printf("{\"m2m:dbg\": \"resource is deleted successfully\"}");
 }
 
 void Restruct_ResourceTree(){
@@ -474,7 +534,7 @@ void Restruct_ResourceTree(){
 	if(access("./AE.db", 0) != -1) {
 		Node* ae_list = Get_All_AE();
 		tail->siblingRight = ae_list;
-		ae_list->siblingLeft = tail;
+		if(ae_list) ae_list->siblingLeft = tail;
 		while(tail->siblingRight) tail = tail->siblingRight;
 	} else {
 		fprintf(stderr,"AE.db is not exist\n");
@@ -483,27 +543,38 @@ void Restruct_ResourceTree(){
 	if(access("./CNT.db", 0) != -1) {
 		Node* cnt_list = Get_All_CNT();
 		tail->siblingRight = cnt_list;
-		cnt_list->siblingLeft = tail;
+		if(cnt_list) cnt_list->siblingLeft = tail;
 		while(tail->siblingRight) tail = tail->siblingRight;
 	} else {
 		fprintf(stderr,"CNT.db is not exist\n");
 	}
 	
+	if(access("./SUB.db", 0) != -1) {
+		Node* sub_list = Get_All_Sub();
+		tail->siblingRight = sub_list;
+		if(sub_list) sub_list->siblingLeft = tail;
+		while(tail->siblingRight) tail = tail->siblingRight;
+	} else {
+		fprintf(stderr,"SUB.db is not exist\n");
+	}
+	
+	/*
 	if(access("./CIN.db", 0) != -1) {
 		Node* cin_list = Get_All_CIN();
 		tail->siblingRight = cin_list;
-		cin_list->siblingLeft = tail;
+		if(cin_list) cin_list->siblingLeft = tail;
 		while(tail->siblingRight) tail = tail->siblingRight;
 	} else {
 		fprintf(stderr,"CIN.db is not exist\n");
 	}
+	*/
 	
-	Node *temp = node_list;
+	Node *fnode = node_list;
 	node_list = node_list->siblingRight;
 	if(node_list) node_list->siblingLeft = NULL;
-	Free_Node(temp);
+	Free_Node(fnode);
 	
-	if(node_list) Restruct_childs(rt->root, node_list);
+	if(node_list) Restruct_childs(rt->cb, node_list);
 }
 
 Node* Restruct_childs(Node *pnode, Node *list) {
@@ -543,7 +614,7 @@ void Response_JSON_Parse_Error(){
 }
 
 
-// httpd open source default functions
+// httpd open source basic functions
 int file_exists(const char *file_name) {
 	struct stat buffer;
 	int exists;
