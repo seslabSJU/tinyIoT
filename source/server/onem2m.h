@@ -297,7 +297,8 @@ void CIN_in_period(Node *pnode);
 void Object_Test_API(Node *node);
 char* JSON_label_value(char *json_payload);
 int net_to_bit(char *net);
-int Get_acop(Node *node);
+int get_acop(Node *node);
+int get_acop_origin(char *origin, Node *acp, int flag);
 
 #define MAX_TREE_VIEWER_SIZE 65536
 #define MAX_PROPERTY_SIZE 32768

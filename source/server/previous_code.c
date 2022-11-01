@@ -1,3 +1,6 @@
+// Create_Node
+Node *Create_Node(char *rn, char *ri, char *pi, char *nu, char *sur, char *acpi, char *pv_acor, char *pv_acop, char *pvs_acor, char *pvs_acop) {}
+
 // Parse_URI
 Node* Parse_URI(Node *cb, char *uri_array) {
 	fprintf(stderr,"Parse_URI \x1b[33m%s\x1b[0m...",uri_array);
