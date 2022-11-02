@@ -4,7 +4,7 @@ clean:
 	@rm -rf *.o
 	@rm -rf server
 
-server: main.o httpd.o onem2m.o cJSON.o berkeleyDB.o jsonparse.o
+server: main.o httpd.o onem2m.o cJSON.o berkeleyDB.o jsonparse.o zeroconf.o
 	gcc -o server $^ -ldb -lpthread -lcurl -lm
 
 main.o: main.c onem2m.h
@@ -24,5 +24,8 @@ jsonparse.o: onem2m.h jsonparse.c
 
 cJSON.o: cJSON.c cJSON.h
 	gcc -c -o cJSON.o cJSON.c
+
+zeroconf.o: zeroconf.c zeroconf.h
+	gcc -c -o zeroconf.o zeroconf.c
 
 
