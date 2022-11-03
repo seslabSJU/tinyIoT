@@ -895,7 +895,7 @@ void Notify_Object(Node *node, char *res_json, Net net) {
 			char *noti_json = Noti_to_json(node->sur, (int)log2((double)net ) + 1, res_json);
 			char *res = Send_HTTP_Packet(node->nu, noti_json);
 			free(noti_json); noti_json = NULL;
-			free(res); res = NULL;
+			if(res) { free(res); res = NULL; }
 		}
 		node = node->siblingRight;
 	}
@@ -1007,7 +1007,6 @@ char *Send_HTTP_Packet(char* target, char *post_data) {
     curl = curl_easy_init();
 
     if (curl) {
-
         curl_easy_setopt(curl, CURLOPT_URL, target);
 		if(post_data){
 			Remove_Invalid_Char_JSON(post_data);
@@ -1015,14 +1014,14 @@ char *Send_HTTP_Packet(char* target, char *post_data) {
 		}
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
-
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2);
         res = curl_easy_perform(curl);
-		/*
+		
         if(res != CURLE_OK) {
                 fprintf(stderr, "curl_easy_perform() failed: %s\n",
                         curl_easy_strerror(res));
         }
-		*/
+		
         curl_easy_cleanup(curl);
     }
 
@@ -1111,7 +1110,8 @@ Node *Find_Node_by_URI(Node *cse, char *node_uri) {
 		
 		node_uri = strtok(NULL, "/");
 		if(!node_uri) break;
-		node = node->child;
+		
+		if(node) node = node->child;
 	}
 
 	return node;

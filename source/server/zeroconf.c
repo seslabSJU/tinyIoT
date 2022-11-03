@@ -34,8 +34,9 @@ char *handle_url_RegistSuccess(char* url, char* CIN_URL) {
     if (curl) {
         curl_easy_setopt(curl, CURLOPT_URL, url);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, RegistSuccess_body);
-    	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+    	   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+		   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2);
 
         res = curl_easy_perform(curl);
 
