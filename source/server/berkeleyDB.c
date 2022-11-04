@@ -617,7 +617,6 @@ int Store_CIN(CIN *cin_object)
         printf("DB Open ERROR\n");
         exit(1);
     }
-
     /*
   * The DB handle for a Btree database supporting duplicate data
   * items is the argument; acquire a cursor for the database.
