@@ -183,12 +183,10 @@ void Retrieve_Object(Node *pnode) {
         	//HTTP_200_CORS;
         	printf("%s 200 OK\n%s\n\n", RESPONSE_PROTOCOL, "Access-Control-Allow-Origin: *\nAccess-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type\nAccess-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS\nAccess-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS\nX-TinyIoT-ID:SejongTinyIoT");
         	printf("%s",zeroconf_data);
-      	} else {
-        	fprintf(stderr,"\x1b[43mRetrieve CSE\x1b[0m\n");
-        	Retrieve_CSE(pnode);
-      	}
+      	}*/
+        fprintf(stderr,"\x1b[43mRetrieve CSE\x1b[0m\n");
+        Retrieve_CSE(pnode);
       	break;
-		*/
 	case t_AE : 
 		fprintf(stderr,"\x1b[43mRetrieve AE\x1b[0m\n");
 		Retrieve_AE(pnode);	
