@@ -126,3 +126,33 @@ void Tree_data(Node *node, char **viewer_data, int cin_num) {
 		node = node->siblingRight;
 	}
 }
+
+// httpd open source basic functions
+int file_exists(const char *file_name) {
+	struct stat buffer;
+	int exists;
+
+	exists = (stat(file_name, &buffer) == 0);
+
+	return exists;
+}
+// httpd open source basic functions
+int read_file(const char *file_name) {
+	char buf[CHUNK_SIZE];
+	FILE *file;
+	size_t nread;
+	int err = 1;
+
+	file = fopen(file_name, "r");
+
+	if (file) {
+		while ((nread = fread(buf, 1, sizeof buf, file)) > 0) {
+			fwrite(buf, 1, nread, stdout);
+		}
+
+		err = ferror(file);
+		fclose(file);
+	}
+	
+	return err;
+}

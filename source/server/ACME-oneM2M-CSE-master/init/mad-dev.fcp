@@ -1,0 +1,85 @@
+// Created by SDTTool
+// oneM2M Release: 4.9.0
+// Domain:         org.onem2m.management
+[
+    // DeviceClass: flexNode
+    {
+        "type"      : "mad:fleNe",
+        "lname"     : "flexNode",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.management.device.flexNode",
+        "attributes": [
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }, 
+            // Property: nodeID
+            { "sname" : "nodID", "lname" : "nodeID", "type" : "string", "car" : "1" }, 
+            // Property: hostedAELinks
+            { "sname" : "hAELs", "lname" : "hostedAELinks", "type" : "string", "car" : "01" }, 
+            // Property: hostedServiceLinks
+            { "sname" : "hoSLs", "lname" : "hostedServiceLinks", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "mad:dmAgt", 
+            "mad:dmDIo", 
+            "mad:dDMIO", 
+            "mad:dmFie", 
+            "mad:dmSoe", 
+            "mad:dmELg", 
+            "mad:dmPae", 
+            "cod:bat", 
+            "mad:dmCay", 
+            "mad:dmSte", 
+            "mad:dANIo"
+        ]
+    },        
+
+
+
+    // DeviceClass Announced: flexNodeAnnc
+    {
+        "type"      : "mad:fleNeAnnc",
+        "lname"     : "flexNodeAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.management.device.flexNodeAnnc",
+        "attributes": [
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }, 
+            // Property: nodeID
+            { "sname" : "nodID", "lname" : "nodeID", "type" : "string", "car" : "1" }, 
+            // Property: hostedAELinks
+            { "sname" : "hAELs", "lname" : "hostedAELinks", "type" : "string", "car" : "01" }, 
+            // Property: hostedServiceLinks
+            { "sname" : "hoSLs", "lname" : "hostedServiceLinks", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "mad:dmAgt", 
+            "mad:dmAgtAnnc", 
+            "mad:dmDIo", 
+            "mad:dmDIoAnnc", 
+            "mad:dDMIO", 
+            "mad:dDMIOAnnc", 
+            "mad:dmFie", 
+            "mad:dmFieAnnc", 
+            "mad:dmSoe", 
+            "mad:dmSoeAnnc", 
+            "mad:dmELg", 
+            "mad:dmELgAnnc", 
+            "mad:dmPae", 
+            "mad:dmPaeAnnc", 
+            "cod:bat", 
+            "cod:batAnnc", 
+            "mad:dmCay", 
+            "mad:dmCayAnnc", 
+            "mad:dmSte", 
+            "mad:dmSteAnnc", 
+            "mad:dANIo", 
+            "mad:dANIoAnnc"
+        ]
+    }
+
+
+]

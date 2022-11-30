@@ -1,0 +1,43 @@
+// Created by SDTTool
+// oneM2M Release: 4.9.0
+// Domain:         org.onem2m.agriculture
+[
+    // ModuleClass: cowActivityMonitor (coAMr)
+    {
+        "type"      : "agd:coAMr",
+        "lname"     : "cowActivityMonitor",
+        "cnd"       : "org.onem2m.agriculture.moduleclass.cowActivityMonitor",
+		"sdttype"	: "moduleclass",
+        "attributes": [
+            // DataPoint: dataGenerationTime
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" }, 
+            // DataPoint: stepsPerPeriod
+            { "sname" : "stPPd", "lname" : "stepsPerPeriod", "type" : "list", "car" : "1" }, 
+            // DataPoint: updateTime
+            { "sname" : "updTe", "lname" : "updateTime", "type" : "timestamp", "car" : "01" }, 
+            // DataPoint: historyStepCounts
+            { "sname" : "hiSCs", "lname" : "historyStepCounts", "type" : "list", "car" : "1" }
+        ]
+    },
+
+    // ModuleClass Announced: cowActivityMonitorAnnc (coAMrAnnc)
+    {
+        "type"      : "agd:coAMrAnnc",
+        "lname"     : "cowActivityMonitorAnnc",
+        "cnd"       : "org.onem2m.agriculture.moduleclass.cowActivityMonitorAnnc",
+		"sdttype"	: "moduleclass",
+        "attributes": [
+            // DataPoint: dataGenerationTime
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" }, 
+            // DataPoint: stepsPerPeriod
+            { "sname" : "stPPd", "lname" : "stepsPerPeriod", "type" : "list", "car" : "1" }, 
+            // DataPoint: updateTime
+            { "sname" : "updTe", "lname" : "updateTime", "type" : "timestamp", "car" : "01" }, 
+            // DataPoint: historyStepCounts
+            { "sname" : "hiSCs", "lname" : "historyStepCounts", "type" : "list", "car" : "1" }
+        ]
+    }
+
+
+
+]
