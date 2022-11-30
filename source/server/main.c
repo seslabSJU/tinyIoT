@@ -70,7 +70,7 @@ void route() {
 	if(pnode->ty == t_CIN) Free_Node(pnode);
 
 	end = (((double)clock()) / CLOCKS_PER_SEC); // runtime check - end
-    fprintf(stderr,"Run time :%lf\n", (end-start)); 
+    fprintf(stderr,"Run time :%lf\n", (end-start));
 }
 
 void init() {
@@ -529,6 +529,11 @@ void Update_ACP(Node *pnode) {
 
 void Delete_Object(Node* pnode) {
 	fprintf(stderr,"\x1b[41mDelete Object\x1b[0m\n");
+	if(pnode->ty == t_CSE) {
+		HTTP_403;
+		printf("{\"m2m:dbg\": \"CSE can not be deleted\"}");
+		return;
+	}
 	Delete_Node_and_DB_Data(pnode,1);
 	pnode = NULL;
 	HTTP_200_JSON;
