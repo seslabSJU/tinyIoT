@@ -143,7 +143,7 @@ int DB_Store_CSE(CSE *cse_object) {
     }
     if (cse_object->rn == NULL) cse_object->rn = " ";
     if (cse_object->pi == NULL) cse_object->pi = " ";
-    if (cse_object->ty == '\0') cse_object->ty = 0;
+   if (cse_object->ty == '\0'||cse_object->ty == 0) cse_object->ty = 5;
     if (cse_object->ct == NULL) cse_object->ct = " ";
     if (cse_object->lt == NULL) cse_object->lt = " ";
     if (cse_object->csi == NULL) cse_object->csi = " ";
@@ -198,7 +198,7 @@ int DB_Store_AE(AE *ae_object) {
     }
     if (ae_object->rn == NULL) ae_object->rn = " ";
     if (ae_object->pi == NULL) ae_object->pi = " ";
-    if (ae_object->ty == '\0') ae_object->ty = 0;
+    if (ae_object->ty == '\0'||ae_object->ty == 0) ae_object->ty = 2;
     if (ae_object->ct == NULL) ae_object->ct = " ";
     if (ae_object->lt == NULL) ae_object->lt = " ";
     if (ae_object->et == NULL) ae_object->et = " ";
@@ -259,7 +259,7 @@ int DB_Store_CNT(CNT *cnt_object) {
     }
     if (cnt_object->rn == NULL) cnt_object->rn = " ";
     if (cnt_object->pi == NULL) cnt_object->pi = " ";
-    if (cnt_object->ty == '\0') cnt_object->ty = 0;
+    if (cnt_object->ty == '\0'||cnt_object->ty == 0) cnt_object->ty = 3;
     if (cnt_object->ct == NULL) cnt_object->ct = " ";
     if (cnt_object->lt == NULL) cnt_object->lt = " ";
     if (cnt_object->et == NULL) cnt_object->et = " ";
@@ -320,7 +320,7 @@ int DB_Store_CIN(CIN *cin_object) {
     }
     if (cin_object->rn == NULL) cin_object->rn = " ";
     if (cin_object->pi == NULL) cin_object->pi = "NULL";
-    if (cin_object->ty == '\0') cin_object->ty = 0;
+    if (cin_object->ty == '\0'||cin_object->ty == 0) cin_object->ty = 4;
     if (cin_object->ct == NULL) cin_object->ct = " ";
     if (cin_object->lt == NULL) cin_object->lt = " ";
     if (cin_object->et == NULL) cin_object->et = " ";
@@ -536,7 +536,7 @@ int DB_Store_ACP(ACP *acp_object) {
     }
     if (acp_object->rn == NULL) acp_object->rn = " ";
     if (acp_object->pi == NULL) acp_object->pi = " ";
-    if (acp_object->ty == '\0') acp_object->ty = 0;
+    if (acp_object->ty == '\0'||acp_object->ty == 0) acp_object->ty = 1;
     if (acp_object->ct == NULL) acp_object->ct = " ";
     if (acp_object->lt == NULL) acp_object->lt = " ";
     if (acp_object->et == NULL) acp_object->et = " ";
