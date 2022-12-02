@@ -296,7 +296,7 @@ ObjectType Parse_ObjectType_Body() {
 	
 	char *cse, *ae, *cnt, *cin, *sub, *acp;
 	
-	cse = strstr(payload, "m2m:cse");
+	cse = strstr(payload, "m2m:cb");
 	ae = strstr(payload, "m2m:ae");
 	cnt = strstr(payload, "m2m:cnt");
 	cin = strstr(payload, "m2m:cin");
@@ -1312,6 +1312,7 @@ Node *Find_Node_by_URI(Node *cb, char *node_uri) {
 	if(node) {
 		if(node->siblingLeft) node->siblingLeft->siblingRight = node->siblingRight;
 		if(node->siblingRight) node->siblingRight->siblingLeft = node->siblingLeft;
+		node->parent = pnode;
 	}
 
 	if(head) Free_Node_List(head);

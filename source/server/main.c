@@ -100,12 +100,7 @@ void Create_Object(Node *pnode) {
 
 	if(e == -1) return;
 
-	switch(ty) {
-
-	case t_CSE :
-		/*no such case*/
-		break;
-		
+	switch(ty) {	
 	case t_AE :
 		fprintf(stderr,"\x1b[42mCreate AE\x1b[0m\n");
 		Create_AE(pnode);
@@ -205,11 +200,6 @@ void Update_Object(Node *pnode) {
 	if(e == -1) return;
 	
 	switch(ty) {
-
-	case t_CSE :
-		/*No Definition such request*/
-		break;
-
 	case t_AE :
 		fprintf(stderr,"\x1b[45mUpdate AE\x1b[0m\n");
 		Update_AE(pnode);
@@ -229,6 +219,11 @@ void Update_Object(Node *pnode) {
 		fprintf(stderr,"\x1b[45mUpdate ACP\x1b[0m\n");
 		Update_ACP(pnode);
 		break;
+
+	default :
+		fprintf(stderr,"Resource type do not support PUT method\n");
+		HTTP_400;
+		printf("{\"m2m:dbg\": \"resource type do not support PUT method\"}");
 	}
 }
 
@@ -645,6 +640,8 @@ int Check_Request_Body() {
 }
 
 int Check_Resource_Name_Duplicate(Node *node) {
+	if(!node) return 0;
+
 	if(duplicate_resource_check(node)) {
 		HTTP_209_JSON;
 		fprintf(stderr,"Resource name duplicate error\n");
