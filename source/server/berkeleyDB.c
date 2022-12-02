@@ -143,7 +143,7 @@ int DB_Store_CSE(CSE *cse_object) {
     }
     if (cse_object->rn == NULL) cse_object->rn = " ";
     if (cse_object->pi == NULL) cse_object->pi = " ";
-   if (cse_object->ty == '\0'||cse_object->ty == 0) cse_object->ty = 5;
+    if (cse_object->ty == '\0') cse_object->ty = 0;
     if (cse_object->ct == NULL) cse_object->ct = " ";
     if (cse_object->lt == NULL) cse_object->lt = " ";
     if (cse_object->csi == NULL) cse_object->csi = " ";
@@ -198,7 +198,7 @@ int DB_Store_AE(AE *ae_object) {
     }
     if (ae_object->rn == NULL) ae_object->rn = " ";
     if (ae_object->pi == NULL) ae_object->pi = " ";
-    if (ae_object->ty == '\0'||ae_object->ty == 0) ae_object->ty = 2;
+    if (ae_object->ty == '\0') ae_object->ty = 0;
     if (ae_object->ct == NULL) ae_object->ct = " ";
     if (ae_object->lt == NULL) ae_object->lt = " ";
     if (ae_object->et == NULL) ae_object->et = " ";
@@ -259,7 +259,7 @@ int DB_Store_CNT(CNT *cnt_object) {
     }
     if (cnt_object->rn == NULL) cnt_object->rn = " ";
     if (cnt_object->pi == NULL) cnt_object->pi = " ";
-    if (cnt_object->ty == '\0'||cnt_object->ty == 0) cnt_object->ty = 3;
+    if (cnt_object->ty == '\0') cnt_object->ty = 0;
     if (cnt_object->ct == NULL) cnt_object->ct = " ";
     if (cnt_object->lt == NULL) cnt_object->lt = " ";
     if (cnt_object->et == NULL) cnt_object->et = " ";
@@ -320,7 +320,7 @@ int DB_Store_CIN(CIN *cin_object) {
     }
     if (cin_object->rn == NULL) cin_object->rn = " ";
     if (cin_object->pi == NULL) cin_object->pi = "NULL";
-    if (cin_object->ty == '\0'||cin_object->ty == 0) cin_object->ty = 4;
+    if (cin_object->ty == '\0') cin_object->ty = 0;
     if (cin_object->ct == NULL) cin_object->ct = " ";
     if (cin_object->lt == NULL) cin_object->lt = " ";
     if (cin_object->et == NULL) cin_object->et = " ";
@@ -506,6 +506,7 @@ int DB_Store_Sub(Sub *sub_object) {
         dbp->err(dbp, ret, "db->cursor");
 
 
+
     /* DB close */
     dbcp->close(dbcp);
     dbp->close(dbp, 0); 
@@ -535,7 +536,7 @@ int DB_Store_ACP(ACP *acp_object) {
     }
     if (acp_object->rn == NULL) acp_object->rn = " ";
     if (acp_object->pi == NULL) acp_object->pi = " ";
-    if (acp_object->ty == '\0'||acp_object->ty == 0) acp_object->ty = 1;
+    if (acp_object->ty == '\0') acp_object->ty = 0;
     if (acp_object->ct == NULL) acp_object->ct = " ";
     if (acp_object->lt == NULL) acp_object->lt = " ";
     if (acp_object->et == NULL) acp_object->et = " ";
@@ -616,7 +617,7 @@ CSE* DB_Get_CSE(char* ri) {
 
                 switch (idx) {
                 case 0:
-                    if(strncmp(ptr," ",1)==0) new_cse->rn=NULL; //data is NULL
+                    if(strcmp(ptr," ")==0) new_cse->rn=NULL; //data is NULL
                     else{
                         new_cse->rn = calloc(strlen(ptr),sizeof(char));
                         strcpy(new_cse->rn, ptr);
@@ -624,7 +625,7 @@ CSE* DB_Get_CSE(char* ri) {
                     idx++;
                     break;
                 case 1:
-                    if(strncmp(ptr," ",1)==0) new_cse->pi=NULL; //data is NULL
+                    if(strcmp(ptr," ")==0) new_cse->pi=NULL; //data is NULL
                     else{
                         new_cse->pi = calloc(strlen(ptr),sizeof(char));
                         strcpy(new_cse->pi, ptr);
@@ -632,13 +633,13 @@ CSE* DB_Get_CSE(char* ri) {
                     idx++;
                     break;
                 case 2:
-                    if(strncmp(ptr,"0",1)==0) new_cse->ty=0;
+                    if(strcmp(ptr,"0")==0) new_cse->ty=0;
                     else {new_cse->ty = atoi(ptr);}
 
                     idx++;
                     break;
                 case 3:
-                    if(strncmp(ptr," ",1)==0) new_cse->ct=NULL; //data is NULL
+                    if(strcmp(ptr," ")==0) new_cse->ct=NULL; //data is NULL
                     else{
                         new_cse->ct = calloc(strlen(ptr),sizeof(char));
                         strcpy(new_cse->ct, ptr);
@@ -646,7 +647,7 @@ CSE* DB_Get_CSE(char* ri) {
                     idx++;
                     break;
                 case 4:
-                    if(strncmp(ptr," ",1)==0) new_cse->lt=NULL;
+                    if(strcmp(ptr," ")==0) new_cse->lt=NULL;
                     else{
                     new_cse->lt = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_cse->lt, ptr);
@@ -654,7 +655,7 @@ CSE* DB_Get_CSE(char* ri) {
                     idx++;
                     break;                
                 case 5:
-                if(strncmp(ptr," ",1)==0) new_cse->csi=NULL;
+                if(strcmp(ptr," ")==0) new_cse->csi=NULL;
                 else{
                     new_cse->csi = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_cse->csi, ptr);
@@ -724,7 +725,7 @@ AE* DB_Get_AE(char* ri) {
             while (ptr != NULL) { // Split to end of next string
                 switch (idx) {
                 case 0:
-                if(strncmp(ptr," ",1)==0) new_ae->rn=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_ae->rn=NULL; //data is NULL
                 else{
                     new_ae->rn = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_ae->rn, ptr);
@@ -732,7 +733,7 @@ AE* DB_Get_AE(char* ri) {
                     idx++;
                     break;
                 case 1:
-                if(strncmp(ptr," ",1)==0) new_ae->pi=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_ae->pi=NULL; //data is NULL
                     else{
                     new_ae->pi = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_ae->pi, ptr);
@@ -740,13 +741,13 @@ AE* DB_Get_AE(char* ri) {
                     idx++;
                     break;
                 case 2:
-                if(strncmp(ptr,"0",1)==0) new_ae->ty=0;
+                if(strcmp(ptr,"0")==0) new_ae->ty=0;
                 else new_ae->ty = atoi(ptr);
 
                     idx++;
                     break;
                 case 3:
-                if(strncmp(ptr," ",1)==0) new_ae->ct=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_ae->ct=NULL; //data is NULL
                 else{
                     new_ae->ct = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_ae->ct, ptr);
@@ -754,7 +755,7 @@ AE* DB_Get_AE(char* ri) {
                     idx++;
                     break;
                 case 4:
-                if(strncmp(ptr," ",1)==0) new_ae->lt=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_ae->lt=NULL; //data is NULL
                 else{                
                     new_ae->lt = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_ae->lt, ptr);
@@ -762,7 +763,7 @@ AE* DB_Get_AE(char* ri) {
                     idx++;
                     break;                
                 case 5:
-                if(strncmp(ptr," ",1)==0) new_ae->et=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_ae->et=NULL; //data is NULL
                 else{                
                     new_ae->et = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_ae->et, ptr);
@@ -770,7 +771,7 @@ AE* DB_Get_AE(char* ri) {
                     idx++;
                     break;      
                 case 6:
-                if(strncmp(ptr," ",1)==0) new_ae->api=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_ae->api=NULL; //data is NULL
                 else{                
                     new_ae->api = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_ae->api, ptr);
@@ -778,7 +779,7 @@ AE* DB_Get_AE(char* ri) {
                     idx++;
                     break;      
                 case 7:
-                    if(strncmp(ptr,"true",4)==0)
+                    if(strcmp(ptr,"true")==0)
                         new_ae->rr = true;
                     else
                         new_ae->rr = false;
@@ -786,7 +787,7 @@ AE* DB_Get_AE(char* ri) {
                     idx++;
                     break;      
                 case 8:
-                if(strncmp(ptr," ",1)==0) new_ae->aei=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_ae->aei=NULL; //data is NULL
                 else{                
                     new_ae->aei = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_ae->aei, ptr);
@@ -856,7 +857,7 @@ CNT* DB_Get_CNT(char* ri) {
             while (ptr != NULL) { // Split to end of next string
                 switch (idx) {
                 case 0:
-                if(strncmp(ptr," ",1)==0) new_cnt->rn=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cnt->rn=NULL; //data is NULL
                     else{
                     new_cnt->rn = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_cnt->rn, ptr);
@@ -864,7 +865,7 @@ CNT* DB_Get_CNT(char* ri) {
                     idx++;
                     break;
                 case 1:
-                if(strncmp(ptr," ",1)==0) new_cnt->pi=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cnt->pi=NULL; //data is NULL
                     else{
                     new_cnt->pi = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_cnt->pi, ptr);
@@ -872,13 +873,13 @@ CNT* DB_Get_CNT(char* ri) {
                     idx++;
                     break;
                 case 2:
-                if(strncmp(ptr,"0",1)==0) new_cnt->ty=0;
+                if(strcmp(ptr,"0")==0) new_cnt->ty=0;
                 else new_cnt->ty = atoi(ptr);
 
                     idx++;
                     break;
                 case 3:
-                if(strncmp(ptr," ",1)==0) new_cnt->ct=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cnt->ct=NULL; //data is NULL
                     else{
                     new_cnt->ct = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_cnt->ct, ptr);
@@ -886,7 +887,7 @@ CNT* DB_Get_CNT(char* ri) {
                     idx++;
                     break;
                 case 4:
-                if(strncmp(ptr," ",1)==0) new_cnt->lt=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cnt->lt=NULL; //data is NULL
                     else{
                     new_cnt->lt = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_cnt->lt, ptr);
@@ -894,7 +895,7 @@ CNT* DB_Get_CNT(char* ri) {
                     idx++;
                     break;                
                 case 5:
-                if(strncmp(ptr," ",1)==0) new_cnt->et=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cnt->et=NULL; //data is NULL
                     else{
                     new_cnt->et = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_cnt->et, ptr);
@@ -902,7 +903,7 @@ CNT* DB_Get_CNT(char* ri) {
                     idx++;
                     break;      
                 case 6:
-                if(strncmp(ptr," ",1)==0) new_cnt->lbl=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cnt->lbl=NULL; //data is NULL
                     else{
                     new_cnt->lbl = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_cnt->lbl, ptr);
@@ -910,7 +911,7 @@ CNT* DB_Get_CNT(char* ri) {
                     idx++;
                     break;   
                 case 7:
-                if(strncmp(ptr," ",1)==0) new_cnt->acpi=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cnt->acpi=NULL; //data is NULL
                     else{
                     new_cnt->acpi = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_cnt->acpi, ptr);
@@ -918,19 +919,19 @@ CNT* DB_Get_CNT(char* ri) {
                     idx++;
                     break;                                           
                 case 8:
-                if(strncmp(ptr,"0",1)==0) new_cnt->cbs=0;
+                if(strcmp(ptr,"0")==0) new_cnt->cbs=0;
                 else new_cnt->cbs = atoi(ptr);
 
                     idx++;
                     break;     
                 case 9:
-                if(strncmp(ptr,"0",1)==0) new_cnt->cni=0;
+                if(strcmp(ptr,"0")==0) new_cnt->cni=0;
                 else new_cnt->cni = atoi(ptr);
 
                     idx++;
                     break;    
                 case 10:
-                if(strncmp(ptr,"0",1)==0) new_cnt->st=0;
+                if(strcmp(ptr,"0")==0) new_cnt->st=0;
                 else new_cnt->st = atoi(ptr);
 
                     idx++;
@@ -999,69 +1000,67 @@ CIN* DB_Get_CIN(char* ri) {
             while (ptr != NULL) { // Split to end of next string
                 switch (idx) {
                 case 0:
-                if(strncmp(ptr," ",1)==0) new_cin->rn=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cin->rn=NULL; //data is NULL
                     else{
-                    new_cin->rn = calloc(strlen(ptr),sizeof(char));
+                    new_cin->rn = malloc(strlen(ptr)*sizeof(char));
                     strcpy(new_cin->rn, ptr);
                     }
                     idx++;
                     break;
                 case 1:
-                if(strncmp(ptr," ",1)==0) new_cin->pi=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cin->pi=NULL; //data is NULL
                     else{
-                    new_cin->pi = calloc(strlen(ptr),sizeof(char));
+                    new_cin->pi = malloc(strlen(ptr)*sizeof(char));
                     strcpy(new_cin->pi, ptr);
                     }
                     idx++;
                     break;
                 case 2:
-                if(strncmp(ptr,"0",1)==0) new_cin->ty=0;
+                if(strcmp(ptr,"0")==0) new_cin->ty=0;
                     else
                     new_cin->ty = atoi(ptr);
 
                     idx++;
                     break;
                 case 3:
-                if(strncmp(ptr," ",1)==0) new_cin->ct=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cin->ct=NULL; //data is NULL
                     else{
-                    new_cin->ct = calloc(strlen(ptr),sizeof(char));
+                    new_cin->ct = malloc(strlen(ptr)*sizeof(char));
                     strcpy(new_cin->ct, ptr);
                     }
                     idx++;
                     break;
                 case 4:
-                if(strncmp(ptr," ",1)==0) new_cin->lt=NULL; //data is NULL
-                    else{
-                    new_cin->lt = calloc(strlen(ptr),sizeof(char));
+                    new_cin->lt = malloc(strlen(ptr)*sizeof(char));
                     strcpy(new_cin->lt, ptr);
-                    }
+
                     idx++;
                     break;                
                 case 5:
-                if(strncmp(ptr," ",1)==0) new_cin->et=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cin->et=NULL; //data is NULL
                     else{
-                    new_cin->et = calloc(strlen(ptr),sizeof(char));
+                    new_cin->et = malloc(strlen(ptr)*sizeof(char));
                     strcpy(new_cin->et, ptr);
                     }
                     idx++;
                     break;      
                 case 6:
-                if(strncmp(ptr," ",1)==0) new_cin->con=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_cin->con=NULL; //data is NULL
                     else{
-                    new_cin->con = calloc(strlen(ptr),sizeof(char));
+                    new_cin->con = malloc(strlen(ptr)*sizeof(char));
                     strcpy(new_cin->con, ptr);
                     }
                     idx++;
                     break;       
                 case 7:
-               if(strncmp(ptr,"0",1)==0) new_cin->cs=0;
+                if(strcmp(ptr,"0")==0) new_cin->cs=0;
                     else
                     new_cin->cs = atoi(ptr);
 
                     idx++;
                     break;            
                 case 8:
-                if(strncmp(ptr,"0",1)==0) new_cin->st=0;
+                if(strcmp(ptr,"0")==0) new_cin->st=0;
                     else
                     new_cin->st = atoi(ptr);
 
@@ -1078,7 +1077,7 @@ CIN* DB_Get_CIN(char* ri) {
     if (ret != DB_NOTFOUND) {
         dbp->err(dbp, ret, "DBcursor->get");
         fprintf(stderr, "Cursor ERROR\n");
-        return NULL;
+        exit(0);
     }
     if (cin == 0 || flag==0) {
         fprintf(stderr, "Data not exist\n");
@@ -1110,19 +1109,19 @@ Sub* DB_Get_Sub(char* ri) {
     if ((ret = db_create(&dbp, NULL, 0)) != 0) {
         fprintf(stderr,
             "%s: db_create: %s\n", database, db_strerror(ret));
-        return NULL;
+        return 0;
     }
 
     ret = dbp->open(dbp, NULL, database, NULL, DB_BTREE, DB_CREATE, 0664);
     if (ret) {
         dbp->err(dbp, ret, "%s", database);
-        return NULL;
+        exit(1);
     }
 
     /* Acquire a cursor for the database. */
     if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return NULL;
+        exit(1);
     }
 
     /* Initialize the key/data return pair. */
@@ -1136,7 +1135,7 @@ Sub* DB_Get_Sub(char* ri) {
     DBC* dbcp0;
     if ((ret = dbp->cursor(dbp, NULL, &dbcp0, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return NULL;
+        exit(1);
     }
     while ((ret = dbcp0->get(dbcp0, &key, &data, DB_NEXT)) == 0) {
         cnt++;
@@ -1148,6 +1147,7 @@ Sub* DB_Get_Sub(char* ri) {
     if (cnt == 0 || flag==0) {
         fprintf(stderr, "Data not exist\n");
         return NULL;
+        //exit(1);
     }
     
     new_sub->pi = malloc(data.size);
@@ -1225,7 +1225,7 @@ Sub* DB_Get_Sub(char* ri) {
     if (ret != DB_NOTFOUND) {
         dbp->err(dbp, ret, "DBcursor->get");
         fprintf(stderr, "Cursor ERROR\n");
-        return NULL;
+        exit(0);
     }
 
         /* Cursors must be closed */
@@ -1277,8 +1277,7 @@ ACP* DB_Get_ACP(char* ri) {
             char *ptr = strtok((char*)data.data, DB_SEP);  //split first string
             while (ptr != NULL) { // Split to end of next string
                 switch (idx) {
-                case 0:
-                if(strncmp(ptr," ",1)==0) new_acp->rn=NULL; //data is NULL
+                case 0:if(strcmp(ptr," ")==0) new_acp->rn=NULL; //data is NULL
                 else{
                     new_acp->rn = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_acp->rn, ptr);
@@ -1286,7 +1285,7 @@ ACP* DB_Get_ACP(char* ri) {
                     idx++;
                     break;
                 case 1:
-                if(strncmp(ptr," ",1)==0) new_acp->pi=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_acp->pi=NULL; //data is NULL
                 else{
                     new_acp->pi = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_acp->pi, ptr);
@@ -1294,13 +1293,13 @@ ACP* DB_Get_ACP(char* ri) {
                     idx++;
                     break;
                 case 2:
-                if(strncmp(ptr,"0",1)==0) new_acp->ty=0;
+                if(strcmp(ptr,"0")==0) new_acp->ty=0;
                 else new_acp->ty = atoi(ptr);
 
                     idx++;
                     break;
                 case 3:
-                if(strncmp(ptr," ",1)==0) new_acp->ct=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_acp->ct=NULL; //data is NULL
                 else{
                     new_acp->ct = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_acp->ct, ptr);
@@ -1308,7 +1307,7 @@ ACP* DB_Get_ACP(char* ri) {
                     idx++;
                     break;
                 case 4:
-                if(strncmp(ptr," ",1)==0) new_acp->lt=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_acp->lt=NULL; //data is NULL
                 else{
                     new_acp->lt = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_acp->lt, ptr);
@@ -1316,7 +1315,7 @@ ACP* DB_Get_ACP(char* ri) {
                     idx++;
                     break;                
                 case 5:
-                if(strncmp(ptr," ",1)==0) new_acp->et=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_acp->et=NULL; //data is NULL
                 else{
                     new_acp->et = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_acp->et, ptr);
@@ -1324,7 +1323,7 @@ ACP* DB_Get_ACP(char* ri) {
                     idx++;
                     break;
                 case 6:
-                if(strncmp(ptr," ",1)==0) new_acp->pv_acor=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_acp->pv_acor=NULL; //data is NULL
                 else{
                     new_acp->pv_acor = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_acp->pv_acor, ptr);
@@ -1332,7 +1331,7 @@ ACP* DB_Get_ACP(char* ri) {
                     idx++;
                     break;
                 case 7:
-                if(strncmp(ptr," ",1)==0) new_acp->pv_acop=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_acp->pv_acop=NULL; //data is NULL
                 else{
                     new_acp->pv_acop = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_acp->pv_acop, ptr);
@@ -1340,7 +1339,7 @@ ACP* DB_Get_ACP(char* ri) {
                     idx++;
                     break;
                 case 8:
-                if(strncmp(ptr," ",1)==0) new_acp->pvs_acor=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_acp->pvs_acor=NULL; //data is NULL
                 else{
                     new_acp->pvs_acor = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_acp->pvs_acor, ptr);
@@ -1348,7 +1347,7 @@ ACP* DB_Get_ACP(char* ri) {
                     idx++;
                     break;
                 case 9:
-                if(strncmp(ptr," ",1)==0) new_acp->pvs_acop=NULL; //data is NULL
+                if(strcmp(ptr," ")==0) new_acp->pvs_acop=NULL; //data is NULL
                 else{
                     new_acp->pvs_acop = calloc(strlen(ptr),sizeof(char));
                     strcpy(new_acp->pvs_acop, ptr);
@@ -1436,19 +1435,21 @@ int DB_Delete_Sub(char* ri) {
     if ((ret = db_create(&dbp, NULL, 0)) != 0) {
         fprintf(stderr,
             "%s: db_create: %s\n", database, db_strerror(ret));
-        return -1;
+        return 0;
     }
 
     ret = dbp->open(dbp, NULL, database, NULL, DB_BTREE, DB_CREATE, 0664);
     if (ret) {
         dbp->err(dbp, ret, "%s", database);
-        return -1;
+        return 0;
+        exit(1);
     }
 
     /* Acquire a cursor for the database. */
     if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return -1;
+        return 0;
+        exit(1);
     }
 
     /* Initialize the key/data return pair. */
@@ -1462,7 +1463,7 @@ int DB_Delete_Sub(char* ri) {
     DBC* dbcp0;
     if ((ret = dbp->cursor(dbp, NULL, &dbcp0, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return -1;
+        return 0;
     }
     while ((ret = dbcp0->get(dbcp0, &key, &data, DB_NEXT)) == 0) {
         cnt++;
@@ -1473,7 +1474,7 @@ int DB_Delete_Sub(char* ri) {
     }
     if (cnt == 0 || flag==0) {
         fprintf(stderr, "Data not exist\n");
-        return -1;
+        return 0;
     }
 
     int idx = -1;
@@ -1489,7 +1490,7 @@ int DB_Delete_Sub(char* ri) {
     if (ret != DB_NOTFOUND) {
         dbp->err(dbp, ret, "DBcursor->get");
         fprintf(stderr, "Cursor ERROR\n");
-        return -1;
+        return 0;
     }
 
     /* Cursors must be closed */
@@ -1792,19 +1793,19 @@ Node* DB_Get_All_Sub(){
     if ((ret = db_create(&dbp, NULL, 0)) != 0) {
         fprintf(stderr,
             "%s: db_create: %s\n", database, db_strerror(ret));
-        return NULL;
+        return 0;
     }
 
     ret = dbp->open(dbp, NULL, database, NULL, DB_BTREE, DB_CREATE, 0664);
     if (ret) {
         dbp->err(dbp, ret, "%s", database);
-        return NULL;
+        exit(1);
     }
 
     /* Acquire a cursor for the database. */
     if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return NULL;
+        exit(1);
     }
 
     /* Initialize the key/data return pair. */
@@ -1818,7 +1819,7 @@ Node* DB_Get_All_Sub(){
     DBC* dbcp0;
     if ((ret = dbp->cursor(dbp, NULL, &dbcp0, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return NULL;
+        exit(1);
     }
     while ((ret = dbcp0->get(dbcp0, &key, &data, DB_NEXT)) == 0) {
         cnt++;

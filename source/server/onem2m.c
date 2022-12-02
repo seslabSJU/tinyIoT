@@ -258,13 +258,7 @@ Node *Latest_CINs(Node* cinList, int num) {
 	return head;
 }
 
-void Object_Test_API(Node *node) {
-	HTTP_200_JSON;
-	printf("{\"cin-size\": %d}",node->cinSize);
-	return;
-}
-
-void Remove_Specific_Asterisk_Payload() {
+void Normalization_Payload() {
 	int index = 0;
 
 	for(int i=0; i<payload_size; i++) {
@@ -355,7 +349,6 @@ Node* Create_CSE_Node(CSE *cse) {
 	strcpy(node->pi, cse->pi);
 
 	node->ty = t_CSE;
-	node->cinSize = 0;
 
 	return node;
 }
@@ -374,7 +367,6 @@ Node* Create_AE_Node(AE *ae) {
 	strcpy(node->pi, ae->pi);
 
 	node->ty = t_AE;
-	node->cinSize = 0;
 
 	return node;
 }
@@ -399,7 +391,6 @@ Node* Create_CNT_Node(CNT *cnt) {
 	
 
 	node->ty = t_CNT;
-	node->cinSize = 0;
 
 	return node;
 }
@@ -418,7 +409,6 @@ Node* Create_CIN_Node(CIN *cin) {
 	strcpy(node->pi, cin->pi);
 
 	node->ty = t_CIN;
-	node->cinSize = 0;
 
 	return node;
 }
@@ -441,7 +431,6 @@ Node* Create_Sub_Node(Sub *sub) {
 	strcpy(node->sur, sub->sur);
 
 	node->ty = t_Sub;
-	node->cinSize = 0;
 	node->net = net_to_bit(sub->net);
 
 	return node;
@@ -469,7 +458,6 @@ Node* Create_ACP_Node(ACP *acp) {
 	strcpy(node->pvs_acop, acp->pvs_acop);
 
 	node->ty = t_ACP;
-	node->cinSize = 0;
 
 	return node;
 }
@@ -626,7 +614,6 @@ void Init_AE(AE* ae, char *pi) {
 	char *et = Get_LocalTime(EXPIRE_TIME);
 	char *aei = request_header("X-M2M-Origin"); 
 	char *ri = resource_identifier(t_AE, ct);
-	char tmp[MAX_PROPERTY_SIZE];
 	int m_aei = 0;
 
 	if(!aei) {
@@ -634,14 +621,11 @@ void Init_AE(AE* ae, char *pi) {
 		aei = (char*)malloc((strlen(ri) + 1) * sizeof(char));
 		strcpy(aei, ri);
 	}
-	
-	strcpy(tmp,ae->api);
-	ae->api = (char*)malloc((strlen(ae->api) + 1) * sizeof(char));
-	strcpy(ae->api,tmp);
-	
-	strcpy(tmp,ae->rn);
-	ae->rn = (char*)malloc((strlen(ae->rn) + 1) * sizeof(char));
-	strcpy(ae->rn,tmp);
+
+	if(!ae->rn) {
+		ae->rn = (char*)malloc((strlen(ri) + 1) * sizeof(char));
+		strcpy(ae->rn, ri);
+	}
 	
 	ae->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
 	ae->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
@@ -649,7 +633,6 @@ void Init_AE(AE* ae, char *pi) {
 	ae->ct = (char*)malloc((strlen(ct) + 1) * sizeof(char));
 	ae->lt = (char*)malloc((strlen(ct) + 1) * sizeof(char));
 	ae->aei = (char*)malloc((strlen(aei) + 1) * sizeof(char));
-	
 	strcpy(ae->ri, ri);
 	strcpy(ae->pi, pi);
 	strcpy(ae->et, et);
@@ -669,18 +652,10 @@ void Init_CNT(CNT* cnt, char *pi) {
 	char *ct = Get_LocalTime(0);
 	char *et = Get_LocalTime(EXPIRE_TIME);
 	char *ri = resource_identifier(t_CNT, ct);
-	char tmp[MAX_PROPERTY_SIZE];
 	
-	if(cnt->rn) {
-		strcpy(tmp,cnt->rn);
-		cnt->rn = (char*)malloc((strlen(cnt->rn) + 1) * sizeof(char));
-		strcpy(cnt->rn,tmp);
-	}
-
-	if(cnt->acpi) {
-		strcpy(tmp,cnt->acpi);
-		cnt->acpi = (char*)malloc((strlen(cnt->acpi) + 1) * sizeof(char));
-		strcpy(cnt->acpi,tmp);
+	if(!cnt->rn) {
+		cnt->rn = (char*)malloc((strlen(ri) + 1) * sizeof(char));
+		strcpy(cnt->rn, ri);
 	}
 	
 	cnt->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
@@ -708,11 +683,6 @@ void Init_CIN(CIN* cin, char *pi) {
 	char *ct = Get_LocalTime(0);
 	char *et = Get_LocalTime(EXPIRE_TIME);
 	char *ri = resource_identifier(t_CIN, ct);
-	char tmp[MAX_PROPERTY_SIZE];
-	
-	strcpy(tmp,cin->con);
-	cin->con = (char*)malloc((strlen(cin->con) + 1) * sizeof(char));
-	strcpy(cin->con,tmp);
 	
 	cin->rn = (char*)malloc((strlen(ri) + 1) * sizeof(char));
 	cin->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
@@ -740,11 +710,16 @@ void Init_Sub(Sub* sub, char *pi) {
 	char *ct = Get_LocalTime(0);
 	char *et = Get_LocalTime(EXPIRE_TIME);
 	char *ri = resource_identifier(t_Sub, ct);
-	char tmp[MAX_PROPERTY_SIZE];
 
-	strcpy(tmp,sub->rn);
-	sub->rn = (char*)malloc((strlen(sub->rn) + 1) * sizeof(char));
-	strcpy(sub->rn,tmp);
+	if(!sub->rn) {
+		sub->rn = (char*)malloc((strlen(ri) + 1) * sizeof(char));
+		strcpy(sub->rn, ri);
+	}
+
+	if(!sub->net) {
+		sub->net = (char*)malloc(2*sizeof(char));
+		strcpy(sub->net,"1");
+	}
 
 	sub->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
 	sub->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
@@ -773,11 +748,11 @@ void Init_ACP(ACP* acp, char *pi) {
 	char *ct = Get_LocalTime(0);
 	char *et = Get_LocalTime(EXPIRE_TIME);
 	char *ri = resource_identifier(t_ACP, ct);
-	char tmp[MAX_PROPERTY_SIZE];
-	
-	strcpy(tmp,acp->rn);
-	acp->rn = (char*)malloc((strlen(acp->rn) + 1) * sizeof(char));
-	strcpy(acp->rn,tmp);
+
+	if(!acp->rn) {
+		acp->rn = (char*)malloc((strlen(ri) + 1) * sizeof(char));
+		strcpy(acp->rn, ri);
+	}
 	
 	acp->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
 	acp->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
@@ -799,19 +774,13 @@ void Init_ACP(ACP* acp, char *pi) {
 
 void Set_AE_Update(AE* after) {
 	char *rn = Get_JSON_Value_char("rn", payload);
-	char *api = Get_JSON_Value_char("api", payload);
 	int rr = Get_JSON_Value_bool("rr", payload);
 
 	if(rn) {
 		free(after->rn);
 		after->rn = (char*)malloc((strlen(rn) + 1) * sizeof(char));
 		strcpy(after->rn, rn);
-	}
-
-	if(api) {
-		if(after->api) free(after->api);
-		after->api = (char*)malloc((strlen(api) + 1) * sizeof(char));
-		strcpy(after->api, api);
+		free(rn);
 	}
 
 	switch(rr) {
@@ -951,6 +920,69 @@ void Set_ACP_Update(ACP* after) {
 	after->lt = Get_LocalTime(0);
 }
 
+void Set_Node_Update(Node *node, void *after) {
+	ObjectType ty = node->ty;
+	if(node->rn) {free(node->rn); node->rn = NULL;}
+	if(node->uri) {free(node->uri); node->uri = NULL;}
+	if(node->acpi) {free(node->acpi); node->acpi = NULL;}
+	if(node->nu) {free(node->nu); node->nu = NULL;}
+	if(node->pv_acor && node->pv_acop) {
+		free(node->pv_acor); node->pv_acor = NULL; 
+		free(node->pv_acop); node->pv_acop = NULL;
+	}
+	if(node->pvs_acor && node->pvs_acop) {
+		free(node->pvs_acor); node->pvs_acor = NULL;
+		free(node->pvs_acop); node->pvs_acop = NULL;
+	}
+	
+	switch(ty) {
+	case t_AE:
+		AE *ae = (AE*)after;
+		node->rn = (char*)malloc((strlen(ae->rn) + 1)*sizeof(char));
+		strcpy(node->rn, ae->rn);
+		break;
+
+	case t_CNT:
+		CNT *cnt = (CNT*)after;
+		node->rn = (char*)malloc((strlen(cnt->rn) + 1)*sizeof(char));
+		strcpy(node->rn, cnt->rn);
+		if(cnt->acpi) {
+			node->acpi = (char*)malloc((strlen(cnt->acpi) + 1)*sizeof(char));
+			strcpy(node->acpi, cnt->acpi);
+		}
+		break;
+
+	case t_Sub:
+		Sub *sub = (Sub*)after;
+		node->rn = (char*)malloc((strlen(sub->rn) + 1)*sizeof(char));
+		strcpy(node->rn, sub->rn);
+		node->net = net_to_bit(sub->net);
+		if(sub->nu) {
+			node->nu = (char*)malloc((strlen(sub->nu) + 1)*sizeof(char));
+			strcpy(node->nu, sub->nu);
+		}
+		break;
+
+	case t_ACP:
+		ACP *acp = (ACP*)after;
+		node->rn = (char*)malloc((strlen(acp->rn) + 1)*sizeof(char));
+		strcpy(node->rn, acp->rn);
+		if(acp->pv_acor && acp->pv_acop) {
+			node->pv_acor = (char*)malloc((strlen(acp->pv_acor) + 1)*sizeof(char));
+			node->pv_acop = (char*)malloc((strlen(acp->pv_acop) + 1)*sizeof(char));
+			strcpy(node->pv_acor, acp->pv_acor);
+			strcpy(node->pv_acop, acp->pv_acop);
+		}
+		if(acp->pvs_acor && acp->pvs_acop) {
+			node->pvs_acor = (char*)malloc((strlen(acp->pvs_acor) + 1)*sizeof(char));
+			node->pvs_acop = (char*)malloc((strlen(acp->pvs_acop) + 1)*sizeof(char));
+			strcpy(node->pvs_acor, acp->pvs_acor);
+			strcpy(node->pvs_acop, acp->pvs_acop);
+		}
+		break;
+	}
+}
+
 void Free_CSE(CSE *cse) {
 	if(cse->ct) free(cse->ct);
 	if(cse->lt) free(cse->lt);
@@ -1024,7 +1056,8 @@ void Notify_Object(Node *node, char *res_json, Net net) {
 	Remove_Invalid_Char_JSON(res_json);
 	while(node) {
 		if(node->ty == t_Sub && (net & node->net) == net) {
-			char *noti_json = Noti_to_json(node->sur, (int)log2((double)net ) + 1, res_json);
+			if(!node->uri) set_node_uri(node);
+			char *noti_json = Noti_to_json(node->uri, (int)log2((double)net ) + 1, res_json);
 			char *res = Send_HTTP_Packet(node->nu, noti_json);
 			free(noti_json); noti_json = NULL;
 			if(res) { free(res); res = NULL; }
@@ -1129,28 +1162,34 @@ char *Send_HTTP_Packet(char* target, char *post_data) {
         fprintf(stderr, "Failed to allocate memory.\n");
         return NULL;
     }
+	if(post_data) Remove_Invalid_Char_JSON(post_data);
 
-    data.data[0] = '\0';
+	char nu[MAX_PROPERTY_SIZE];
+	strcpy(nu, target);
+
+	target = strtok(nu, ",");
 
     CURLcode res;
 
     curl = curl_easy_init();
 
     if (curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, target);
-		if(post_data){
-			Remove_Invalid_Char_JSON(post_data);
-			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
-		}
+		if(post_data) curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2);
-        res = curl_easy_perform(curl);
 		
-        if(res != CURLE_OK) {
-                fprintf(stderr, "curl_easy_perform() failed: %s\n",
-                        curl_easy_strerror(res));
-        }
+		while(target) {
+			data.data[0] = '\0';
+			curl_easy_setopt(curl, CURLOPT_URL, target);
+			res = curl_easy_perform(curl);
+			
+			if(res != CURLE_OK) {
+				fprintf(stderr, "curl_easy_perform() failed: %s\n",
+				curl_easy_strerror(res));
+			}
+			target = strtok(NULL, ",");
+		}
 		
         curl_easy_cleanup(curl);
     }

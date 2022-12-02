@@ -4,9 +4,21 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <ctype.h>
+
+void eliminate_quotation_mark(char *s){
+	int len = strlen(s);
+	int index = 0;
+
+	for(int i=0; i<len; i++) {
+		if(s[i] != '\\' && s[i] != '\"')
+			s[index++] = s[i];
+	}
+	s[index] = '\0';
+}
 
 AE* JSON_to_AE(char *json_payload) {
-	AE *ae = (AE *)calloc(1, sizeof(AE));
+	AE *ae = (AE *)calloc(1,sizeof(AE));
 
 	cJSON *root = NULL;
 	cJSON *api = NULL;
@@ -18,50 +30,58 @@ AE* JSON_to_AE(char *json_payload) {
 		const char *error_ptr = cJSON_GetErrorPtr();
 		if (error_ptr != NULL)
 		{
-			//fprintf(stderr, "Error before: %s\n", error_ptr);
+			fprintf(stderr, "Error before: %s\n", error_ptr);
 		}
 		return NULL;
 	}
 
 	root = cJSON_GetObjectItem(json, "m2m:ae");
 
-	// api
-	if(strstr(json_payload,"\"api\"")) {
-		api = cJSON_GetObjectItem(root, "api");
-		if (!cJSON_IsString(api) && (api->valuestring == NULL))
-		{
-			goto end;
+	// api (mandatory)
+	api = cJSON_GetObjectItem(root, "api");
+	rr = cJSON_GetObjectItemCaseSensitive(root, "rr");	// + rr
+	if (api == NULL || api->valuestring[0] == 0 || isspace(api->valuestring[0])) {
+		fprintf(stderr, "Invalid api\n");
+		if (!cJSON_IsTrue(rr) && !cJSON_IsFalse(rr)) {
+			fprintf(stderr, "Invalid rr\n");
 		}
+		cJSON_Delete(json);
+		return NULL;
+	}
+	else {
 		ae->api = cJSON_Print(api);
-		ae->api = strtok(ae->api, "\"");
+		eliminate_quotation_mark(ae->api);
+		//ae->api = strtok(ae->api, "\"");
 	}
 
-	// rr
-	if(strstr(json_payload,"\"rr\"")) {
-	rr = cJSON_GetObjectItemCaseSensitive(root, "rr");
-		if (!cJSON_IsTrue(rr) && !cJSON_IsFalse(rr))
-		{
-			goto end;
-		}
-		else if (cJSON_IsTrue(rr))
-		{
-			ae->rr = true;
-		}
-		else if (cJSON_IsFalse(rr))
-		{
-			ae->rr = false;
-		}
+
+	// rr (mandatory)
+	//rr = cJSON_GetObjectItemCaseSensitive(root, "rr");
+	if (!cJSON_IsTrue(rr) && !cJSON_IsFalse(rr))
+	{
+		fprintf(stderr, "Invalid rr\n");
+		cJSON_Delete(json);
+		return NULL;
+	}
+	else if (cJSON_IsTrue(rr))
+	{
+		ae->rr = true;
+	}
+	else if (cJSON_IsFalse(rr))
+	{
+		ae->rr = false;
 	}
 	
-	// rn
-	if(strstr(json_payload,"\"rn\"")){
-		rn = cJSON_GetObjectItem(root, "rn");
-		if (!cJSON_IsString(rn) && (rn->valuestring == NULL))
-		{
-			goto end;
-		}
+
+	// rn (optional)
+	rn = cJSON_GetObjectItem(root, "rn");
+	if (rn == NULL || isspace(rn->valuestring[0])) {
+		ae->rn = NULL;
+	}
+	else {
 		ae->rn = cJSON_Print(rn);
-		ae->rn = strtok(ae->rn, "\"");
+		eliminate_quotation_mark(ae->rn);
+		//ae->rn = strtok(ae->rn, "\"");
 	}
 
 end:
@@ -71,7 +91,7 @@ end:
 }
 
 CNT* JSON_to_CNT(char *json_payload) {
-	CNT *cnt = (CNT *)calloc(1, sizeof(CNT));
+	CNT *cnt = (CNT *)calloc(1,sizeof(CNT));
 
 	cJSON *root = NULL;
 	cJSON *rn = NULL;
@@ -84,34 +104,56 @@ CNT* JSON_to_CNT(char *json_payload) {
 		{
 			fprintf(stderr, "Error before: %s\n", error_ptr);
 		}
-		goto end;
+		cJSON_Delete(json);
+		return NULL;
 	}
 
 	root = cJSON_GetObjectItem(json, "m2m:cnt");
 
-	// rn
+	// rn (optional)
 	rn = cJSON_GetObjectItem(root, "rn");
-	if (!cJSON_IsString(rn) && (rn->valuestring == NULL))
-	{
-		goto end;
+	if (rn == NULL || isspace(rn->valuestring[0])) {
+		cnt->rn = NULL;
 	}
-	cnt->rn = cJSON_Print(rn);
-	cnt->rn = strtok(cnt->rn, "\"");
+	else {
+		cnt->rn = cJSON_Print(rn);
+		eliminate_quotation_mark(cnt->rn);
+	}
 
-	if(strstr(payload, "acpi") != NULL) { 
-		// acpi
-		acpi = cJSON_GetObjectItem(root, "acpi");
+
+	// acpi (optional)
+	acpi = cJSON_GetObjectItem(root, "acpi");
+	if (acpi == NULL) {
+		cnt->acpi = NULL;
+	}
+	else {
 		int acpi_size = cJSON_GetArraySize(acpi);
-		char acpi_str[1024] = { '\0' };
-		for (int i = 0; i < acpi_size; i++) {
-			strcat(acpi_str, cJSON_GetArrayItem(acpi, i)->valuestring);
-			if (i < acpi_size - 1) {
-				strcat(acpi_str, ",");
+		int is_NULL_flag = 0;
+		if (acpi_size == 0) {
+			cnt->acpi = NULL;
+		}
+		else {
+			char acpi_str[MAX_PROPERTY_SIZE] = { '\0' };
+			for (int i = 0; i < acpi_size; i++) {
+				if (isspace(cJSON_GetArrayItem(acpi, i)->valuestring[0]) || (cJSON_GetArrayItem(acpi, i)->valuestring[0] == 0)) {
+					cnt->acpi = NULL;
+					is_NULL_flag = 1;
+					break;
+				}
+				else {
+					strcat(acpi_str, cJSON_GetArrayItem(acpi, i)->valuestring);
+					if (i < acpi_size - 1) {
+						strcat(acpi_str, ",");
+					}
+				}
+			}
+			if (is_NULL_flag != 1) {
+				cnt->acpi = (char *)malloc(sizeof(char *) * strlen(acpi_str) + 1);
+				strcpy(cnt->acpi, acpi_str);
 			}
 		}
-		cnt->acpi = (char *)malloc(sizeof(char *) * strlen(acpi_str) + 1);
-		strcpy(cnt->acpi, acpi_str);
 	}
+
 
 end:
 	cJSON_Delete(json);
@@ -120,36 +162,49 @@ end:
 }
 
 CIN* JSON_to_CIN(char *json_payload) {
-	CIN *cin = (CIN *)calloc(1, sizeof(CIN));
+	CIN *cin = (CIN *)calloc(1,sizeof(CIN));
 
 	cJSON *root = NULL;
+	cJSON *rn = NULL;
 	cJSON *con = NULL;
+
+	const char *error_ptr = NULL;
 
 	cJSON* json = cJSON_Parse(json_payload);
 	if (json == NULL) {
-		const char *error_ptr = cJSON_GetErrorPtr();
+		error_ptr = cJSON_GetErrorPtr();
 		if (error_ptr != NULL)
 		{
-			//fprintf(stderr, "Error before: %s\n", error_ptr);
+			fprintf(stderr, "Error before: %s\n", error_ptr);
 		}
+		cJSON_Delete(json);
 		return NULL;
 	}
 
 	root = cJSON_GetObjectItem(json, "m2m:cin");
 
-	// con
-	if(strstr(json_payload,"\"con\"")) {
-		con = cJSON_GetObjectItem(root, "con");
-		if (!cJSON_IsString(con) && (con->valuestring == NULL))
-		{
-			goto end;
-		}
-		cin->con = cJSON_Print(con);
-		cin->con = strtok(cin->con, "\"");
+	// con (mandatory)
+	con = cJSON_GetObjectItem(root, "con");
+	if (con == NULL || con->valuestring[0] == 0 || isspace(con->valuestring[0]))
+	{
+		fprintf(stderr, "Invalid con\n");
+		cJSON_Delete(json);
+		return NULL;
 	}
+	cin->con = cJSON_Print(con);
+	eliminate_quotation_mark(cin->con);
 
-	// cs
-	if(cin->con) cin->cs = strlen(cin->con);
+	/*
+	// rn (optional)
+	rn = cJSON_GetObjectItem(root, "rn");
+	if (rn == NULL || isspace(rn->valuestring[0])) {
+		cin->rn = NULL;
+	}
+	else {
+		cin->rn = cJSON_Print(rn);
+		eliminate_quotation_mark(cin->rn);
+	}
+	*/
 
 end:
 	cJSON_Delete(json);
@@ -158,7 +213,7 @@ end:
 }
 
 Sub* JSON_to_Sub(char *json_payload) {
-	Sub *sub = (Sub *)calloc(1, sizeof(Sub));
+	Sub *sub = (Sub *)calloc(1,sizeof(Sub));
 
 	cJSON *root = NULL;
 	cJSON *rn = NULL;
@@ -171,32 +226,65 @@ Sub* JSON_to_Sub(char *json_payload) {
 		const char *error_ptr = cJSON_GetErrorPtr();
 		if (error_ptr != NULL)
 		{
-			//fprintf(stderr, "Error before: %s\n", error_ptr);
+			fprintf(stderr, "Error before: %s\n", error_ptr);
 		}
+		cJSON_Delete(json);
 		return NULL;
 	}
 
 	root = cJSON_GetObjectItem(json, "m2m:sub");
 
-	// rn
-	if(strstr(json_payload,"\"rn\"")) {
-		rn = cJSON_GetObjectItem(root, "rn");
-		if (!cJSON_IsString(rn) && rn->valuestring == NULL)
-		{
-			goto end;
+	// nu (mandatory)
+	nu = cJSON_GetObjectItem(root, "nu");
+	int nu_size = cJSON_GetArraySize(nu);
+	if (nu == NULL || nu_size == 0) {
+		fprintf(stderr, "Invalid nu\n");
+		cJSON_Delete(json);
+		return NULL;
+	}
+	else {
+		char nu_str[MAX_PROPERTY_SIZE] = { '\0' };
+		int is_NULL = 0;
+		for (int i = 0; i < nu_size; i++) {
+			if (isspace(cJSON_GetArrayItem(nu, i)->valuestring[0]) || (cJSON_GetArrayItem(nu, i)->valuestring[0] == 0)) {
+				fprintf(stderr, "Invalid nu\n");
+				is_NULL = 1;
+				cJSON_Delete(json);
+				return NULL;
+			}
+			strcat(nu_str, cJSON_GetArrayItem(nu, i)->valuestring);
+			if (i < nu_size - 1) {
+				strcat(nu_str, ",");
+			}
 		}
-		sub->rn = cJSON_Print(rn);
-		sub->rn = strtok(sub->rn, "\"");
+		sub->nu = (char *)malloc(sizeof(char) * strlen(nu_str) + 1);
+		strcpy(sub->nu, nu_str);
 	}
 
-	// enc
-	if(strstr(json_payload,"\"enc\"")) {
-		enc = cJSON_GetObjectItem(root, "enc");
 
-		// net
-		if(strstr(json_payload,"\"net\"")) {
-			net = cJSON_GetObjectItem(enc, "net");
-			int net_size = cJSON_GetArraySize(net);
+	// rn (optional)
+	rn = cJSON_GetObjectItem(root, "rn");
+	if (rn == NULL || isspace(rn->valuestring[0])) {
+		sub->rn = NULL;
+	}
+	else {
+		sub->rn = cJSON_Print(rn);
+		eliminate_quotation_mark(sub->rn);
+	}
+
+	// enc (optional)
+	enc = cJSON_GetObjectItem(root, "enc");
+	if (enc == NULL) {
+		sub->net = NULL;
+	}
+	else {
+		// net (optional)
+		net = cJSON_GetObjectItem(enc, "net");
+		int net_size = cJSON_GetArraySize(net);
+		if (net == NULL || net_size == 0) {
+			sub->net = NULL;
+		}
+		else {
 			char net_str[10] = { '\0' };
 			char tmp[10] = { '\0' };
 			for (int i = 0; i < net_size; i++) {
@@ -211,20 +299,6 @@ Sub* JSON_to_Sub(char *json_payload) {
 		}
 	}
 
-	// nu
-	if(strstr(json_payload,"\"nu\"")) {
-		nu = cJSON_GetObjectItem(root, "nu");
-		int nu_size = cJSON_GetArraySize(nu);
-		char nu_str[100] = { '\0' };
-		for (int i = 0; i < nu_size; i++) {
-			strcat(nu_str, cJSON_GetArrayItem(nu, i)->valuestring);
-			if (i < nu_size - 1) {
-				strcat(nu_str, ",");
-			}
-		}
-		sub->nu = (char *)malloc(sizeof(char) * strlen(nu_str) + 1);
-		strcpy(sub->nu, nu_str);
-	}
 
 end:
 	cJSON_Delete(json);
@@ -233,7 +307,7 @@ end:
 }
 
 ACP* JSON_to_ACP(char *json_payload) {
-	ACP *acp = (ACP *)calloc(1, sizeof(ACP));
+	ACP *acp = (ACP *)malloc(sizeof(ACP));
 
 	cJSON *root = NULL;
 	cJSON *rn = NULL;
@@ -251,96 +325,171 @@ ACP* JSON_to_ACP(char *json_payload) {
 		{
 			fprintf(stderr, "Error before: %s\n", error_ptr);
 		}
-		goto end;
+		cJSON_Delete(json);
+		return NULL;
 	}
 
 	root = cJSON_GetObjectItem(json, "m2m:acp");
 
-	// rn
-	rn = cJSON_GetObjectItem(root, "rn");
-	if (!cJSON_IsString(rn) && rn->valuestring == NULL)
-	{
-		goto end;
-	}
-	acp->rn = cJSON_Print(rn);
-	acp->rn = strtok(acp->rn, "\"");
-
 	// pv
 	pv = cJSON_GetObjectItem(root, "pv");
-
-	// acr
-	acrs = cJSON_GetObjectItem(pv, "acr");
-	int acr_size = cJSON_GetArraySize(acrs);
-	char acor_str[1024] = { '\0' };
-	char acop_str[1024] = { '\0' };
-	int i = 0;
-	cJSON_ArrayForEach(acr, acrs) {
-		acor = cJSON_GetObjectItem(acr, "acor");
-		int acor_size = cJSON_GetArraySize(acor);
-		for (int j = 0; j < acor_size; j++) {
-			strcat(acor_str, cJSON_GetArrayItem(acor, j)->valuestring);
-			if (j < acor_size - 1) {
-				strcat(acor_str, ",");
-			}
-		}
-		if (i < acr_size - 1)
-			strcat(acor_str, ",");
-
-		acop = cJSON_GetObjectItem(acr, "acop");
-		for (int j = 0; j < acor_size; j++) {
-			strcat(acop_str, strtok(cJSON_Print(acop), "\""));
-			if (j < acor_size - 1) {
-				strcat(acop_str, ",");
-			}
-		}
-		if (i < acr_size - 1)
-			strcat(acop_str, ",");
-		i++;
+	if (pv == NULL) {
+		fprintf(stderr, "Invalid pv\n");
+		cJSON_Delete(json);
+		return NULL;
 	}
-	acp->pv_acor = (char *)malloc(sizeof(char) * strlen(acor_str) + 1);
-	strcpy(acp->pv_acor, acor_str);
+	else {
+		// acr
+		acrs = cJSON_GetObjectItem(pv, "acr");
+		int acr_size = cJSON_GetArraySize(acrs);
+		if (acrs == NULL || acr_size == 0) {
+			fprintf(stderr, "Invalid pv-acr\n");
+			cJSON_Delete(json);
+			return NULL;
+		}
+		else {
+			char acor_str[100] = { '\0' };
+			char acop_str[100] = { '\0' };
+			int i = 0;
+			cJSON_ArrayForEach(acr, acrs) {
+				acor = cJSON_GetObjectItem(acr, "acor");
+				int acor_size = cJSON_GetArraySize(acor);
+				if (acor == NULL || acor_size == 0) {
+					fprintf(stderr, "Invalid pv-acr-acor\n");
+					if (acor_size == 0) {
+						fprintf(stderr, "Invalid pv-acr-acop\n");
+					}
+					cJSON_Delete(json);
+					return NULL;
+				}
+				else {
+					for (int j = 0; j < acor_size; j++) {
+						if (isspace(cJSON_GetArrayItem(acor, j)->valuestring[0]) || (cJSON_GetArrayItem(acor, j)->valuestring[0] == 0)) {
+							fprintf(stderr, "Invalid pv-acr-acor\n");
+							cJSON_Delete(json);
+							return NULL;
+						}
+						else {
+							strcat(acor_str, cJSON_GetArrayItem(acor, j)->valuestring);
+							if (j < acor_size - 1) {
+								strcat(acor_str, ",");
+							}
+						}
+					}
+					if (i < acr_size - 1)
+						strcat(acor_str, ",");
+				}
 
-	acp->pv_acop = (char *)malloc(sizeof(char) * strlen(acop_str) + 1);
-	strcpy(acp->pv_acop, acop_str);
+				acop = cJSON_GetObjectItem(acr, "acop");
+				if (acop == NULL || acop->valuestring[0] == 0 || isspace(acop->valuestring[0])) {
+					fprintf(stderr, "Invalid pv-acr-acop\n");
+					cJSON_Delete(json);
+					return NULL;
+				}
+				else {
+					for (int j = 0; j < acor_size; j++) {
+						strcat(acop_str, strtok(cJSON_Print(acop), "\""));
+						if (j < acor_size - 1) {
+							strcat(acop_str, ",");
+						}
+					}
+					if (i < acr_size - 1)
+						strcat(acop_str, ",");
+					i++;
+				}
+			}
+			acp->pv_acor = (char *)malloc(sizeof(char) * strlen(acor_str) + 1);
+			strcpy(acp->pv_acor, acor_str);
 
+			acp->pv_acop = (char *)malloc(sizeof(char) * strlen(acop_str) + 1);
+			strcpy(acp->pv_acop, acop_str);
+		}
+	}
 
 	// pvs
 	pvs = cJSON_GetObjectItem(root, "pvs");
-
-	// acr
-	acrs = cJSON_GetObjectItem(pvs, "acr");
-	acr_size = cJSON_GetArraySize(acrs);
-	memset(acor_str, 0, 1024);	// �迭 �� �ʱ�ȭ
-	memset(acop_str, 0, 1024);
-	i = 0;
-	cJSON_ArrayForEach(acr, acrs) {
-		acor = cJSON_GetObjectItem(acr, "acor");
-		int acor_size = cJSON_GetArraySize(acor);
-		for (int j = 0; j < acor_size; j++) {
-			strcat(acor_str, cJSON_GetArrayItem(acor, j)->valuestring);
-			if (j < acor_size - 1) {
-				strcat(acor_str, ",");
-			}
-		}
-		if (i < acr_size - 1)
-			strcat(acor_str, ",");
-
-		acop = cJSON_GetObjectItem(acr, "acop");
-		for (int j = 0; j < acor_size; j++) {
-			strcat(acop_str, strtok(cJSON_Print(acop), "\""));
-			if (j < acor_size - 1) {
-				strcat(acop_str, ",");
-			}
-		}
-		if (i < acr_size - 1)
-			strcat(acop_str, ",");
-		i++;
+	if (pvs == NULL) {
+		fprintf(stderr, "Invalid pvs\n");
+		cJSON_Delete(json);
+		return NULL;
 	}
-	acp->pvs_acor = (char *)malloc(sizeof(char) * strlen(acor_str) + 1);
-	strcpy(acp->pvs_acor, acor_str);
+	else {
+		// acr
+		acrs = cJSON_GetObjectItem(pvs, "acr");
+		int acr_size = cJSON_GetArraySize(acrs);
+		if (acrs == NULL || acr_size == 0) {
+			fprintf(stderr, "Invalid pvs-acr\n");
+			cJSON_Delete(json);
+			return NULL;
+		}
+		else {
+			char acor_str[100] = { '\0' };
+			char acop_str[100] = { '\0' };
+			int i = 0;
+			cJSON_ArrayForEach(acr, acrs) {
+				acor = cJSON_GetObjectItem(acr, "acor");
+				int acor_size = cJSON_GetArraySize(acor);
+				if (acor == NULL || acor_size == 0) {
+					fprintf(stderr, "Invalid pvs-acr-acor\n");
+					if (acor_size == 0) {
+						fprintf(stderr, "Invalid pvs-acr-acop\n");
+					}
+					cJSON_Delete(json);
+					return NULL;
+				}
+				else {
+					for (int j = 0; j < acor_size; j++) {
+						if (isspace(cJSON_GetArrayItem(acor, j)->valuestring[0]) || (cJSON_GetArrayItem(acor, j)->valuestring[0] == 0)) {
+							fprintf(stderr, "Invalid pvs-acr-acor\n");
+							cJSON_Delete(json);
+							return NULL;
+						}
+						else {
+							strcat(acor_str, cJSON_GetArrayItem(acor, j)->valuestring);
+							if (j < acor_size - 1) {
+								strcat(acor_str, ",");
+							}
+						}
+					}
+					if (i < acr_size - 1)
+						strcat(acor_str, ",");
+				}
 
-	acp->pvs_acop = (char *)malloc(sizeof(char) * strlen(acop_str) + 1);
-	strcpy(acp->pvs_acop, acop_str);
+				acop = cJSON_GetObjectItem(acr, "acop");
+				if (acop == NULL || acop->valuestring[0] == 0 || isspace(acop->valuestring[0])) {
+					fprintf(stderr, "Invalid pvs-acr-acop\n");
+					cJSON_Delete(json);
+					return NULL;
+				}
+				else {
+					for (int j = 0; j < acor_size; j++) {
+						strcat(acop_str, strtok(cJSON_Print(acop), "\""));
+						if (j < acor_size - 1) {
+							strcat(acop_str, ",");
+						}
+					}
+					if (i < acr_size - 1)
+						strcat(acop_str, ",");
+					i++;
+				}
+			}
+			acp->pvs_acor = (char *)malloc(sizeof(char) * strlen(acor_str) + 1);
+			strcpy(acp->pvs_acor, acor_str);
+
+			acp->pvs_acop = (char *)malloc(sizeof(char) * strlen(acop_str) + 1);
+			strcpy(acp->pvs_acop, acop_str);
+		}
+	}
+
+	// rn (optional)
+	rn = cJSON_GetObjectItem(root, "rn");
+	if (rn == NULL || isspace(rn->valuestring[0])) {
+		acp->rn = NULL;
+	}
+	else {
+		acp->rn = cJSON_Print(rn);
+		eliminate_quotation_mark(acp->rn);
+	}
 
 end:
 	cJSON_Delete(json);
@@ -777,7 +926,7 @@ char* Get_JSON_Value_char(char *key, char *json) {
 		goto end;
 	}
 	value = cJSON_Print(ckey);
-	value = strtok(value, "\"");
+	eliminate_quotation_mark(value);
 
 end:
 	cJSON_Delete(cjson);

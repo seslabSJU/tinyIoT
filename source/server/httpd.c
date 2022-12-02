@@ -235,7 +235,7 @@ void respond(int slot) {
     t2 = request_header("Content-Length"); // and the related header if there is
     payload = t;
     payload_size = t2 ? atol(t2) : (rcvd - (t - buf));
-    if(payload) Remove_Specific_Asterisk_Payload();
+    if(payload) Normalization_Payload();
     // bind clientfd to stdout, making it easier to write
     int clientfd = clients[slot];
     dup2(clientfd, STDOUT_FILENO);
