@@ -378,10 +378,7 @@ int DB_Store_Sub(Sub *sub_object) {
         return -1;
     }
     if (sub_object->rn == NULL) sub_object->rn = " ";
-    if (sub_object->pi == NULL) {
-        fprintf(stderr, "The pi is NULL\n");
-        return -1;
-    }
+    if (sub_object->pi == NULL) sub_object->ri = " ";
     if (sub_object->nu == NULL) sub_object->nu = " ";
     if (sub_object->net == NULL) sub_object->net = "1";
     
@@ -1316,76 +1313,34 @@ int DB_Delete_Object(char* ri) {
 
 int DB_Delete_Sub(char* ri) {
     fprintf(stderr,"[Delete Sub] %s...", ri);
-    char* database = "Sub.db";
-
+    char* DATABASE = "Sub.db";
     DB* dbp;
     DBC* dbcp;
     DBT key, data;
     int ret;
+    int flag = 0;
 
-    /* Open the database. */
-    if ((ret = db_create(&dbp, NULL, 0)) != 0) {
-        fprintf(stderr,
-            "%s: db_create: %s\n", database, db_strerror(ret));
-        return -1;
-    }
-
-    ret = dbp->open(dbp, NULL, database, NULL, DB_BTREE, DB_CREATE, 0664);
-    if (ret) {
-        dbp->err(dbp, ret, "%s", database);
-        return -1;
-    }
-
-    /* Acquire a cursor for the database. */
-    if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
-        dbp->err(dbp, ret, "DB->cursor");
-        return -1;
-    }
+    dbp = DB_CREATE_(dbp);
+    dbp = DB_OPEN_(dbp,DATABASE);
+    dbcp = DB_GET_CURSOR(dbp,dbcp);
 
     /* Initialize the key/data return pair. */
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
 
-    int cnt = 0;
-    int flag = 0;
-    int struct_size = 10;
-
-    DBC* dbcp0;
-    if ((ret = dbp->cursor(dbp, NULL, &dbcp0, 0)) != 0) {
-        dbp->err(dbp, ret, "DB->cursor");
-        return -1;
-    }
-    while ((ret = dbcp0->get(dbcp0, &key, &data, DB_NEXT)) == 0) {
-        cnt++;
-        if (strncmp(data.data, ri, data.size) == 0) {
-            flag=1;
+    while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
+        if (strncmp(key.data, ri, key.size) == 0) {
+            flag = 1;
+            dbcp->del(dbcp, 0);
             break;
         }
     }
-    if (cnt == 0 || flag==0) {
-        fprintf(stderr, "Data not exist\n");
-        return -1;
-    }
-
-    int idx = -1;
-    while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
-        if (strncmp(data.data, ri, data.size) == 0) {
-            idx=0;
-        }
-        if(idx!=-1 && idx < struct_size){
-            dbcp->del(dbcp, 0);
-            idx++;
-        }
-    }
-    if (ret != DB_NOTFOUND) {
-        dbp->err(dbp, ret, "DBcursor->get");
-        fprintf(stderr, "Cursor ERROR\n");
+    if (flag == 0) {
+        fprintf(stderr, "Not Found\n");
         return -1;
     }
 
     /* Cursors must be closed */
-    if (dbcp0 != NULL)
-        dbcp0->close(dbcp0);
     if (dbcp != NULL)
         dbcp->close(dbcp);
     if (dbp != NULL)
