@@ -506,7 +506,6 @@ int DB_Store_Sub(Sub *sub_object) {
         dbp->err(dbp, ret, "db->cursor");
 
 
-
     /* DB close */
     dbcp->close(dbcp);
     dbp->close(dbp, 0); 
