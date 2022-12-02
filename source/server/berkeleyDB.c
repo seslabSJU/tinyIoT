@@ -1078,7 +1078,7 @@ CIN* DB_Get_CIN(char* ri) {
     if (ret != DB_NOTFOUND) {
         dbp->err(dbp, ret, "DBcursor->get");
         fprintf(stderr, "Cursor ERROR\n");
-        return -1;
+        return NULL;
     }
     if (cin == 0 || flag==0) {
         fprintf(stderr, "Data not exist\n");
@@ -1110,19 +1110,19 @@ Sub* DB_Get_Sub(char* ri) {
     if ((ret = db_create(&dbp, NULL, 0)) != 0) {
         fprintf(stderr,
             "%s: db_create: %s\n", database, db_strerror(ret));
-        return 0;
+        return NULL;
     }
 
     ret = dbp->open(dbp, NULL, database, NULL, DB_BTREE, DB_CREATE, 0664);
     if (ret) {
         dbp->err(dbp, ret, "%s", database);
-        return -1;
+        return NULL;
     }
 
     /* Acquire a cursor for the database. */
     if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return -1;
+        return NULL;
     }
 
     /* Initialize the key/data return pair. */
@@ -1136,7 +1136,7 @@ Sub* DB_Get_Sub(char* ri) {
     DBC* dbcp0;
     if ((ret = dbp->cursor(dbp, NULL, &dbcp0, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return -1;
+        return NULL;
     }
     while ((ret = dbcp0->get(dbcp0, &key, &data, DB_NEXT)) == 0) {
         cnt++;
@@ -1225,7 +1225,7 @@ Sub* DB_Get_Sub(char* ri) {
     if (ret != DB_NOTFOUND) {
         dbp->err(dbp, ret, "DBcursor->get");
         fprintf(stderr, "Cursor ERROR\n");
-        return -1;
+        return NULL;
     }
 
         /* Cursors must be closed */
@@ -1473,7 +1473,7 @@ int DB_Delete_Sub(char* ri) {
     }
     if (cnt == 0 || flag==0) {
         fprintf(stderr, "Data not exist\n");
-        return NULL;
+        return -1;
     }
 
     int idx = -1;
@@ -1792,19 +1792,19 @@ Node* DB_Get_All_Sub(){
     if ((ret = db_create(&dbp, NULL, 0)) != 0) {
         fprintf(stderr,
             "%s: db_create: %s\n", database, db_strerror(ret));
-        return 0;
+        return NULL;
     }
 
     ret = dbp->open(dbp, NULL, database, NULL, DB_BTREE, DB_CREATE, 0664);
     if (ret) {
         dbp->err(dbp, ret, "%s", database);
-        return -1;
+        return NULL;
     }
 
     /* Acquire a cursor for the database. */
     if ((ret = dbp->cursor(dbp, NULL, &dbcp, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return -1;
+        return NULL;
     }
 
     /* Initialize the key/data return pair. */
@@ -1818,7 +1818,7 @@ Node* DB_Get_All_Sub(){
     DBC* dbcp0;
     if ((ret = dbp->cursor(dbp, NULL, &dbcp0, 0)) != 0) {
         dbp->err(dbp, ret, "DB->cursor");
-        return -1;
+        return NULL;
     }
     while ((ret = dbcp0->get(dbcp0, &key, &data, DB_NEXT)) == 0) {
         cnt++;
