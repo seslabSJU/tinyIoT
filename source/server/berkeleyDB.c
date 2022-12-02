@@ -1629,11 +1629,11 @@ Node* DB_Get_All_CNT() {
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
         if (strncmp(key.data, TYPE , 2) == 0){
             CNT* cnt_ = DB_Get_CNT((char*)key.data);
-            node->ri = malloc((strlen(cnt_->ri)+1)*sizeof(char));
-            node->rn = malloc((strlen(cnt_->rn)+1)*sizeof(char));
-            node->pi = malloc((strlen(cnt_->pi)+1)*sizeof(char));
+            node->ri = calloc((strlen(cnt_->ri)+1),sizeof(char));
+            node->rn = calloc((strlen(cnt_->rn)+1),sizeof(char));
+            node->pi = calloc((strlen(cnt_->pi)+1),sizeof(char));
             if(cnt_->acpi) {
-                node->acpi = malloc((strlen(cnt_->acpi) + 1)*sizeof(char));
+                node->acpi = calloc((strlen(cnt_->acpi) + 1),sizeof(char));
                 strcpy(node->acpi, cnt_->acpi);
             }
 
