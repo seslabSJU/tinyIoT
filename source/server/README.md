@@ -2,6 +2,10 @@
 
 This is a very light oneM2M server using C
 
+## OS
+
+Linux Ubuntu 22.04
+
 ## Quick start
 
 1. chmod 755 server
@@ -12,3 +16,4 @@ This is a very light oneM2M server using C
 
 1. Berkeley DB
 2. cJSON
+
