@@ -4,8 +4,9 @@ This is a very light oneM2M server using C
 
 ## Quick start
 
-Run `./server` or `./server [port]` (port = 3000 by default).
-If there is no executable file, Run `make`
+1. chmod 755 server
+2. Run `./server` or `./server [port]` (port = 3000 by default).
+3. If there is no executable file, Run `make`
 
 ## make Denpendency
 
