@@ -348,8 +348,8 @@ ACP* JSON_to_ACP(char *json_payload) {
 			return NULL;
 		}
 		else {
-			char acor_str[100] = { '\0' };
-			char acop_str[100] = { '\0' };
+			char acor_str[1024] = { '\0' };
+			char acop_str[1024] = { '\0' };
 			int i = 0;
 			cJSON_ArrayForEach(acr, acrs) {
 				acor = cJSON_GetObjectItem(acr, "acor");
@@ -381,14 +381,11 @@ ACP* JSON_to_ACP(char *json_payload) {
 				}
 
 				acop = cJSON_GetObjectItem(acr, "acop");
-				if (acop == NULL || acop->valuestring[0] == 0 || isspace(acop->valuestring[0])) {
-					fprintf(stderr, "Invalid pv-acr-acop\n");
-					cJSON_Delete(json);
-					return NULL;
-				}
-				else {
-					for (int j = 0; j < acor_size; j++) {
-						strcat(acop_str, strtok(cJSON_Print(acop), "\""));
+				int acop_int = acop->valueint;
+				char tmp[1024]={'\0'};
+				for (int j = 0; j < acor_size; j++) {
+					sprintf(tmp, "%d", acop_int);
+					strcat(acop_str, tmp);
 						if (j < acor_size - 1) {
 							strcat(acop_str, ",");
 						}
@@ -396,11 +393,11 @@ ACP* JSON_to_ACP(char *json_payload) {
 					if (i < acr_size - 1)
 						strcat(acop_str, ",");
 					i++;
-				}
+			
 			}
 			acp->pv_acor = (char *)malloc(sizeof(char) * strlen(acor_str) + 1);
 			strcpy(acp->pv_acor, acor_str);
-
+		
 			acp->pv_acop = (char *)malloc(sizeof(char) * strlen(acop_str) + 1);
 			strcpy(acp->pv_acop, acop_str);
 		}
@@ -456,14 +453,11 @@ ACP* JSON_to_ACP(char *json_payload) {
 				}
 
 				acop = cJSON_GetObjectItem(acr, "acop");
-				if (acop == NULL || acop->valuestring[0] == 0 || isspace(acop->valuestring[0])) {
-					fprintf(stderr, "Invalid pvs-acr-acop\n");
-					cJSON_Delete(json);
-					return NULL;
-				}
-				else {
-					for (int j = 0; j < acor_size; j++) {
-						strcat(acop_str, strtok(cJSON_Print(acop), "\""));
+				int acop_int = acop->valueint;
+				char tmp[1024]={'\0'};
+				for (int j = 0; j < acor_size; j++) {
+					sprintf(tmp, "%d", acop_int);
+					strcat(acop_str, tmp);
 						if (j < acor_size - 1) {
 							strcat(acop_str, ",");
 						}
@@ -471,7 +465,6 @@ ACP* JSON_to_ACP(char *json_payload) {
 					if (i < acr_size - 1)
 						strcat(acop_str, ",");
 					i++;
-				}
 			}
 			acp->pvs_acor = (char *)malloc(sizeof(char) * strlen(acor_str) + 1);
 			strcpy(acp->pvs_acor, acor_str);
@@ -595,15 +588,14 @@ char* CNT_to_json(CNT* cnt_object) {
 	// acpi
 	acpi = cJSON_CreateArray();
 
-	if(cnt_object->acpi) {
+	if(cnt_object->acpi && strcmp(cnt_object->acpi," ")) {
 		char *acpi_str = strtok(cnt_object->acpi, ",");
 		do {
 			cJSON_AddItemToArray(acpi, cJSON_CreateString(acpi_str));
 			acpi_str = strtok(NULL, ",");
 		} while (acpi_str != NULL);
+		cJSON_AddItemToObject(cnt, "acpi", acpi);
 	}
-	cJSON_AddItemToObject(cnt, "acpi", acpi);
-
 	json = cJSON_Print(root);
 
 	cJSON_Delete(root);
@@ -1078,7 +1070,7 @@ char *Get_JSON_Value_list(char *key_str, char *json) {
 					strcat(acorp_str, cJSON_GetArrayItem(acor, j)->valuestring);
 				}
 				else {	// acop
-					strcat(acorp_str, strtok(cJSON_Print(acop), "\""));
+					strcat(acorp_str, cJSON_Print(acop));
 				}
 
 				if (j < acor_size - 1) {

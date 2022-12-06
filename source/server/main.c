@@ -16,6 +16,8 @@
 
 ResourceTree *rt;
 
+char response_header[1024];
+
 int main(int c, char **v) {
 	init();
  	char *port = c == 1 ? "3000" : v[1];
@@ -31,6 +33,17 @@ void route() {
     start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
 
 	Operation op = o_NONE;
+
+	memset(response_header,0,sizeof(response_header));
+	char *v;
+	if(v = request_header("X-M2M-RI")) {
+		strcat(response_header, "\nX-M2M-RI: ");
+		strcat(response_header, v);
+	}
+	if(v = request_header("X-M2M-RVI")) {
+		strcat(response_header, "\nX-M2M-RVI: ");
+		strcat(response_header, v);
+	} 
 
 	Node* pnode = Parse_URI(rt->cb, uri, &op); // return tree node by URI
 	int e = Result_Parse_URI(pnode);
@@ -100,6 +113,8 @@ void Create_Object(Node *pnode) {
 
 	if(e == -1) return;
 
+	strcat(response_header,"\nX-M2M-RSC: 2001");
+
 	switch(ty) {	
 	case t_AE :
 		fprintf(stderr,"\x1b[42mCreate AE\x1b[0m\n");
@@ -137,6 +152,8 @@ void Retrieve_Object(Node *pnode) {
 	int e = Check_Privilege(pnode, acop_Retrieve);
 
 	if(e == -1) return;
+
+	strcat(response_header,"\nX-M2M-RSC: 2000");
 
 	int fu = get_value_querystring_int("fu");
 
@@ -198,6 +215,8 @@ void Update_Object(Node *pnode) {
 	if(e != -1) e = Check_Resource_Type_Equal(ty, pnode->ty);
 
 	if(e == -1) return;
+
+	strcat(response_header,"\nX-M2M-RSC: 2004");
 	
 	switch(ty) {
 	case t_AE :
@@ -249,8 +268,11 @@ void Create_AE(Node *pnode) {
 	
 	Node* node = Create_Node(ae, t_AE);
 	Add_child(pnode,node);
-	
 	char *res_json = AE_to_json(ae);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_201_JSON;
 	printf("%s", res_json);
 	Notify_Object(pnode->child, res_json, noti_event_3);
@@ -277,11 +299,16 @@ void Create_CNT(Node *pnode) {
 		Free_CNT(cnt); cnt = NULL;
 		return;
 	}
+	if(!strcmp(cnt->acpi, " ")) cnt->acpi = NULL;
 	
 	Node* node = Create_Node(cnt, t_CNT);
 	Add_child(pnode,node);
 
 	char *res_json = CNT_to_json(cnt);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_201_JSON;
 	printf("%s", res_json);
 	Notify_Object(pnode->child, res_json, noti_event_3);
@@ -311,6 +338,10 @@ void Create_CIN(Node *pnode) {
 	}
 	
 	char *res_json = CIN_to_json(cin);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_201_JSON;
 	printf("%s", res_json);
 	Notify_Object(pnode->child, res_json, noti_event_3);
@@ -342,6 +373,10 @@ void Create_Sub(Node *pnode) {
 	Add_child(pnode,node);
 	
 	char *res_json = Sub_to_json(sub);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_201_JSON;
 	printf("%s", res_json);
 	char *res = Send_HTTP_Packet(sub->nu, res_json);
@@ -375,6 +410,10 @@ void Create_ACP(Node *pnode) {
 	Add_child(pnode,node);
 	
 	char *res_json = ACP_to_json(acp);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_201_JSON;
 	printf("%s", res_json);
 	Notify_Object(pnode->child, res_json, noti_event_3);
@@ -385,6 +424,10 @@ void Create_ACP(Node *pnode) {
 void Retrieve_CSE(Node *pnode){
 	CSE* gcse = DB_Get_CSE(pnode->ri);
 	char *res_json = CSE_to_json(gcse);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	free(res_json); res_json = NULL; 
@@ -394,6 +437,10 @@ void Retrieve_CSE(Node *pnode){
 void Retrieve_AE(Node *pnode){
 	AE* gae = DB_Get_AE(pnode->ri);
 	char *res_json = AE_to_json(gae);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	free(res_json); res_json = NULL;
@@ -403,6 +450,10 @@ void Retrieve_AE(Node *pnode){
 void Retrieve_CNT(Node *pnode){
 	CNT* gcnt = DB_Get_CNT(pnode->ri);
 	char *res_json = CNT_to_json(gcnt);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	free(res_json); res_json = NULL;
@@ -412,6 +463,10 @@ void Retrieve_CNT(Node *pnode){
 void Retrieve_CIN(Node *pnode){
 	CIN* gcin = DB_Get_CIN(pnode->ri);
 	char *res_json = CIN_to_json(gcin);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	free(res_json); res_json = NULL; 
@@ -421,6 +476,10 @@ void Retrieve_CIN(Node *pnode){
 void Retrieve_Sub(Node *pnode){
 	Sub* gsub = DB_Get_Sub(pnode->ri);
 	char *res_json = Sub_to_json(gsub);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	free(res_json); res_json = NULL; 
@@ -430,6 +489,10 @@ void Retrieve_Sub(Node *pnode){
 void Retrieve_ACP(Node *pnode){
 	ACP* gacp = DB_Get_ACP(pnode->ri);
 	char *res_json = ACP_to_json(gacp);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	free(res_json); res_json = NULL; 
@@ -446,6 +509,10 @@ void Update_AE(Node *pnode) {
 	result = DB_Store_AE(after);
 	
 	char *res_json = AE_to_json(after);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	Notify_Object(pnode->child, res_json, noti_event_1);
@@ -463,6 +530,10 @@ void Update_CNT(Node *pnode) {
 	result = DB_Store_CNT(after);
 	
 	char *res_json = CNT_to_json(after);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	Notify_Object(pnode->child, res_json, noti_event_1);
@@ -480,6 +551,10 @@ void Update_Sub(Node *pnode) {
 	result = DB_Store_Sub(after);
 	
 	char *res_json = Sub_to_json(after);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	free(res_json); res_json = NULL;
@@ -496,6 +571,10 @@ void Update_ACP(Node *pnode) {
 	result = DB_Store_ACP(after);
 	
 	char *res_json = ACP_to_json(after);
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s", res_json);
 	Notify_Object(pnode->child, res_json, noti_event_1);
@@ -510,6 +589,7 @@ void Delete_Object(Node* pnode) {
 		printf("{\"m2m:dbg\": \"CSE can not be deleted\"}");
 		return;
 	}
+	strcat(response_header,"\nX-M2M-RSC: 2002");
 	Delete_Node_and_DB_Data(pnode,1);
 	pnode = NULL;
 	HTTP_200_JSON;
@@ -618,12 +698,17 @@ int Check_JSON_Format() {
 
 int Check_Privilege(Node *node, ACOP acop) {
 	if(node->ty == t_CIN) node = node->parent;
-	if(node->ty != t_CNT) return 0;
+	if(node->ty != t_CNT && node->ty != t_ACP) return 0;
 
 	if((get_acop(node) & acop) != acop) {
-		fprintf(stderr,"Origin has no privilege\n");
+		fprintf(stderr,"X-M2M-Origin has no privilege\n");
+		char res_json[1024] = "{\"m2m:dbg\": \"access denied\"}";
+		char cl[8];
+		strcat(response_header,"\nContent-Length :");
+		sprintf(cl,"%ld",strlen(res_json));
+		strcat(response_header, cl);
 		HTTP_403;
-		printf("{\"m2m:dbg\": \"access denied\"}");
+		printf("%s",res_json);
 		return -1;
 	}
 	return 0;
@@ -748,7 +833,10 @@ void Retrieve_Object_FilterCriteria(Node *pnode) {
 	char *res_json = Discovery_to_json(discovery_list, size);
 	for(int i=0; i<size; i++) free(discovery_list[i]);
 	free(discovery_list);
-
+	char cl[8];
+	strcat(response_header,"\nContent-Length :");
+	sprintf(cl,"%ld",strlen(res_json));
+	strcat(response_header, cl);
 	HTTP_200_JSON;
 	printf("%s",res_json);
 	free(res_json); res_json = NULL;

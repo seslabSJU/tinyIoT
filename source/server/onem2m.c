@@ -10,6 +10,8 @@
 #include <malloc.h>
 #include <sys/timeb.h>
 
+extern char response_header[1024];
+
 Node* Parse_URI(Node *cb, char *uri, Operation *op) {
 	fprintf(stderr,"Parse_URI \x1b[33m%s\x1b[0m...",uri);
 	char uri_array[MAX_URI_SIZE];
@@ -106,7 +108,7 @@ int duplicate_resource_check(Node *pnode) {
 
 	return 0;
 }
-
+/*
 void Retrieve_CIN_Ri(char *ri) {
 	fprintf(stderr,"OK\n\x1b[43mRetrieve CIN By Ri\x1b[0m\n");
 	CIN* gcin = DB_Get_CIN(ri);
@@ -123,7 +125,7 @@ void Retrieve_CIN_Ri(char *ri) {
 		printf("{\"m2m:dbg\": \"invalid object\"}");
 	}
 }
-/*
+
 void CIN_in_period(Node *pnode) {
 	int period = 0;
 	char key[8] = "period=";
@@ -612,14 +614,15 @@ void Init_CSE(CSE* cse) {
 void Init_AE(AE* ae, char *pi) {
 	char *ct = Get_LocalTime(0);
 	char *et = Get_LocalTime(EXPIRE_TIME);
-	char *aei = request_header("X-M2M-Origin"); 
+	char *aei = NULL; //request_header("X-M2M-Origin"); 
 	char *ri = resource_identifier(t_AE, ct);
 	int m_aei = 0;
-
+	
 	if(!aei) {
 		m_aei = 1;
-		aei = (char*)malloc((strlen(ri) + 1) * sizeof(char));
-		strcpy(aei, ri);
+		aei = (char*)malloc((strlen(ri) + 2) * sizeof(char));
+		strcpy(aei, "C");
+		strcat(aei, ri);
 	}
 
 	if(!ae->rn) {
@@ -798,7 +801,7 @@ void Set_CNT_Update(CNT* after) {
 	char *rn = Get_JSON_Value_char("rn", payload);
 	char *acpi = NULL;
 
-	if(strstr(payload, "acpi") != NULL)
+	if(strstr(payload, "\"acpi\"") != NULL)
 		acpi = Get_JSON_Value_list("acpi", payload);
 
 	if(rn) {
@@ -822,14 +825,14 @@ void Set_Sub_Update(Sub* after) {
 	char *nu = NULL;
 	char *net = NULL;
 
-	if(strstr(payload,"nu") != NULL) {
+	if(strstr(payload,"\"nu\"") != NULL) {
 		nu = Get_JSON_Value_list("nu", payload);
 		if(!strcmp(nu, "\0")) {
 			free(nu); nu = after->nu = NULL;
 		}
 	}
-	if(strstr(payload,"enc") != NULL) {
-		if(strstr(payload, "net") != NULL) {
+	if(strstr(payload,"\"enc\"") != NULL) {
+		if(strstr(payload, "\"net\"") != NULL) {
 			net = Get_JSON_Value_list("enc-net", payload);
 			if(!strcmp(net, "\0")) {
 				free(net); net = after->net = NULL;
@@ -866,9 +869,9 @@ void Set_ACP_Update(ACP* after) {
 	char *pvs_acor = NULL;
 	char *pvs_acop = NULL;
 
-	if(strstr(payload, "pv")) {
-		if(strstr(payload, "acr")) {
-			if(strstr(payload, "acor") && strstr(payload, "acop")) {
+	if(strstr(payload, "\"pv\"")) {
+		if(strstr(payload, "\"acr\"")) {
+			if(strstr(payload, "\"acor\"") && strstr(payload, "acop")) {
 				pv_acor = Get_JSON_Value_list("pv-acr-acor", payload); 
 				pv_acop = Get_JSON_Value_list("pv-acr-acop", payload);
 				if(!strcmp(pv_acor, "\0") || !strcmp(pv_acop, "\0")) {
@@ -879,9 +882,9 @@ void Set_ACP_Update(ACP* after) {
 		}
 	}
 
-	if(strstr(payload, "pvs")) {
-		if(strstr(payload, "acr")) {
-			if(strstr(payload, "acor") && strstr(payload, "acop")) {
+	if(strstr(payload, "\"pvs\"")) {
+		if(strstr(payload, "\"acr\"")) {
+			if(strstr(payload, "\"acor\"") && strstr(payload, "\"acop\"")) {
 				pvs_acor = Get_JSON_Value_list("pvs-acr-acor", payload);
 				pvs_acop = Get_JSON_Value_list("pvs-acr-acop", payload);
 				if(!strcmp(pvs_acor, "\0") || !strcmp(pvs_acop, "\0")) {
@@ -1198,18 +1201,28 @@ char *Send_HTTP_Packet(char* target, char *post_data) {
 }
 
 int get_acop(Node *node) {
-	char *origin = request_header("X-M2M-Origin");
+	char *requestheader_origin = request_header("X-M2M-Origin");
+	char origin[128];
+	int acop = 0;
+	
+	if(requestheader_origin) {
+		strcpy(origin, requestheader_origin);
+	} else {
+		strcpy(origin, "all");
+	}
 
-	if(node->ty == t_ACP) return get_acop_origin(origin, node, 1);
+	if(node->ty == t_ACP) {
+		acop = (acop | get_acop_origin(origin, node, 1));
+		acop = (acop | get_acop_origin("all", node, 1));
+		return acop;
+	}
 
 	if(!node->acpi || !strcmp(node->acpi, "") || !strcmp(node->acpi, " ")) return ALL_ACOP;
-
-	if(!origin) return 0;
 
 	Node *cb = node;
 	while(cb->parent) cb = cb->parent;
 	
-	int acop = 0, uri_cnt = 0;
+	int uri_cnt = 0;
 	char arr_acp_uri[512][1024] = {"\0", }, arr_acpi[MAX_PROPERTY_SIZE] = "\0";
 	char *acp_uri = NULL;
 
@@ -1227,7 +1240,10 @@ int get_acop(Node *node) {
 	for(int i=0; i<uri_cnt; i++) {
 		Node *acp = Find_Node_by_URI(cb, arr_acp_uri[i]);
 
-		if(acp) acop = (acop | get_acop_origin(origin, acp, 0));
+		if(acp) {
+			acop = (acop | get_acop_origin(origin, acp, 0));
+			acop = (acop | get_acop_origin("all", acp, 0));
+		}
 	}
 
 	return acop;
