@@ -614,13 +614,13 @@ void Restruct_ResourceTree(){
 		fprintf(stderr,"RESOURCE.db is not exist\n");
 	}
 	
-	if(access("./SUB.db", 0) != -1) {
+	if(access("./Sub.db", 0) != -1) {
 		Node* sub_list = DB_Get_All_Sub();
 		tail->siblingRight = sub_list;
 		if(sub_list) sub_list->siblingLeft = tail;
 		while(tail->siblingRight) tail = tail->siblingRight;
 	} else {
-		fprintf(stderr,"SUB.db is not exist\n");
+		fprintf(stderr,"Sub.db is not exist\n");
 	}
 
 	if(access("./ACP.db", 0) != -1) {
