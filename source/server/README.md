@@ -2,6 +2,10 @@
 
 It is a very light oneM2M server using C
 
+## Operating System
+
+Linux Ubuntu 22.04
+
 ## Quick start
 
 Run `./server` or `./server [port]` (port = 3000 by default).
