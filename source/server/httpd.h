@@ -27,12 +27,11 @@ header_t *request_headers(void);
 // user shall implement this function
 
 void route();
-void bindfd(int slot);
 
 // Response
 #define RESPONSE_PROTOCOL "HTTP/1.1"
 #define RESPONSE_CORS_HEADERS "Access-Control-Allow-Origin: *\nAccess-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type\nAccess-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS\nAccess-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS"
-#define RESPONSE_JSON_HEADERS "Connection: close\nAccept: application/json\nContent-Type: application/json; charset=utf-8"
+#define RESPONSE_JSON_HEADERS "Accept: application/json\nContent-Type: application/json; charset=utf-8"
 
 #define HTTP_200_CORS printf("%s 200 OK\n%s%s\n\n", RESPONSE_PROTOCOL, RESPONSE_CORS_HEADERS,response_header)
 #define HTTP_200_JSON printf("%s 200 OK\n%s\n%s%s\n\n", RESPONSE_PROTOCOL, RESPONSE_CORS_HEADERS, RESPONSE_JSON_HEADERS, response_header)

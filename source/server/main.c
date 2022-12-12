@@ -7,13 +7,6 @@
 #include <unistd.h>
 #include "onem2m.h"
 
-#define CHUNK_SIZE 1024 // read 1024 bytes at a time
-
-// Public directory settings
-#define PUBLIC_DIR "./public"
-#define INDEX_HTML "/index.html"
-#define NOT_FOUND_HTML "/404.html"
-
 ResourceTree *rt;
 
 char response_header[1024];
@@ -614,13 +607,13 @@ void Restruct_ResourceTree(){
 		fprintf(stderr,"RESOURCE.db is not exist\n");
 	}
 	
-	if(access("./Sub.db", 0) != -1) {
+	if(access("./SUB.db", 0) != -1) {
 		Node* sub_list = DB_Get_All_Sub();
 		tail->siblingRight = sub_list;
 		if(sub_list) sub_list->siblingLeft = tail;
 		while(tail->siblingRight) tail = tail->siblingRight;
 	} else {
-		fprintf(stderr,"Sub.db is not exist\n");
+		fprintf(stderr,"SUB.db is not exist\n");
 	}
 
 	if(access("./ACP.db", 0) != -1) {
