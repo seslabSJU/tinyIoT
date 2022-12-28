@@ -4,21 +4,28 @@
         <v-form>
             <v-container fluid>
                 <v-row>
-                    <v-col cols="12" md="5">
+                    <v-col cols="12" md="4">
                         <v-text-field v-model="url1" :rules="urlRules" label="Target Resource" required>
                         </v-text-field>
                     </v-col>
-                    <v-col cols="12" md="5">
+                    <v-col cols="12" md="4">
                         <v-text-field v-model="url2" :rules="urlRules" label="Target Resource" required>
                         </v-text-field>
                     </v-col>
                     <v-col cols="12" md="2">
-                        <v-btn class="mr-4" @click="submit">
+                        <v-btn class="mr-4" @click="submit" small> <!-- small 변경 -->
                             submit
                         </v-btn>
-                        <v-btn @click="clear">
+                        <v-btn @click="clear" small>
                             clear
                         </v-btn>
+                    </v-col>
+                    <v-col cols="12" md="2">
+                        <v-text-field v-model="searchText" dense filled rounded clearable placeholder="Search"
+                            prepend-inner-icon="mdi-magnify" :class="{ closed: searchBoxClosed && searchText === '' }"
+                            @keyup.enter="discovery(searchText)" @focus="searchBoxClosed = false"
+                            @blur="searchBoxClosed = true">
+                        </v-text-field>
                     </v-col>
                 </v-row>
                 <label>Number of Instance</label>
@@ -36,26 +43,29 @@
                 <v-col cols="12" md="8">
                     <v-treeview :items="treeList" hoverable>
                         <template slot="label" slot-scope="{ item }">
-                            <span v-if="item.ty === 5">
-                                <v-chip class="ma-2" color="yellow" label small><strong>CSE</strong></v-chip>
-                            </span>
-                            <span v-if="item.ty === 2">
-                                <v-chip class="ma-2" color="blue" text-color="white" label small><strong>AE</strong>
-                                </v-chip>
-                            </span>
-                            <span v-if="item.ty === 3">
-                                <v-chip class="ma-2" color="red" text-color="white" label small><strong>CNT</strong>
-                                </v-chip>
-                            </span>
-                            <span v-if="item.ty === 4">
-                                <v-chip class="ma-2" color="green" text-color="white" label small><strong>CIN</strong>
-                                </v-chip>
-                            </span>
-                            <span v-if="item.ty === 23">
-                                <v-chip class="ma-2" label small><strong>SUB</strong></v-chip>
-                            </span>
-                            <span @contextmenu.prevent="show($event, item)">
-                                {{ item.rn }}
+                            <span :class="{ blink: newRI === item.ri }">
+                                <span v-if="item.ty === 5">
+                                    <v-chip class="ma-2" color="yellow" label small><strong>CSE</strong></v-chip>
+                                </span>
+                                <span v-if="item.ty === 2">
+                                    <v-chip class="ma-2" color="blue" text-color="white" label small><strong>AE</strong>
+                                    </v-chip>
+                                </span>
+                                <span v-if="item.ty === 3">
+                                    <v-chip class="ma-2" color="red" text-color="white" label small><strong>CNT</strong>
+                                    </v-chip>
+                                </span>
+                                <span v-if="item.ty === 4">
+                                    <v-chip class="ma-2" color="green" text-color="white" label
+                                        small><strong>CIN</strong>
+                                    </v-chip>
+                                </span>
+                                <span v-if="item.ty === 23" :class="{ blink: createRn == item.rn }">
+                                    <v-chip class="ma-2" label small><strong>SUB</strong></v-chip>
+                                </span>
+                                <span @contextmenu.prevent="show($event, item)">
+                                    {{ item.rn }}
+                                </span>
                             </span>
                         </template>
                     </v-treeview>
@@ -67,9 +77,6 @@
                                 <v-list-item-title>{{ menuItem.title }}</v-list-item-title>
                             </v-list-item>
                             <!-- enabled만 보이기 -->
-                            <!-- <v-list-item v-for="(item, index) in menuItems" :key="index" v-if="item.disabled === false" @click="menuClick(item)"> 
-                                                <v-list-item-title>{{ item.title }}</v-list-item-title>
-                                            </v-list-item> -->
                         </v-list>
                     </v-menu>
                 </v-col>
@@ -91,23 +98,24 @@
                                 <v-card-text>1. Select resource type</v-card-text>
                                 <div style="padding-left: 15px">
                                     <label>
-                                        <input type="radio" id="cnt" name="selectResource" value="cnt" v-model="selectR" @click="clickRadio()">
+                                        <input type="radio" id="cnt" name="selectResource" value="cnt" v-model="selectR"
+                                            @click="clickRadio()">
                                         <v-chip class="ma-2" color="red" text-color="white" label small>
                                             <label for="cnt"><strong>CNT</strong></label>
                                         </v-chip>
                                     </label>
                                     &nbsp;&nbsp;
                                     <label>
-                                        <input type="radio" id="cin" name="selectResource" value="cin" v-model="selectR" @click="clickRadio()"
-                                            :disabled="disableR === true">
+                                        <input type="radio" id="cin" name="selectResource" value="cin" v-model="selectR"
+                                            @click="clickRadio()" :disabled="disableR === true">
                                         <v-chip class="ma-2" color="green" text-color="white" label small>
                                             <label for="cin"><strong>CIN</strong></label>
                                         </v-chip>
                                     </label>
                                     &nbsp;&nbsp;
                                     <label>
-                                        <input type="radio" id="sub" name="selectResource" value="sub" v-model="selectR" @click="clickRadio()"
-                                            :disabled="disableR === true">
+                                        <input type="radio" id="sub" name="selectResource" value="sub" v-model="selectR"
+                                            @click="clickRadio()" :disabled="disableR === true">
                                         <v-chip class="ma-2" label small>
                                             <label for="sub"><strong>SUB</strong></label>
                                         </v-chip>
@@ -130,7 +138,7 @@
                                             <v-card-text>Content (con)</v-card-text>
                                         </v-col>
                                         <v-col cols="12" md="8">
-                                            <v-text-field v-model="createCon" label="Content" required>
+                                            <v-text-field v-model="createCon" :rules="conRules" label="Content" required>
                                             </v-text-field>
                                         </v-col>
                                     </v-row>
@@ -139,7 +147,7 @@
                                             <v-card-text>Event Noti. Uri (nu)</v-card-text>
                                         </v-col>
                                         <v-col cols="12" md="8">
-                                            <v-text-field v-model="createNu" label="Event Noti. Uri" required>
+                                            <v-text-field v-model="createNu" :rules="nuRules" label="Event Noti. Uri" required>
                                             </v-text-field>
                                         </v-col>
                                     </v-row>
@@ -235,6 +243,7 @@
                                     </template>
                                 </v-simple-table>
                             </div>
+
                             <v-card-actions>
                                 <v-spacer></v-spacer>
                                 <v-btn v-if="selectMenu === 'c'" class="ma-1" color="error" plain @click="create">
@@ -262,6 +271,8 @@ export default {
         urlRules: [
             v => !!v || 'URL is required'
         ],
+        searchText: '', // Discovery
+        searchBoxClosed: true,
         latest: '10',
 
         // Tree
@@ -275,7 +286,7 @@ export default {
         menuItems: [
             { title: 'Create', disabled: false },
             { title: 'Delete', disabled: false },
-            { title: 'Properties', disabled: false }
+            { title: 'Properties', disabled: false },
         ],
 
         // Menu
@@ -287,9 +298,16 @@ export default {
         disableR: false,
         createRn: '',
         createCon: '',
+        conRules: [
+            v => !!v || 'Content is required'
+        ],
         createNu: [],
+        nuRules: [
+            v => v === 0 || 'Noti URI is required'
+        ],
         createNet: [],
         resource: {},
+        newRI: '',
 
     }),
     methods: {
@@ -315,9 +333,6 @@ export default {
         async submit() {
             var url = this.url1 + '/viewer' + this.url2 + '?la=' + this.latest;
 
-            // Mock Server
-            //var url = 'https://4aded162-929f-41b2-904c-fe542272d2d7.mock.pstmn.io/TinyIoT'
-
             await axios.get(url)
                 .then(response => {
                     this.list = response.data;
@@ -338,6 +353,10 @@ export default {
 
         clear() {
             Object.assign(this.$data, this.$options.data.call(this));
+        },
+
+        async discovery(searchText) { // 미구현
+            console.log(this.url1 + this.url2 + '?fur');
         },
 
         // ContextMenu
@@ -398,7 +417,7 @@ export default {
                 this.selectMenu = 'd';
             }
             else if (menuItem.title === 'Properties') {
-                console.log('Properties')
+                console.log('Properties');
                 this.selectMenu = 'p';
                 this.properties();
             }
@@ -444,7 +463,7 @@ export default {
 
                 await axios.post(url, jsonData, { headers: { 'Content-Type': 'application/json; ty=3' } })
                     .then((response) => {
-                        console.log(response.data["m2m:cnt"].rn);
+                        this.newRI = response.data["m2m:cnt"].ri;
                     })
                     .catch((error) => {
                         console.log(error);
@@ -462,7 +481,7 @@ export default {
 
                 await axios.post(url, jsonData, { headers: { 'Content-Type': 'application/json; ty=4' } })
                     .then((response) => {
-                        console.log(response.data["m2m:cin"].rn);
+                        this.newRI = response.data["m2m:cin"].ri;
                     })
                     .catch((error) => {
                         console.log(error);
@@ -472,10 +491,6 @@ export default {
                 if (this.createNu.includes(' '))
                     this.createNu = this.createNu.replace(' ', '') // 공백 제거
                 this.createNu = this.createNu.split(',');
-
-                console.log(this.createRn);
-                console.log(this.createNu);
-                console.log(this.createNet);
 
                 var data = {
                     "m2m:sub": {
@@ -491,13 +506,12 @@ export default {
                 console.log(jsonData);
 
                 await axios.post(url, jsonData, { headers: { 'Content-Type': 'application/json; ty=23' } })
-                .then((response) => {
-                    console.log(response);
-                    console.log(response.data["m2m:sub"].rn)
-                })
-                .catch((error) => {
-                    console.log(error);
-                });
+                    .then((response) => {
+                        this.newRI = response.data["m2m:sub"].ri;
+                    })
+                    .catch((error) => {
+                        console.log(error);
+                    });
             }
 
             console.log('생성완료!');
@@ -509,8 +523,6 @@ export default {
         async remove() {
             var path = this.findPath(this.list, this.selectRn);
             var url = this.url1 + path;
-            console.log('create url: ' + url);
-            console.log('create selectR: ' + this.selectR);
 
             await axios.delete(url)
                 .then((response) => {
@@ -551,12 +563,6 @@ export default {
             var path = this.findPath(this.list, this.selectRn);
             var url = this.url1 + path;
 
-            // Mock Server
-            // var url = 'https://911d7654-821e-4958-b6f2-6f45f66399e2.mock.pstmn.io/TinyIoT'
-
-            console.log(url);
-
-
             await axios.get(url)
                 .then(response => {
                     console.log(response);
@@ -571,3 +577,17 @@ export default {
     }
 }
 </script>
+
+<style>
+@keyframes blink-effect {
+    50% {
+        opacity: 0;
+    }
+}
+
+.blink {
+    animation-name: blink-effect;
+    animation-duration: 1s;
+    animation-iteration-count: 10;  
+}
+</style>
