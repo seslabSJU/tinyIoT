@@ -1,0 +1,19 @@
+
+DeviceList
+
+
+Type:        _Other-oneM2M-Device1._tcp
+Device Name: other oneM2M Device1
+Network:     local
+
+
+Type:        _Other-oneM2M-Device._tcp
+Device Name: other oneM2M Device
+Network:     local
+
+
+Type:        _Other-oneM2M-Device2._tcp
+Device Name: other oneM2M Device2
+Network:     local
+
+

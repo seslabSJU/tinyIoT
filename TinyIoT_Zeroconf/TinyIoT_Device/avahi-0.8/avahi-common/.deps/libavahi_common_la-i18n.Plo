@@ -1,0 +1,26 @@
+libavahi_common_la-i18n.lo: i18n.c /usr/include/stdc-predef.h ../config.h \
+ i18n.h /usr/include/libintl.h /usr/include/features.h \
+ /usr/include/aarch64-linux-gnu/sys/cdefs.h \
+ /usr/include/aarch64-linux-gnu/bits/wordsize.h \
+ /usr/include/aarch64-linux-gnu/bits/long-double.h \
+ /usr/include/aarch64-linux-gnu/gnu/stubs.h \
+ /usr/include/aarch64-linux-gnu/gnu/stubs-lp64.h \
+ /usr/lib/gcc/aarch64-linux-gnu/10/include/stddef.h /usr/include/locale.h \
+ /usr/include/aarch64-linux-gnu/bits/locale.h \
+ /usr/include/aarch64-linux-gnu/bits/types/locale_t.h \
+ /usr/include/aarch64-linux-gnu/bits/types/__locale_t.h
+/usr/include/stdc-predef.h:
+../config.h:
+i18n.h:
+/usr/include/libintl.h:
+/usr/include/features.h:
+/usr/include/aarch64-linux-gnu/sys/cdefs.h:
+/usr/include/aarch64-linux-gnu/bits/wordsize.h:
+/usr/include/aarch64-linux-gnu/bits/long-double.h:
+/usr/include/aarch64-linux-gnu/gnu/stubs.h:
+/usr/include/aarch64-linux-gnu/gnu/stubs-lp64.h:
+/usr/lib/gcc/aarch64-linux-gnu/10/include/stddef.h:
+/usr/include/locale.h:
+/usr/include/aarch64-linux-gnu/bits/locale.h:
+/usr/include/aarch64-linux-gnu/bits/types/locale_t.h:
+/usr/include/aarch64-linux-gnu/bits/types/__locale_t.h:

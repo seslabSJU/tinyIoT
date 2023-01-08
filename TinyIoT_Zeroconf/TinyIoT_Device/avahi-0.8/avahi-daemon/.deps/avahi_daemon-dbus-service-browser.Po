@@ -1,0 +1,174 @@
+avahi_daemon-dbus-service-browser.o: dbus-service-browser.c \
+ /usr/include/stdc-predef.h ../config.h /usr/include/string.h \
+ /usr/include/aarch64-linux-gnu/bits/libc-header-start.h \
+ /usr/include/features.h /usr/include/aarch64-linux-gnu/sys/cdefs.h \
+ /usr/include/aarch64-linux-gnu/bits/wordsize.h \
+ /usr/include/aarch64-linux-gnu/bits/long-double.h \
+ /usr/include/aarch64-linux-gnu/gnu/stubs.h \
+ /usr/include/aarch64-linux-gnu/gnu/stubs-lp64.h \
+ /usr/lib/gcc/aarch64-linux-gnu/10/include/stddef.h \
+ /usr/include/aarch64-linux-gnu/bits/types/locale_t.h \
+ /usr/include/aarch64-linux-gnu/bits/types/__locale_t.h \
+ /usr/include/strings.h ../avahi-common/malloc.h \
+ /usr/include/aarch64-linux-gnu/sys/types.h \
+ /usr/include/aarch64-linux-gnu/bits/types.h \
+ /usr/include/aarch64-linux-gnu/bits/timesize.h \
+ /usr/include/aarch64-linux-gnu/bits/typesizes.h \
+ /usr/include/aarch64-linux-gnu/bits/time64.h \
+ /usr/include/aarch64-linux-gnu/bits/types/clock_t.h \
+ /usr/include/aarch64-linux-gnu/bits/types/clockid_t.h \
+ /usr/include/aarch64-linux-gnu/bits/types/time_t.h \
+ /usr/include/aarch64-linux-gnu/bits/types/timer_t.h \
+ /usr/include/aarch64-linux-gnu/bits/stdint-intn.h /usr/include/endian.h \
+ /usr/include/aarch64-linux-gnu/bits/endian.h \
+ /usr/include/aarch64-linux-gnu/bits/endianness.h \
+ /usr/include/aarch64-linux-gnu/bits/byteswap.h \
+ /usr/include/aarch64-linux-gnu/bits/uintn-identity.h \
+ /usr/include/aarch64-linux-gnu/sys/select.h \
+ /usr/include/aarch64-linux-gnu/bits/select.h \
+ /usr/include/aarch64-linux-gnu/bits/types/sigset_t.h \
+ /usr/include/aarch64-linux-gnu/bits/types/__sigset_t.h \
+ /usr/include/aarch64-linux-gnu/bits/types/struct_timeval.h \
+ /usr/include/aarch64-linux-gnu/bits/types/struct_timespec.h \
+ /usr/include/aarch64-linux-gnu/bits/pthreadtypes.h \
+ /usr/include/aarch64-linux-gnu/bits/thread-shared-types.h \
+ /usr/include/aarch64-linux-gnu/bits/pthreadtypes-arch.h \
+ /usr/include/aarch64-linux-gnu/bits/struct_mutex.h \
+ /usr/include/aarch64-linux-gnu/bits/struct_rwlock.h \
+ /usr/lib/gcc/aarch64-linux-gnu/10/include/stdarg.h \
+ /usr/lib/gcc/aarch64-linux-gnu/10/include/limits.h \
+ /usr/lib/gcc/aarch64-linux-gnu/10/include/syslimits.h \
+ /usr/include/limits.h /usr/include/aarch64-linux-gnu/bits/posix1_lim.h \
+ /usr/include/aarch64-linux-gnu/bits/local_lim.h \
+ /usr/include/linux/limits.h \
+ /usr/include/aarch64-linux-gnu/bits/posix2_lim.h \
+ /usr/include/aarch64-linux-gnu/bits/xopen_lim.h \
+ /usr/include/aarch64-linux-gnu/bits/uio_lim.h /usr/include/assert.h \
+ ../avahi-common/cdecl.h ../avahi-common/gccmacro.h \
+ ../avahi-common/dbus.h /usr/include/dbus-1.0/dbus/dbus.h \
+ /usr/lib/aarch64-linux-gnu/dbus-1.0/include/dbus/dbus-arch-deps.h \
+ /usr/include/dbus-1.0/dbus/dbus-macros.h \
+ /usr/include/dbus-1.0/dbus/dbus-address.h \
+ /usr/include/dbus-1.0/dbus/dbus-types.h \
+ /usr/include/dbus-1.0/dbus/dbus-errors.h \
+ /usr/include/dbus-1.0/dbus/dbus-protocol.h \
+ /usr/include/dbus-1.0/dbus/dbus-bus.h \
+ /usr/include/dbus-1.0/dbus/dbus-connection.h \
+ /usr/include/dbus-1.0/dbus/dbus-memory.h \
+ /usr/include/dbus-1.0/dbus/dbus-message.h \
+ /usr/include/dbus-1.0/dbus/dbus-shared.h \
+ /usr/include/dbus-1.0/dbus/dbus-misc.h \
+ /usr/include/dbus-1.0/dbus/dbus-pending-call.h \
+ /usr/include/dbus-1.0/dbus/dbus-server.h \
+ /usr/include/dbus-1.0/dbus/dbus-signature.h \
+ /usr/include/dbus-1.0/dbus/dbus-syntax.h \
+ /usr/include/dbus-1.0/dbus/dbus-threads.h ../avahi-common/error.h \
+ ../avahi-core/log.h dbus-util.h /usr/include/inttypes.h \
+ /usr/lib/gcc/aarch64-linux-gnu/10/include/stdint.h /usr/include/stdint.h \
+ /usr/include/aarch64-linux-gnu/bits/wchar.h \
+ /usr/include/aarch64-linux-gnu/bits/stdint-uintn.h \
+ ../avahi-common/strlst.h ../avahi-common/defs.h dbus-internal.h \
+ ../avahi-core/core.h ../avahi-common/address.h ../avahi-common/watch.h \
+ /usr/include/poll.h /usr/include/aarch64-linux-gnu/sys/poll.h \
+ /usr/include/aarch64-linux-gnu/bits/poll.h \
+ /usr/include/aarch64-linux-gnu/sys/time.h ../avahi-common/timeval.h \
+ ../avahi-core/rr.h ../avahi-core/publish.h ../avahi-core/lookup.h \
+ ../avahi-common/llist.h main.h ../avahi-common/simple-watch.h
+/usr/include/stdc-predef.h:
+../config.h:
+/usr/include/string.h:
+/usr/include/aarch64-linux-gnu/bits/libc-header-start.h:
+/usr/include/features.h:
+/usr/include/aarch64-linux-gnu/sys/cdefs.h:
+/usr/include/aarch64-linux-gnu/bits/wordsize.h:
+/usr/include/aarch64-linux-gnu/bits/long-double.h:
+/usr/include/aarch64-linux-gnu/gnu/stubs.h:
+/usr/include/aarch64-linux-gnu/gnu/stubs-lp64.h:
+/usr/lib/gcc/aarch64-linux-gnu/10/include/stddef.h:
+/usr/include/aarch64-linux-gnu/bits/types/locale_t.h:
+/usr/include/aarch64-linux-gnu/bits/types/__locale_t.h:
+/usr/include/strings.h:
+../avahi-common/malloc.h:
+/usr/include/aarch64-linux-gnu/sys/types.h:
+/usr/include/aarch64-linux-gnu/bits/types.h:
+/usr/include/aarch64-linux-gnu/bits/timesize.h:
+/usr/include/aarch64-linux-gnu/bits/typesizes.h:
+/usr/include/aarch64-linux-gnu/bits/time64.h:
+/usr/include/aarch64-linux-gnu/bits/types/clock_t.h:
+/usr/include/aarch64-linux-gnu/bits/types/clockid_t.h:
+/usr/include/aarch64-linux-gnu/bits/types/time_t.h:
+/usr/include/aarch64-linux-gnu/bits/types/timer_t.h:
+/usr/include/aarch64-linux-gnu/bits/stdint-intn.h:
+/usr/include/endian.h:
+/usr/include/aarch64-linux-gnu/bits/endian.h:
+/usr/include/aarch64-linux-gnu/bits/endianness.h:
+/usr/include/aarch64-linux-gnu/bits/byteswap.h:
+/usr/include/aarch64-linux-gnu/bits/uintn-identity.h:
+/usr/include/aarch64-linux-gnu/sys/select.h:
+/usr/include/aarch64-linux-gnu/bits/select.h:
+/usr/include/aarch64-linux-gnu/bits/types/sigset_t.h:
+/usr/include/aarch64-linux-gnu/bits/types/__sigset_t.h:
+/usr/include/aarch64-linux-gnu/bits/types/struct_timeval.h:
+/usr/include/aarch64-linux-gnu/bits/types/struct_timespec.h:
+/usr/include/aarch64-linux-gnu/bits/pthreadtypes.h:
+/usr/include/aarch64-linux-gnu/bits/thread-shared-types.h:
+/usr/include/aarch64-linux-gnu/bits/pthreadtypes-arch.h:
+/usr/include/aarch64-linux-gnu/bits/struct_mutex.h:
+/usr/include/aarch64-linux-gnu/bits/struct_rwlock.h:
+/usr/lib/gcc/aarch64-linux-gnu/10/include/stdarg.h:
+/usr/lib/gcc/aarch64-linux-gnu/10/include/limits.h:
+/usr/lib/gcc/aarch64-linux-gnu/10/include/syslimits.h:
+/usr/include/limits.h:
+/usr/include/aarch64-linux-gnu/bits/posix1_lim.h:
+/usr/include/aarch64-linux-gnu/bits/local_lim.h:
+/usr/include/linux/limits.h:
+/usr/include/aarch64-linux-gnu/bits/posix2_lim.h:
+/usr/include/aarch64-linux-gnu/bits/xopen_lim.h:
+/usr/include/aarch64-linux-gnu/bits/uio_lim.h:
+/usr/include/assert.h:
+../avahi-common/cdecl.h:
+../avahi-common/gccmacro.h:
+../avahi-common/dbus.h:
+/usr/include/dbus-1.0/dbus/dbus.h:
+/usr/lib/aarch64-linux-gnu/dbus-1.0/include/dbus/dbus-arch-deps.h:
+/usr/include/dbus-1.0/dbus/dbus-macros.h:
+/usr/include/dbus-1.0/dbus/dbus-address.h:
+/usr/include/dbus-1.0/dbus/dbus-types.h:
+/usr/include/dbus-1.0/dbus/dbus-errors.h:
+/usr/include/dbus-1.0/dbus/dbus-protocol.h:
+/usr/include/dbus-1.0/dbus/dbus-bus.h:
+/usr/include/dbus-1.0/dbus/dbus-connection.h:
+/usr/include/dbus-1.0/dbus/dbus-memory.h:
+/usr/include/dbus-1.0/dbus/dbus-message.h:
+/usr/include/dbus-1.0/dbus/dbus-shared.h:
+/usr/include/dbus-1.0/dbus/dbus-misc.h:
+/usr/include/dbus-1.0/dbus/dbus-pending-call.h:
+/usr/include/dbus-1.0/dbus/dbus-server.h:
+/usr/include/dbus-1.0/dbus/dbus-signature.h:
+/usr/include/dbus-1.0/dbus/dbus-syntax.h:
+/usr/include/dbus-1.0/dbus/dbus-threads.h:
+../avahi-common/error.h:
+../avahi-core/log.h:
+dbus-util.h:
+/usr/include/inttypes.h:
+/usr/lib/gcc/aarch64-linux-gnu/10/include/stdint.h:
+/usr/include/stdint.h:
+/usr/include/aarch64-linux-gnu/bits/wchar.h:
+/usr/include/aarch64-linux-gnu/bits/stdint-uintn.h:
+../avahi-common/strlst.h:
+../avahi-common/defs.h:
+dbus-internal.h:
+../avahi-core/core.h:
+../avahi-common/address.h:
+../avahi-common/watch.h:
+/usr/include/poll.h:
+/usr/include/aarch64-linux-gnu/sys/poll.h:
+/usr/include/aarch64-linux-gnu/bits/poll.h:
+/usr/include/aarch64-linux-gnu/sys/time.h:
+../avahi-common/timeval.h:
+../avahi-core/rr.h:
+../avahi-core/publish.h:
+../avahi-core/lookup.h:
+../avahi-common/llist.h:
+main.h:
+../avahi-common/simple-watch.h:

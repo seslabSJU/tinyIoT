@@ -1,0 +1,8 @@
+prefix=/usr/local
+exec_prefix=/usr/local
+libdir=/usr/local/lib
+
+Name: avahi-sharp
+Description: Mono bindings for the Avahi mDNS/DNS-SD stack
+Version: 0.8
+Libs: -r:${libdir}/mono/avahi-sharp/avahi-sharp.dll
