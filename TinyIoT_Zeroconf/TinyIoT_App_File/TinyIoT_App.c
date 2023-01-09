@@ -7,7 +7,6 @@
 
 #define SERVER_URL "http://192.168.35.232:3000/TinyIoT"
 #define TINYIOT_ID_HEADER_NAME "TinyIoT-ID"
-#define AE_API "tiny_IoT"
 #define MAX_VALUE 3000
 #define VALUE 100
 #define MIDDLE_VALUE 300
