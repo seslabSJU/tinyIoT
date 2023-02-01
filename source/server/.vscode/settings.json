@@ -1,0 +1,23 @@
+{
+    "files.associations": {
+        "random": "c",
+        "zeroconf.h": "c",
+        "ctype.h": "c",
+        "stdio.h": "c",
+        "*.moc5": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "onem2m.h": "c",
+        "unistd.h": "c",
+        "stdlib.h": "c",
+        "numbers": "c",
+        "time.h": "c",
+        "curl.h": "c",
+        "jsonparse.h": "c",
+        "berkeleydb.h": "c",
+        "pthread.h": "c",
+        "config.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
+}

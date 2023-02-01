@@ -1,6 +1,4 @@
 #include "httpd.h"
-#include "config.h"
-#include "onem2m.h"
 
 #include <arpa/inet.h>
 #include <ctype.h>
@@ -12,20 +10,17 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <fcntl.h>
 
-#define MAX_CONNECTIONS 1024
+#define MAX_CONNECTIONS 1000
 #define BUF_SIZE 65535
 #define QUEUE_SIZE 1000000
 
-pthread_mutex_t mutex_lock;
-int listenfd;
+static int listenfd;
 int *clients;
 static void start_server(const char *);
 static void respond(int);
 
-static char *buf[MAX_CONNECTIONS];
+static char *buf;
 
 // Client request
 char *method, // "GET" or "POST"
@@ -36,22 +31,14 @@ char *method, // "GET" or "POST"
 
 int payload_size;
 
-void *respond_thread(void *ps) {
-  int *slot = (int*)ps;
-	respond(*slot);
-	close(clients[*slot]);
-	clients[*slot] = -1;
-	return NULL;
-}
-
 void serve_forever(const char *PORT) {
-  pthread_mutex_init(&mutex_lock, NULL);
   struct sockaddr_in clientaddr;
-  socklen_t addrlen = 0;
-  
-  int slot = 0; 
+  socklen_t addrlen;
 
-  fprintf(stderr,"Server started %shttp://127.0.0.1:%s%s\n", "\033[92m", PORT, "\033[0m");
+  int slot = 0;
+
+  printf("Server started %shttp://127.0.0.1:%s%s\n", "\033[92m", PORT,
+         "\033[0m");
 
   // create shared memory for client slot array
   clients = mmap(NULL, sizeof(*clients) * MAX_CONNECTIONS,
@@ -68,19 +55,24 @@ void serve_forever(const char *PORT) {
 
   // ACCEPT connections
   while (1) {
+    addrlen = sizeof(clientaddr);
     clients[slot] = accept(listenfd, (struct sockaddr *)&clientaddr, &addrlen);
 
-    fprintf(stderr,"error : %d\n", clients[slot]);
     if (clients[slot] < 0) {
       perror("accept() error");
       exit(1);
     } else {
-      pthread_t thread_id;
-      int s = slot;
-      int *ps = &s; 
-      pthread_create(&thread_id, NULL, respond_thread, (void*)ps);
-      if(MONO_THREAD) pthread_join(thread_id, NULL);
+      if (fork() == 0) {
+        close(listenfd);
+        respond(slot);
+        close(clients[slot]);
+        clients[slot] = -1;
+        exit(0);
+      } else {
+        close(clients[slot]);
+      }
     }
+
     while (clients[slot] != -1)
       slot = (slot + 1) % MAX_CONNECTIONS;
   }
@@ -99,7 +91,7 @@ void start_server(const char *port) {
     perror("getaddrinfo() error");
     exit(1);
   }
-  // socket and 
+  // socket and bind
   for (p = res; p != NULL; p = p->ai_next) {
     int option = 1;
     listenfd = socket(p->ai_family, p->ai_socktype, 0);
@@ -142,9 +134,9 @@ static void uri_unescape(char *uri) {
   char chr = 0;
   char *src = uri;
   char *dst = uri;
-  
-  // Skip initial non encoded character
-  while (*src && !isspace((int)(*src)) && (*src != '%')) 
+
+  // Skip inital non encoded character
+  while (*src && !isspace((int)(*src)) && (*src != '%'))
     src++;
 
   // Replace encoded characters with corresponding code.
@@ -162,46 +154,31 @@ static void uri_unescape(char *uri) {
     *dst++ = chr;
     src++;
   }
-
   *dst = '\0';
 }
 
 // client connection
 void respond(int slot) {
   int rcvd;
-  
-  buf[slot] = malloc(BUF_SIZE);
-  rcvd = recv(clients[slot], buf[slot], BUF_SIZE, 0);
 
-  if (rcvd < 0){ // receive error
+  buf = malloc(BUF_SIZE);
+  rcvd = recv(clients[slot], buf, BUF_SIZE, 0);
+
+  if (rcvd < 0) // receive error
     fprintf(stderr, ("recv() error\n"));
-    return;
-  }
-  else if (rcvd == 0) { // receive socket closed
+  else if (rcvd == 0) // receive socket closed
     fprintf(stderr, "Client disconnected upexpectedly.\n");
-    return;
-  }
   else // message received
   {
-    pthread_mutex_lock(&mutex_lock);
+    buf[rcvd] = '\0';
 
-    buf[slot][rcvd] = '\0';
-    fprintf(stderr,"\n\033[34m======================Buffer received======================\033[0m\n\n");
-    fprintf(stderr,"%s",buf[slot]);
-    fprintf(stderr,"\n\033[34m==========================================================\033[0m\n");
-
-    method = strtok(buf[slot], " \t\r\n");
+    method = strtok(buf, " \t\r\n");
     uri = strtok(NULL, " \t");
     prot = strtok(NULL, " \t\r\n");
 
-    if(!uri) {
-      fprintf(stderr,"uri is NULL\n");
-      return;
-    }
-
     uri_unescape(uri);
-    
-    fprintf(stderr, "\n\x1b[36m + [%s] %s\x1b[0m\n", method, uri);
+
+    fprintf(stderr, "\x1b[32m + [%s] %s\x1b[0m\n", method, uri);
 
     qs = strchr(uri, '?');
 
@@ -226,8 +203,7 @@ void respond(int slot) {
       h->name = key;
       h->value = val;
       h++;
-      //fprintf(stderr, "[H] %s: %s\n", key, val); // print request headers 
-      
+      //fprintf(stderr, "[H] %s: %s\n", key, val);
       t = val + 1 + strlen(val);
       if (t[1] == '\r' && t[2] == '\n')
         break;
@@ -235,84 +211,21 @@ void respond(int slot) {
     t = strtok(NULL, "\r\n");
     t2 = request_header("Content-Length"); // and the related header if there is
     payload = t;
-    payload_size = t2 ? atol(t2) : (rcvd - (t - buf[slot]));
-    if(payload) normalize_payload();
+    payload_size = t2 ? atol(t2) : (rcvd - (t - buf));
+
     // bind clientfd to stdout, making it easier to write
     int clientfd = clients[slot];
     dup2(clientfd, STDOUT_FILENO);
     close(clientfd);
 
     // call router
-    handle_http_request();
-
-    pthread_mutex_unlock(&mutex_lock);
+    route();
 
     // tidy up
     fflush(stdout);
     shutdown(STDOUT_FILENO, SHUT_WR);
-    //close(STDOUT_FILENO);
+    close(STDOUT_FILENO);
   }
-  free(buf[slot]);
-}
 
-Operation http_parse_operation(){
-	Operation op;
-
-	if(strcmp(method, "POST") == 0) op = OP_CREATE;
-	else if(strcmp(method, "GET") == 0) op = OP_RETRIEVE;
-	else if (strcmp(method, "PUT") == 0) op = OP_UPDATE;
-	else if (strcmp(method, "DELETE") == 0) op = OP_DELETE;
-
-	return op;
-}
-
-void set_response_header(char *key, char *value, char *response_headers) {
-  if(!value) return;
-  char header[128];
-
-  sprintf(header, "%s: %s\n", key, value);
-  strcat(response_headers, header);
-
-  return;
-}
-
-void normalize_payload() {
-	int index = 0;
-
-	for(int i=0; i<payload_size; i++) {
-		if(is_json_valid_char(payload[i])) {
-			payload[index++] =  payload[i];
-		}
-	}
-
-	payload[index] = '\0';
-}
-
-void http_respond_to_client(oneM2MPrimitive *o2pt, int status) {
-    char content_length[16];
-    char rsc[6];
-    char response_headers[1024] = {'\0'};
-
-    sprintf(content_length, "%ld", strlen(o2pt->pc));
-    sprintf(rsc, "%d", o2pt->rsc);
-    set_response_header("Content-Length", content_length, response_headers);
-    set_response_header("X-M2M-RSC", rsc, response_headers);
-    set_response_header("X-M2M-RVI", o2pt->rvi, response_headers);
-    set_response_header("X-M2M-RI", o2pt->rqi, response_headers);
-
-    fprintf(stderr,"\n\033[34m========================Buffer sent========================\033[0m\n\n");
-    switch(status) {
-        case 200: HTTP_200; LOG_HTTP_200; break;
-        case 201: HTTP_201; LOG_HTTP_201; break;
-        case 209: HTTP_209; LOG_HTTP_209; break;
-        case 400: HTTP_400; LOG_HTTP_400; break;
-        case 403: HTTP_403; LOG_HTTP_403; break;
-        case 404: HTTP_404; LOG_HTTP_404; break;
-        case 406: HTTP_406; LOG_HTTP_406; break;
-        case 413: HTTP_413; LOG_HTTP_413; break;
-        case 500: HTTP_500; LOG_HTTP_500; break;
-    }
-    printf("%s",o2pt->pc); 
-    fprintf(stderr,"%s\n",o2pt->pc);
-    fprintf(stderr,"\n\n\033[34m==========================================================\033[0m\n");
+  free(buf);
 }

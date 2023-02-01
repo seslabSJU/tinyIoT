@@ -1,6 +1,0 @@
-*.zip
-.vscode
-*.o
-*.tar.gz
-venvs
-server

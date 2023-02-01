@@ -3,9 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <db.h>
 #include "onem2m.h"
-#define DB_STR_MAX 2048
-#define DB_SEP ";"
+#include "berkeleyDB.h"
+
 
 /*DB CREATE*/
 DB* DB_CREATE_(DB *dbp){
@@ -182,6 +183,7 @@ int db_store_cse(CSE *cse_object) {
 int db_store_ae(AE *ae_object) {
     fprintf(stderr,"[Store AE] %s...",ae_object->ri);
     char* DATABASE = "RESOURCE.db";
+    char* blankspace = " ";
 
     DB* dbp;    // db handle
     DBC* dbcp;
@@ -196,18 +198,18 @@ int db_store_ae(AE *ae_object) {
         fprintf(stderr, "ri is NULL\n");
         return -1;
     }
-    if (ae_object->rn == NULL) ae_object->rn = " ";
-    if (ae_object->pi == NULL) ae_object->pi = " ";
+    if (ae_object->rn == NULL) ae_object->rn = blankspace;
+    if (ae_object->pi == NULL) ae_object->pi = blankspace;
     if (ae_object->ty == '\0') ae_object->ty = 0;
-    if (ae_object->ct == NULL) ae_object->ct = " ";
-    if (ae_object->lt == NULL) ae_object->lt = " ";
-    if (ae_object->et == NULL) ae_object->et = " ";
-
+    if (ae_object->ct == NULL) ae_object->ct = blankspace;
+    if (ae_object->lt == NULL) ae_object->lt = blankspace;
+    if (ae_object->et == NULL) ae_object->et = blankspace;
+    if (ae_object->api == NULL) ae_object->api = blankspace;
+    if (ae_object->aei == NULL) ae_object->aei = blankspace;
+    if (ae_object->lbl == NULL) ae_object->lbl = blankspace;
+    if (ae_object->srv == NULL) ae_object->srv = blankspace;
     if(ae_object->rr == false) strcpy(rr,"false");
     else strcpy(rr,"true");
-
-    if (ae_object->api == NULL) ae_object->api = " ";
-    if (ae_object->aei == NULL) ae_object->aei = " ";
 
     dbp = DB_CREATE_(dbp);
     dbp = DB_OPEN_(dbp,DATABASE);
@@ -223,9 +225,9 @@ int db_store_ae(AE *ae_object) {
 
     /* List data excluding 'ri' as strings using delimiters. */
     char str[DB_STR_MAX]= "\0";
-    sprintf(str, "%s;%s;%d;%s;%s;%s;%s;%s;%s",
+    sprintf(str, "%s;%s;%d;%s;%s;%s;%s;%s;%s;%s;%s",
             ae_object->rn,ae_object->pi,ae_object->ty,ae_object->ct,ae_object->lt,
-            ae_object->et,ae_object->api,rr,ae_object->aei);
+            ae_object->et,ae_object->api,rr,ae_object->aei,ae_object->lbl,ae_object->srv);
 
     data.data = str;
     data.size = strlen(str) + 1;
@@ -236,7 +238,19 @@ int db_store_ae(AE *ae_object) {
 
     /* DB close */
     dbcp->close(dbcp);
-    dbp->close(dbp, 0); 
+    dbp->close(dbp, 0);
+
+    if (ae_object->rn == blankspace) ae_object->rn = NULL;
+    if (ae_object->pi == blankspace) ae_object->pi = NULL;
+    if (ae_object->ty == '\0') ae_object->ty = 0;
+    if (ae_object->ct == blankspace) ae_object->ct = NULL;
+    if (ae_object->lt == blankspace) ae_object->lt = NULL;
+    if (ae_object->et == blankspace) ae_object->et = NULL;
+    if (ae_object->api == blankspace) ae_object->api = NULL;
+    if (ae_object->aei == blankspace) ae_object->aei = NULL;
+    if (ae_object->lbl == blankspace) ae_object->lbl = NULL;
+    if (ae_object->srv == blankspace) ae_object->srv = NULL;
+
     fprintf(stderr,"OK\n");
     return 1;
 }
@@ -244,6 +258,7 @@ int db_store_ae(AE *ae_object) {
 int db_store_cnt(CNT *cnt_object) {
     fprintf(stderr,"[Store CNT] %s...",cnt_object->ri);
     char* DATABASE = "RESOURCE.db";
+    char* blankspace = " ";
 
     DB* dbp;    // db handle
     DBC* dbcp;
@@ -257,15 +272,15 @@ int db_store_cnt(CNT *cnt_object) {
         fprintf(stderr, "ri is NULL\n");
         return -1;
     }
-    if (cnt_object->rn == NULL) cnt_object->rn = " ";
-    if (cnt_object->pi == NULL) cnt_object->pi = " ";
+    if (cnt_object->rn == NULL) cnt_object->rn = blankspace;
+    if (cnt_object->pi == NULL) cnt_object->pi = blankspace;
     if (cnt_object->ty == '\0') cnt_object->ty = 0;
-    if (cnt_object->ct == NULL) cnt_object->ct = " ";
-    if (cnt_object->lt == NULL) cnt_object->lt = " ";
-    if (cnt_object->et == NULL) cnt_object->et = " ";
+    if (cnt_object->ct == NULL) cnt_object->ct = blankspace;
+    if (cnt_object->lt == NULL) cnt_object->lt = blankspace;
+    if (cnt_object->et == NULL) cnt_object->et = blankspace;
     
-    if (cnt_object->lbl == NULL) cnt_object->lbl = "NULL";
-    if (cnt_object->acpi == NULL) cnt_object->acpi = " ";
+    if (cnt_object->acpi == NULL) cnt_object->acpi = blankspace;
+    if (cnt_object->lbl == NULL) cnt_object->lbl = blankspace;
     if (cnt_object->cni == '\0') cnt_object->cni = 0;
     if (cnt_object->cbs == '\0') cnt_object->cbs = 0;
     if (cnt_object->st == '\0') cnt_object->st = 0;
@@ -298,6 +313,20 @@ int db_store_cnt(CNT *cnt_object) {
     /* DB close */
     dbcp->close(dbcp);
     dbp->close(dbp, 0); 
+
+    if (cnt_object->rn == blankspace) cnt_object->rn = NULL;
+    if (cnt_object->pi == blankspace) cnt_object->pi = NULL;
+    if (cnt_object->ty == 0) cnt_object->ty = '\0';
+    if (cnt_object->ct == blankspace) cnt_object->ct = NULL;
+    if (cnt_object->lt == blankspace) cnt_object->lt = NULL;
+    if (cnt_object->et == blankspace) cnt_object->et = NULL;
+    
+    if (cnt_object->acpi == blankspace) cnt_object->acpi = NULL;
+    if (cnt_object->lbl == blankspace) cnt_object->lbl = NULL;
+    if (cnt_object->cni == 0) cnt_object->cni = '\0';
+    if (cnt_object->cbs == 0) cnt_object->cbs = '\0';
+    if (cnt_object->st == 0) cnt_object->st = '\0';
+
     fprintf(stderr,"OK\n");
     return 1;
 }
@@ -585,7 +614,7 @@ CSE* db_get_cse(char* ri) {
     char* DATABASE = "RESOURCE.db";
 
     //struct to return
-    CSE* new_cse= calloc(1,sizeof(CSE));
+    CSE* new_cse= NULL;
 
     DB* dbp;
     DBC* dbcp;
@@ -607,6 +636,7 @@ CSE* db_get_cse(char* ri) {
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
         cnt++;
         if (strncmp(key.data, ri, key.size) == 0) {
+            new_cse= calloc(1,sizeof(CSE));
             flag=1;
             // ri = key
             new_cse->ri = calloc(key.size,sizeof(char));
@@ -718,7 +748,7 @@ AE* db_get_ae(char* ri) {
         if (strncmp(key.data, ri, key.size) == 0) {
             flag=1;
             // ri = key
-            new_ae->ri = calloc(key.size,sizeof(char));
+            new_ae->ri = malloc((key.size+1)*sizeof(char));
             strcpy(new_ae->ri, key.data);
 
             char *ptr = strtok((char*)data.data,DB_SEP);  //split first string
@@ -727,7 +757,7 @@ AE* db_get_ae(char* ri) {
                 case 0:
                 if(strcmp(ptr," ")==0) new_ae->rn=NULL; //data is NULL
                 else{
-                    new_ae->rn = calloc(strlen(ptr),sizeof(char));
+                    new_ae->rn = malloc((strlen(ptr) + 1) * sizeof(char));
                     strcpy(new_ae->rn, ptr);
                 }
                     idx++;
@@ -735,7 +765,7 @@ AE* db_get_ae(char* ri) {
                 case 1:
                 if(strcmp(ptr," ")==0) new_ae->pi=NULL; //data is NULL
                     else{
-                    new_ae->pi = calloc(strlen(ptr),sizeof(char));
+                    new_ae->pi = malloc((strlen(ptr) + 1) * sizeof(char));
                     strcpy(new_ae->pi, ptr);
                     }
                     idx++;
@@ -749,7 +779,7 @@ AE* db_get_ae(char* ri) {
                 case 3:
                 if(strcmp(ptr," ")==0) new_ae->ct=NULL; //data is NULL
                 else{
-                    new_ae->ct = calloc(strlen(ptr),sizeof(char));
+                    new_ae->ct = malloc((strlen(ptr) + 1) * sizeof(char));
                     strcpy(new_ae->ct, ptr);
                 }
                     idx++;
@@ -757,7 +787,7 @@ AE* db_get_ae(char* ri) {
                 case 4:
                 if(strcmp(ptr," ")==0) new_ae->lt=NULL; //data is NULL
                 else{                
-                    new_ae->lt = calloc(strlen(ptr),sizeof(char));
+                    new_ae->lt = malloc((strlen(ptr) + 1) * sizeof(char));
                     strcpy(new_ae->lt, ptr);
                 }
                     idx++;
@@ -765,7 +795,7 @@ AE* db_get_ae(char* ri) {
                 case 5:
                 if(strcmp(ptr," ")==0) new_ae->et=NULL; //data is NULL
                 else{                
-                    new_ae->et = calloc(strlen(ptr),sizeof(char));
+                    new_ae->et = malloc((strlen(ptr) + 1) * sizeof(char));
                     strcpy(new_ae->et, ptr);
                 }
                     idx++;
@@ -773,7 +803,7 @@ AE* db_get_ae(char* ri) {
                 case 6:
                 if(strcmp(ptr," ")==0) new_ae->api=NULL; //data is NULL
                 else{                
-                    new_ae->api = calloc(strlen(ptr),sizeof(char));
+                    new_ae->api = malloc((strlen(ptr) + 1) * sizeof(char));
                     strcpy(new_ae->api, ptr);
                 }
                     idx++;
@@ -789,11 +819,27 @@ AE* db_get_ae(char* ri) {
                 case 8:
                 if(strcmp(ptr," ")==0) new_ae->aei=NULL; //data is NULL
                 else{                
-                    new_ae->aei = calloc(strlen(ptr),sizeof(char));
+                    new_ae->aei = malloc((strlen(ptr) + 1) * sizeof(char));
                     strcpy(new_ae->aei, ptr);
                 }
                     idx++;
-                    break;                                                                     
+                    break; 
+                case 9:
+                if(strcmp(ptr," ")==0) new_ae->lbl=NULL; //data is NULL
+                else{                
+                    new_ae->lbl = malloc((strlen(ptr) + 1) * sizeof(char));
+                    strcpy(new_ae->lbl, ptr);
+                }
+                    idx++;
+                    break;
+                case 10:
+                if(strcmp(ptr," ")==0) new_ae->srv=NULL; //data is NULL
+                else{                
+                    new_ae->srv = malloc((strlen(ptr) + 1) * sizeof(char));
+                    strcpy(new_ae->srv, ptr);
+                }            
+                    idx++;
+                    break;                                    
                 default:
                     idx=-1;
                 }
@@ -961,6 +1007,8 @@ CNT* db_get_cnt(char* ri) {
         dbp->close(dbp, 0);
     fprintf(stderr,"OK\n");
 
+    
+
     return new_cnt;
 }
 
@@ -969,7 +1017,7 @@ CIN* db_get_cin(char* ri) {
     char* DATABASE = "RESOURCE.db";
 
     //struct to return
-    CIN* new_cin = calloc(1,sizeof(CIN));
+    CIN* new_cin = NULL;
 
     DB* dbp;
     DBC* dbcp;
@@ -977,7 +1025,6 @@ CIN* db_get_cin(char* ri) {
     int ret;
 
     int cin = 0;
-    int flag = 0;
     int idx = 0;
     
     dbp = DB_CREATE_(dbp);
@@ -991,7 +1038,7 @@ CIN* db_get_cin(char* ri) {
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
         cin++;
         if (strncmp(key.data, ri, key.size) == 0) {
-            flag=1;
+            new_cin = calloc(1,sizeof(CIN));
             // ri = key
             new_cin->ri = calloc(key.size,sizeof(char));
             strcpy(new_cin->ri, key.data);
@@ -1079,7 +1126,7 @@ CIN* db_get_cin(char* ri) {
         fprintf(stderr, "Cursor ERROR\n");
         exit(0);
     }
-    if (cin == 0 || flag==0) {
+    if (cin == 0) {
         fprintf(stderr, "Data not exist\n");
         return NULL;
     }
@@ -1546,10 +1593,10 @@ int db_delete_acp(char* ri) {
     return 1;
 }
 
-Node* db_get_all_cse() {
+RTNode* db_get_all_cse() {
     fprintf(stderr,"\x1b[92m[Get All CSE]\x1b[0m\n");
     char* DATABASE = "RESOURCE.db";
-    char* TYPE = "5-";
+    const char* TYPE = "5-";
 
     DB* dbp;
     DBC* dbcp;
@@ -1578,8 +1625,8 @@ Node* db_get_all_cse() {
         return NULL;
     }
 
-    Node* head = calloc(1,sizeof(Node));
-    Node* node;
+    RTNode* head = calloc(1,sizeof(RTNode));
+    RTNode* node;
     node = head;
 
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
@@ -1594,7 +1641,7 @@ Node* db_get_all_cse() {
             strcpy(node->pi,cse->pi);
             node->ty = cse->ty;
 
-            node->sibling_right=calloc(1,sizeof(Node));            
+            node->sibling_right=calloc(1,sizeof(RTNode));            
             node->sibling_right->sibling_left = node;
             node = node->sibling_right;
             free(cse);
@@ -1618,14 +1665,13 @@ Node* db_get_all_cse() {
         dbcp->close(dbcp);
     if (dbp != NULL)
         dbp->close(dbp, 0);    
-    fprintf(stderr,"\n");
     return head;
 }
 
-Node* db_get_all_ae() {
+RTNode* db_get_all_ae() {
     fprintf(stderr,"\x1b[92m[Get All AE]\x1b[0m\n");
     char* DATABASE = "RESOURCE.db";
-    char* TYPE = "2-";
+    const const char* TYPE = "C";
 
     DB* dbp;
     DBC* dbcp;
@@ -1644,7 +1690,7 @@ Node* db_get_all_ae() {
     DBC* dbcp0;
     dbcp0 = DB_GET_CURSOR(dbp,dbcp0);
     while ((ret = dbcp0->get(dbcp0, &key, &data, DB_NEXT)) == 0) {
-        if (strncmp(key.data, TYPE , 2) == 0) 
+        if (strncmp(key.data, TYPE , 1) == 0) 
             cnt++;
     }
     //fprintf(stderr, "<%d>\n",cnt);
@@ -1654,12 +1700,12 @@ Node* db_get_all_ae() {
         return NULL;
     }
 
-    Node* head = calloc(1,sizeof(Node));
-    Node* node;
+    RTNode* head = calloc(1,sizeof(RTNode));
+    RTNode* node;
     node = head;
 
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
-        if (strncmp(key.data, TYPE , 2) == 0){
+        if (strncmp(key.data, TYPE , 1) == 0){
             AE* ae = db_get_ae((char*)key.data);
             node->ri = calloc(strlen(ae->ri)+1,sizeof(char));
             node->rn = calloc(strlen(ae->rn)+1,sizeof(char));
@@ -1671,8 +1717,8 @@ Node* db_get_all_ae() {
             strcpy(node->pi,ae->pi);
             node->ty = ae->ty;
 
-            node->sibling_right=(Node*)calloc(1,sizeof(Node));
-            //node->sibling_right=calloc(1,sizeof(Node));            
+            node->sibling_right=(RTNode*)calloc(1,sizeof(RTNode));
+            //node->sibling_right=calloc(1,sizeof(RTNode));            
             node->sibling_right->sibling_left = node;
             node = node->sibling_right;
             free(ae);
@@ -1696,14 +1742,13 @@ Node* db_get_all_ae() {
         dbcp->close(dbcp);
     if (dbp != NULL)
         dbp->close(dbp, 0);    
-    fprintf(stderr,"\n");
     return head;
 }
 
-Node* db_get_all_cnt() {
+RTNode* db_get_all_cnt() {
     fprintf(stderr,"\x1b[92m[Get All CNT]\x1b[0m\n");
     char* DATABASE = "RESOURCE.db";
-    char* TYPE = "3-";
+    const char* TYPE = "3-";
 
     DB* dbp;
     DBC* dbcp;
@@ -1732,8 +1777,8 @@ Node* db_get_all_cnt() {
         return NULL;
     }
 
-    Node* head = calloc(1,sizeof(Node));
-    Node* node;
+    RTNode* head = calloc(1,sizeof(RTNode));
+    RTNode* node;
     node = head;
 
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
@@ -1752,7 +1797,7 @@ Node* db_get_all_cnt() {
             strcpy(node->pi,cnt_->pi);
             node->ty = cnt_->ty;
 
-            node->sibling_right=calloc(1,sizeof(Node));            
+            node->sibling_right=calloc(1,sizeof(RTNode));            
             node->sibling_right->sibling_left = node;
             node = node->sibling_right;
             free(cnt_);
@@ -1780,7 +1825,7 @@ Node* db_get_all_cnt() {
     return head;
 }
 
-Node* db_get_all_sub(){
+RTNode* db_get_all_sub(){
     fprintf(stderr,"\x1b[92m[Get All Sub]\x1b[0m\n");
     char* database = "SUB.db";
 
@@ -1834,8 +1879,8 @@ Node* db_get_all_sub(){
     char* tmp;
 
 
-    Node* head = (Node*)calloc(cnt, sizeof(Node));
-    Node* node;
+    RTNode* head = (RTNode*)calloc(cnt, sizeof(RTNode));
+    RTNode* node;
     node = head;
     //node_ri = node_pi = node_rn = node_nu = node_sub_bit = head;
     
@@ -1846,7 +1891,7 @@ Node* db_get_all_sub(){
                 node->ri = malloc(data.size);
                 strcpy(node->ri, data.data);
 
-                node->sibling_right = (Node*)calloc(1,sizeof(Node));
+                node->sibling_right = (RTNode*)calloc(1,sizeof(RTNode));
                 node->sibling_right->sibling_left = node;
 
                 idx++;
@@ -1904,10 +1949,10 @@ Node* db_get_all_sub(){
     return head;
 }
 
-Node* db_get_all_acp() {
+RTNode* db_get_all_acp() {
     fprintf(stderr,"\x1b[92m[Get All ACP]\x1b[0m\n");
     char* DATABASE = "ACP.db";
-    char* TYPE = "1-";
+    const char* TYPE = "1-";
 
     DB* dbp;
     DBC* dbcp;
@@ -1936,8 +1981,8 @@ Node* db_get_all_acp() {
         return NULL;
     }
 
-    Node* head = calloc(1,sizeof(Node));
-    Node* node;
+    RTNode* head = calloc(1,sizeof(RTNode));
+    RTNode* node;
     node = head;
 
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
@@ -1964,7 +2009,7 @@ Node* db_get_all_acp() {
             strcpy(node->pi,acp->pi);
             node->ty = acp->ty;
 
-            node->sibling_right=calloc(1,sizeof(Node));            
+            node->sibling_right=calloc(1,sizeof(RTNode));            
             node->sibling_right->sibling_left = node;
             node = node->sibling_right;
             free(acp);
@@ -1992,9 +2037,9 @@ Node* db_get_all_acp() {
     return head;
 }
 
-Node* db_get_cin_list_by_pi(char* pi) {
+RTNode* db_get_cin_list_by_pi(char* pi) {
     char* DATABASE = "RESOURCE.db";
-    char* TYPE = "4-";
+    const char* TYPE = "4-";
 
     DB* dbp;
     DBC* dbcp;
@@ -2032,8 +2077,8 @@ Node* db_get_cin_list_by_pi(char* pi) {
         //fprintf(stderr, "Data not exist\n");
         return NULL;
     }
-    Node* head = calloc(1,sizeof(Node));
-    Node* node;
+    RTNode* head = calloc(1,sizeof(RTNode));
+    RTNode* node;
     node = head;
     
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
@@ -2051,7 +2096,7 @@ Node* db_get_cin_list_by_pi(char* pi) {
                 strcpy(node->pi,cin->pi);
                 node->ty = cin->ty;
 
-                node->sibling_right=calloc(1,sizeof(Node));            
+                node->sibling_right=calloc(1,sizeof(RTNode));            
                 node->sibling_right->sibling_left = node;
                 node = node->sibling_right;
             }
@@ -2065,7 +2110,7 @@ Node* db_get_cin_list_by_pi(char* pi) {
     }    
 
     if(node->sibling_left) node->sibling_left->sibling_right = NULL;
-    free_node(node); 
+    free_rtnode(node); 
     node = NULL;
 
     /* Cursors must be closed */

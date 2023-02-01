@@ -1,4 +1,3 @@
-#include "onem2m.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -9,14 +8,19 @@
 #include <ctype.h>
 #include <malloc.h>
 #include <sys/timeb.h>
+#include "onem2m.h"
+#include "berkeleyDB.h"
+#include "jsonparse.h"
+#include "httpd.h"
+#include "mqttClient.h"
+#include "onem2mTypes.h"
+#include "config.h"
 
-extern char response_headers[1024];
-
-Node* parse_uri(Node *cb, char *uri, Operation *op) {
-	fprintf(stderr,"parse_uri \x1b[33m%s\x1b[0m...",uri);
+RTNode* parse_uri(oneM2MPrimitive *o2pt, RTNode *cb) {
+	fprintf(stderr,"parse_uri \x1b[33m%s\x1b[0m...", o2pt->to);
 	char uri_array[MAX_URI_SIZE];
 	char *uri_parse = uri_array;
-	strcpy(uri_array, uri);
+	strcpy(uri_array, o2pt->to);
 
 	char uri_strtok[64][MAX_URI_SIZE] = {"\0", };
 	int index_start = 0, index_end = -1;
@@ -28,255 +32,144 @@ Node* parse_uri(Node *cb, char *uri, Operation *op) {
 		uri_parse = strtok(NULL, "/");
 	}
 
+	int latest_oldest_flag = -1;
+
 	if(!strcmp(uri_strtok[0], "viewer")) index_start++;
 	if(!strcmp(uri_strtok[index_end], "la") || !strcmp(uri_strtok[index_end], "latest")) {
-		*op = OP_LATEST; index_end--;
+		latest_oldest_flag = 0; index_end--;
 	} else if(!strcmp(uri_strtok[index_end], "ol") || !strcmp(uri_strtok[index_end], "oldest")) {
-		*op = OP_OLDEST; index_end--;
+		latest_oldest_flag = 1; index_end--;
 	}
 
 	strcpy(uri_array, "\0");
 	for(int i=index_start; i<=index_end; i++) {
 		strcat(uri_array,"/"); strcat(uri_array,uri_strtok[i]);
 	}
-	Node* node = find_node_by_uri(cb, uri_array);
+	RTNode* rtnode = find_rtnode_by_uri(cb, uri_array);
 	
-	if(node && (*op == OP_LATEST || *op == OP_OLDEST)) node = find_latest_oldest(node, op);
+	if(rtnode && latest_oldest_flag != -1) rtnode = find_latest_oldest(rtnode, latest_oldest_flag);
 
-	if(index_start == 1) *op = OP_VIEWER;
+	if(index_start == 1) o2pt->op = OP_VIEWER;
 
-	return node;
+	return rtnode;
 }
 
-Node *find_latest_oldest(Node* node, Operation *op) {
-	if(node->ty == TY_CNT) {
-		Node *head = db_get_cin_list_by_pi(node->ri);
-		Node *cin = head;
+RTNode *find_rtnode_by_uri(RTNode *cb, char *target_uri) {
+	RTNode *rtnode = cb, *parent_rtnode = NULL;
+	target_uri = strtok(target_uri, "/");
+
+	if(!target_uri) return NULL;
+
+	char uri_array[64][MAX_URI_SIZE];
+	int index = -1;
+
+	while(target_uri) {
+		strcpy(uri_array[++index], target_uri);
+		target_uri = strtok(NULL, "/");
+	}
+
+	for(int i=0; i<=index; i++) {
+		while(rtnode) {
+			if(!strcmp(rtnode->rn, uri_array[i])) break;
+			rtnode = rtnode->sibling_right;
+		}
+		if(i == index-1) parent_rtnode = rtnode;
+		if(!rtnode) break;
+		if(i != index) rtnode = rtnode->child;
+	}
+
+	if(rtnode) return rtnode;
+
+	if(parent_rtnode) {
+		CIN *cin = db_get_cin(uri_array[index]);
+		if(cin) {
+			if(!strcmp(cin->pi, parent_rtnode->ri)) {
+				rtnode = create_rtnode(cin, TY_CIN);
+				rtnode->parent = parent_rtnode;
+			}
+			free_cin(cin);
+		}
+	}
+
+	return rtnode;
+}
+
+RTNode *find_latest_oldest(RTNode* rtnode, int flag) {
+	if(rtnode->ty == TY_CNT) {
+		RTNode *head = db_get_cin_list_by_pi(rtnode->ri);
+		RTNode *cin = head;
 
 		if(cin) {
-			if(*op == OP_OLDEST) {
+			if(flag == 1) {
 				head = head->sibling_right;
-				cin->sibling_right = NULL;
+				cin->sibling_right = NULL;			
 			} else {
 				while(cin->sibling_right) cin = cin->sibling_right;
-				if(cin->sibling_left) cin->sibling_left->sibling_right = NULL;
-				cin->sibling_left = NULL;
+				if(cin->sibling_left) cin->sibling_left->sibling_right = NULL;				cin->sibling_left = NULL;
 			}
-			if(head != cin) free_node_list(head);
-			*op = OP_NONE;
-			if(cin) cin->parent = node;
-			return cin;
-		}
-	} else if(node->ty == TY_AE){
-		node = node->child;
-		while(node) {
-			if(node->ty == TY_CNT) break;
-			node = node->sibling_right;
-		}
-		if(node && *op == OP_LATEST) {
-			while(node->sibling_right && node->sibling_right->ty == TY_CNT) {
-				node = node->sibling_right;
+			if(head != cin) free_rtnode_list(head);
+			if(cin) {
+				cin->parent = rtnode;
+				return cin;
+			} else {
+				return NULL;
 			}
 		}
-		*op = OP_NONE;
-		return node;
-	}
-	return NULL;
-}
-
-Operation parse_operation(){
-	Operation op;
-
-	if(strcmp(method, "POST") == 0) op = OP_CREATE;
-	else if(strcmp(method, "GET") == 0) op = OP_RETRIEVE;
-	else if (strcmp(method, "PUT") == 0) op = OP_UPDATE;
-	else if (strcmp(method, "DELETE") == 0) op = OP_DELETE;
-	else if (strcmp(method, "OPTIONS") == 0) op = OP_OPTIONS;
-
-	return op;
-}
-
-int find_same_resource_name(Node *pnode) {
-	Node* node = pnode->child;
-	char* rn = get_json_value_char("rn",payload);
-	if(!rn) return 0;
-
-	while(node) {
-		if(!strcmp(node->rn, rn)) return 1;
-		node = node->sibling_right;
-	}
-
-	return 0;
-}
-
-void tree_viewer_api(Node *node) {
-	fprintf(stderr,"\x1b[43mTree Viewer API\x1b[0m\n");
-	char arr_viewer_data[MAX_TREE_VIEWER_SIZE] = "[";
-	char *viewer_data = arr_viewer_data;
-	
-	Node *p = node;
-	while(p = p->parent) {
-		char *json = node_to_json(p);
-		strcat(viewer_data,",");
-		strcat(viewer_data,json);
-		free(json); json = NULL;
-	}
-	
-	int cinSize = 1;
-	
-	char *la = strstr(qs,"la=");
-	if(la) cinSize = atoi(la+3);
-	
-	fprintf(stderr,"Latest CIN Size : %d\n", cinSize);
-	
-	tree_viewer_data(node, &viewer_data, cinSize);
-	strcat(viewer_data,"]\0");
-	char res[MAX_TREE_VIEWER_SIZE] = "";
-	int index = 0;
-	
-	for(int i=0; i<MAX_TREE_VIEWER_SIZE; i++) {
-		if(i == 1) continue;
-		if(is_json_valid_char(viewer_data[i])) {
-			res[index++] = viewer_data[i];
-		}
-	}
-	
-	fprintf(stderr,"tree_viewer_api Content-Size : %ld\n",strlen(res));
-
-	HTTP_200;
-	printf("%s",res);
-}
-
-void tree_viewer_data(Node *node, char **viewer_data, int cin_size) {
-	char *json = node_to_json(node);
-
-	strcat(*viewer_data, ",");
-	strcat(*viewer_data, json);
-	free(json); json = NULL;
-
-	Node *child = node->child;
-	while(child) {
-		tree_viewer_data(child, viewer_data, cin_size);
-		child = child->sibling_right;
-	}
-
-	if(node->ty != TY_SUB && node->ty != TY_ACP) {
-		Node *cin_list_head = db_get_cin_list_by_pi(node->ri);
-
-		if(cin_list_head) cin_list_head = latest_cin_list(cin_list_head, cin_size);
-
-		Node *p = cin_list_head;
-
-		while(p) {
-			json = node_to_json(p);
-			strcat(*viewer_data, ",");
-			strcat(*viewer_data, json);
-			free(json); json = NULL;
-			p = p->sibling_right;		
-		}
-		free_node_list(cin_list_head);
+		return NULL;
 	}
 }
 
-Node *latest_cin_list(Node* cinList, int num) {
-	Node *head, *tail;
-	head = tail = cinList;
-	int cnt = 1;
+void init_cse(CSE* cse) {
+	char *ct = get_local_time(0);
+	char *ri = CSE_BASE_RI;
+	char *rn = CSE_BASE_NAME;
 	
-	while(tail->sibling_right) {
-		tail = tail->sibling_right;
-		cnt++;
-	}
+	cse->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
+	cse->rn = (char*)malloc((strlen(rn) + 1) * sizeof(char));
+	cse->ct = (char*)malloc((strlen(ct) + 1) * sizeof(char));
+	cse->lt = (char*)malloc((strlen(ct) + 1) * sizeof(char));
+	cse->csi = (char*)malloc((strlen(rn) + 2) * sizeof(char));
+	cse->pi = (char*)malloc((strlen("NULL") + 1) * sizeof(char));
 	
-	for(int i=0; i < cnt-num; i++) {
-		head = head->sibling_right;
-		free_node(head->sibling_left); head->sibling_left = NULL;
-	}
+	strcpy(cse->ri, ri);
+	strcpy(cse->rn, rn);
+	strcpy(cse->ct, ct);
+	strcpy(cse->lt, ct);
+	strcpy(cse->csi,"/");
+	strcat(cse->csi,rn);
+	strcpy(cse->pi, "NULL");
 	
-	return head;
+	cse->ty = TY_CSE;
+	
+	free(ct); ct = NULL;
 }
 
-void normalization_payload() {
-	int index = 0;
-
-	for(int i=0; i<payload_size; i++) {
-		if(is_json_valid_char(payload[i])) {
-			payload[index++] =  payload[i];
-		}
-	}
-
-	payload[index] = '\0';
-}
-
-ObjectType parse_object_type() {
-	char *ct = request_header("Content-Type");
-	if(!ct) return 0;
-	char *qs_ty = strstr(ct, "ty=");
-	if(!qs_ty) return 0;
-	int obj_ty = atoi(qs_ty+3);
-
-	ObjectType ty;
-	
-	switch(obj_ty) {
-	case 1 : ty = TY_ACP; break;
-	case 2 : ty = TY_AE; break;
-	case 3 : ty = TY_CNT; break;
-	case 4 : ty = TY_CIN; break;
-	case 5 : ty = TY_CSE; break;
-	case 23 : ty = TY_SUB; break;
-	}
-	
-	return ty;
-}
-
-ObjectType parse_object_type_in_request_body() {
-	ObjectType ty;
-	
-	char *cse, *ae, *cnt, *cin, *sub, *acp;
-	
-	cse = strstr(payload, "m2m:cb");
-	ae = strstr(payload, "m2m:ae");
-	cnt = strstr(payload, "m2m:cnt");
-	cin = strstr(payload, "m2m:cin");
-	sub = strstr(payload, "m2m:sub");
-	acp = strstr(payload, "m2m:acp");
-	
-	if(cse) ty = TY_CSE;
-	else if(ae) ty = TY_AE;
-	else if(cnt) ty = TY_CNT;
-	else if(cin) ty = TY_CIN;
-	else if(sub) ty = TY_SUB;
-	else if(acp) ty = TY_ACP;
-	
-	return ty;
-}
-
-Node* create_node(void *obj, ObjectType ty){
-	Node* node = NULL;
+RTNode* create_rtnode(void *resource, ObjectType ty){
+	RTNode* rtnode = NULL;
 
 	switch(ty) {
-	case TY_CSE: node = create_cse_node((CSE*)obj); break;
-	case TY_AE: node = create_ae_node((AE*)obj); break;
-	case TY_CNT: node = create_cnt_node((CNT*)obj); break;
-	case TY_CIN: node = create_cin_node((CIN*)obj); break;
-	case TY_SUB: node = create_sub_node((Sub*)obj); break;
-	case TY_ACP: node = create_acp_node((ACP*)obj); break;
+	case TY_CSE: rtnode = create_cse_rtnode((CSE*)resource); break;
+	case TY_AE: rtnode = create_ae_rtnode((AE*)resource); break;
+	case TY_CNT: rtnode = create_cnt_rtnode((CNT*)resource); break;
+	case TY_CIN: rtnode = create_cin_rtnode((CIN*)resource); break;
+	case TY_SUB: rtnode = create_sub_rtnode((Sub*)resource); break;
+	case TY_ACP: rtnode = create_acp_rtnode((ACP*)resource); break;
 	}
 
-	node->parent = NULL;
-	node->child = NULL;
-	node->sibling_left = NULL;
-	node->sibling_right = NULL;
+	rtnode->parent = NULL;
+	rtnode->child = NULL;
+	rtnode->sibling_left = NULL;
+	rtnode->sibling_right = NULL;
 	
 	fprintf(stderr,"OK\n");
 	
-	return node;
+	return rtnode;
 }
 
-Node* create_cse_node(CSE *cse) {
-	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",cse->rn, cse->ri);
+RTNode* create_cse_rtnode(CSE *cse) {
+	fprintf(stderr,"Create Tree RTNode\n[rn] %s\n[ri] %s...",cse->rn, cse->ri);
 
-	Node* node = calloc(1, sizeof(Node));
+	RTNode* node = calloc(1, sizeof(RTNode));
 
 	node->rn = (char*)malloc((strlen(cse->rn) + 1) * sizeof(char));
 	node->ri = (char*)malloc((strlen(cse->ri) + 1) * sizeof(char));
@@ -291,10 +184,10 @@ Node* create_cse_node(CSE *cse) {
 	return node;
 }
 
-Node* create_ae_node(AE *ae) {
-	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",ae->rn, ae->ri);
+RTNode* create_ae_rtnode(AE *ae) {
+	fprintf(stderr,"Create Tree RTNode\n[rn] %s\n[ri] %s...",ae->rn, ae->ri);
 
-	Node* node = calloc(1, sizeof(Node));
+	RTNode* node = calloc(1, sizeof(RTNode));
 
 	node->rn = (char*)malloc((strlen(ae->rn) + 1) * sizeof(char));
 	node->ri = (char*)malloc((strlen(ae->ri) + 1) * sizeof(char));
@@ -309,10 +202,10 @@ Node* create_ae_node(AE *ae) {
 	return node;
 }
 
-Node* create_cnt_node(CNT *cnt) {
-	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",cnt->rn, cnt->ri);
+RTNode* create_cnt_rtnode(CNT *cnt) {
+	fprintf(stderr,"Create Tree RTNode\n[rn] %s\n[ri] %s...",cnt->rn, cnt->ri);
 
-	Node* node = calloc(1, sizeof(Node));
+	RTNode* node = calloc(1, sizeof(RTNode));
 
 	node->rn = (char*)malloc((strlen(cnt->rn) + 1) * sizeof(char));
 	node->ri = (char*)malloc((strlen(cnt->ri) + 1) * sizeof(char));
@@ -332,10 +225,10 @@ Node* create_cnt_node(CNT *cnt) {
 	return node;
 }
 
-Node* create_cin_node(CIN *cin) {
-	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",cin->rn, cin->ri);
+RTNode* create_cin_rtnode(CIN *cin) {
+	fprintf(stderr,"Create Tree RTNode\n[rn] %s\n[ri] %s...",cin->rn, cin->ri);
 
-	Node* node = calloc(1, sizeof(Node));
+	RTNode* node = calloc(1, sizeof(RTNode));
 
 	node->rn = (char*)malloc((strlen(cin->rn) + 1) * sizeof(char));
 	node->ri = (char*)malloc((strlen(cin->ri) + 1) * sizeof(char));
@@ -350,10 +243,10 @@ Node* create_cin_node(CIN *cin) {
 	return node;
 }
 
-Node* create_sub_node(Sub *sub) {
-	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",sub->rn, sub->ri);
+RTNode* create_sub_rtnode(Sub *sub) {
+	fprintf(stderr,"Create Tree RTNode\n[rn] %s\n[ri] %s...",sub->rn, sub->ri);
 
-	Node* node = calloc(1, sizeof(Node));
+	RTNode* node = calloc(1, sizeof(RTNode));
 
 	node->rn = (char*)malloc((strlen(sub->rn) + 1) * sizeof(char));
 	node->ri = (char*)malloc((strlen(sub->ri) + 1) * sizeof(char));
@@ -373,10 +266,10 @@ Node* create_sub_node(Sub *sub) {
 	return node;
 }
 
-Node* create_acp_node(ACP *acp) {
-	fprintf(stderr,"Create Tree Node\n[rn] %s\n[ri] %s...",acp->rn, acp->ri);
+RTNode* create_acp_rtnode(ACP *acp) {
+	fprintf(stderr,"Create Tree RTNode\n[rn] %s\n[ri] %s...",acp->rn, acp->ri);
 
-	Node* node = calloc(1, sizeof(Node));
+	RTNode* node = calloc(1, sizeof(RTNode));
 
 	node->rn = (char*)malloc((strlen(acp->rn) + 1) * sizeof(char));
 	node->ri = (char*)malloc((strlen(acp->ri) + 1) * sizeof(char));
@@ -399,8 +292,115 @@ Node* create_acp_node(ACP *acp) {
 	return node;
 }
 
-int add_child_resource_tree(Node *parent, Node *child) {
-	Node *node = parent->child;
+void free_cse(CSE *cse) {
+	if(cse->ct) free(cse->ct);
+	if(cse->lt) free(cse->lt);
+	if(cse->rn) free(cse->rn);
+	if(cse->ri) free(cse->ri);
+	if(cse->csi) free(cse->csi);
+	if(cse->pi) free(cse->pi);
+	free(cse); cse = NULL;
+}
+
+void free_ae(AE *ae) {
+	if(ae->et) free(ae->et);
+	if(ae->ct) free(ae->ct);
+	if(ae->lt) free(ae->lt);
+	if(ae->rn) free(ae->rn);
+	if(ae->ri) free(ae->ri);
+	if(ae->pi) free(ae->pi);
+	if(ae->api) free(ae->api);
+	if(ae->aei) free(ae->aei);
+	if(ae->lbl) free(ae->lbl);
+	if(ae->srv) free(ae->srv);
+	free(ae); ae = NULL;
+}
+
+void free_cnt(CNT *cnt) {
+	if(cnt->et) free(cnt->et);
+	if(cnt->ct) free(cnt->ct);
+	if(cnt->lt) free(cnt->lt);
+	if(cnt->rn) free(cnt->rn);
+	if(cnt->ri) free(cnt->ri);
+	if(cnt->pi) free(cnt->pi);
+	free(cnt); cnt = NULL;
+}
+
+void free_cin(CIN* cin) {
+	if(cin->et) free(cin->et);
+	if(cin->ct) free(cin->ct);
+	if(cin->lt) free(cin->lt);
+	if(cin->rn) free(cin->rn);
+	if(cin->ri) free(cin->ri);
+	if(cin->pi) free(cin->pi);
+	if(cin->con) free(cin->con);
+	free(cin); cin = NULL;
+}
+
+void free_sub(Sub* sub) {
+	if(sub->et) free(sub->et);
+	if(sub->ct) free(sub->ct);
+	if(sub->lt) free(sub->lt);
+	if(sub->rn) free(sub->rn);
+	if(sub->ri) free(sub->ri);
+	if(sub->pi) free(sub->pi);
+	if(sub->nu) free(sub->nu);
+	if(sub->net) free(sub->net);
+	free(sub); sub = NULL;
+}
+
+void free_acp(ACP* acp) {
+	if(acp->et) free(acp->et);
+	if(acp->ct) free(acp->ct);
+	if(acp->lt) free(acp->lt);
+	if(acp->rn) free(acp->rn);
+	if(acp->ri) free(acp->ri);
+	if(acp->pi) free(acp->pi);
+	if(acp->pv_acor) free(acp->pv_acor);
+	if(acp->pv_acop) free(acp->pv_acop);
+	if(acp->pvs_acor) free(acp->pvs_acor);
+	if(acp->pvs_acop) free(acp->pvs_acop);
+	free(acp); acp = NULL;
+}
+
+void free_rtnode(RTNode *rtnode) {
+	free(rtnode->ri);
+	free(rtnode->rn);
+	free(rtnode->pi);
+	if(rtnode->nu) free(rtnode->nu);
+	if(rtnode->sur) free(rtnode->sur);
+	if(rtnode->acpi) free(rtnode->acpi);
+	if(rtnode->pv_acop) free(rtnode->pv_acop);
+	if(rtnode->pv_acor) free(rtnode->pv_acor);
+	if(rtnode->pvs_acor) free(rtnode->pvs_acor);
+	if(rtnode->pvs_acop) free(rtnode->pvs_acop);
+	if(rtnode->uri) free(rtnode->uri);
+	free(rtnode); rtnode = NULL;
+}
+
+void free_rtnode_list(RTNode *rtnode) {
+	while(rtnode) {
+		RTNode *right = rtnode->sibling_right;
+
+		free_rtnode(rtnode);
+		rtnode = right;
+	}
+}
+
+int net_to_bit(char *net) {
+	int netLen = strlen(net);
+	int ret = 0;
+
+	for(int i=0; i<netLen; i++) {
+		int exp = atoi(net+i);
+		if(exp > 0) ret = (ret | (int)pow(2, exp - 1));
+	}
+
+	return ret;
+}
+
+int add_child_resource_tree(RTNode *parent, RTNode *child) {
+	RTNode *node = parent->child;
 	child->parent = parent;
 
 	fprintf(stderr,"\nAdd Child\n[P] %s\n[C] %s...",parent->rn, child->rn);
@@ -432,66 +432,285 @@ int add_child_resource_tree(Node *parent, Node *child) {
 	return 1;
 }
 
-void delete_node_and_db_data(Node *node, int flag) {
-	switch(node->ty) {
+ObjectType http_parse_object_type() {
+	char *content_type = request_header("Content-Type");
+	if(!content_type) return TY_NONE;
+	char *str_ty = strstr(content_type, "ty=");
+	if(!str_ty) return TY_NONE;
+	int object_type = atoi(str_ty+3);
+
+	ObjectType ty;
+	
+	switch(object_type) {
+	case 1 : ty = TY_ACP; break;
+	case 2 : ty = TY_AE; break;
+	case 3 : ty = TY_CNT; break;
+	case 4 : ty = TY_CIN; break;
+	case 5 : ty = TY_CSE; break;
+	case 23 : ty = TY_SUB; break;
+	default : ty = TY_NONE; break;
+	}
+	
+	return ty;
+}
+
+void create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
+	int e = check_aei_duplicate(o2pt, parent_rtnode);
+	if(e != -1) e = check_rn_invalid(o2pt, TY_AE);
+	if(e == -1) return;
+
+	if(parent_rtnode->ty != TY_CSE) {
+		child_type_error(o2pt);
+		return;
+	}
+	AE* ae = cjson_to_ae(o2pt->cjson_pc);
+	if(!ae) {
+		no_mandatory_error(o2pt);
+		return;
+	}
+	if(ae->api[0] != 'R' && ae->api[0] != 'N') {
+		free_ae(ae);
+		api_prefix_invalid(o2pt);
+		return;
+	}
+	init_ae(ae,parent_rtnode->ri, o2pt->fr);
+	
+	int result = db_store_ae(ae);
+	if(result != 1) { 
+		set_o2pt_pc(o2pt, "{\"m2m:dbg\": \"DB store fail\"}");
+		o2pt->rsc = internalServerError;
+		respond_to_client(o2pt, 500);
+		free_ae(ae); ae = NULL;
+		return;
+	}
+	
+	RTNode* child_rtnode = create_rtnode(ae, TY_AE);
+	add_child_resource_tree(parent_rtnode, child_rtnode);
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = ae_to_json(ae);
+	o2pt->rsc = 2001;
+	respond_to_client(o2pt, 201);
+	// notify_onem2m_resource(pnode->child, response_payload, NOTIFICATION_EVENT_3);
+	free_ae(ae); ae = NULL;
+}
+
+void create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
+	if(parent_rtnode->ty != TY_CNT && parent_rtnode->ty != TY_AE && parent_rtnode->ty != TY_CSE) {
+		child_type_error(o2pt);
+		return;
+	}
+	CNT* cnt = cjson_to_cnt(o2pt->cjson_pc);
+	if(!cnt) {
+		no_mandatory_error(o2pt);
+		return;
+	}
+	init_cnt(cnt,parent_rtnode->ri);
+
+	int result = db_store_cnt(cnt);
+	if(result != 1) { 
+		set_o2pt_pc(o2pt, "{\"m2m:dbg\": \"DB store fail\"}");
+		o2pt->rsc = internalServerError;
+		respond_to_client(o2pt, 500);
+		free_cnt(cnt); cnt = NULL;
+		return;
+	}
+	
+	RTNode* child_rtnode = create_rtnode(cnt, TY_CNT);
+	add_child_resource_tree(parent_rtnode,child_rtnode);
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = cnt_to_json(cnt);
+	o2pt->rsc = created;
+	respond_to_client(o2pt, 201);
+	//notify_onem2m_resource(pnode->child, response_payload, NOTIFICATION_EVENT_3);
+	free_cnt(cnt); cnt = NULL;
+}
+
+
+void create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
+	if(parent_rtnode->ty != TY_CNT) {
+		child_type_error(o2pt);
+		return;
+	}
+	CIN* cin = cjson_to_cin(o2pt->cjson_pc);
+	if(!cin) {
+		no_mandatory_error(o2pt);
+		return;
+	}
+	init_cin(cin,parent_rtnode->ri);
+
+	int result = db_store_cin(cin);
+	if(result != 1) { 
+		set_o2pt_pc(o2pt, "{\"m2m:dbg\": \"DB store fail\"}");
+		o2pt->rsc = internalServerError;
+		respond_to_client(o2pt, 500);
+		free_cin(cin);
+		cin = NULL;
+		return;
+	}
+	
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = cin_to_json(cin);
+	o2pt->rsc = created;
+	respond_to_client(o2pt, 201);
+	//notify_onem2m_resource(pnode->child, response_payload, NOTIFICATION_EVENT_3);
+	free_cin(cin); cin = NULL;
+}
+
+void create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
+	if(parent_rtnode->ty == TY_CIN || parent_rtnode->ty == TY_SUB) {
+		child_type_error(o2pt);
+		return;
+	}
+	Sub* sub = cjson_to_sub(o2pt->cjson_pc);
+	if(!sub) {
+		no_mandatory_error(o2pt);
+		return;
+	}
+	init_sub(sub, parent_rtnode->ri);
+	
+	int result = db_store_sub(sub);
+	if(result != 1) { 
+		set_o2pt_pc(o2pt, "{\"m2m:dbg\": \"DB store fail\"}");
+		o2pt->rsc = internalServerError;
+		respond_to_client(o2pt, 500);
+		free_sub(sub); sub = NULL;
+		return;
+	}
+	
+	RTNode* child_rtnode = create_rtnode(sub, TY_SUB);
+	add_child_resource_tree(parent_rtnode,child_rtnode);
+	
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = sub_to_json(sub);
+	o2pt->rsc = created;
+	respond_to_client(o2pt, 201);
+	//notify_onem2m_resource(pnode->child, response_payload, NOTIFICATION_EVENT_3);
+	free_sub(sub); sub = NULL;
+}
+
+void create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
+	if(parent_rtnode->ty != TY_CSE && parent_rtnode->ty != TY_AE) {
+		child_type_error(o2pt);
+		return;
+	}
+	ACP* acp = cjson_to_acp(o2pt->cjson_pc);
+	if(!acp) {
+		no_mandatory_error(o2pt);
+		return;
+	}
+	init_acp(acp, parent_rtnode->ri);
+	
+	int result = db_store_acp(acp);
+	if(result != 1) { 
+		set_o2pt_pc(o2pt, "{\"m2m:dbg\": \"DB store fail\"}");
+		o2pt->rsc = internalServerError;
+		respond_to_client(o2pt, 500);
+		free_acp(acp); acp = NULL;
+		return;
+	}
+	
+	RTNode* child_rtnode = create_rtnode(acp, TY_ACP);
+	add_child_resource_tree(parent_rtnode, child_rtnode);
+	
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = acp_to_json(acp);
+	o2pt->rsc = created;
+	respond_to_client(o2pt, 201);
+	//notify_onem2m_resource(pnode->child, response_payload, NOTIFICATION_EVENT_3);
+	free_acp(acp); acp = NULL;
+}
+
+void retrieve_cse(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
+	CSE* gcse = db_get_cse(target_rtnode->ri);
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = cse_to_json(gcse);
+	o2pt->rsc = OK;
+	respond_to_client(o2pt, 200);
+	free_cse(gcse); gcse = NULL;
+}
+
+
+void retrieve_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
+	AE* gae = db_get_ae(target_rtnode->ri);
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = ae_to_json(gae);
+	o2pt->rsc = OK;
+	respond_to_client(o2pt, 200);
+	free_ae(gae); gae = NULL;
+}
+
+void retrieve_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
+	CNT* gcnt = db_get_cnt(target_rtnode->ri);
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = cnt_to_json(gcnt);
+	o2pt->rsc = OK;
+	respond_to_client(o2pt, 200);
+	free_cnt(gcnt); gcnt = NULL;
+}
+
+void retrieve_cin(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
+	CIN* gcin = db_get_cin(target_rtnode->ri);
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = cin_to_json(gcin);
+	o2pt->rsc = OK;
+	respond_to_client(o2pt, 200); 
+	free_cin(gcin); gcin = NULL;
+}
+
+void retrieve_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
+	Sub* gsub = db_get_sub(target_rtnode->ri);
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = sub_to_json(gsub);
+	o2pt->rsc = OK;
+	respond_to_client(o2pt, 200); 
+	free_sub(gsub); gsub = NULL;
+}
+
+void retrieve_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
+	ACP* gacp = db_get_acp(target_rtnode->ri);
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = acp_to_json(gacp);
+	o2pt->rsc = OK;
+	respond_to_client(o2pt, 200);
+	free_acp(gacp); gacp = NULL;
+}
+
+void delete_rtnode_and_db_data(RTNode *rtnode, int flag) {
+	switch(rtnode->ty) {
 	case TY_AE : 
-		db_delete_object(node->ri); 
+		db_delete_object(rtnode->ri); 
 		break;
 	case TY_CNT : 
-		db_delete_object(node->ri); 
-		char *noti_json = (char*)malloc(sizeof("resource is deleted successfully") + 1);
-		strcpy(noti_json, "resource is deleted successfully");
-		notify_object(node->child,noti_json,NOTIFICATION_EVENT_2); 
-		free(noti_json); noti_json = NULL;
+		db_delete_object(rtnode->ri); 
+		//char *noti_json = (char*)malloc(sizeof("resource is deleted successfully") + 1);
+		//strcpy(noti_json, "resource is deleted successfully");
+		//notify_onem2m_resource(node->child,noti_json,NOTIFICATION_EVENT_2); 
+		//free(noti_json); noti_json = NULL;
 		break;
 	case TY_SUB :
-		db_delete_sub(node->ri);
+		db_delete_sub(rtnode->ri);
 		break;
 	case TY_ACP :
-		db_delete_acp(node->ri);
+		db_delete_acp(rtnode->ri);
 		break;
 	}
 
-	Node *left = node->sibling_left;
-	Node *right = node->sibling_right;
+	RTNode *left = rtnode->sibling_left;
+	RTNode *right = rtnode->sibling_right;
 	
 	if(flag == 1) {
 		if(left) left->sibling_right = right;
-		else node->parent->child = right;
+		else rtnode->parent->child = right;
 		if(right) right->sibling_left = left;
 	} else {
-		if(right) delete_node_and_db_data(right, 0);
+		if(right) delete_rtnode_and_db_data(right, 0);
 	}
 	
-	if(node->child) delete_node_and_db_data(node->child, 0);
+	if(rtnode->child) delete_rtnode_and_db_data(rtnode->child, 0);
 	
-	fprintf(stderr,"[free_node] %s...",node->rn);
-	free_node(node); node = NULL;
+	fprintf(stderr,"[free_rtnode] %s...",rtnode->rn);
+	free_rtnode(rtnode); rtnode = NULL;
 	fprintf(stderr,"OK\n");
-}
-
-void free_node(Node *node) {
-	free(node->ri);
-	free(node->rn);
-	free(node->pi);
-	if(node->nu) free(node->nu);
-	if(node->sur) free(node->sur);
-	if(node->acpi) free(node->acpi);
-	if(node->pv_acop) free(node->pv_acop);
-	if(node->pv_acor) free(node->pv_acor);
-	if(node->pvs_acor) free(node->pvs_acor);
-	if(node->pvs_acop) free(node->pvs_acop);
-	if(node->uri) free(node->uri);
-	free(node); node = NULL;
-}
-
-void free_node_list(Node *node) {
-	while(node) {
-		Node *right = node->sibling_right;
-
-		free_node(node);
-		node = right;
-	}
 }
 
 char *get_local_time(int diff) {
@@ -507,57 +726,77 @@ char *get_local_time(int diff) {
 	sprintf(minute,"%02d",tm.tm_min);
 	sprintf(sec,"%02d",tm.tm_sec);
 	
-	char* now = (char*)malloc(16 * sizeof(char));
+	char* local_time = (char*)malloc(16 * sizeof(char));
 	
-	*now = '\0';
-	strcat(now,year);
-	strcat(now,mon);
-	strcat(now,day);
-	strcat(now,"T");
-	strcat(now,hour);
-	strcat(now,minute);
-	strcat(now,sec);
+	*local_time = '\0';
+	strcat(local_time,year);
+	strcat(local_time,mon);
+	strcat(local_time,day);
+	strcat(local_time,"T");
+	strcat(local_time,hour);
+	strcat(local_time,minute);
+	strcat(local_time,sec);
 	
-	return now;
+	return local_time;
 }
 
-void init_cse(CSE* cse) {
-	char *ct = get_local_time(0);
-	char *ri = resource_identifer(TY_CSE, ct);
-	char rn[1024] = "TinyIoT";
-	
-	cse->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
-	cse->rn = (char*)malloc((strlen(rn) + 1) * sizeof(char));
-	cse->ct = (char*)malloc((strlen(ct) + 1) * sizeof(char));
-	cse->lt = (char*)malloc((strlen(ct) + 1) * sizeof(char));
-	cse->csi = (char*)malloc((strlen(ct) + 1) * sizeof(char));
-	cse->pi = (char*)malloc((strlen("NULL") + 1) * sizeof(char));
-	
-	strcpy(cse->ri, ri);
-	strcpy(cse->rn, rn);
-	strcpy(cse->ct, ct);
-	strcpy(cse->lt, ct);
-	strcpy(cse->csi,ct);
-	strcpy(cse->pi,"NULL");
-	
-	cse->ty = TY_CSE;
-	
-	free(ct); ct = NULL;
-	free(ri); ri = NULL;
+void set_o2pt_pc(oneM2MPrimitive *o2pt, char *pc){
+	if(o2pt->pc) free(o2pt->pc);
+
+	o2pt->pc = (char *)malloc((strlen(pc) + 1) * sizeof(char));
+	strcpy(o2pt->pc, pc);
 }
 
-void init_ae(AE* ae, char *pi) {
+void set_o2pt_rsc(oneM2MPrimitive *o2pt, int rsc){
+	o2pt->rsc = rsc;
+}
+
+int is_json_valid_char(char c){
+	return (('!' <= c && c <= '~') || c == ' ');
+}
+
+void respond_to_client(oneM2MPrimitive *o2pt, int status) {
+	if(!o2pt->pc) {
+		fprintf(stderr,"o2pt->pc is NULL\n");
+		return;
+	}
+
+	switch(o2pt->prot) {
+		case PROT_HTTP:
+			http_respond_to_client(o2pt, status); break;
+		case PROT_MQTT:
+			mqtt_respond_to_client(o2pt);
+			break;
+	}
+}
+
+ObjectType parse_object_type_cjson(cJSON *cjson) {
+	ObjectType ty;
+
+	if(!cjson) return TY_NONE;
+	
+	if(cJSON_GetObjectItem(cjson, "m2m:cb") || cJSON_GetObjectItem(cjson, "m2m:cse")) ty = TY_CSE;
+	else if(cJSON_GetObjectItem(cjson, "m2m:ae")) ty = TY_AE;
+	else if(cJSON_GetObjectItem(cjson, "m2m:cnt")) ty = TY_CNT;
+	else if(cJSON_GetObjectItem(cjson, "m2m:cin")) ty = TY_CIN;
+	else if(cJSON_GetObjectItem(cjson, "m2m:sub")) ty = TY_SUB;
+	else if(cJSON_GetObjectItem(cjson, "m2m:acp")) ty = TY_ACP;
+	else ty = TY_NONE;
+	
+	return ty;
+}
+
+void init_ae(AE* ae, char *pi, char *origin) {
 	char *ct = get_local_time(0);
 	char *et = get_local_time(EXPIRE_TIME);
-	char *aei = NULL; //request_header("X-M2M-Origin"); 
-	char *ri = resource_identifer(TY_AE, ct);
-	int m_aei = 0;
-	
-	if(!aei) {
-		m_aei = 1;
-		aei = (char*)malloc((strlen(ri) + 2) * sizeof(char));
-		strcpy(aei, "C");
-		strcat(aei, ri);
+	char ri[128] = {'\0'};
+
+	if(origin) {
+		if(origin[0] != 'C') strcpy(ri, "C");
+		strcat(ri, origin);
+	} else {
+		strcpy(ri, "CAE");
+		strcat(ri, ct);
 	}
 
 	if(!ae->rn) {
@@ -570,26 +809,24 @@ void init_ae(AE* ae, char *pi) {
 	ae->et = (char*)malloc((strlen(et) + 1) * sizeof(char));
 	ae->ct = (char*)malloc((strlen(ct) + 1) * sizeof(char));
 	ae->lt = (char*)malloc((strlen(ct) + 1) * sizeof(char));
-	ae->aei = (char*)malloc((strlen(aei) + 1) * sizeof(char));
+	ae->aei = (char*)malloc((strlen(ri) + 1) * sizeof(char));
 	strcpy(ae->ri, ri);
 	strcpy(ae->pi, pi);
 	strcpy(ae->et, et);
 	strcpy(ae->ct, ct);
 	strcpy(ae->lt, ct);
-	strcpy(ae->aei, aei);
+	strcpy(ae->aei, ri);
 	
 	ae->ty = TY_AE;
 	
-	if(m_aei) {free(aei); aei = NULL;}
 	free(ct); ct = NULL;
 	free(et); et = NULL;
-	free(ri); ri = NULL;
 }
 
 void init_cnt(CNT* cnt, char *pi) {
 	char *ct = get_local_time(0);
 	char *et = get_local_time(EXPIRE_TIME);
-	char *ri = resource_identifer(TY_CNT, ct);
+	char *ri = resource_identifier(TY_CNT, ct);
 	
 	if(!cnt->rn) {
 		cnt->rn = (char*)malloc((strlen(ri) + 1) * sizeof(char));
@@ -620,7 +857,7 @@ void init_cnt(CNT* cnt, char *pi) {
 void init_cin(CIN* cin, char *pi) {
 	char *ct = get_local_time(0);
 	char *et = get_local_time(EXPIRE_TIME);
-	char *ri = resource_identifer(TY_CIN, ct);
+	char *ri = resource_identifier(TY_CIN, ct);
 	
 	cin->rn = (char*)malloc((strlen(ri) + 1) * sizeof(char));
 	cin->ri = (char*)malloc((strlen(ri) + 1) * sizeof(char));
@@ -647,7 +884,7 @@ void init_cin(CIN* cin, char *pi) {
 void init_sub(Sub* sub, char *pi) {
 	char *ct = get_local_time(0);
 	char *et = get_local_time(EXPIRE_TIME);
-	char *ri = resource_identifer(TY_SUB, ct);
+	char *ri = resource_identifier(TY_SUB, ct);
 
 	if(!sub->rn) {
 		sub->rn = (char*)malloc((strlen(ri) + 1) * sizeof(char));
@@ -685,7 +922,7 @@ void init_sub(Sub* sub, char *pi) {
 void init_acp(ACP* acp, char *pi) {
 	char *ct = get_local_time(0);
 	char *et = get_local_time(EXPIRE_TIME);
-	char *ri = resource_identifer(TY_ACP, ct);
+	char *ri = resource_identifier(TY_ACP, ct);
 
 	if(!acp->rn) {
 		acp->rn = (char*)malloc((strlen(ri) + 1) * sizeof(char));
@@ -710,49 +947,211 @@ void init_acp(ACP* acp, char *pi) {
 	free(ri); ri = NULL;
 }
 
-void set_ae_update(AE* after) {
-	char *rn = get_json_value_char("rn", payload);
-	int rr = get_json_value_bool("rr", payload);
+void set_ae_update(cJSON *m2m_ae, AE* after) {
+	cJSON *rr = cJSON_GetObjectItemCaseSensitive(m2m_ae, "rr");
+	cJSON *lbl = cJSON_GetObjectItem(m2m_ae, "lbl");
+	cJSON *srv = cJSON_GetObjectItem(m2m_ae, "srv");
 
-	if(rn) {
-		free(after->rn);
-		after->rn = (char*)malloc((strlen(rn) + 1) * sizeof(char));
-		strcpy(after->rn, rn);
-		free(rn);
+	if(rr) {
+		if(cJSON_IsTrue(rr)) {
+			after->rr = true;
+		} else {
+			after->rr = false;
+		}
 	}
 
-	switch(rr) {
-		case 0: after->rr = false; break;
-		case 1: after->rr = true; break;
-		default: break;
+	if(lbl) {
+		if(after->lbl) free(after->lbl);
+		after->lbl = cjson_list_item_to_string(lbl);
+	}
+
+	if(srv) {
+		if(after->srv) free(after->srv);
+		after->srv = cjson_list_item_to_string(srv);
 	}
 
 	if(after->lt) free(after->lt);
 	after->lt = get_local_time(0);
 }
 
-
-void set_cnt_update(CNT* after) {
-	char *rn = get_json_value_char("rn", payload);
-	char *acpi = NULL;
-
-	if(strstr(payload, "\"acpi\"") != NULL)
-		acpi = get_json_value_list("acpi", payload);
-
-	if(rn) {
-		free(after->rn);
-		after->rn = (char*)malloc((strlen(rn) + 1) * sizeof(char));
-		strcpy(after->rn, rn);
-	}
+void set_cnt_update(cJSON *m2m_cnt, CNT* after) {
+	cJSON *lbl = cJSON_GetObjectItem(m2m_cnt, "lbl");
+	cJSON *acpi = cJSON_GetObjectItem(m2m_cnt, "acpi");
 
 	if(acpi) {
 		if(after->acpi) free(after->acpi);
-		after->acpi = (char*)malloc((strlen(acpi) + 1) * sizeof(char)); 
-		strcpy(after->acpi, acpi);
+		after->acpi = cjson_list_item_to_string(acpi);
+	}
+	
+	if(lbl) {
+		if(after->lbl) free(after->lbl);
+		after->lbl = cjson_list_item_to_string(lbl);
 	}
 
 	if(after->lt) free(after->lt);
 	after->lt = get_local_time(0);
+}
+
+char *resource_identifier(ObjectType ty, char *ct) {
+	char *ri = (char *)calloc(24, sizeof(char));
+
+	switch(ty) {
+		case TY_CNT : strcpy(ri, "3-"); break;
+		case TY_CIN : strcpy(ri, "4-"); break;
+		case TY_SUB : strcpy(ri, "23-"); break;
+		case TY_ACP : strcpy(ri, "1-"); break;
+	}
+
+	struct timespec specific_time;
+    int millsec;
+
+	char buf[32] = "\0";
+
+    clock_gettime(CLOCK_REALTIME, &specific_time);
+    millsec = floor(specific_time.tv_nsec/1.0e6);
+
+	sprintf(buf, "%s%03d",ct, millsec);
+
+	strcat(ri, buf);
+
+	return ri;
+}
+
+void set_rtnode_update(RTNode *rtnode, void *after) {
+	ObjectType ty = rtnode->ty;
+	if(rtnode->acpi) {free(rtnode->acpi); rtnode->acpi = NULL;}
+	if(rtnode->nu) {free(rtnode->nu); rtnode->nu = NULL;}
+	if(rtnode->pv_acor && rtnode->pv_acop) {
+		free(rtnode->pv_acor); rtnode->pv_acor = NULL; 
+		free(rtnode->pv_acop); rtnode->pv_acop = NULL;
+	}
+	if(rtnode->pvs_acor && rtnode->pvs_acop) {
+		free(rtnode->pvs_acor); rtnode->pvs_acor = NULL;
+		free(rtnode->pvs_acop); rtnode->pvs_acop = NULL;
+	}
+	
+	switch(ty) {
+	case TY_CNT:
+		CNT *cnt = (CNT*)after;
+		if(cnt->acpi) {
+			rtnode->acpi = (char*)malloc((strlen(cnt->acpi) + 1)*sizeof(char));
+			strcpy(rtnode->acpi, cnt->acpi);
+		}
+		break;
+
+	case TY_SUB:
+		Sub *sub = (Sub*)after;
+		rtnode->net = net_to_bit(sub->net);
+		if(sub->nu) {
+			rtnode->nu = (char*)malloc((strlen(sub->nu) + 1)*sizeof(char));
+			strcpy(rtnode->nu, sub->nu);
+		}
+		break;
+
+	case TY_ACP:
+		ACP *acp = (ACP*)after;
+		if(acp->pv_acor && acp->pv_acop) {
+			rtnode->pv_acor = (char*)malloc((strlen(acp->pv_acor) + 1)*sizeof(char));
+			rtnode->pv_acop = (char*)malloc((strlen(acp->pv_acop) + 1)*sizeof(char));
+			strcpy(rtnode->pv_acor, acp->pv_acor);
+			strcpy(rtnode->pv_acop, acp->pv_acop);
+		}
+		if(acp->pvs_acor && acp->pvs_acop) {
+			rtnode->pvs_acor = (char*)malloc((strlen(acp->pvs_acor) + 1)*sizeof(char));
+			rtnode->pvs_acop = (char*)malloc((strlen(acp->pvs_acop) + 1)*sizeof(char));
+			strcpy(rtnode->pvs_acor, acp->pvs_acor);
+			strcpy(rtnode->pvs_acop, acp->pvs_acop);
+		}
+		break;
+	}
+}
+
+/*
+
+void tree_viewer_api(RTNode *node) {
+	fprintf(stderr,"\x1b[43mTree Viewer API\x1b[0m\n");
+	char arr_viewer_data[MAX_TREE_VIEWER_SIZE] = "[";
+	char *viewer_data = arr_viewer_data;
+	
+	RTNode *p = node;
+	while(p = p->parent) {
+		char *json = node_to_json(p);
+		strcat(viewer_data,",");
+		strcat(viewer_data,json);
+		free(json); json = NULL;
+	}
+	
+	int cinSize = 1;
+	
+	char *la = strstr(qs,"la=");
+	if(la) cinSize = atoi(la+3);
+	
+	fprintf(stderr,"Latest CIN Size : %d\n", cinSize);
+	
+	tree_viewer_data(node, &viewer_data, cinSize);
+	strcat(viewer_data,"]\0");
+	char res[MAX_TREE_VIEWER_SIZE] = "";
+	int index = 0;
+	
+	for(int i=0; i<MAX_TREE_VIEWER_SIZE; i++) {
+		if(i == 1) continue;
+		if(is_json_valid_char(viewer_data[i])) {
+			res[index++] = viewer_data[i];
+		}
+	}
+	
+	fprintf(stderr,"Content-Size : %ld\n",strlen(res));
+
+	respond_to_client(200, res, 2000);
+}
+
+void tree_viewer_data(RTNode *node, char **viewer_data, int cin_size) {
+	char *json = node_to_json(node);
+
+	strcat(*viewer_data, ",");
+	strcat(*viewer_data, json);
+	free(json); json = NULL;
+
+	RTNode *child = node->child;
+	while(child) {
+		tree_viewer_data(child, viewer_data, cin_size);
+		child = child->sibling_right;
+	}
+
+	if(node->ty != TY_SUB && node->ty != TY_ACP) {
+		RTNode *cin_list_head = db_get_cin_list_by_pi(node->ri);
+
+		if(cin_list_head) cin_list_head = latest_cin_list(cin_list_head, cin_size);
+
+		RTNode *p = cin_list_head;
+
+		while(p) {
+			json = node_to_json(p);
+			strcat(*viewer_data, ",");
+			strcat(*viewer_data, json);
+			free(json); json = NULL;
+			p = p->sibling_right;		
+		}
+		free_rtnode_list(cin_list_head);
+	}
+}
+
+RTNode *latest_cin_list(RTNode* cinList, int num) {
+	RTNode *head, *tail;
+	head = tail = cinList;
+	int cnt = 1;
+	
+	while(tail->sibling_right) {
+		tail = tail->sibling_right;
+		cnt++;
+	}
+	
+	for(int i=0; i < cnt-num; i++) {
+		head = head->sibling_right;
+		free_rtnode(head->sibling_left); head->sibling_left = NULL;
+	}
+	
+	return head;
 }
 
 void set_sub_update(Sub* after) {
@@ -858,144 +1257,12 @@ void set_acp_update(ACP* after) {
 	after->lt = get_local_time(0);
 }
 
-void set_node_update(Node *node, void *after) {
-	ObjectType ty = node->ty;
-	if(node->rn) {free(node->rn); node->rn = NULL;}
-	if(node->uri) {free(node->uri); node->uri = NULL;}
-	if(node->acpi) {free(node->acpi); node->acpi = NULL;}
-	if(node->nu) {free(node->nu); node->nu = NULL;}
-	if(node->pv_acor && node->pv_acop) {
-		free(node->pv_acor); node->pv_acor = NULL; 
-		free(node->pv_acop); node->pv_acop = NULL;
-	}
-	if(node->pvs_acor && node->pvs_acop) {
-		free(node->pvs_acor); node->pvs_acor = NULL;
-		free(node->pvs_acop); node->pvs_acop = NULL;
-	}
-	
-	switch(ty) {
-	case TY_AE:
-		AE *ae = (AE*)after;
-		node->rn = (char*)malloc((strlen(ae->rn) + 1)*sizeof(char));
-		strcpy(node->rn, ae->rn);
-		break;
-
-	case TY_CNT:
-		CNT *cnt = (CNT*)after;
-		node->rn = (char*)malloc((strlen(cnt->rn) + 1)*sizeof(char));
-		strcpy(node->rn, cnt->rn);
-		if(cnt->acpi) {
-			node->acpi = (char*)malloc((strlen(cnt->acpi) + 1)*sizeof(char));
-			strcpy(node->acpi, cnt->acpi);
-		}
-		break;
-
-	case TY_SUB:
-		Sub *sub = (Sub*)after;
-		node->rn = (char*)malloc((strlen(sub->rn) + 1)*sizeof(char));
-		strcpy(node->rn, sub->rn);
-		node->net = net_to_bit(sub->net);
-		if(sub->nu) {
-			node->nu = (char*)malloc((strlen(sub->nu) + 1)*sizeof(char));
-			strcpy(node->nu, sub->nu);
-		}
-		break;
-
-	case TY_ACP:
-		ACP *acp = (ACP*)after;
-		node->rn = (char*)malloc((strlen(acp->rn) + 1)*sizeof(char));
-		strcpy(node->rn, acp->rn);
-		if(acp->pv_acor && acp->pv_acop) {
-			node->pv_acor = (char*)malloc((strlen(acp->pv_acor) + 1)*sizeof(char));
-			node->pv_acop = (char*)malloc((strlen(acp->pv_acop) + 1)*sizeof(char));
-			strcpy(node->pv_acor, acp->pv_acor);
-			strcpy(node->pv_acop, acp->pv_acop);
-		}
-		if(acp->pvs_acor && acp->pvs_acop) {
-			node->pvs_acor = (char*)malloc((strlen(acp->pvs_acor) + 1)*sizeof(char));
-			node->pvs_acop = (char*)malloc((strlen(acp->pvs_acop) + 1)*sizeof(char));
-			strcpy(node->pvs_acor, acp->pvs_acor);
-			strcpy(node->pvs_acop, acp->pvs_acop);
-		}
-		break;
-	}
-}
-
-void free_cse(CSE *cse) {
-	if(cse->ct) free(cse->ct);
-	if(cse->lt) free(cse->lt);
-	if(cse->rn) free(cse->rn);
-	if(cse->ri) free(cse->ri);
-	if(cse->csi) free(cse->csi);
-	if(cse->pi) free(cse->pi);
-	free(cse); cse = NULL;
-}
-
-void free_ae(AE *ae) {
-	if(ae->et) free(ae->et);
-	if(ae->ct) free(ae->ct);
-	if(ae->lt) free(ae->lt);
-	if(ae->rn) free(ae->rn);
-	if(ae->ri) free(ae->ri);
-	if(ae->pi) free(ae->pi);
-	if(ae->api) free(ae->api);
-	if(ae->aei) free(ae->aei);
-	free(ae); ae = NULL;
-}
-
-void free_cnt(CNT *cnt) {
-	if(cnt->et) free(cnt->et);
-	if(cnt->ct) free(cnt->ct);
-	if(cnt->lt) free(cnt->lt);
-	if(cnt->rn) free(cnt->rn);
-	if(cnt->ri) free(cnt->ri);
-	if(cnt->pi) free(cnt->pi);
-	free(cnt); cnt = NULL;
-}
-
-void free_cin(CIN* cin) {
-	if(cin->et) free(cin->et);
-	if(cin->ct) free(cin->ct);
-	if(cin->lt) free(cin->lt);
-	if(cin->rn) free(cin->rn);
-	if(cin->ri) free(cin->ri);
-	if(cin->pi) free(cin->pi);
-	if(cin->con) free(cin->con);
-	free(cin); cin = NULL;
-}
-
-void free_sub(Sub* sub) {
-	if(sub->et) free(sub->et);
-	if(sub->ct) free(sub->ct);
-	if(sub->lt) free(sub->lt);
-	if(sub->rn) free(sub->rn);
-	if(sub->ri) free(sub->ri);
-	if(sub->pi) free(sub->pi);
-	if(sub->nu) free(sub->nu);
-	if(sub->net) free(sub->net);
-	free(sub); sub = NULL;
-}
-
-void free_acp(ACP* acp) {
-	if(acp->et) free(acp->et);
-	if(acp->ct) free(acp->ct);
-	if(acp->lt) free(acp->lt);
-	if(acp->rn) free(acp->rn);
-	if(acp->ri) free(acp->ri);
-	if(acp->pi) free(acp->pi);
-	if(acp->pv_acor) free(acp->pv_acor);
-	if(acp->pv_acop) free(acp->pv_acop);
-	if(acp->pvs_acor) free(acp->pvs_acor);
-	if(acp->pvs_acop) free(acp->pvs_acop);
-	free(acp); acp = NULL;
-}
-
-void notify_object(Node *node, char *res_json, NET net) {
-	remove_invalid_char_json(res_json);
+void notify_onem2m_resource(RTNode *node, char *response_payload, NET net) {
+	remove_invalid_char_json(response_payload);
 	while(node) {
 		if(node->ty == TY_SUB && (net & node->net) == net) {
 			if(!node->uri) set_node_uri(node);
-			char *notify_json = notification_to_json(node->uri, (int)log2((double)net ) + 1, res_json);
+			char *notify_json = notification_to_json(node->uri, (int)log2((double)net ) + 1, response_payload);
 			int result = send_http_packet(node->nu, notify_json);
 			free(notify_json); notify_json = NULL;
 		}
@@ -1016,57 +1283,13 @@ void remove_invalid_char_json(char* json) {
 	json[index] = '\0';
 }
 
-int is_json_valid_char(char c){
-	return ('!' <= c && c <= '~');
-}
-
-int net_to_bit(char *net) {
-	int netLen = strlen(net);
-	int ret = 0;
-
-	for(int i=0; i<netLen; i++) {
-		int exp = atoi(net+i);
-		if(exp > 0) ret = (ret | (int)pow(2, exp - 1));
-	}
-
-	return ret;
-}
-
-char *resource_identifer(ObjectType ty, char *ct) {
-	char *ri = (char *)malloc(24 * sizeof(char));
-
-	switch(ty) {
-		case TY_CSE : strcpy(ri, "5-"); break;
-		case TY_AE : strcpy(ri, "2-"); break;
-		case TY_CNT : strcpy(ri, "3-"); break;
-		case TY_CIN : strcpy(ri, "4-"); break;
-		case TY_SUB : strcpy(ri, "23-"); break;
-		case TY_ACP : strcpy(ri, "1-"); break;
-	}
-
-	struct timespec specific_time;
-    int millsec;
-
-	char buf[32] = "\0";
-
-    clock_gettime(CLOCK_REALTIME, &specific_time);
-    millsec = floor(specific_time.tv_nsec/1.0e6);
-
-	sprintf(buf, "%s%03d",ct, millsec);
-
-	strcat(ri, buf);
-
-	return ri;
-}
-
-
 size_t write_data(void *ptr, size_t size, size_t nmemb, struct url_data *data) {
     size_t index = data->size;
     size_t n = (size * nmemb);
     char* tmp;
 
     data->size += (size * nmemb);
-    tmp = realloc(data->data, data->size + 1); /* +1 for '\0' */
+    tmp = realloc(data->data, data->size + 1); // +1 for '\0' 
 
     if(tmp) {
         data->data = tmp;
@@ -1089,7 +1312,7 @@ int send_http_packet(char* target, char *post_data) {
     struct url_data data;
 
     data.size = 0;
-    data.data = malloc(4096 * sizeof(char)); /* reasonable size initial buffer */
+    data.data = malloc(4096 * sizeof(char)); // reasonable size initial buffer
 
     if(NULL == data.data) {
         fprintf(stderr, "Failed to allocate memory.\n");
@@ -1132,13 +1355,13 @@ int send_http_packet(char* target, char *post_data) {
     return EXIT_SUCCESS;
 }
 
-int get_acop(Node *node) {
-	char *requestheader_origin = request_header("X-M2M-Origin");
+int get_acop(RTNode *node) {
+	char *request_header_origin = request_header("X-M2M-Origin");
 	char origin[128];
 	int acop = 0;
 	
-	if(requestheader_origin) {
-		strcpy(origin, requestheader_origin);
+	if(request_header_origin) {
+		strcpy(origin, request_header_origin);
 	} else {
 		strcpy(origin, "all");
 	}
@@ -1149,9 +1372,9 @@ int get_acop(Node *node) {
 		return acop;
 	}
 
-	if(!node->acpi || !strcmp(node->acpi, "") || !strcmp(node->acpi, " ")) return ALL_ACOP;
+	if(!node->acpi) return ALL_ACOP;
 
-	Node *cb = node;
+	RTNode *cb = node;
 	while(cb->parent) cb = cb->parent;
 	
 	int uri_cnt = 0;
@@ -1170,7 +1393,7 @@ int get_acop(Node *node) {
 	}
 
 	for(int i=0; i<uri_cnt; i++) {
-		Node *acp = find_node_by_uri(cb, arr_acp_uri[i]);
+		RTNode *acp = find_rtnode_by_uri(cb, arr_acp_uri[i]);
 
 		if(acp) {
 			acop = (acop | get_acop_origin(origin, acp, 0));
@@ -1181,7 +1404,7 @@ int get_acop(Node *node) {
 	return acop;
 }
 
-int get_acop_origin(char *origin, Node *acp, int flag) {
+int get_acop_origin(char *origin, RTNode *acp, int flag) {
 	if(!origin) return 0;
 
 	int ret_acop = 0, cnt = 0;
@@ -1220,54 +1443,6 @@ int get_acop_origin(char *origin, Node *acp, int flag) {
 	return ret_acop;
 }
 
-Node *find_node_by_uri(Node *cb, char *node_uri) {
-	Node *node = cb, *pnode = NULL;
-	node_uri = strtok(node_uri, "/");
-
-	if(!node_uri) return NULL;
-
-	char uri_array[64][MAX_URI_SIZE];
-	int index = -1;
-
-	while(node_uri) {
-		strcpy(uri_array[++index], node_uri);
-		node_uri = strtok(NULL, "/");
-	}
-
-	for(int i=0; i<=index; i++) {
-		while(node) {
-			if(!strcmp(node->rn, uri_array[i])) break;
-			node = node->sibling_right;
-		}
-		if(i == index-1) pnode = node;
-		if(!node) break;
-		if(i != index) node = node->child;
-	}
-
-	if(node) return node;
-
-	Node *head;
-
-	if(pnode) {
-		head = db_get_cin_list_by_pi(pnode->ri);
-		node = head;
-		while(node) {
-			if(!strcmp(node->rn, uri_array[index])) break;
-			node = node->sibling_right;
-		}
-	}
-
-	if(node) {
-		if(node->sibling_left) node->sibling_left->sibling_right = node->sibling_right;
-		if(node->sibling_right) node->sibling_right->sibling_left = node->sibling_left;
-		node->parent = pnode;
-	}
-
-	if(head) free_node_list(head);
-
-	return node;
-}
-
 int get_value_querystring_int(char *key) {
 	char *value = strstr(qs, key);
 	if(!value) return -1;
@@ -1277,10 +1452,10 @@ int get_value_querystring_int(char *key) {
 	return atoi(value);
 }
 
-void set_node_uri(Node* node) {
+void set_node_uri(RTNode* node) {
 	if(!node->uri) node->uri = (char*)calloc(MAX_URI_SIZE,sizeof(char));
 
-	Node *p = node;
+	RTNode *p = node;
 	char uri_copy[32][MAX_URI_SIZE];
 	int index = -1;
 
@@ -1306,3 +1481,4 @@ int check_origin() {
 		return 0;
 	}
 }
+*/

@@ -1,8 +1,10 @@
-#ifndef _HTTPD_H___
-#define _HTTPD_H___
+#ifndef __HTTPD_H__
+#define __HTTPD_H__
 
 #include <stdio.h>
 #include <string.h>
+#include "onem2m.h"
+#include "mqttClient.h"
 
 // Client request
 extern char *method, // "GET" or "POST"
@@ -15,12 +17,11 @@ extern int payload_size;
 
 // Server control functions
 void serve_forever(const char *PORT);
-
 char *request_header(const char *name);
-
-void set_response_header(char *key, char *value);
-
-void respond_to_client(int status, char *json);
+void set_response_header(char *key, char *value, char *response_headers);
+void normalize_payload();
+Operation http_parse_operation();
+void http_respond_to_client(oneM2MPrimitive *o2pt, int status);
 
 typedef struct {
   char *name, *value;
@@ -45,5 +46,14 @@ void route();
 #define HTTP_406 printf("%s 406 Not Acceptable\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
 #define HTTP_413 printf("%s 413 Payload Too Large\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
 #define HTTP_500 printf("%s 500 Internal Server Error\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
+#define LOG_HTTP_200 fprintf(stderr,"%s 200 OK\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
+#define LOG_HTTP_201 fprintf(stderr,"%s 201 Created\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
+#define LOG_HTTP_209 fprintf(stderr,"%s 209 Conflict\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
+#define LOG_HTTP_400 fprintf(stderr,"%s 400 Bad Request\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
+#define LOG_HTTP_403 fprintf(stderr,"%s 403 Forbidden\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
+#define LOG_HTTP_404 fprintf(stderr,"%s 404 Not found\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
+#define LOG_HTTP_406 fprintf(stderr,"%s 406 Not Acceptable\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
+#define LOG_HTTP_413 fprintf(stderr,"%s 413 Payload Too Large\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
+#define LOG_HTTP_500 fprintf(stderr,"%s 500 Internal Server Error\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers)
 
 #endif
