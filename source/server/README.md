@@ -14,9 +14,3 @@ If there is no executable file, Run `make`
 ## make Dependency
 
 1. Berkeley DB 18.1.32 → https://mindlestick.github.io/TinyIoT/build/html/installation.html (guide)
-
-## Add or Remove Response Header
-
-1. open `httpd.h`
-2. modify → `#define RESPONSE_JSON_HEADER`
-3. header format → `Connection : close\n`
