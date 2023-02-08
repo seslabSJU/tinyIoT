@@ -1,20 +1,20 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
+#include "logger.h"
 
 #define SERVER_PORT "3000"
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
 
-#define MONO_THREAD 0 // 0 → multithread, 1 → monothread
+#define MONO_THREAD 1 // 0 → multithread, 1 → monothread
 
 #define MAX_PAYLOAD_SIZE 16384
 #define MAX_URI_SIZE 1024
 #define MAX_PROPERTY_SIZE 16384
 
+// MQTT Settings
 #define ENABLE_MQTT
 
-
-// MQTT Settings
 #ifdef ENABLE_MQTT
 #define MQTT_HOST            "127.0.0.1"
 #define MQTT_QOS             MQTT_QOS_0
@@ -41,5 +41,9 @@
 #define PRINT_BUFFER_SIZE    16384
 
 #endif
+
+#include "logger.h"
+#define LOG_LEVEL LOG_LEVEL_DEBUG
+#define LOG_BUFFER_SIZE 1024
 
 #endif

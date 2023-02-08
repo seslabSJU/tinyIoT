@@ -17,11 +17,11 @@
 
 #define MAX_CONNECTIONS 1024
 #define BUF_SIZE 65535
-#define QUEUE_SIZE 1000000
+#define QUEUE_SIZE 64
 
 pthread_mutex_t mutex_lock;
 int listenfd;
-int *clients;
+int clients[MAX_CONNECTIONS];
 static void start_server(const char *);
 static void respond(int);
 
@@ -51,11 +51,11 @@ void serve_forever(const char *PORT) {
   
   int slot = 0; 
 
-  fprintf(stderr,"Server started %shttp://127.0.0.1:%s%s\n", "\033[92m", PORT, "\033[0m");
+  logger("HTTP", LOG_LEVEL_INFO, "Server started %shttp://127.0.0.1:%s%s\n", "\033[92m", PORT, "\033[0m");
 
   // create shared memory for client slot array
-  clients = mmap(NULL, sizeof(*clients) * MAX_CONNECTIONS,
-                 PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+  //clients = mmap(NULL, sizeof(*clients) * MAX_CONNECTIONS,
+                 //PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
 
   // Setting all elements to -1: signifies there is no client connected
   int i;
@@ -69,8 +69,6 @@ void serve_forever(const char *PORT) {
   // ACCEPT connections
   while (1) {
     clients[slot] = accept(listenfd, (struct sockaddr *)&clientaddr, &addrlen);
-
-    fprintf(stderr,"error : %d\n", clients[slot]);
     if (clients[slot] < 0) {
       perror("accept() error");
       exit(1);
@@ -170,15 +168,15 @@ static void uri_unescape(char *uri) {
 void respond(int slot) {
   int rcvd;
   
-  buf[slot] = malloc(BUF_SIZE);
+  buf[slot] = malloc(BUF_SIZE*sizeof(char));
   rcvd = recv(clients[slot], buf[slot], BUF_SIZE, 0);
 
   if (rcvd < 0){ // receive error
-    fprintf(stderr, ("recv() error\n"));
+    logger("HTTP", LOG_LEVEL_ERROR, "recv() error");
     return;
   }
   else if (rcvd == 0) { // receive socket closed
-    fprintf(stderr, "Client disconnected upexpectedly.\n");
+    logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
     return;
   }
   else // message received
@@ -186,22 +184,20 @@ void respond(int slot) {
     pthread_mutex_lock(&mutex_lock);
 
     buf[slot][rcvd] = '\0';
-    fprintf(stderr,"\n\033[34m======================Buffer received======================\033[0m\n\n");
-    fprintf(stderr,"%s",buf[slot]);
-    fprintf(stderr,"\n\033[34m==========================================================\033[0m\n");
+    logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf[slot]);
 
     method = strtok(buf[slot], " \t\r\n");
     uri = strtok(NULL, " \t");
     prot = strtok(NULL, " \t\r\n");
 
     if(!uri) {
-      fprintf(stderr,"uri is NULL\n");
+      logger("HTTP", LOG_LEVEL_ERROR, "URI is NULL");
       return;
     }
 
     uri_unescape(uri);
     
-    fprintf(stderr, "\n\x1b[36m + [%s] %s\x1b[0m\n", method, uri);
+    logger("HTTP", LOG_LEVEL_DEBUG, "\x1b[36m + [%s] %s\x1b[0m",method, uri);
 
     qs = strchr(uri, '?');
 
@@ -245,14 +241,13 @@ void respond(int slot) {
     // call router
     handle_http_request();
 
-    pthread_mutex_unlock(&mutex_lock);
-
     // tidy up
     fflush(stdout);
     shutdown(STDOUT_FILENO, SHUT_WR);
     //close(STDOUT_FILENO);
   }
   free(buf[slot]);
+  pthread_mutex_unlock(&mutex_lock);
 }
 
 Operation http_parse_operation(){
@@ -289,9 +284,9 @@ void normalize_payload() {
 }
 
 void http_respond_to_client(oneM2MPrimitive *o2pt, int status) {
-    char content_length[16];
-    char rsc[6];
-    char response_headers[1024] = {'\0'};
+    char content_length[64];
+    char rsc[64];
+    char response_headers[2048] = {'\0'};
 
     sprintf(content_length, "%ld", strlen(o2pt->pc));
     sprintf(rsc, "%d", o2pt->rsc);
@@ -300,19 +295,20 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int status) {
     set_response_header("X-M2M-RVI", o2pt->rvi, response_headers);
     set_response_header("X-M2M-RI", o2pt->rqi, response_headers);
 
-    fprintf(stderr,"\n\033[34m========================Buffer sent========================\033[0m\n\n");
+    char buf[BUF_SIZE] = {'\0'};
+
     switch(status) {
-        case 200: HTTP_200; LOG_HTTP_200; break;
-        case 201: HTTP_201; LOG_HTTP_201; break;
-        case 209: HTTP_209; LOG_HTTP_209; break;
-        case 400: HTTP_400; LOG_HTTP_400; break;
-        case 403: HTTP_403; LOG_HTTP_403; break;
-        case 404: HTTP_404; LOG_HTTP_404; break;
-        case 406: HTTP_406; LOG_HTTP_406; break;
-        case 413: HTTP_413; LOG_HTTP_413; break;
-        case 500: HTTP_500; LOG_HTTP_500; break;
+        case 200: sprintf(buf, "%s 200 OK\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers); break;
+        case 201: sprintf(buf, "%s 201 Created\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers); break;
+        case 209: sprintf(buf, "%s 209 Conflict\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers); break;
+        case 400: sprintf(buf, "%s 400 Bad Request\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers); break;
+        case 403: sprintf(buf, "%s 403 Forbidden\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers); break;
+        case 404: sprintf(buf, "%s 404 Not found\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers); break;
+        case 406: sprintf(buf, "%s 406 Not Acceptable\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers); break;
+        case 413: sprintf(buf, "%s 413 Payload Too Large\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers); break;
+        case 500: sprintf(buf, "%s 500 Internal Server Error\n%s%s\n", RESPONSE_PROTOCOL, DEFAULT_RESPONSE_HEADERS, response_headers); break;
     }
-    printf("%s",o2pt->pc); 
-    fprintf(stderr,"%s\n",o2pt->pc);
-    fprintf(stderr,"\n\n\033[34m==========================================================\033[0m\n");
+    strcat(buf, o2pt->pc);
+    printf("%s",buf); 
+    logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf);
 }

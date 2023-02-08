@@ -85,6 +85,8 @@ typedef struct {
 	int st;
 	int cni;
 	int cbs;
+	int mni;
+	int mbs;
 } CNT;
 
 typedef struct {
@@ -149,6 +151,11 @@ typedef struct RTNode {
 	ObjectType ty;
 
 	int net;
+	int cni;
+	int cbs;
+	int mni;
+	int mbs;
+	int cs;
 }RTNode;
 
 typedef struct {  
@@ -208,7 +215,7 @@ void init_cse(CSE* cse);
 void init_ae(AE* ae, char *pi, char *origin);
 void init_cnt(CNT* cnt, char *pi);
 void init_cin(CIN* cin, char *pi);
-void init_sub(Sub* sub, char *pi);
+void init_sub(Sub* sub, char *pi, char *uri);
 void init_acp(ACP* acp, char *pi);
 void set_ae_update(cJSON *m2m_ae, AE* after);
 void set_cnt_update(cJSON *m2m_cnt, CNT* after);
@@ -269,6 +276,9 @@ int check_payload_size(oneM2MPrimitive *o2pt);
 int check_payload_format(oneM2MPrimitive *o2pt);
 int check_rn_invalid(oneM2MPrimitive *o2pt, ObjectType ty);
 void api_prefix_invalid(oneM2MPrimitive *o2pt);
+void too_large_content_size_error(oneM2MPrimitive *o2pt);
+void mni_mbs_invalid(oneM2MPrimitive *o2pt, char *attribute);
+void db_store_fail(oneM2MPrimitive *o2pt);
 
 //etc
 void init_server();
@@ -282,10 +292,12 @@ int get_acop(RTNode *node);
 int get_acop_origin(char *origin, RTNode *acp, int flag);
 int get_value_querystring_int(char *key);
 void log_runtime(double start);
-void set_o2pt_pc(oneM2MPrimitive *o2pt, char *pc);
+void set_o2pt_pc(oneM2MPrimitive *o2pt, char *pc, ...);
 void set_o2pt_rsc(oneM2MPrimitive *o2pt, int rsc);
 void handle_http_request();
 void respond_to_client(oneM2MPrimitive *o2pt, int status);
+void update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign);
+void delete_cin_under_cnt_mni_mbs(CNT *cnt);
 
 #define MAX_TREE_VIEWER_SIZE 65536
 #define EXPIRE_TIME -3600*24*365*2

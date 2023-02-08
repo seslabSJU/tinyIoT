@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <limits.h>
 #include "onem2m.h"
 #include "jsonparse.h"
 #include "cJSON.h"
@@ -102,12 +103,12 @@ AE* cjson_to_ae(cJSON *cjson) {
 }
 
 CNT* cjson_to_cnt(cJSON *cjson) {
-	CNT *cnt = (CNT *)calloc(1,sizeof(CNT));
-
 	cJSON *root = NULL;
 	cJSON *rn = NULL;
 	cJSON *acpi = NULL;
 	cJSON *lbl = NULL;
+	cJSON *mni = NULL;
+	cJSON *mbs = NULL;
 
 	if (cjson == NULL) {
 		// const char *error_ptr = cJSON_GetErrorPtr();
@@ -120,6 +121,8 @@ CNT* cjson_to_cnt(cJSON *cjson) {
 
 	root = cJSON_GetObjectItem(cjson, "m2m:cnt");
 	if(!root) return NULL;
+
+	CNT *cnt = (CNT *)calloc(1,sizeof(CNT));
 
 	// rn (optional)
 	rn = cJSON_GetObjectItem(root, "rn");
@@ -198,6 +201,22 @@ CNT* cjson_to_cnt(cJSON *cjson) {
 		}
 	}
 
+	//mni (Optional)
+	mni = cJSON_GetObjectItem(root, "mni");
+	if(mni) {
+		cnt->mni = mni->valueint;
+	} else {
+		cnt->mni = INT_MIN;
+	}
+
+	//mbs (Optional)
+	mbs = cJSON_GetObjectItem(root, "mbs");
+	if(mbs) {
+		cnt->mbs = mbs->valueint;
+	} else {
+		cnt->mbs = INT_MIN;
+	}
+
 	return cnt;
 }
 
@@ -231,6 +250,7 @@ CIN* cjson_to_cin(cJSON *cjson) {
 	}
 	cin->con = cJSON_PrintUnformatted(con);
 	remove_quotation_mark(cin->con);
+	cin->cs = strlen(cin->con);
 
 	return cin;
 }
@@ -594,6 +614,7 @@ char* ae_to_json(AE *ae_object) {
 }
 
 char* cnt_to_json(CNT* cnt_object) {
+	logger("cJSON", LOG_LEVEL_DEBUG, "Call cnt_to_json");
 	char *json = NULL;
 	char str_array[MAX_PROPERTY_SIZE];
 
@@ -615,6 +636,8 @@ char* cnt_to_json(CNT* cnt_object) {
 	cJSON_AddStringToObject(cnt, "et", cnt_object->et);
 	cJSON_AddNumberToObject(cnt, "cni", cnt_object->cni);
 	cJSON_AddNumberToObject(cnt, "cbs", cnt_object->cbs);
+	if(cnt_object->mni != INT_MIN) cJSON_AddNumberToObject(cnt, "mni", cnt_object->mni);
+	if(cnt_object->mbs != INT_MIN) cJSON_AddNumberToObject(cnt, "mbs", cnt_object->mbs);
 
 	// acpi
 	if(cnt_object->acpi) {

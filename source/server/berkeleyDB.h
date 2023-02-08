@@ -17,7 +17,7 @@ CIN* db_get_cin(char *ri);
 Sub* db_get_sub(char* ri);
 ACP* db_get_acp(char* ri);
 
-int db_delete_object(char *ri);
+int db_delete_onem2m_resource(char *ri);
 int db_delete_sub(char* ri);
 int db_delete_acp(char* ri);
 
@@ -28,7 +28,7 @@ RTNode* db_get_all_cin();
 RTNode* db_get_all_sub();
 RTNode* db_get_all_acp();
 
-RTNode* db_get_cin_list_by_pi(char* pi);
+RTNode* db_get_cin_rtnode_list_by_pi(char* pi);
 
 #define DB_STR_MAX 2048
 #define DB_SEP ";"
