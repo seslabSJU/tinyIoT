@@ -14,3 +14,24 @@ tinyIoT supports the following features:
 - Bindings: HTTP and MQTT (CoAP will be added in 2023 first quarter)
 - Group management (to be added in 2023 first quarter)
 
+
+Tested Operating System: 
+  - Linux Ubuntu 22.04
+
+Configure your running environment with the config.h file. You can configure IP address, Port number, supported binding protocols, etc. 
+Default IP address and port number are 127.0.0.1 and 3000. 
+
+Use the following command to run tinyIoT server: 
+
+  Run ./server 
+ 
+You can configure port number and ip address as parameters, for example, 
+
+  ./server [port] (port = 3000 by default)
+   
+To make an excutable tinyIoT server, simply execute the make file. 
+
+  make Dependency
+  make
+
+Berkeley DB 18.1.32 → https://mindlestick.github.io/TinyIoT/build/html/installation.html (guide)
