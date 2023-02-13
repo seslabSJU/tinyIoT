@@ -31,7 +31,18 @@ You can configure port number and ip address as parameters, for example,
    
 To make an excutable tinyIoT server, simply execute the make file. 
 
-  make Dependency
   make
+  
+Dependencies: 
 
-Berkeley DB 18.1.32 → https://mindlestick.github.io/TinyIoT/build/html/installation.html (guide)
+  - Database: BerkeleyDB ==> Berkeley DB 18.1.32 → https://mindlestick.github.io/TinyIoT/build/html/installation.html (guide) Or you can read README_DB.md
+  - JSON parser: CJSon
+
+For binding protocols, tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later. 
+In order to run MQTT, Mosquitto MQTT broker should be installed on your machine. 
+
+  - HTTP: lighthttpd
+  - MQTT: Mosquitto
+  - CoAP: To be added
+
+
