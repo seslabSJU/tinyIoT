@@ -21,8 +21,8 @@
 
 /* Visibility control macros */
 
-#ifndef WOLFMQTT_VISIBILITY_H
-#define WOLFMQTT_VISIBILITY_H
+#ifndef WOLFMQTT_VISIBILIRT_H
+#define WOLFMQTT_VISIBILIRT_H
 
 /* WOLFMQTT_API is used for the public API symbols.
         It either imports or exports (or does nothing for static builds)
@@ -62,4 +62,4 @@
     #endif
 #endif /* BUILDING_WOLFMQTT */
 
-#endif /* WOLFMQTT_VISIBILITY_H */
+#endif /* WOLFMQTT_VISIBILIRT_H */

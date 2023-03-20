@@ -59,6 +59,7 @@ int logger(const char* tag,  LOGLEVEL level, const char *msg, ...){
         charsCnt = vsnprintf(t, LOG_BUFFER_SIZE, msg, ap);
         va_end(ap);
         fprintf(stderr, "%s\n", t);
+        free(t);
     }
 
     return charsCnt;

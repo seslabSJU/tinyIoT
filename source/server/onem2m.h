@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "cJSON.h"
+#include "onem2mTypes.h"
 
 //enum
 typedef enum {
@@ -17,25 +18,9 @@ typedef enum {
 	OP_UPDATE,
 	OP_DELETE,
 	OP_VIEWER = 1000,
-	OP_OPTIONS
+	OP_OPTIONS,
+	OP_DISCOVERY
 }Operation;
-
-typedef enum {
-	TY_NONE = 0,
-	TY_ACP,
-	TY_AE,
-	TY_CNT,
-	TY_CIN,
-	TY_CSE,
-	TY_SUB = 23
-}ObjectType;
-
-typedef enum {
-	NOTIFICATION_EVENT_1 = 1,
-	NOTIFICATION_EVENT_2 = 2,
-	NOTIFICATION_EVENT_3 = 4,
-	NOTIFICATION_EVENT_4 = 8
-}NET;
 
 typedef enum {
 	ACOP_CREATE = 1,
@@ -46,6 +31,11 @@ typedef enum {
 	ACOP_DISCOVERY = 32
 }ACOP;
 
+typedef enum {
+	CS_PARTIAL_CONTENT = 1,
+	CS_FULL_CONTENT = 2
+} ContentStatus;
+
 //oneM2M Resource
 typedef struct {
 	char *ct;
@@ -54,7 +44,7 @@ typedef struct {
 	char *ri;
 	char *pi;
 	char *csi;
-	int ty;
+	ResourceType ty;
 } CSE;
 
 typedef struct {
@@ -68,7 +58,9 @@ typedef struct {
 	char *aei;
 	char *lbl;
 	char *srv;
-	int ty;
+	char *acpi;
+	char *origin;
+	ResourceType ty;
 	bool rr;
 } AE;
 
@@ -81,7 +73,7 @@ typedef struct {
 	char *pi;
 	char *lbl;
 	char *acpi;
-	int ty;
+	ResourceType ty;
 	int st;
 	int cni;
 	int cbs;
@@ -97,7 +89,7 @@ typedef struct {
 	char *ri;
 	char *pi;
 	char *con;	
-	int ty;
+	ResourceType ty;
 	int st;
 	int cs;
 } CIN;
@@ -112,9 +104,10 @@ typedef struct {
 	char *nu;
 	char *net;
 	char *sur;
-	int ty;
+	ResourceType ty;
 	int nct;
-} Sub;
+	int net_bit;
+} SUB;
 
 typedef struct {
 	char *rn;
@@ -127,8 +120,28 @@ typedef struct {
 	char *pv_acop;
 	char *pvs_acor;
 	char *pvs_acop;
-	int ty;
+	char *lbl;
+	ResourceType ty;
 } ACP;
+
+typedef struct {
+	char *rn;
+	char *pi;
+	char *ri;
+	char *ct;
+	char *lt;
+	char *et;
+	char *acpi;
+	char *macp;
+	
+	ResourceType mt;
+	int mnm;
+	int cnm;
+
+	char **mid;
+	bool mtv;
+	ConsistencyStrategy csy;
+} GRP;
 
 //Resource Tree
 typedef struct RTNode {
@@ -136,33 +149,109 @@ typedef struct RTNode {
 	struct RTNode *child;
 	struct RTNode *sibling_left;
 	struct RTNode *sibling_right;
-	
-	char *rn;
-	char *ri;
-	char *pi;
-	char *nu;
-	char *sur;
-	char *acpi;
-	char *pv_acor;
-	char *pv_acop;
-	char *pvs_acor;
-	char *pvs_acop;
-	char *uri;
-	ObjectType ty;
 
-	int net;
-	int cni;
-	int cbs;
-	int mni;
-	int mbs;
-	int cs;
+	char *uri;
+	ResourceType ty;
+	void *obj;
 }RTNode;
 
 typedef struct {  
 	RTNode *cb;
 }ResourceTree;
 
+typedef enum {
+    FU_DISCOVERY                    = 1,
+    FU_CONDITIONAL_OPERATION       = 2, // DEFAULT
+    FU_IPE_ON_DEMAND_DISCOVERY     = 3,
+    FU_DISCOVERY_BASED_OPERATION   = 4
+} FilterUsage;
+
+
+typedef enum{
+    FO_AND = 1,    // DEFAULT
+    FO_OR  = 2,
+    FO_XOR = 3
+} FilterOperation;
+
+
 typedef struct {
+    /*Created Before*/
+    char* crb;
+    /*Created After*/
+    char* cra;
+    /*Modified Since*/
+    char* ms;
+    /*Unmodified Since*/
+    char* us;
+    /*stateTag Smaller*/
+    int sts;
+    /*stateTag Bigger*/
+    int stb;
+    /*Expire Before*/
+    char* exb;
+    /*Expire After*/
+    char* exa;
+    
+    /*Label*/
+    cJSON* lbl;
+    /*Parent Label*/
+    cJSON *palb;
+    /*Child Label*/
+    cJSON *clbl;
+
+    /*Labels Query*/
+    char* lbq;
+    /*Resource Type*/
+    int *ty;
+    int tycnt;
+    /*Child Resource Type*/
+    int *chty;
+    int chtycnt;
+    /*Parent Resource Type*/
+    int *pty;
+    int ptycnt;
+    /*Size Above*/
+    int sza;
+    /*Size Below*/
+    int szb;
+
+    /*Content Type*/
+    char* cty;
+    /*Attribute*/
+    char* atr;
+    /*Child Attribute*/
+    char* catr;
+    /*Parent Attribute*/
+    char* patr;
+
+    FilterUsage fu;
+    /*Limit*/
+    int lim;
+    /*sememtics FIlter*/
+    char* smf;
+    FilterOperation fo;
+
+    /*Content Filter Syntax*/
+    char* cfs;
+    /*Content Filter Query*/
+    char* cfq;
+
+    /*Level*/
+    int lvl;
+    /*Offset*/
+    int ofst;
+    /*apply Relative Path*/
+    char* arp;
+    /*GeoQuery*/
+    char* gq;
+    /*Operations*/
+    ACOP ops;
+    
+    struct _o *o2pt;
+} FilterCriteria;
+
+
+typedef struct _o{
 	char *to;
 	char *fr;
 	char *rqi;
@@ -175,132 +264,132 @@ typedef struct {
 	int ty;
 	char *origin;
 	char *req_type;
+	bool isFopt;
+	char *fopt;
+	bool errFlag;
+	ContentStatus cnst;
+	int cnot;
+	FilterCriteria *fc;
 }oneM2MPrimitive;
 
-//http request
-RTNode* parse_uri(oneM2MPrimitive *o2pt, RTNode *cb);
-ObjectType http_parse_object_type();
-ObjectType parse_object_type_cjson(cJSON *cjson);
-
 //onem2m resource
-void create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode);
-void retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void retrieve_object_filtercriteria(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *node, char *response_payload, NET net);
+int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode);
+int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_object_filtercriteria(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 
-void create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
-void create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
-void create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
-void create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
-void create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 
-void retrieve_cse(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void retrieve_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void retrieve_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void retrieve_cin(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void retrieve_cin_latest(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void retrieve_cin_by_ri(char *ri);
-void retrieve_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void retrieve_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_cse(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_cin(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_cin_latest(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_cin_by_ri(char *ri);
+int retrieve_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int retrieve_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 
-void update_cse(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-void update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_cse(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 
 void init_cse(CSE* cse);
 void init_ae(AE* ae, char *pi, char *origin);
 void init_cnt(CNT* cnt, char *pi);
 void init_cin(CIN* cin, char *pi);
-void init_sub(Sub* sub, char *pi, char *uri);
+void init_sub(SUB* sub, char *pi, char *uri);
 void init_acp(ACP* acp, char *pi);
-void set_ae_update(cJSON *m2m_ae, AE* after);
-void set_cnt_update(cJSON *m2m_cnt, CNT* after);
-void set_sub_update(cJSON *m2m_sub, Sub* after);
-void set_acp_update(cJSON *m2m_acp, ACP* after);
-void set_rtnode_update(RTNode* rtnode, void *after);
+void init_grp(GRP* grp, char *pi);
+int set_ae_update(oneM2MPrimitive *o2pt, cJSON *m2m_ae, AE* ae);
+int set_cnt_update(oneM2MPrimitive *o2pt, cJSON *m2m_cnt, CNT* cnt);
+int set_sub_update(oneM2MPrimitive *o2pt, cJSON *m2m_sub, SUB* sub);
+int set_acp_update(oneM2MPrimitive *o2pt, cJSON *m2m_acp, ACP* acp);
+int set_grp_update(oneM2MPrimitive *o2pt, cJSON *m2m_grp, GRP* grp);
 
 void free_cse(CSE* cse);
 void free_ae(AE* ae);
 void free_cnt(CNT* cnt);
 void free_cin(CIN* cin);
-void free_sub(Sub* sub);
+void free_sub(SUB* sub);
 void free_acp(ACP *acp);
+void free_grp(GRP *grp);
 
 //resource tree
-RTNode* create_rtnode(void *resource, ObjectType ty);
-RTNode* create_cse_rtnode(CSE *cse);
-RTNode* create_ae_rtnode(AE *ae);
-RTNode* create_cnt_rtnode(CNT *cnt);
-RTNode* create_cin_rtnode(CIN *cin);
-RTNode* create_sub_rtnode(Sub *sub);
-RTNode* create_acp_rtnode(ACP *acp);
-int add_child_resource_tree(RTNode *parent, RTNode *child);
-RTNode *find_rtnode_by_uri(RTNode *cse, char *node_uri);
-void delete_rtnode_and_db_data(RTNode *node, int flag);
-void free_rtnode(RTNode *node);
-void free_rtnode_list(RTNode *node);
+RTNode* create_rtnode(void *resource, ResourceType ty);
+int delete_rtnode_and_db_data(oneM2MPrimitive *o2pt, RTNode *rtnode, int flag);
+void free_rtnode(RTNode *rtnode);
+void free_rtnode_list(RTNode *rtnode);
 
-void tree_viewer_api(RTNode *node);
-void tree_viewer_data(RTNode *node, char **viewer_data, int cin_size);
-void restruct_resource_tree();
-RTNode* restruct_resource_tree_child(RTNode *node, RTNode *list);
+RTNode* restruct_resource_tree(RTNode *node, RTNode *list);
 RTNode* latest_cin_list(RTNode *cinList, int num); // use in viewer API
 RTNode* find_latest_oldest(RTNode* node, int flag);
-void set_node_uri(RTNode* node);
-
-//json
-void remove_invalid_char_json(char* json);
-int is_json_valid_char(char c);
-bool is_rn_valid_char(char c);
-
-//http etc
-struct url_data { size_t size; char* data;};
-size_t write_data(void *ptr, size_t size, size_t nmemb, struct url_data *data);
-int send_http_packet(char *target, char *post_data);
-
-//exception
-void no_mandatory_error(oneM2MPrimitive *o2pt);
-void child_type_error(oneM2MPrimitive *o2pt);
-int check_privilege(oneM2MPrimitive *o2pt, RTNode *target_rtnode, ACOP acop);
-int check_payload_empty(oneM2MPrimitive *o2pt);
-int check_rn_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode);
-int check_aei_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode);
-int check_resource_type_equal(oneM2MPrimitive *o2pt);
-int check_resource_type_invalid(oneM2MPrimitive *o2pt);
-int result_parse_uri(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-int check_payload_size(oneM2MPrimitive *o2pt);
-int check_payload_format(oneM2MPrimitive *o2pt);
-int check_rn_invalid(oneM2MPrimitive *o2pt, ObjectType ty);
-void api_prefix_invalid(oneM2MPrimitive *o2pt);
-void too_large_content_size_error(oneM2MPrimitive *o2pt);
-void mni_mbs_invalid(oneM2MPrimitive *o2pt, char *attribute);
-void db_store_fail(oneM2MPrimitive *o2pt);
+void set_node_uri(RTNode* rtnode);
 
 //etc
-void init_server();
-char* get_local_time(int diff);
-char* resource_identifier(ObjectType ty, char *ct);
-void cin_in_period(RTNode *pnode);
-void object_test_api(RTNode *node);
-char* json_label_value(char *json_payload);
-int net_to_bit(char *net);
-int get_acop(RTNode *node);
-int get_acop_origin(char *origin, RTNode *acp, int flag);
-int get_value_querystring_int(char *key);
-void log_runtime(double start);
-void set_o2pt_pc(oneM2MPrimitive *o2pt, char *pc, ...);
-void set_o2pt_rsc(oneM2MPrimitive *o2pt, int rsc);
-void handle_http_request();
-void respond_to_client(oneM2MPrimitive *o2pt, int status);
-void update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign);
-void delete_cin_under_cnt_mni_mbs(CNT *cnt);
+int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign);
 
-#define MAX_TREE_VIEWER_SIZE 65536
-#define EXPIRE_TIME -3600*24*365*2
+/* check resource is apt to filter criteria */
+bool isResourceAptFC(RTNode *rtnode, FilterCriteria *fc);
+bool FC_isAptCra(char* fcCra, RTNode *rtnode);
+bool FC_isAptCrb(char *fcCrb, RTNode *rtnode);
+bool FC_isAptExa(char *fcExa, RTNode *rtnode);
+bool FC_isAptExb(char *fcExa, RTNode *rtnode);
+bool FC_isAptLbl(cJSON* fcLbl, RTNode *rtnode);
+bool FC_isAptMs(char *fcMs, RTNode *rtnode);
+bool FC_isAptUs(char *fcUs, RTNode *rtnode);
+bool FC_isAptStb(int fcStb, RTNode *rtnode);
+bool FC_isAptSts(int fcSts, RTNode *rtnode);
+bool FC_isAptTy(int *fcTy, int tycnt, int ty);
+bool FC_isAptChty(int *fcChty, int tycnt, int ty);
+bool FC_isAptPty(int *fcPty, int tycnt, int ty);
+bool FC_isAptSza(int fcSza, RTNode *rtnode);
+bool FC_isAptSzb(int fcSzb, RTNode *rtnode);
+bool FC_isAptOps(ACOP fcAcop, oneM2MPrimitive *o2pt, RTNode *rtnode);
+
+bool isValidFcAttr(char* attr);
+
+FilterCriteria *parseFilterCriteria(cJSON *fcjson);
+
+void free_fc(FilterCriteria *fc);
+
+/* check resource is apt to filter criteria */
+bool isResourceAptFC(RTNode *rtnode, FilterCriteria *fc);
+bool FC_isAptCra(char* fcCra, RTNode *rtnode);
+bool FC_isAptCrb(char *fcCrb, RTNode *rtnode);
+bool FC_isAptExa(char *fcExa, RTNode *rtnode);
+bool FC_isAptExb(char *fcExa, RTNode *rtnode);
+bool FC_isAptLbl(cJSON* fcLbl, RTNode *rtnode);
+bool FC_isAptMs(char *fcMs, RTNode *rtnode);
+bool FC_isAptUs(char *fcUs, RTNode *rtnode);
+bool FC_isAptStb(int fcStb, RTNode *rtnode);
+bool FC_isAptSts(int fcSts, RTNode *rtnode);
+bool FC_isAptTy(int *fcTy, int tycnt, int ty);
+bool FC_isAptChty(int *fcChty, int tycnt, int ty);
+bool FC_isAptPty(int *fcPty, int tycnt, int ty);
+bool FC_isAptSza(int fcSza, RTNode *rtnode);
+bool FC_isAptSzb(int fcSzb, RTNode *rtnode);
+bool FC_isAptOps(ACOP fcAcop, oneM2MPrimitive *o2pt, RTNode *rtnode);
+
+bool isValidFcAttr(char* attr);
+
+FilterCriteria *parseFilterCriteria(cJSON *fcjson);
+
+void free_fc(FilterCriteria *fc);
+
 #define ALL_ACOP ACOP_CREATE + ACOP_RETRIEVE + ACOP_UPDATE + ACOP_DELETE + ACOP_NOTIFY + ACOP_DISCOVERY
 
 #endif

@@ -211,7 +211,7 @@ void respond(int slot) {
     t = strtok(NULL, "\r\n");
     t2 = request_header("Content-Length"); // and the related header if there is
     payload = t;
-    payload_size = t2 ? atol(t2) : (rcvd - (t - buf));
+    payload_size = t2 ? atol(t2) : 0;
 
     // bind clientfd to stdout, making it easier to write
     int clientfd = clients[slot];

@@ -6,11 +6,18 @@
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
 
-#define MONO_THREAD 1 // 0 → multithread, 1 → monothread
+#define MONO_THREAD 1 // 0 → multi-thread, 1 → mono-thread
 
-#define MAX_PAYLOAD_SIZE 16384
+#define MAX_PAYLOAD_SIZE 65536 
 #define MAX_URI_SIZE 1024
-#define MAX_PROPERTY_SIZE 16384
+#define MAX_ATTRIBUTE_SIZE 4096
+
+#define MAX_TREE_VIEWER_SIZE 65536
+#define DEFAULT_EXPIRE_TIME -3600*24*365*2
+
+// Group Settings
+#define CONSISTENCY_POLICY SET_MIXED
+
 
 // MQTT Settings
 #define ENABLE_MQTT
@@ -19,7 +26,7 @@
 #define MQTT_HOST            "127.0.0.1"
 #define MQTT_QOS             MQTT_QOS_0
 #define MQTT_KEEP_ALIVE_SEC  60
-#define MQTT_CMD_TIMEOUT_MS  30000
+#define MQTT_CMD_TIMEOUT_MS  3000
 #define MQTT_CON_TIMEOUT_MS  5000
 #define MQTT_CLIENT_ID       "TinyIoT"
 #define MQTT_USERNAME        "test"
@@ -44,6 +51,6 @@
 
 #include "logger.h"
 #define LOG_LEVEL LOG_LEVEL_DEBUG
-#define LOG_BUFFER_SIZE 1024
+#define LOG_BUFFER_SIZE MAX_PAYLOAD_SIZE
 
 #endif

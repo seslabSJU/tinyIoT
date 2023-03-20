@@ -302,12 +302,12 @@ static int Handle_Props(MqttClient* client, MqttProp* props, byte use_cb,
 
     /* If no properties, just return */
     if (props != NULL) {
-    #ifdef WOLFMQTT_PROPERTY_CB
+    #ifdef WOLFMQTT_PROPERRT_CB
         /* Check for properties set by the server */
-        if ((use_cb == 1) && (client->property_cb != NULL)) {
+        if ((use_cb == 1) && (client->properRT_cb != NULL)) {
             /* capture error if returned */
-            int rc_err = client->property_cb(client, props,
-                    client->property_ctx);
+            int rc_err = client->properRT_cb(client, props,
+                    client->properRT_ctx);
             if (rc_err < 0) {
                 rc = rc_err;
             }
@@ -1403,15 +1403,15 @@ int MqttClient_SetDisconnectCallback(MqttClient *client,
 }
 #endif
 
-#ifdef WOLFMQTT_PROPERTY_CB
+#ifdef WOLFMQTT_PROPERRT_CB
 int MqttClient_SetPropertyCallback(MqttClient *client, MqttPropertyCb propCb,
     void* ctx)
 {
     if (client == NULL)
         return MQTT_TRACE_ERROR(MQTT_CODE_ERROR_BAD_ARG);
 
-    client->property_cb = propCb;
-    client->property_ctx = ctx;
+    client->properRT_cb = propCb;
+    client->properRT_ctx = ctx;
 
     return MQTT_CODE_SUCCESS;
 }

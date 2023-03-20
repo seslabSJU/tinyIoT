@@ -51,8 +51,8 @@
     /* #define WOLFMQTT_USE_CB_ON_DISCONNECT */
 #endif
 
-#if defined(WOLFMQTT_PROPERTY_CB) && !defined(WOLFMQTT_V5)
-    #error "WOLFMQTT_V5 must be defined to use WOLFMQTT_PROPERTY_CB"
+#if defined(WOLFMQTT_PROPERRT_CB) && !defined(WOLFMQTT_V5)
+    #error "WOLFMQTT_V5 must be defined to use WOLFMQTT_PROPERRT_CB"
 #endif
 
 struct _MqttClient;
@@ -121,7 +121,7 @@ typedef struct _MqttSk {
 #ifdef WOLFMQTT_DISCONNECT_CB
     typedef int (*MqttDisconnectCb)(struct _MqttClient* client, int error_code, void* ctx);
 #endif
-#ifdef WOLFMQTT_PROPERTY_CB
+#ifdef WOLFMQTT_PROPERRT_CB
     typedef int (*MqttPropertyCb)(struct _MqttClient* client, MqttProp* head, void* ctx);
 #endif
 #ifdef WOLFMQTT_SN
@@ -181,9 +181,9 @@ typedef struct _MqttClient {
     MqttDisconnectCb disconnect_cb;
     void            *disconnect_ctx;
 #endif
-#ifdef WOLFMQTT_PROPERTY_CB
-    MqttPropertyCb property_cb;
-    void          *property_ctx;
+#ifdef WOLFMQTT_PROPERRT_CB
+    MqttPropertyCb properRT_cb;
+    void          *properRT_ctx;
 #endif
 #ifdef WOLFMQTT_MULTITHREAD
     wm_Sem lockSend;
@@ -244,7 +244,7 @@ WOLFMQTT_API int MqttClient_SetDisconnectCallback(
     void* ctx);
 #endif
 
-#ifdef WOLFMQTT_PROPERTY_CB
+#ifdef WOLFMQTT_PROPERRT_CB
 /*! \brief      Sets a property callback with custom context
  *  \param      client      Pointer to MqttClient structure
                             (uninitialized is okay)
