@@ -5,11 +5,11 @@
             <v-container fluid>
                 <v-row>
                     <v-col cols="12" md="4">
-                        <v-text-field v-model="url1" :rules="urlRules" label="Target Resource" required>
+                        <v-text-field v-model="url" :rules="urlRules" label="Target IP" placeholder="http://localhost:3000" required>
                         </v-text-field>
                     </v-col>
                     <v-col cols="12" md="4">
-                        <v-text-field v-model="url2" :rules="urlRules" label="Target Resource" required>
+                        <v-text-field v-model="path" :rules="urlRules" label="Target Resource" placeholder="/TinyIoT" required>
                         </v-text-field>
                     </v-col>
                     <v-col cols="12" md="2">
@@ -42,8 +42,10 @@
             <v-row>
                 <v-col cols="12" md="8">
                     <v-treeview :items="treeList" hoverable>
-                        <template slot="label" slot-scope="{ item }">
-                            <span :class="{ blink: newRI === item.ri }">
+                        <template v-slot:label="{ item }">
+                            <span :class="{ blink: newRI === item.ri }" @contextmenu.prevent="show($event, item)"
+                            style="display: block;"
+                            >
                                 <span v-if="item.ty === 5">
                                     <v-chip class="ma-2" color="yellow" label small><strong>CSE</strong></v-chip>
                                 </span>
@@ -57,13 +59,18 @@
                                 </span>
                                 <span v-if="item.ty === 4">
                                     <v-chip class="ma-2" color="green" text-color="white" label
-                                        small><strong>CIN</strong>
+                                    small><strong>CIN</strong>
+                                </v-chip>
+                                </span>
+                                <span v-if="item.ty === 9">
+                                    <v-chip class="ma-2" color="orange" text-color="white" label
+                                    small><strong>GRP</strong>
                                     </v-chip>
                                 </span>
-                                <span v-if="item.ty === 23" :class="{ blink: createRn == item.rn }">
+                                <span v-if="item.ty === 23">
                                     <v-chip class="ma-2" label small><strong>SUB</strong></v-chip>
                                 </span>
-                                <span @contextmenu.prevent="show($event, item)">
+                                <span>
                                     {{ item.rn }}
                                 </span>
                             </span>
@@ -193,6 +200,11 @@
                                                 <strong>CIN</strong>
                                             </v-chip>
                                         </span>
+                                        <span v-if="selectTy === 9">
+                                            <v-chip class="ma-2" color="orange" text-color="white" label
+                                                small><strong>GRP</strong>
+                                            </v-chip>
+                                        </span>
                                         <span v-if="selectTy === 23">
                                             <v-chip class="ma-2" label small><strong>SUB</strong></v-chip>
                                         </span>
@@ -219,6 +231,11 @@
                                     <span v-if="selectTy === 4">
                                         <v-chip class="ma-2" color="green" text-color="white" label small>
                                             <strong>CIN</strong>
+                                        </v-chip>
+                                    </span>
+                                    <span v-if="selectTy === 9">
+                                        <v-chip class="ma-2" color="orange" text-color="white" label
+                                            small><strong>GRP</strong>
                                         </v-chip>
                                     </span>
                                     <span v-if="selectTy === 23">
@@ -266,8 +283,8 @@ import axios from 'axios'
 
 export default {
     data: () => ({
-        url1: '',
-        url2: '',
+        url: '',
+        path: '',
         urlRules: [
             v => !!v || 'URL is required'
         ],
@@ -331,7 +348,7 @@ export default {
         },
 
         async submit() {
-            var url = this.url1 + '/viewer' + this.url2 + '?la=' + this.latest;
+            var url = this.url + '/viewer' + this.path + '?fu=1&la=' + this.latest;
 
             await axios.get(url)
                 .then(response => {
@@ -356,7 +373,7 @@ export default {
         },
 
         async discovery(searchText) { // 미구현
-            console.log(this.url1 + this.url2 + '?fur');
+            console.log(this.url + this.path + '?fur');
         },
 
         // ContextMenu
@@ -368,6 +385,12 @@ export default {
             this.$nextTick(() => {
                 this.showMenu = true;
             });
+
+            if(this.selectRn === item.rn){
+                return;
+            }else{
+                this.resource = {};
+            }
 
             if (item.ty === 5) {
                 console.log('CSE');
@@ -389,6 +412,11 @@ export default {
                 this.menuItems[0].disabled = true;
                 this.menuItems[1].disabled = true;
             }
+            else if (item.ty === 9){
+                console.log('GRP');
+                this.menuItems[0].disabled = false;
+                this.menuItems[0].disabled = false;
+            }
             else if (item.ty === 23) {
                 console.log('SUB');
                 this.menuItems[0].disabled = true;
@@ -397,8 +425,6 @@ export default {
 
             this.selectRn = item.rn;
             this.selectTy = item.ty;
-
-            this.clickMenu = false;
         },
 
         menuClick(menuItem) {
@@ -449,7 +475,7 @@ export default {
 
         async create() {
             var path = this.findPath(this.list, this.selectRn);
-            var url = this.url1 + path;
+            var url = this.url + path;
 
             if (this.selectR === 'cnt') {
                 var data = {
@@ -461,7 +487,8 @@ export default {
                 const jsonData = JSON.stringify(data);
                 console.log(jsonData);
 
-                await axios.post(url, jsonData, { headers: { 'Content-Type': 'application/json; ty=3' } })
+                await axios.post(url, jsonData, { headers: { 'Content-Type': 'application/json; ty=3', "X-M2M-Origin":"COrigin",
+                    "X-M2M-RI":"12345" } })
                     .then((response) => {
                         this.newRI = response.data["m2m:cnt"].ri;
                     })
@@ -479,7 +506,8 @@ export default {
                 const jsonData = JSON.stringify(data);
                 console.log(jsonData);
 
-                await axios.post(url, jsonData, { headers: { 'Content-Type': 'application/json; ty=4' } })
+                await axios.post(url, jsonData, { headers: { 'Content-Type': 'application/json; ty=4', "X-M2M-Origin":"COrigin",
+                    "X-M2M-RI":"12345" } })
                     .then((response) => {
                         this.newRI = response.data["m2m:cin"].ri;
                     })
@@ -522,9 +550,10 @@ export default {
 
         async remove() {
             var path = this.findPath(this.list, this.selectRn);
-            var url = this.url1 + path;
+            var url = this.url + path;
 
-            await axios.delete(url)
+            await axios.delete(url, { headers: { "X-M2M-Origin":"COrigin",
+                    "X-M2M-RI":"12345" } } )
                 .then((response) => {
                     console.log(response.data);
                     this.$swal.fire({
@@ -560,10 +589,14 @@ export default {
         },
 
         async properties() {
-            var path = this.findPath(this.list, this.selectRn);
-            var url = this.url1 + path;
 
-            await axios.get(url)
+            var path = this.findPath(this.list, this.selectRn);
+            var url = this.url + path;
+            console.log(path, url);
+            await axios.get(url, {headers:{
+                    "X-M2M-Origin":"COrigin",
+                    "X-M2M-RI":"12345"
+                }})
                 .then(response => {
                     console.log(response);
                     this.resource = response.data;
