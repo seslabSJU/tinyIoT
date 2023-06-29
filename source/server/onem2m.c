@@ -3,11 +3,11 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
-#include <curl/curl.h>
 #include <math.h>
 #include <ctype.h>
 #include <malloc.h>
 #include <sys/timeb.h>
+#include <limits.h>
 #include "onem2m.h"
 #include "dbmanager.h"
 #include "jsonparser.h"
@@ -39,14 +39,16 @@ void init_cse(CSE* cse) {
 	strcpy(cse->csi,"/");
 	strcat(cse->csi,rn);
 	strcpy(cse->pi, "NULL");
+	cse->uri = strdup(rn);
 	
 	cse->ty = RT_CSE;
 	
 	free(ct); ct = NULL;
 }
 
-void init_ae(AE* ae, char *pi, char *origin) {
+void init_ae(AE* ae, RTNode *parent_rtnode, char *origin) {
 	int origin_size;
+	char *uri[128];
 
 	ae->ct = get_local_time(0);
 	ae->et = get_local_time(DEFAULT_EXPIRE_TIME);
@@ -63,20 +65,22 @@ void init_ae(AE* ae, char *pi, char *origin) {
 		ae->ri = resource_identifier(RT_AE, ae->ct);
 	}
 
-	if(!ae->rn) {
-		ae->rn = (char*)malloc((strlen(ae->ri) + 1) * sizeof(char));
-		strcpy(ae->rn, ae->ri);
-	}
+	if(!ae->rn) 
+		ae->rn = strdup(ae->ri);
 	
-	ae->pi = strdup(pi);
+	ae->pi = strdup(get_ri_rtnode(parent_rtnode));
 	ae->lt = strdup(ae->ct);
 	ae->aei = strdup(ae->ri);
-	ae->origin = strdup(ae->ri);
+
+	sprintf(uri, "%s/%s", get_uri_rtnode(parent_rtnode), ae->rn);
+	ae->uri = strdup(uri);
+
 	
 	ae->ty = RT_AE;
 }
 
-void init_cnt(CNT* cnt, char *pi) {
+void init_cnt(CNT* cnt, RTNode *parent_rtnode) {
+	char uri[128] = {0};
 	cnt->ct = get_local_time(0);
 	cnt->et = get_local_time(DEFAULT_EXPIRE_TIME);
 	cnt->ri = resource_identifier(RT_CNT, cnt->ct);
@@ -86,35 +90,37 @@ void init_cnt(CNT* cnt, char *pi) {
 		strcpy(cnt->rn, cnt->ri);
 	}
 	
-	cnt->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
-	cnt->lt = (char*)malloc((strlen(cnt->ct) + 1) * sizeof(char));
-	strcpy(cnt->pi, pi);
-	strcpy(cnt->lt, cnt->ct);
+	cnt->pi = strdup(get_ri_rtnode(parent_rtnode));
+	cnt->lt = strdup(cnt->ct);;
 	
 	cnt->ty = RT_CNT;
 	cnt->st = 0;
 	cnt->cni = 0;
 	cnt->cbs = 0;
+
+	sprintf(uri, "%s/%s", get_uri_rtnode(parent_rtnode), cnt->rn);
+	cnt->uri = strdup(uri);
 }
 
-void init_cin(CIN* cin, char *pi) {
+void init_cin(CIN* cin, RTNode *parent_rtnode) {
+	char uri[256] = {0};
 	cin->ct = get_local_time(0);
 	cin->et = get_local_time(DEFAULT_EXPIRE_TIME);
 	cin->ri = resource_identifier(RT_CIN, cin->ct);
 	
-	cin->rn = (char*)malloc((strlen(cin->ri) + 1) * sizeof(char));
-	cin->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
-	cin->lt = (char*)malloc((strlen(cin->ct) + 1) * sizeof(char));
-	strcpy(cin->rn, cin->ri);
-	strcpy(cin->pi, pi);
-	strcpy(cin->lt, cin->ct);
+	cin->rn = strdup(cin->ri);
+	cin->pi = strdup(get_ri_rtnode(parent_rtnode));
+	cin->lt = strdup(cin->ct);
 	
 	cin->ty = RT_CIN;
 	cin->st = 0;
 	cin->cs = strlen(cin->con);
+	sprintf(uri, "%s/%s",get_uri_rtnode(parent_rtnode), cin->rn);
+	cin->uri = strdup(uri);
 }
 
-void init_sub(SUB* sub, char *pi, char *uri) {
+void init_sub(SUB* sub, RTNode *parent_rtnode) {
+	char uri[256] = {0};
 	sub->ct = get_local_time(0);
 	sub->et = get_local_time(DEFAULT_EXPIRE_TIME);
 	sub->ri = resource_identifier(RT_SUB, sub->ct);
@@ -129,31 +135,36 @@ void init_sub(SUB* sub, char *pi, char *uri) {
 		strcpy(sub->net,"1");
 	}
 
-	sub->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
-	sub->lt = (char*)malloc((strlen(sub->ct) + 1) * sizeof(char));
-	sub->sur = (char *)malloc((strlen(uri) + strlen(sub->rn) + 3) * sizeof(char));
+	sprintf(uri, "/%s/%s", get_uri_rtnode(parent_rtnode), sub->rn);
+	sub->pi = strdup(get_ri_rtnode(parent_rtnode));
+	sub->lt = strdup(sub->ct);
 
-	sprintf(sub->sur, "/%s/%s",uri,sub->rn);
-	strcpy(sub->pi, pi);
-	strcpy(sub->lt, sub->ct);
+	sub->sur = strdup(uri);
+	sub->uri = strdup(uri);
+
 	sub->ty = RT_SUB;
 	sub->nct = 0;
 }
 
-void init_acp(ACP* acp, char *pi) {
-	acp->ct = get_local_time(0);
-	acp->et = get_local_time(DEFAULT_EXPIRE_TIME);
-	acp->ri = resource_identifier(RT_ACP, acp->ct);
+void init_acp(ACP* acp, RTNode *parent_rtnode) {
+	char *ct = get_local_time(0);
+	char *et = get_local_time(DEFAULT_EXPIRE_TIME);
+	char *ri = resource_identifier(RT_ACP, ct);
+	char uri[128] = {0};
 
 	if(!acp->rn) {
 		acp->rn = (char*)malloc((strlen(acp->ri) + 1) * sizeof(char));
 		strcpy(acp->rn, acp->ri);
 	}
 	
-	acp->pi = (char*)malloc((strlen(pi) + 1) * sizeof(char));
-	acp->lt = (char*)malloc((strlen(acp->ct) + 1) * sizeof(char));
-	strcpy(acp->pi, pi);
-	strcpy(acp->lt, acp->ct);
+	acp->ri = strdup(ri);
+	acp->pi = strdup(get_ri_rtnode(parent_rtnode));
+	acp->et = strdup(et);
+	acp->ct = strdup(ct);
+	acp->lt = strdup(ct);
+
+	sprintf(uri, "%s/%s", get_uri_rtnode(parent_rtnode), acp->rn);
+	acp->uri = strdup(uri);
 	
 	acp->ty = RT_ACP;
 }
@@ -193,7 +204,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		free_ae(ae);
 		return RSC_BAD_REQUEST;
 	}
-	init_ae(ae, get_ri_rtnode(parent_rtnode), o2pt->fr);
+	init_ae(ae, parent_rtnode, o2pt->fr);
 	
 	int result = db_store_ae(ae);
 	if(result != 1) { 
@@ -230,7 +241,7 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		handle_error(o2pt, RSC_BAD_REQUEST, "attribute `mni` is invalid");
 		return o2pt->rsc;
 	}
-	init_cnt(cnt,get_ri_rtnode(parent_rtnode));
+	init_cnt(cnt,parent_rtnode);
 
 	int result = db_store_cnt(cnt);
 	if(result != 1) { 
@@ -264,8 +275,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		free(cin); cin = NULL;
 		return o2pt->rsc;
 	}
-
-	init_cin(cin,get_ri_rtnode(parent_rtnode));
+	init_cin(cin,parent_rtnode);
 
 	int result = db_store_cin(cin);
 	if(result != 1) { 
@@ -296,7 +306,7 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
 		return o2pt->rsc;
 	}
-	init_sub(sub, get_ri_rtnode(parent_rtnode), o2pt->to);
+	init_sub(sub, parent_rtnode);
 	
 	int result = db_store_sub(sub);
 	if(result != 1) { 
@@ -324,8 +334,7 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
 		return o2pt->rsc;
 	}
-
-	init_acp(acp, get_ri_rtnode(parent_rtnode));
+	init_acp(acp, parent_rtnode);
 	
 	int result = db_store_acp(acp);
 	if(result != 1) { 
@@ -423,9 +432,12 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	if(result != 1) {
 		return o2pt->rsc;
 	}
-	result = db_delete_onem2m_resource(ae->ri);
+	#ifdef SQLITE_DB
+	result = db_update_ae(ae);
+	#else
+	result = db_delete_onem2m_resource(target_rtnode);
 	result = db_store_ae(ae);
-	
+	#endif
 	if(o2pt->pc) free(o2pt->pc);
 	o2pt->pc = ae_to_json(ae);
 	o2pt->rsc = RSC_UPDATED;
@@ -458,9 +470,12 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	//set_rtnode_update(target_rtnode, after);
 	delete_cin_under_cnt_mni_mbs(target_rtnode);
 	cnt->st++;
-	result = db_delete_onem2m_resource(cnt->ri);
+	#ifdef SQLITE_DB
+	result = db_update_cnt(cnt);
+	#else
+	result = db_delete_onem2m_resource(target_rtnode);
 	result = db_store_cnt(cnt);
-	
+	#endif
 	if(o2pt->pc) free(o2pt->pc);
 	o2pt->pc = cnt_to_json(cnt);
 	o2pt->rsc = RSC_UPDATED;
@@ -482,8 +497,13 @@ int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	
 	result = set_acp_update(o2pt, m2m_acp, acp);
 	if(result != 1) return result;
-	result = db_delete_acp(acp->ri);
+	
+	#ifdef SQLITE_DB
+	result = db_update_acp(acp);
+	#else
+	result = db_delete_onem2m_resource(target_rtnode);
 	result = db_store_acp(acp);
+	#endif
 	
 	if(o2pt->pc) free(o2pt->pc);
 	o2pt->pc = acp_to_json(acp);
@@ -688,14 +708,19 @@ int set_acp_update(oneM2MPrimitive *o2pt, cJSON *m2m_acp, ACP* acp) {
 }
 
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign) {
-	CNT *cnt = (CNT *)cnt_rtnode->obj;
-	CIN *cin = (CIN *)cin_rtnode->obj;
+	CNT *cnt = (CNT *) cnt_rtnode->obj;
+	CIN *cin = (CIN *) cin_rtnode->obj;
 	cnt->cni += sign;
 	cnt->cbs += sign*(cin->cs);
 	delete_cin_under_cnt_mni_mbs(cnt_rtnode);	
 	cnt->st++;
-	db_delete_onem2m_resource(cnt->ri);
+	#ifdef SQLITE_DB
+	db_update_cnt(cnt);
+	#else
+	db_delete_onem2m_resource(cnt_rtnode);
 	db_store_cnt(cnt);
+	#endif
+
 	return 1;
 }
 
@@ -721,23 +746,24 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode) {
 int delete_rtnode_and_db_data(oneM2MPrimitive *o2pt, RTNode *rtnode, int flag) {
 	switch(rtnode->ty) {
 	case RT_AE : 
-		db_delete_onem2m_resource(((AE *)rtnode->obj)->ri); 
-		break;
 	case RT_CNT : 
-		db_delete_onem2m_resource(((CNT *)rtnode->obj)->ri); 
+		#ifdef BERKELEY_DB
+		db_delete_child_cin(rtnode);
+		#endif
+		db_delete_onem2m_resource(rtnode); 
 		break;
 	case RT_CIN :
-		db_delete_onem2m_resource(((CIN *)rtnode->obj)->ri);
+		db_delete_onem2m_resource(rtnode);
 		update_cnt_cin(rtnode->parent, rtnode,-1);
 		break;
 	case RT_SUB :
-		db_delete_sub(((SUB *)rtnode->obj)->ri);
+		db_delete_sub(get_ri_rtnode(rtnode));
 		break;
 	case RT_ACP :
-		db_delete_acp(((ACP *)rtnode->obj)->ri);
+		db_delete_acp(get_ri_rtnode(rtnode));
 		break;
 	case RT_GRP:
-		db_delete_grp(((GRP *)rtnode->obj)->ri);
+		db_delete_grp(get_ri_rtnode(rtnode));
 		break;
 	}
 
@@ -770,6 +796,7 @@ void free_cse(CSE *cse) {
 	if(cse->ri) free(cse->ri);
 	if(cse->csi) free(cse->csi);
 	if(cse->pi) free(cse->pi);
+	if(cse->uri) free(cse->uri);
 	free(cse); cse = NULL;
 }
 
@@ -785,6 +812,7 @@ void free_ae(AE *ae) {
 	if(ae->lbl) free(ae->lbl);
 	if(ae->srv) free(ae->srv);
 	if(ae->acpi) free(ae->acpi);
+	if(ae->uri) free(ae->uri);
 	free(ae); ae = NULL;
 }
 
@@ -797,10 +825,12 @@ void free_cnt(CNT *cnt) {
 	if(cnt->pi) free(cnt->pi);
 	if(cnt->acpi) free(cnt->acpi);
 	if(cnt->lbl) free(cnt->lbl);
+	if(cnt->uri) free(cnt->uri);
 	free(cnt); cnt = NULL;
 }
 
 void free_cin(CIN* cin) {
+	if(!cin) return;
 	if(cin->et) free(cin->et);
 	if(cin->ct) free(cin->ct);
 	if(cin->lt) free(cin->lt);
@@ -808,6 +838,7 @@ void free_cin(CIN* cin) {
 	if(cin->ri) free(cin->ri);
 	if(cin->pi) free(cin->pi);
 	if(cin->con) free(cin->con);
+	if(cin->uri) free(cin->uri);
 	free(cin); cin = NULL;
 }
 
@@ -820,6 +851,7 @@ void free_sub(SUB* sub) {
 	if(sub->pi) free(sub->pi);
 	if(sub->nu) free(sub->nu);
 	if(sub->net) free(sub->net);
+	if(sub->uri) free(sub->uri);
 	free(sub); sub = NULL;
 }
 
@@ -834,6 +866,7 @@ void free_acp(ACP* acp) {
 	if(acp->pv_acop) free(acp->pv_acop);
 	if(acp->pvs_acor) free(acp->pvs_acor);
 	if(acp->pvs_acop) free(acp->pvs_acop);
+	if(acp->uri) free(acp->uri);
 	free(acp); acp = NULL;
 }
 
@@ -846,8 +879,8 @@ void free_grp(GRP *grp) {
 	if(grp->lt) free(grp->lt);
 	if(grp->pi) free(grp->pi);
 	if(grp->acpi) free(grp->acpi);
+	if(grp->uri) free(grp->uri);
 
-	
 	if(grp->mid){
 		for(int i = 0 ; i < grp->cnm ; i++){
 			if(grp->mid[i]){
@@ -956,27 +989,28 @@ void set_node_uri(RTNode* node) {
 */
 /* GROUP IMPLEMENTATION */
 
-void init_grp(GRP *grp, char *pi){
+void init_grp(GRP *grp, RTNode *parent_rtnode){
 	char *ct = get_local_time(0);
 	char *et = get_local_time(DEFAULT_EXPIRE_TIME);
 	char *ri = resource_identifier(RT_GRP, ct);
+	char uri[128] = {0};
 
 	grp->ct = (char *) malloc((strlen(ct) + 1) * sizeof(char));
 	grp->et = (char *) malloc((strlen(et) + 1) * sizeof(char));
 	grp->ri = (char *) malloc((strlen(ri) + 1) * sizeof(char));
 	grp->lt = (char *) malloc((strlen(ri) + 1) * sizeof(char));
-	grp->pi = (char *) malloc((strlen(pi) + 1) * sizeof(char));
-
+	
+	if(!grp->rn) grp->rn = strdup(ri);
 	strcpy(grp->ct, ct);
 	strcpy(grp->et, et);
 	strcpy(grp->lt, ct);
 	strcpy(grp->ri, ri);
-	strcpy(grp->pi, pi);
+	grp->pi = strdup( get_ri_rtnode(parent_rtnode));
+
+	sprintf(uri, "%s/%s", get_uri_rtnode(parent_rtnode), grp->rn);
+	grp->uri = strdup(uri);
 
 	if(grp->csy == 0) grp->csy = CSY_ABANDON_MEMBER;
-
-
-	if(!grp->rn) grp->rn = strdup(ri);
 
 	free(ct); ct = NULL;
 	free(et); et = NULL;
@@ -995,14 +1029,10 @@ int set_grp_update(oneM2MPrimitive *o2pt, cJSON *m2m_grp, GRP* grp){
 	grp->mtv = false;
 
 	if(acpi){
-		if(grp->acpi) 
-			free(grp->acpi);
 		grp->acpi = cjson_string_list_item_to_string(acpi);
 	}
 
 	if(et) {
-		if(grp->et)
-			free(grp->et);
 		grp->et = strdup(et->valuestring);
 	}
 
@@ -1013,7 +1043,7 @@ int set_grp_update(oneM2MPrimitive *o2pt, cJSON *m2m_grp, GRP* grp){
 		if(mnm->valueint < grp->cnm){
 			return RSC_MAX_NUMBER_OF_MEMBER_EXCEEDED;
 		}
-		grp->mnm = mnm->valueint;
+		//grp->mnm = mnm->valueint;
 		
 	}
 
@@ -1030,6 +1060,9 @@ int set_grp_update(oneM2MPrimitive *o2pt, cJSON *m2m_grp, GRP* grp){
 
 			grp->mid[i] = NULL;
 		}
+		if(mnm)
+			grp->mnm = mnm->valueint; // change mnm to new value if valid;
+
 		for(int i = 0 ; i < grp->mnm; i++){
 			
 			if(i < mid_size){
@@ -1070,24 +1103,37 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 		}
 	}
 
-	GRP *grp = (GRP *)target_rtnode->obj;
+	GRP *new_grp = db_get_grp(get_ri_rtnode(target_rtnode));
+	
 	int result;
-	if( (o2pt->rsc = set_grp_update(o2pt, m2m_grp, grp)) >= 4000){
+	if( (o2pt->rsc = set_grp_update(o2pt, m2m_grp, new_grp)) >= 4000){
 		return o2pt->rsc;
 	}
-	grp->mtv = false;
-	if( (rsc = validate_grp(grp))  >= 4000){
+	new_grp->mtv = false;
+	if( (rsc = validate_grp(new_grp))  >= 4000){
 		o2pt->rsc = rsc;
 		return rsc;
 	}
+	#ifdef SQLITE_DB
+	result = db_update_grp(new_grp);
+	#else
+	result = db_delete_grp(new_grp->ri);
+	result = db_store_grp(new_grp);
+	#endif
+	if(!result){
+		logger("O2M", LOG_LEVEL_ERROR, "DB update Failed");
+		free_grp(new_grp);
+		return RSC_INTERNAL_SERVER_ERROR;
+	}
 
-	result = db_delete_grp(grp->ri);
-	result = db_store_grp(grp);
 	if(o2pt->pc) free(o2pt->pc);
-	o2pt->pc = grp_to_json(grp);
+	o2pt->pc = grp_to_json(new_grp);
+
 	o2pt->rsc = RSC_UPDATED;
-	if(target_rtnode->obj)
+	if(target_rtnode->obj){
 		free_grp((GRP *) target_rtnode->obj);
+		target_rtnode->obj = new_grp;
+	}
 
 	return RSC_UPDATED;
 }
@@ -1107,7 +1153,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 		o2pt->rsc = rsc;
 		return rsc;
 	}
-	init_grp(grp, get_ri_rtnode(parent_rtnode));
+	init_grp(grp, parent_rtnode);
 	rsc = validate_grp(grp);
 	if(rsc >= 4000){
 		logger("O2M", LOG_LEVEL_DEBUG, "Group Validation failed");
@@ -1135,224 +1181,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	return rsc;
 }
 
-bool isResourceAptFC(RTNode *rtnode, FilterCriteria *fc){
-    void *obj;
-    int flag = 0;
-	RTNode *prtnode = NULL;
-	FilterOperation fo = fc->fo;
-    if(!rtnode || !fc) return false;
-
-	// check Created Time
-	if(fc->cra && fc->crb){
-		if(strcmp(fc->cra, fc->crb) >= 0 && fo == FO_AND) return false;
-	}
-    if(fc->cra){
-		if(!FC_isAptCra(fc->cra, rtnode)) {
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-    }
-	if(fc->crb){
-		if(!FC_isAptCrb(fc->crb, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-	// check Last Modified
-	if(fc->ms && fc->us){
-		if(strcmp(fc->ms, fc->us) >= 0 && fo == FO_AND) return false;
-	}
-	if(fc->ms){
-		if(!FC_isAptMs(fc->ms, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-	if(fc->us){
-		if(!FC_isAptUs(fc->us, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-	// check state tag
-	if(fc->stb && fc->sts){
-		if(fc->stb >= fc->sts && fo == FO_AND) 
-			return false;
-	}
-	if(fc->stb){
-		if(!FC_isAptStb(fc->stb, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-	if(fc->sts){
-		if(!FC_isAptSts(fc->sts, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-	// check Expiration Time
-	if(fc->exa){
-		if(!FC_isAptExa(fc->exa, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-	
-	if(fc->exb){
-		if(!FC_isAptExb(fc->exb, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-	// check label
-	if(fc->lbl){
-		if(!FC_isAptLbl(fc->lbl, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-	if(fc->clbl){
-		if(!FC_isAptClbl(fc->clbl, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-	if(fc->palb){
-		if(!FC_isAptPalb(fc->palb, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-	// check TY
-    if(fc->tycnt > 0){
-        if(!FC_isAptTy(fc->ty, fc->tycnt, rtnode->ty)){
-            return false;
-		}else{
-			if(fo == FO_OR){
-				return true;
-			}
-		}
-    }
-	// check chty
-	if(fc->chtycnt > 0){
-		int flag = 0;
-		prtnode = rtnode->child;
-		if(!prtnode){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			while(prtnode){
-				if(FC_isAptChty(fc->chty, fc->chtycnt, prtnode->ty)){
-					flag = 1;
-					break;
-				}
-				prtnode = prtnode->sibling_right;
-			}
-			if(flag){
-				if(fo == FO_OR)
-					return true;
-			}else{
-				if(fo == FO_AND)
-					return false;
-			}
-		}
-		
-	}
-	// check pty
-	if(fc->ptycnt > 0){
-		if(!rtnode->parent){
-			if(fo == FO_AND)
-				return false;
-		}
-		else if(!FC_isAptChty(fc->pty, fc->ptycnt, rtnode->parent->ty)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-	//check cs
-	if(fc->sza && fc->szb){
-		if(fc->sza >= fc->szb && fo == FO_AND){
-			return false;
-		}
-	}
-	if(fc->sza){
-		if(!FC_isAptSza(fc->sza, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-	if(fc->szb){
-		if(!FC_isAptSzb(fc->szb, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-	if(fc->ops){
-		if(!FC_isAptOps(fc->ops, fc->o2pt, rtnode)){
-			if(fo == FO_AND)
-				return false;
-		}else{
-			if(fo == FO_OR)
-				return true;
-		}
-	}
-
-    return true;
-}
-
-int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
+int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 	char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
 	cJSON *m2m_sub = cJSON_GetObjectItem(o2pt->cjson_pc, "m2m:sub");
 	int invalid_key_size = sizeof(invalid_key)/(8*sizeof(char));
@@ -1604,31 +1433,29 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 */
 int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 	logger("MAIN", LOG_LEVEL_DEBUG, "Discover Resource");
-	RTNode *pn = NULL;
 	cJSON *root = cJSON_CreateObject();
 	cJSON *uril = NULL;
 	int urilSize = 0;
+	if(!o2pt->fc){
+		logger("O2M", LOG_LEVEL_WARN, "Empty Filter Criteria");
+		return RSC_BAD_REQUEST;
+	}
 
-	// TODO - IMPLEMENT OFFSET
-	// for(int i = 0 ; i < o2pt->fc->ofst ; i++){ 
-	// 	if(pn->child){
-	// 		pn = pn->child;
-	// 	}else{
-	// 		break;
-	// 	}
-	// }
+	#ifdef SQLITE_DB
+	uril = db_get_filter_criteria(o2pt->to, o2pt->fc);
+	#else
+	RTNode *pn = NULL;
 	o2pt->fc->o2pt = o2pt;
 	if(target_rtnode->ty == RT_CNT){
 		target_rtnode->child = pn = db_get_cin_rtnode_list(target_rtnode);
 		pn->parent = target_rtnode;	
-		logger("O2", LOG_LEVEL_DEBUG, "%s", pn->uri);
 	}else{
 		pn = target_rtnode->child;
 	}
 	uril = fc_scan_resource_tree(pn, o2pt->fc, 1);
+	#endif
 	
-	
-	urilSize = cJSON_GetArraySize(uril);	//Todo : contentStatus(cnst) set to Partial_content, cnot too 
+	urilSize = cJSON_GetArraySize(uril);
 	if(o2pt->fc->lim < urilSize - o2pt->fc->ofst){
 		logger("MAIN", LOG_LEVEL_DEBUG, "limit exceeded");
 		for(int i = 0 ; i < o2pt->fc->ofst ; i++){
@@ -1638,19 +1465,15 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 		for(int i = o2pt->fc->lim ; i < urilSize; i++){
 			cJSON_DeleteItemFromArray(uril, o2pt->fc->lim);
 		}
+		o2pt->cnst = CS_PARTIAL_CONTENT;
+		o2pt->cnot = o2pt->fc->ofst + o2pt->fc->lim;
 	}
 	cJSON_AddItemToObject(root, "m2m:uril", uril);
-	o2pt->cnst = CS_PARTIAL_CONTENT;
-	o2pt->cnot = o2pt->fc->ofst + o2pt->fc->lim;
 
 	if(o2pt->pc)
 		free(o2pt->pc);
 	o2pt->pc = cJSON_PrintUnformatted(root);
 
-	if(target_rtnode->ty == RT_CNT){
-		target_rtnode->child = NULL;
-		free_rtnode_list(pn);
-	}
 	cJSON_Delete(root);
 
 	return o2pt->rsc = RSC_OK;

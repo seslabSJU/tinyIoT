@@ -45,6 +45,7 @@ typedef struct {
 	char *pi;
 	char *csi;
 	ResourceType ty;
+	char *uri;
 } CSE;
 
 typedef struct {
@@ -62,6 +63,7 @@ typedef struct {
 	char *origin;
 	ResourceType ty;
 	bool rr;
+	char *uri;
 } AE;
 
 typedef struct {
@@ -79,6 +81,7 @@ typedef struct {
 	int cbs;
 	int mni;
 	int mbs;
+	char *uri;
 } CNT;
 
 typedef struct {
@@ -92,6 +95,7 @@ typedef struct {
 	ResourceType ty;
 	int st;
 	int cs;
+	char *uri;
 } CIN;
 
 typedef struct {
@@ -106,6 +110,7 @@ typedef struct {
 	char *sur;
 	ResourceType ty;
 	int nct;
+	char *uri;
 	int net_bit;
 } SUB;
 
@@ -120,6 +125,7 @@ typedef struct {
 	char *pv_acop;
 	char *pvs_acor;
 	char *pvs_acop;
+	char *uri;
 	char *lbl;
 	ResourceType ty;
 } ACP;
@@ -141,6 +147,7 @@ typedef struct {
 	char **mid;
 	bool mtv;
 	ConsistencyStrategy csy;
+	char *uri;
 } GRP;
 
 //Resource Tree
@@ -263,14 +270,22 @@ typedef struct _o{
 	int rsc;
 	int ty;
 	char *origin;
-	char *req_type;
 	bool isFopt;
 	char *fopt;
 	bool errFlag;
 	ContentStatus cnst;
 	int cnot;
 	FilterCriteria *fc;
+	int slotno;
 }oneM2MPrimitive;
+
+typedef struct _n{
+	Protocol prot;
+	char host[1024];
+	int port;
+	char target[256];
+	char *noti_json;
+} NotiTarget;
 
 //onem2m resource
 int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode);
@@ -308,12 +323,13 @@ int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 
 void init_cse(CSE* cse);
-void init_ae(AE* ae, char *pi, char *origin);
-void init_cnt(CNT* cnt, char *pi);
-void init_cin(CIN* cin, char *pi);
-void init_sub(SUB* sub, char *pi, char *uri);
-void init_acp(ACP* acp, char *pi);
-void init_grp(GRP* grp, char *pi);
+void init_ae(AE* ae, RTNode *parent_rtnode, char *origin);
+void init_cnt(CNT* cnt, RTNode *parent_rtnode);
+void init_cin(CIN* cin, RTNode *parent_rtnode);
+void init_sub(SUB* sub, RTNode *parent_rtnode);
+void init_acp(ACP* acp, RTNode *parent_rtnode);
+void init_grp(GRP* grp, RTNode *parent_rtnode);
+void set_rtnode_update(RTNode* rtnode, void *after);
 int set_ae_update(oneM2MPrimitive *o2pt, cJSON *m2m_ae, AE* ae);
 int set_cnt_update(oneM2MPrimitive *o2pt, cJSON *m2m_cnt, CNT* cnt);
 int set_sub_update(oneM2MPrimitive *o2pt, cJSON *m2m_sub, SUB* sub);
@@ -342,47 +358,11 @@ void set_node_uri(RTNode* rtnode);
 //etc
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign);
 
-/* check resource is apt to filter criteria */
-bool isResourceAptFC(RTNode *rtnode, FilterCriteria *fc);
-bool FC_isAptCra(char* fcCra, RTNode *rtnode);
-bool FC_isAptCrb(char *fcCrb, RTNode *rtnode);
-bool FC_isAptExa(char *fcExa, RTNode *rtnode);
-bool FC_isAptExb(char *fcExa, RTNode *rtnode);
-bool FC_isAptLbl(cJSON* fcLbl, RTNode *rtnode);
-bool FC_isAptMs(char *fcMs, RTNode *rtnode);
-bool FC_isAptUs(char *fcUs, RTNode *rtnode);
-bool FC_isAptStb(int fcStb, RTNode *rtnode);
-bool FC_isAptSts(int fcSts, RTNode *rtnode);
-bool FC_isAptTy(int *fcTy, int tycnt, int ty);
-bool FC_isAptChty(int *fcChty, int tycnt, int ty);
-bool FC_isAptPty(int *fcPty, int tycnt, int ty);
-bool FC_isAptSza(int fcSza, RTNode *rtnode);
-bool FC_isAptSzb(int fcSzb, RTNode *rtnode);
-bool FC_isAptOps(ACOP fcAcop, oneM2MPrimitive *o2pt, RTNode *rtnode);
-
-bool isValidFcAttr(char* attr);
-
 FilterCriteria *parseFilterCriteria(cJSON *fcjson);
 
 void free_fc(FilterCriteria *fc);
-
-/* check resource is apt to filter criteria */
-bool isResourceAptFC(RTNode *rtnode, FilterCriteria *fc);
-bool FC_isAptCra(char* fcCra, RTNode *rtnode);
-bool FC_isAptCrb(char *fcCrb, RTNode *rtnode);
-bool FC_isAptExa(char *fcExa, RTNode *rtnode);
-bool FC_isAptExb(char *fcExa, RTNode *rtnode);
-bool FC_isAptLbl(cJSON* fcLbl, RTNode *rtnode);
-bool FC_isAptMs(char *fcMs, RTNode *rtnode);
-bool FC_isAptUs(char *fcUs, RTNode *rtnode);
-bool FC_isAptStb(int fcStb, RTNode *rtnode);
-bool FC_isAptSts(int fcSts, RTNode *rtnode);
-bool FC_isAptTy(int *fcTy, int tycnt, int ty);
-bool FC_isAptChty(int *fcChty, int tycnt, int ty);
-bool FC_isAptPty(int *fcPty, int tycnt, int ty);
-bool FC_isAptSza(int fcSza, RTNode *rtnode);
-bool FC_isAptSzb(int fcSzb, RTNode *rtnode);
-bool FC_isAptOps(ACOP fcAcop, oneM2MPrimitive *o2pt, RTNode *rtnode);
+bool do_uri_exist(cJSON* list, char *uri);
+cJSON *cjson_merge_arrays_by_operation(cJSON* arr1, cJSON* arr2, FilterOperation fo);
 
 bool isValidFcAttr(char* attr);
 

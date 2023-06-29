@@ -24,7 +24,6 @@ bool isFCAttrValid(FilterCriteria *fc){
     if(fc->ofst < 0) return false;
 
     for(int i = 0 ; i < fc->tycnt ; i++){
-        logger("test", LOG_LEVEL_DEBUG, "%d", fc->ty[i]);
         if(fc->ty[i] < 0) return false;
     }
 
@@ -35,9 +34,9 @@ bool isFCAttrValid(FilterCriteria *fc){
 }
 
 bool isValidFcAttr(char* attr){
-    char *fcAttr[32] = {
+    char *fcAttr[33] = {
     "crb", "cra", "ms", "us", "sts", "stb", "exb", "exa", "lbl","clbl", "palb", "lbq", "ty", "chty", "pty", "sza", "szb", "cty", 
-    "atr", "catr", "patr", "fu", "lim", "smf", "fo", "cfs", "cfq", "lvl", "ofst", "arp", "gq", "ops"};
+    "atr", "catr", "patr", "fu", "lim", "smf", "fo", "cfs", "cfq", "lvl", "ofst", "arp", "gq", "ops", "la"};
 
     for(int i = 0 ; i < 32 ; i++){
         if(!strcmp(attr, fcAttr[i])) return true;
@@ -277,7 +276,7 @@ void free_fc(FilterCriteria *fc){
     fc = NULL;
 }
 
-
+#ifndef SQLITE_DB
 
 bool FC_isAptCrb(char *fcCrb, RTNode *rtnode){
     if(!rtnode || !fcCrb) return false;
@@ -503,3 +502,221 @@ bool FC_isAptOps(ACOP fcAcop, oneM2MPrimitive *o2pt, RTNode *rtnode){
 
     return true;
 }
+
+bool isResourceAptFC(RTNode *rtnode, FilterCriteria *fc){
+    void *obj;
+    int flag = 0;
+	RTNode *prtnode = NULL;
+	FilterOperation fo = fc->fo;
+    if(!rtnode || !fc) return false;
+
+	// check Created Time
+	if(fc->cra && fc->crb){
+		if(strcmp(fc->cra, fc->crb) >= 0 && fo == FO_AND) return false;
+	}
+    if(fc->cra){
+		if(!FC_isAptCra(fc->cra, rtnode)) {
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+    }
+	if(fc->crb){
+		if(!FC_isAptCrb(fc->crb, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	// check Last Modified
+	if(fc->ms && fc->us){
+		if(strcmp(fc->ms, fc->us) >= 0 && fo == FO_AND) return false;
+	}
+	if(fc->ms){
+		if(!FC_isAptMs(fc->ms, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+	if(fc->us){
+		if(!FC_isAptUs(fc->us, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	// check state tag
+	if(fc->stb && fc->sts){
+		if(fc->stb >= fc->sts && fo == FO_AND) 
+			return false;
+	}
+	if(fc->stb){
+		if(!FC_isAptStb(fc->stb, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+	if(fc->sts){
+		if(!FC_isAptSts(fc->sts, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	// check Expiration Time
+	if(fc->exa){
+		if(!FC_isAptExa(fc->exa, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+	
+	if(fc->exb){
+		if(!FC_isAptExb(fc->exb, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	// check label
+	if(fc->lbl){
+		if(!FC_isAptLbl(fc->lbl, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	if(fc->clbl){
+		if(!FC_isAptClbl(fc->clbl, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	if(fc->palb){
+		if(!FC_isAptPalb(fc->palb, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	// check TY
+    if(fc->tycnt > 0){
+        if(!FC_isAptTy(fc->ty, fc->tycnt, rtnode->ty)){
+            return false;
+		}else{
+			if(fo == FO_OR){
+				return true;
+			}
+		}
+    }
+	// check chty
+	if(fc->chtycnt > 0){
+		int flag = 0;
+		prtnode = rtnode->child;
+		if(!prtnode){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			while(prtnode){
+				if(FC_isAptChty(fc->chty, fc->chtycnt, prtnode->ty)){
+					flag = 1;
+					break;
+				}
+				prtnode = prtnode->sibling_right;
+			}
+			if(flag){
+				if(fo == FO_OR)
+					return true;
+			}else{
+				if(fo == FO_AND)
+					return false;
+			}
+		}
+		
+	}
+	// check pty
+	if(fc->ptycnt > 0){
+		if(!rtnode->parent){
+			if(fo == FO_AND)
+				return false;
+		}
+		else if(!FC_isAptChty(fc->pty, fc->ptycnt, rtnode->parent->ty)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	//check cs
+	if(fc->sza && fc->szb){
+		if(fc->sza >= fc->szb && fo == FO_AND){
+			return false;
+		}
+	}
+	if(fc->sza){
+		if(!FC_isAptSza(fc->sza, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+	if(fc->szb){
+		if(!FC_isAptSzb(fc->szb, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	if(fc->ops){
+		if(!FC_isAptOps(fc->ops, fc->o2pt, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+    return true;
+}
+#endif

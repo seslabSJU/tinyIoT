@@ -8,6 +8,7 @@ AE* cjson_to_ae(cJSON *cjson);
 CNT* cjson_to_cnt(cJSON *cjson);
 CIN* cjson_to_cin(cJSON *cjson);
 SUB* cjson_to_sub(cJSON *cjson);
+SUB* cjson_to_sub_db(cJSON *cjson);
 ACP* cjson_to_acp(cJSON *cjson);
 int cjson_to_grp(cJSON *cjson, GRP *grp);
 

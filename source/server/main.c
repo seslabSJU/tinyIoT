@@ -26,19 +26,24 @@ void stop_server(int sig);
 int terminate = 0;
 #ifdef ENABLE_MQTT
 pthread_t mqtt;
+int mqtt_thread_id;
 #endif
 
-int main(int c, char **v) {
+int main(int argc, char **argv) {
 	signal(SIGINT, stop_server);
-	
+	char *PORT = SERVER_PORT;
 	if(!init_dbp()){
 		logger("MAIN", LOG_LEVEL_ERROR, "DB Error");
 		return 0;
 	}
+
+	if(argc >= 3 && !strcmp(argv[1], "-p")){
+		PORT = argv[2];
+	}
+
 	init_server();
 	
 	#ifdef ENABLE_MQTT
-	int mqtt_thread_id;
 	mqtt_thread_id = pthread_create(&mqtt, NULL, mqtt_serve, "mqtt Client");
 	if(mqtt_thread_id < 0){
 		fprintf(stderr, "MQTT thread create error\n");
@@ -46,7 +51,14 @@ int main(int c, char **v) {
 	}
 	#endif
 
-	serve_forever(SERVER_PORT); // main oneM2M operation logic in void route()    
+	serve_forever(PORT); // main oneM2M operation logic in void route()    
+
+	#ifdef ENABLE_MQTT
+	pthread_join(mqtt, NULL);
+	if(terminate){
+		return 0;
+	}
+	#endif
 
 	return 0;
 }
@@ -61,7 +73,6 @@ void route(oneM2MPrimitive *o2pt) {
 
 	if(e != -1) e = check_payload_size(o2pt);
 	if(e == -1) {
-		respond_to_client(o2pt);
 		log_runtime(start);
 		return;
 	}
@@ -69,7 +80,6 @@ void route(oneM2MPrimitive *o2pt) {
 	if(o2pt->fc && o2pt->fc->fu != FU_DISCOVERY){
 		o2pt->rsc = RSC_BAD_REQUEST;
 		set_o2pt_pc(o2pt, "{\"m2m:dbg\":\"Only Filter Usage Discovery Supported\"}");
-		respond_to_client(o2pt);
 		log_runtime(start);
 		return;
 	}
@@ -85,7 +95,6 @@ void route(oneM2MPrimitive *o2pt) {
 		}
 	}
 
-	respond_to_client(o2pt);
 	if(o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode) notify_onem2m_resource(o2pt, target_rtnode);
 	log_runtime(start);
 }
@@ -100,23 +109,29 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 	switch(o2pt->op) {
 		
 		case OP_CREATE:	
-			rsc = create_onem2m_resource(o2pt, target_rtnode); break;
+			rsc = create_onem2m_resource(o2pt, target_rtnode); 
+			break;
 		
 		case OP_RETRIEVE:
-			rsc = retrieve_onem2m_resource(o2pt, target_rtnode); break;
+			rsc = retrieve_onem2m_resource(o2pt, target_rtnode); 
+			break;
 			
 		case OP_UPDATE: 
-			rsc = update_onem2m_resource(o2pt, target_rtnode); break;
+			rsc = update_onem2m_resource(o2pt, target_rtnode); 
+			break;
 			
 		case OP_DELETE:
-			rsc = delete_onem2m_resource(o2pt, target_rtnode); break;
+			rsc = delete_onem2m_resource(o2pt, target_rtnode); 
+			break;
 
 		case OP_VIEWER:
-			rsc = tree_viewer_api(o2pt, target_rtnode); break;
+			rsc = tree_viewer_api(o2pt, target_rtnode); 
+			break;
 		
-		//case OP_OPTIONS:
-			//respond_to_client(200, "{\"m2m:dbg\": \"response about options method\"}", "2000");
-			//break;
+		case OP_OPTIONS:
+			rsc = RSC_OK;
+			set_o2pt_pc(o2pt, "{\"m2m:dbg\": \"response about options method\"}");
+			break;
 		case OP_DISCOVERY:
 			rsc = discover_onem2m_resource(o2pt, target_rtnode); break;
 
@@ -124,16 +139,14 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 			handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "{\"m2m:dbg\": \"internal server error\"}");
 			return RSC_INTERNAL_SERVER_ERROR;
 		}
-
+		
 		return rsc;
 }
 
 void stop_server(int sig){
 	logger("MAIN", LOG_LEVEL_INFO, "Shutting down server...");
 	#ifdef ENABLE_MQTT
-	terminate = 1;
-	logger("MAIN", LOG_LEVEL_INFO, "Waiting for MQTT Client to shut down...");
-	pthread_join(mqtt, NULL);
+	pthread_kill(mqtt, SIGINT);
 	#endif
 	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
 	close_dbp();

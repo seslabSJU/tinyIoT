@@ -15,6 +15,11 @@
 #define MAX_TREE_VIEWER_SIZE 65536
 #define DEFAULT_EXPIRE_TIME -3600*24*365*2
 
+// DB Settings
+/* Select which Database to use. */
+//#define BERKELEY_DB
+#define SQLITE_DB
+
 // Group Settings
 #define CONSISTENCY_POLICY SET_MIXED
 
@@ -26,7 +31,7 @@
 #define MQTT_HOST            "127.0.0.1"
 #define MQTT_QOS             MQTT_QOS_0
 #define MQTT_KEEP_ALIVE_SEC  60
-#define MQTT_CMD_TIMEOUT_MS  3000
+#define MQTT_CMD_TIMEOUT_MS  30000
 #define MQTT_CON_TIMEOUT_MS  5000
 #define MQTT_CLIENT_ID       "TinyIoT"
 #define MQTT_USERNAME        "test"

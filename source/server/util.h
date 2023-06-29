@@ -2,6 +2,7 @@
 #define __UTIL_H__
 #include "onem2mTypes.h"
 #include "onem2m.h"
+#include "config.h"
 #include "cJSON.h"
 
 void init_server();
@@ -34,6 +35,7 @@ char *get_lt_rtnode(RTNode *rtnode);
 int get_st_rtnode(RTNode *rtnode);
 int get_cs_rtnode(RTNode *rtnode);
 char *get_lbl_rtnode(RTNode *rtnode);
+char *get_uri_rtnode(RTNode *rtnode);
 
 //error
 int check_privilege(oneM2MPrimitive *o2pt, RTNode *target_rtnode, ACOP acop);
@@ -53,7 +55,6 @@ void db_store_fail(oneM2MPrimitive *o2pt);
 char* get_local_time(int diff);
 char* resource_identifier(ResourceType ty, char *ct);
 void delete_cin_under_cnt_mni_mbs(RTNode *rtnode);
-void respond_to_client(oneM2MPrimitive *o2pt);
 int net_to_bit(char *net);
 int get_acop(oneM2MPrimitive *o2pt, RTNode *node);
 int get_acop_origin(char *origin, RTNode *acp, int flag);
@@ -81,6 +82,10 @@ int handle_csy(GRP *grp, int i);
 int get_number_from_cjson(cJSON *json);
 cJSON *qs_to_json(char* qs);
 cJSON *handle_uril(cJSON *uril, char *new_uri, FilterOperation fo);
-cJSON *fc_scan_resource_tree(RTNode *rtnode, FilterCriteria *fc, int lvl);void notify_to_nu(oneM2MPrimitive *o2pt, RTNode *sub_rtnode, cJSON *noti_cjson, int net);
+void filterOptionStr(FilterOperation fo , char *sql);
+
+#ifdef BERKELEY_DB
+cJSON *fc_scan_resource_tree(RTNode *rtnode, FilterCriteria *fc, int lvl);
+#endif
 
 #endif

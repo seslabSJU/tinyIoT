@@ -30,6 +30,7 @@ AE* cjson_to_ae(cJSON *cjson) {
 	cJSON *lbl = NULL;
 	cJSON *srv = NULL;
 	cJSON *acpi = NULL;
+	cJSON *pjson = NULL;
 
 	if (cjson == NULL) {
 		return NULL;
@@ -101,16 +102,39 @@ AE* cjson_to_ae(cJSON *cjson) {
 	acpi = cJSON_GetObjectItem(root, "acpi");
 	ae->acpi = cjson_string_list_item_to_string(acpi);
 
+	if(pjson = cJSON_GetObjectItem(root, "pi")){
+		ae->pi = strdup(pjson->valuestring);
+
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ri") ){
+		ae->ri = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ct")){
+		ae->ct = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "lt")){
+		ae->lt = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "et")){
+		ae->et = strdup(pjson->valuestring);
+	}if(pjson = cJSON_GetObjectItem(root, "uri")){
+		ae->uri = strdup(pjson->valuestring);
+	}
+
+	ae->ty = RT_AE;
 	return ae;
 }
 
 CNT* cjson_to_cnt(cJSON *cjson) {
 	cJSON *root = NULL;
+	cJSON *pi = NULL;
+	cJSON *ri = NULL;
 	cJSON *rn = NULL;
 	cJSON *acpi = NULL;
 	cJSON *lbl = NULL;
 	cJSON *mni = NULL;
 	cJSON *mbs = NULL;
+	cJSON *pjson = NULL;
 
 	if (cjson == NULL) {
 		return NULL;
@@ -155,6 +179,29 @@ CNT* cjson_to_cnt(cJSON *cjson) {
 		cnt->mbs = INT_MIN;
 	}
 
+	if(pjson = cJSON_GetObjectItem(root, "pi")){
+		cnt->pi = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ri") ){
+		cnt->ri = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ct")){
+		cnt->ct = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "lt")){
+		cnt->lt = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "et")){
+		cnt->et = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "uri")){
+		cnt->uri = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "st")){
+		cnt->st = pjson->valueint;
+	}
+
+
 	return cnt;
 }
 
@@ -162,6 +209,7 @@ CIN* cjson_to_cin(cJSON *cjson) {
 	cJSON *root = NULL;
 	cJSON *rn = NULL;
 	cJSON *con = NULL;
+	cJSON *pjson = NULL;
 
 	const char *error_ptr = NULL;
 
@@ -185,7 +233,91 @@ CIN* cjson_to_cin(cJSON *cjson) {
 	remove_quotation_mark(cin->con);
 	cin->cs = strlen(cin->con);
 
+	if(pjson = cJSON_GetObjectItem(root, "rn")){
+		cin->rn = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "st")){
+		cin->st = pjson->valueint;
+	}
+	if(pjson = cJSON_GetObjectItem(root, "cs")){
+		cin->cs = pjson->valueint;
+	}
+	if(pjson = cJSON_GetObjectItem(root, "pi")){
+		cin->pi = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ri") ){
+		cin->ri = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ct")){
+		cin->ct = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "lt")){
+		cin->lt = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "et")){
+		cin->et = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "uri")){
+		cin->uri = strdup(pjson->valuestring);
+	}
+	cin->ty = RT_CIN;
+
 	return cin;
+}
+
+SUB *cjson_to_sub_db(cJSON *cjson){
+	cJSON *root = NULL;
+	cJSON *pjson = NULL;
+
+	root = cJSON_GetObjectItem(cjson, "m2m:sub");
+	if(!root) return NULL;
+
+	SUB *sub = (SUB *) calloc(1, sizeof(SUB));
+
+	pjson = cJSON_GetObjectItem(root, "nu");
+	if(pjson){
+		sub->nu = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "net");
+	if(pjson){
+		sub->net = strdup(pjson->valuestring);
+	}
+
+	pjson = cJSON_GetObjectItem(root, "nct");
+	if(pjson){
+		sub->nct = pjson->valueint;
+	}
+	pjson = cJSON_GetObjectItem(root, "pi");
+	if(pjson){
+		sub->pi = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "ri");
+	if(pjson){
+		sub->ri = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "ct");
+	if(pjson){
+		sub->ct = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "et");
+	if(pjson){
+		sub->et= strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "lt");
+	if(pjson){
+		sub->lt = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "uri");
+	if(pjson){
+		sub->uri = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "sur");
+	if(pjson){
+		sub->sur = strdup(pjson->valuestring);
+	}
+
+	return sub;
+
 }
 
 SUB* cjson_to_sub(cJSON *cjson) {
@@ -194,6 +326,7 @@ SUB* cjson_to_sub(cJSON *cjson) {
 	cJSON *enc = NULL;
 	cJSON *net = NULL;
 	cJSON *nu = NULL;
+	cJSON *pjson = NULL;
 
 	if (cjson == NULL) {
 		return NULL;
@@ -206,10 +339,17 @@ SUB* cjson_to_sub(cJSON *cjson) {
 
 	// nu (mandatory)
 	nu = cJSON_GetObjectItem(root, "nu");
-	int nu_size = cJSON_GetArraySize(nu);
-	if (nu == NULL || nu_size == 0) {
-		return NULL;
-	} else {
+	if(cJSON_IsArray(nu)){
+		int nu_size = cJSON_GetArraySize(nu);
+		if (nu == NULL || nu_size == 0) {
+			return NULL;
+		} else {
+			sub->nu = cjson_string_list_item_to_string(nu);
+		}
+	}else if(cJSON_IsString(nu)){
+		if(strlen(nu->valuestring) == 0){
+			return NULL;
+		}
 		sub->nu = cjson_string_list_item_to_string(nu);
 	}
 
@@ -235,6 +375,41 @@ SUB* cjson_to_sub(cJSON *cjson) {
 		sub->net = cjson_int_list_item_to_string(net);
 	}
 
+	pjson = cJSON_GetObjectItem(root, "nct");
+	if(pjson){
+		sub->nct = pjson->valueint;
+	}
+	pjson = cJSON_GetObjectItem(root, "pi");
+	if(pjson){
+		sub->pi = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "ri");
+	if(pjson){
+		sub->ri = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "ct");
+	if(pjson){
+		sub->ct = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "et");
+	if(pjson){
+		sub->et= strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "lt");
+	if(pjson){
+		sub->lt = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "uri");
+	if(pjson){
+		sub->uri = strdup(pjson->valuestring);
+	}
+	pjson = cJSON_GetObjectItem(root, "sur");
+	if(pjson){
+		sub->sur = strdup(pjson->valuestring);
+	}
+
+	sub->ty = RT_SUB;
+
 	return sub;
 }
 
@@ -248,6 +423,7 @@ ACP* cjson_to_acp(cJSON *cjson) {
 	cJSON *acor = NULL;
 	cJSON *acop = NULL;
 	cJSON *lbl = NULL;
+	cJSON *pjson = NULL;
 
 	if (cjson == NULL) {
 		const char *error_ptr = cJSON_GetErrorPtr();
@@ -403,6 +579,27 @@ ACP* cjson_to_acp(cJSON *cjson) {
 	lbl = cJSON_GetObjectItem(root, "lbl");
 	acp->lbl = cjson_string_list_item_to_string(lbl);
 
+
+	if(pjson = cJSON_GetObjectItem(root, "pi")){
+		acp->pi = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ri") ){
+		acp->ri = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ct")){
+		acp->ct = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "lt")){
+		acp->lt = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "et")){
+		acp->et = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "uri")){
+		acp->uri = strdup(pjson->valuestring);
+	}
+
+
 	return acp;
 }
 
@@ -422,7 +619,7 @@ int cjson_to_grp(cJSON *cjson, GRP *grp){
 	if(cjson == NULL){
 		return 0;
 	}
-
+	
 	root = cJSON_GetObjectItem(cjson, "m2m:grp");
 
 	rn = cJSON_GetObjectItem(root, "rn");
@@ -482,16 +679,37 @@ int cjson_to_grp(cJSON *cjson, GRP *grp){
 		if(midx < mid_size){
 			pmid = cJSON_GetArrayItem(mid, i);
 			if(!isMinDup(grp->mid, midx, pmid->valuestring)){
-				logger("json-t", LOG_LEVEL_DEBUG, "adding %s to mid[%d]", pmid->valuestring, midx);
+				//logger("json-t", LOG_LEVEL_DEBUG, "adding %s to mid[%d]", pmid->valuestring, midx);
 				grp->mid[midx] = strdup(pmid->valuestring);
 				midx++;
 			}
 			else{
-				logger("json-t", LOG_LEVEL_DEBUG, "declining %s", pmid->valuestring);
+				//logger("json-t", LOG_LEVEL_DEBUG, "declining %s", pmid->valuestring);
 				grp->mid[i] = NULL;
 				grp->cnm--;
 			}
 		}
+	}
+	if(pjson = cJSON_GetObjectItem(root, "pi")){
+		grp->pi = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ri") ){
+		grp->ri = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "ct")){
+		grp->ct = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "lt")){
+		grp->lt = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "et")){
+		grp->et = strdup(pjson->valuestring);
+	}
+	if(pjson = cJSON_GetObjectItem(root, "mtv")){
+		grp->mtv = pjson->valueint;
+	}
+	if(pjson = cJSON_GetObjectItem(root, "uri")){
+		grp->uri = strdup(pjson->valuestring);
 	}
 
 	return RSC_CREATED;
@@ -943,6 +1161,11 @@ char *cjson_string_list_item_to_string(cJSON *key) {
 		else {
 			char item_str[MAX_ATTRIBUTE_SIZE] = { '\0' };
 			for (int i = 0; i < item_size; i++) {
+				if(cJSON_GetArrayItem(key, i)->valuestring == NULL){
+					return NULL;
+				}
+				// TODO - if int value should convert to string.
+				
 				if (isspace(cJSON_GetArrayItem(key, i)->valuestring[0]) || (cJSON_GetArrayItem(key, i)->valuestring[0] == 0)) {
 					return NULL;
 				}
