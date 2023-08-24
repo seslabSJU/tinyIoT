@@ -134,7 +134,6 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
     }
 
     /* type mqtt */
-    o2pt->prot = PROT_MQTT;
     o2pt->origin = strdup(originator);
     MqttClientIdToId(o2pt->origin);
 
@@ -172,26 +171,30 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
         if(pjson->valueint) o2pt->ty = pjson->valueint;
         else o2pt->ty = atoi(pjson->valuestring);
     }
-
+    int rsc = 0;
     pjson = cJSON_GetObjectItem(json, "fc");
     if(pjson){
-        if((o2pt->fc = parseFilterCriteria(pjson)) == NULL){
-            if(o2pt->pc)
-                free(o2pt->pc);
-            o2pt->pc = strdup("{\"m2m:dbg\": \"Invalid FilterCriteria\"}");
-            o2pt->rsc = RSC_BAD_REQUEST;
+        o2pt->fc = pjson;
+        if(rsc = validate_filter_criteria(o2pt) > 4000){
+            handle_error(o2pt, rsc, "Invalid FilterCriteria");
             mqtt_respond_to_client(o2pt, req_type);
             goto exit;
-
-        }else{
-            if(o2pt->fc->fu == FU_DISCOVERY)
-                o2pt->op = OP_DISCOVERY;
         }
     }
 
     /* initialize */
     o2pt->fopt = NULL;
     o2pt->isFopt = false;
+
+    // if(!strncmp(o2pt->to, "/~/", 3)){
+    //     if(!strncmp(o2pt->to + 3, CSE_BASE_RI, strlen(CSE_BASE_RI))){
+    //         char *temp = strdup(o2pt->to + 3 + strlen(CSE_BASE_RI) + 1);
+    //         free(o2pt->to);
+    //         o2pt->to = temp;
+    //     }else{
+    //         o2pt->isForwarding = true;
+    //     }
+    // }
 
     /* supported content type : json*/
     if(strcmp(contentType, "json")){
@@ -598,6 +601,130 @@ int mqtt_notify(oneM2MPrimitive *o2pt, char* noti_json, NotiTarget *nt){
         return rc;
     }
 
+
+    exit:
+    if (rc != MQTT_CODE_SUCCESS) {
+        logger(LOG_TAG, LOG_LEVEL_ERROR, "MQTT Error %d: %s", rc, MqttClient_ReturnCodeToString(rc));
+    }
+    if(sfd > 0){
+        MqttClient_Disconnect(&notiClient);
+        MqttClient_DeInit(&notiClient);
+    }
+    return NULL;
+}
+
+int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, char *port, cJSON *csr){
+    int rc = 0;
+    int sfd = 0;
+    MqttObject mqttObj;
+    MqttNet mNet;
+    MqttPublish mqttPub;
+    MqttClient notiClient;
+    MqttTopic topics[2];
+
+    char buf[1024] = {'\0'};
+    char topic[1024] = {'\0'};
+
+    char notiSbuf[1024], notiRbuf[1024];
+    
+    sprintf(topic, "/oneM2M/req/%s/%s/json", CSE_BASE_RI, csr->csi);
+    logger("MQTT", LOG_LEVEL_DEBUG, "topic : %s", topic);
+
+    if(!strcmp(host, MQTT_HOST)){
+        memcpy(&notiClient, &mClient, sizeof(MqttClient));
+        memcpy(&mNet, &mNetwork, sizeof(MqttNet));
+    }else{
+        memset(&mNet, 0, sizeof(mNet));
+        mNet.connect = mqtt_net_connect;
+        mNet.read = mqtt_net_read;
+        mNet.write = mqtt_net_write;
+        mNet.disconnect = mqtt_net_disconnect;
+        mNet.context = &sfd;
+        
+        rc = MqttClient_Init(&notiClient, &mNet, NULL,
+            notiSbuf, sizeof(notiSbuf), notiRbuf, sizeof(notiRbuf),
+            MQTT_CON_TIMEOUT_MS);
+        if (rc != MQTT_CODE_SUCCESS) {
+            goto exit;
+        }
+        logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT Noti Init Success");
+
+        rc = MqttClient_NetConnect(&notiClient, host, atoi(port),
+            MQTT_CON_TIMEOUT_MS, MQTT_USE_TLS, mqtt_tls_cb);
+        if (rc != MQTT_CODE_SUCCESS) {
+            goto exit;
+        }
+        logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT Network Connect Success: Host %s, Port %d, UseTLS %d",
+            MQTT_HOST, MQTT_PORT, MQTT_USE_TLS);
+
+        sprintf(buf, "%s_forwarding",MQTT_CLIENT_ID); // new client ID for notification
+        /* Send Connect and wait for Ack */
+        XMEMSET(&mqttObj, 0, sizeof(mqttObj));
+        mqttObj.connect.keep_alive_sec = MQTT_KEEP_ALIVE_SEC;
+        mqttObj.connect.client_id = strdup(buf);
+        mqttObj.connect.username = MQTT_USERNAME;
+        mqttObj.connect.password = MQTT_PASSWORD;
+        rc = MqttClient_Connect(&notiClient, &mqttObj.connect);
+        if (rc != MQTT_CODE_SUCCESS) {
+            goto exit;
+        }
+        logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT Broker Connect Success: ClientID %s, Username %s, Password %s",
+            MQTT_CLIENT_ID,
+            (MQTT_USERNAME == NULL) ? "Null" : MQTT_USERNAME,
+            (MQTT_PASSWORD == NULL) ? "Null" : MQTT_PASSWORD);
+
+    }
+
+    char respTopic[256] = {0};
+
+    sprintf(respTopic, "/oneM2M/resp/%s/%s/#", CSE_BASE_RI, csr->csi);
+    topics[0].topic_filter = respTopic;
+    topics[0].qos = MQTT_QOS;
+
+    mqttObj.subscribe.packet_id = mqtt_get_packetid();
+    mqttObj.subscribe.topic_count = sizeof(topics) / sizeof(MqttTopic);
+    mqttObj.subscribe.topics = topics;
+    rc = MqttClient_Subscribe(&mClient, &mqttObj.subscribe);
+    if (rc != MQTT_CODE_SUCCESS) {
+        goto exit;
+    }
+    
+    XMEMSET(&mqttPub, 0, sizeof(MqttPublish));
+    mqttPub.retain = 0;
+    mqttPub.qos = MQTT_QOS;
+    mqttPub.topic_name = topic;
+    mqttPub.packet_id = mqtt_get_packetid();
+    mqttPub.buffer = strdup(o2pt->pc);
+    mqttPub.total_len = XSTRLEN(o2pt->pc);
+
+    logger(LOG_TAG, LOG_LEVEL_DEBUG, "MQTT Publish: Topic %s, Qos %d\n%s\n",
+        mqttPub.topic_name, mqttPub.qos, mqttPub.buffer);
+
+    do{
+        rc = MqttClient_Publish(&notiClient, &mqttPub);
+    } while(rc == MQTT_CODE_PUB_CONTINUE);
+
+    if(rc != MQTT_CODE_SUCCESS){
+        return rc;
+    }
+
+    rc = MqttClient_WaitMessage_ex(&mClient, &mqttObj, 5000);
+    if (rc == MQTT_CODE_ERROR_TIMEOUT) {
+        /* send keep-alive ping */
+        rc = MqttClient_Ping_ex(&mClient, &mqttObj.ping);
+        if (rc != MQTT_CODE_SUCCESS) {
+            goto exit;
+        }
+        
+    }
+    else if (rc != MQTT_CODE_SUCCESS) {
+        goto exit;
+    }else{
+        logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT Recv Success");
+
+        logger(LOG_TAG, LOG_LEVEL_DEBUG, "MQTT Recv: Topic %s, Qos %d\n%s\n",
+            mqttObj.publish.topic_name, mqttObj.publish.qos, mqttObj.publish.buffer);
+    }
 
     exit:
     if (rc != MQTT_CODE_SUCCESS) {

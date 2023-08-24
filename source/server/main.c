@@ -22,7 +22,10 @@
 ResourceTree *rt;
 void route(oneM2MPrimitive *o2pt);
 void stop_server(int sig);
-
+cJSON *ATTRIBUTES;
+cJSON *ACP_SUPPORT_ACR;
+cJSON *ACP_SUPPORT_ACCO;
+char *PORT = SERVER_PORT;
 int terminate = 0;
 #ifdef ENABLE_MQTT
 pthread_t mqtt;
@@ -31,7 +34,26 @@ int mqtt_thread_id;
 
 int main(int argc, char **argv) {
 	signal(SIGINT, stop_server);
-	char *PORT = SERVER_PORT;
+	ATTRIBUTES = cJSON_Parse(
+	"{ \
+		\"general\": {\"rn\": \"\", \"ri\": \"\", \"pi\": \"\", \"ct\": \"\", \"et\": \"\", \"lt\": \"\" , \"uri\": \"\" , \"acpi\": [\"\"], \"lbl\": [\"\"], \"ty\":0}, \
+		\"m2m:ae\": {\"ri\": \"\", \"api\": \"\", \"aei\" : \"\", \"rr\": true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"]}, \
+		\"m2m:cnt\": {\"ri\":\"\", \"cr\": null, \"mni\":0, \"mbs\":0, \"mia\":0, \"st\":0, \"cni\":0, \"cbs\":0}, \
+		\"m2m:cin\": {\"ri\":\"\", \"cs\":0, \"cr\":null, \"con\":\"\"}, \
+		\"m2m:acp\": {\"ri\":\"\", \"pv\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"pvs\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}}, \
+		\"m2m:sub\": {\"ri\":\"\", \"enc\":{\"net\":[1]}, \"exc\":0, \"nu\":[\"\"], \"gpi\":0, \"nfu\":0, \"bn\":0, \"rl\":0, \"sur\":0, \"nct\":0, \"cr\":\"\", \"su\":\"\"},\
+		\"m2m:grp\": {\"ri\":\"\", \"cr\":\"\", \"mt\":0, \"cnm\":0, \"mnm\":0, \"mid\":[\"\"], \"macp\":[\"\"], \"mtv\":true, \"csy\":0, \"gn\":0}, \
+		\"m2m:csr\": {\"ri\":\"\", \"cst\":0, \"poa\":[\"\"], \"cb\":\"\", \"csi\":\"\", \"mei\":\"\", \"tri\":\"\", \"rr\":true, \"nl\":\"\", \"srv\":[\"\"]},\
+		\"m2m:cb\": {\"ri\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[0], \"rr\":true} \
+	 }"
+    );
+
+    if(ATTRIBUTES == NULL){
+        logger("DB", LOG_LEVEL_ERROR, "Cannot create attributes");
+        logger("DB", LOG_LEVEL_DEBUG, "%s", cJSON_GetErrorPtr());
+        return 0;
+    }
+
 	if(!init_dbp()){
 		logger("MAIN", LOG_LEVEL_ERROR, "DB Error");
 		return 0;
@@ -70,18 +92,16 @@ void route(oneM2MPrimitive *o2pt) {
     start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
 	RTNode* target_rtnode = parse_uri(o2pt, rt->cb);
 	int e = result_parse_uri(o2pt, target_rtnode);
-
 	if(e != -1) e = check_payload_size(o2pt);
 	if(e == -1) {
 		log_runtime(start);
 		return;
 	}
 
-	if(o2pt->fc && o2pt->fc->fu != FU_DISCOVERY){
-		o2pt->rsc = RSC_BAD_REQUEST;
-		set_o2pt_pc(o2pt, "{\"m2m:dbg\":\"Only Filter Usage Discovery Supported\"}");
-		log_runtime(start);
-		return;
+	if(o2pt->fc){
+		if(rsc = validate_filter_criteria(o2pt) > 4000){
+			return rsc;
+		}
 	}
 
 	if(o2pt->isFopt)
@@ -100,10 +120,16 @@ void route(oneM2MPrimitive *o2pt) {
 }
 
 int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
+	logger("MAIN", LOG_LEVEL_INFO, "handle_onem2m_request");
 	int rsc = 0;
 
 	if(o2pt->op == OP_CREATE && o2pt->fc){
 		return o2pt->rsc = rsc = RSC_BAD_REQUEST;
+	}
+
+	if(o2pt->isForwarding){
+		rsc = forwarding_onem2m_resource(o2pt, target_rtnode);
+		return rsc;
 	}
 
 	switch(o2pt->op) {
@@ -133,8 +159,9 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 			set_o2pt_pc(o2pt, "{\"m2m:dbg\": \"response about options method\"}");
 			break;
 		case OP_DISCOVERY:
-			rsc = discover_onem2m_resource(o2pt, target_rtnode); break;
-
+			rsc = discover_onem2m_resource(o2pt, target_rtnode); 
+			break;
+	
 		default:
 			handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "{\"m2m:dbg\": \"internal server error\"}");
 			return RSC_INTERNAL_SERVER_ERROR;

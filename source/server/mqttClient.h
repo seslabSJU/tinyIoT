@@ -16,6 +16,7 @@
 
 int mqtt_respond_to_client(oneM2MPrimitive *o2pt, char* req_type);
 int mqtt_notify(oneM2MPrimitive *o2pt, char* noti_json, NotiTarget *nt);
+int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, char *port, cJSON *csr);
 
 void idToMqttClientId(char *id);
 void MqttClientIdToId(char *id);

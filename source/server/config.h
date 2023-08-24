@@ -2,9 +2,18 @@
 #define __CONFIG_H__
 #include "logger.h"
 
+#define SERVER_TYPE IN_CSE
+
+#define SERVER_HOST "127.0.0.1"
 #define SERVER_PORT "3000"
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
+
+#if SERVER_TYPE == MN_CSE
+#define REMOTE_CSE_ID "in-cse"
+#define REMOTE_CSE_HOST ""
+#define REMOTE_CSE_PORT ""
+#endif
 
 #define MONO_THREAD 1 // 0 → multi-thread, 1 → mono-thread
 
@@ -15,17 +24,21 @@
 #define MAX_TREE_VIEWER_SIZE 65536
 #define DEFAULT_EXPIRE_TIME -3600*24*365*2
 
-// DB Settings
-/* Select which Database to use. */
-//#define BERKELEY_DB
-#define SQLITE_DB
+
+// AE Settings
+// #define ALLOW_AE_ORIGIN "C*,S*" , no blankspace allowed
+#define ALLOW_AE_ORIGIN "C*,S*"
+
+// CNT Settings
+#define DEFAULT_MAX_NR_INSTANCES 10
+#define DEFAULT_MAX_BYTE_SIZE 1024
 
 // Group Settings
-#define CONSISTENCY_POLICY SET_MIXED
+#define DEFAULT_CONSISTENCY_POLICY CSY_SET_MIXED
 
 
 // MQTT Settings
-#define ENABLE_MQTT
+//#define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
 #define MQTT_HOST            "127.0.0.1"
@@ -54,8 +67,7 @@
 
 #endif
 
-#include "logger.h"
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LEVEL LOG_LEVEL_INFO
 #define LOG_BUFFER_SIZE MAX_PAYLOAD_SIZE
 
 #endif

@@ -3,6 +3,11 @@
 
 #include <stdbool.h>
 
+typedef enum {
+	IN_CSE = 1,
+	MN_CSE = 2,
+	ASN_CSE = 3
+} CSEType;
 
 typedef enum {
     RSC_ACCEPTED									= 1000,
@@ -103,8 +108,22 @@ typedef enum {
 	RCN_CHILD_RESOURCES							= 8,
 	RCN_MODIFIED_ATTRIBUTES						= 9,
 	RCN_SEMANTIC_CONTENT						= 10,
-	RCN_DISCOVERY_RESULT_REFERENCES				= 11
+	RCN_DISCOVERY_RESULT_REFERENCES				= 11,
+	RCN_PERMISSIONS								= 12
 } ResultContentType;
+
+typedef enum {
+	DRT_STRUCTURED = 1,
+	DRT_UNSTRUCTURED = 2,
+} desIdResType;
+
+typedef enum {
+	NCT_ALL_ATTRIBUTES = 1,
+	NCT_MODIFIED_ATTRIBUTES = 2,
+	NCT_RESOURCE_ID = 3,
+	NCT_TRIGGER_PAYLOAD = 4,
+	NCT_TIMESERIES_NOTIFICATION = 5,
+} notificationContentType;
 
 typedef enum {
 	CSY_ABANDON_MEMBER = 1,
