@@ -22,15 +22,16 @@ Configure your running environment with the config.h file. You can configure IP 
 Default IP address and port number are 127.0.0.1 and 3000. 
 
 To make an excutable tinyIoT server, simply execute the make file. 
-  make
+
+  $ make
 
 Use the following command to run tinyIoT server: 
 
-  Run ./server 
+  $ ./server 
  
 You can configure port number and ip address as parameters, for example, 
 
-  ./server -p [port] (port = 3000 by default)
+  $ ./server -p [port] (port = 3000 by default)
    
 
 For binding protocols, tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later. 
