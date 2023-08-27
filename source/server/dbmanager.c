@@ -480,6 +480,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty){
 
 void db_test_and_bind_value(sqlite3_stmt *stmt, int index, cJSON *obj){
     if(!obj) return;
+    char *temp = NULL;
     switch(obj->type){
         case cJSON_String:
             db_test_and_set_bind_text(stmt, index, obj->valuestring);
@@ -489,7 +490,7 @@ void db_test_and_bind_value(sqlite3_stmt *stmt, int index, cJSON *obj){
             break;
         case cJSON_Array:
         case cJSON_Object:
-            char *temp = cJSON_PrintUnformatted(obj);
+            temp = cJSON_PrintUnformatted(obj);
             db_test_and_set_bind_text(stmt, index, temp);
             free(temp);
             break;
