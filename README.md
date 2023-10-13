@@ -2,7 +2,7 @@
 
 oneM2M is a global partnership project founded in 2012 to create a global technical standard for interoperability concerning the architecture, API specifications, security and enrolments solutions for Internet of Things (IoT) technologies based on requirements contributed by its members. The standardised specifications produced by oneM2M enable an Eco-System to support a wide range of applications and services such as smart cities, smart grid, connected car, home automation, public safety, and health.
 
-tinyIoT is a secure, fast, lightweight and very flexible oneM2M service layer platform compliant with oneM2M specifications. tinyIoT uses memory and CPU efficiently and has low resource use. tinyIoT is implemented in C and uses lightweight open source components for database (SQLite), JSON parser (cJSON), http server (lightHTTP) and mqtt client (wolfMQTT) . tinyIoT also comes with a web-based dashboard implemented using Vue. 
+tinyIoT is a secure, fast, lightweight and very flexible oneM2M service layer platform compliant with oneM2M specifications. tinyIoT uses memory and CPU efficiently and has low resource use. tinyIoT is implemented in C and uses lightweight open source components for database (SQLite), JSON parser (cJSON), http server (pico) and mqtt client (wolfMQTT) . tinyIoT also comes with a web-based dashboard implemented using Vue. 
 
 tinyIoT supports the following features: 
 
@@ -37,7 +37,7 @@ You can configure port number and ip address as parameters, for example,
 For binding protocols, tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later. 
 In order to run MQTT, Mosquitto MQTT broker should be installed on your machine. 
 
-  - HTTP: lighthttpd
+  - HTTP: foxweb/pico
   - MQTT: Mosquitto
   - CoAP: To be added
 
