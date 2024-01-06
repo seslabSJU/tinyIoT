@@ -184,7 +184,6 @@ RTNode *find_csr_rtnode_by_uri(char *uri){
 	if(!uri) return NULL;
 	char *target_uri = strdup(uri); // remove second '/'
 	char *ptr = strtok(target_uri+1, "/");
-	logger("O2M", LOG_LEVEL_DEBUG, "target_uri : %s", target_uri);
 	if(!ptr) return NULL;
 
 	while(rtnode) {
@@ -2922,7 +2921,7 @@ int create_local_csr(){
 	RTNode* rtnode = create_rtnode(csr, RT_CSR);
 	add_child_resource_tree(rt->cb, rtnode);
 
-	registrar_csr = csr;
+	registrar_csr = rtnode;
 
 	free_HTTPRequest(req);	
 	return 0;

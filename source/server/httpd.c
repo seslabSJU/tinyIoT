@@ -537,7 +537,7 @@ void send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *re
     }
 
     struct timeval tv;
-    tv.tv_sec  = 5;
+    tv.tv_sec  = SOCKET_TIMEOUT;
     tv.tv_usec = 0;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
 

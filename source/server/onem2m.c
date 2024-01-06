@@ -17,7 +17,7 @@
 #include "cJSON.h"
 
 extern ResourceTree *rt;
-extern registrar_csr;
+
 
 void init_cse(cJSON* cse) {
 	char *ct = get_local_time(0);
@@ -1551,15 +1551,17 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
  * @return int result code
 */
 int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
-	logger("O2M", LOG_LEVEL_DEBUG, "Forwarding Resource");
+	extern RTNode *registrar_csr;
 	Protocol protocol = 0;
 	char *host = NULL;
 	int port = 0;
 	char *path = NULL;
 	
+	logger("O2M", LOG_LEVEL_DEBUG, "Forwarding Resource");
+	
 	if(!target_rtnode){
 		if(registrar_csr){
-			logger("O2M", LOG_LEVEL_ERROR, "local csr not found, forwarding to registrar");
+			logger("O2M", LOG_LEVEL_DEBUG, "local csr not found, forwarding to registrar");
 			target_rtnode = registrar_csr;
 		}else{
 			return o2pt->rsc = RSC_NOT_FOUND;
