@@ -2,20 +2,24 @@
 #define __CONFIG_H__
 #include "logger.h"
 
-#define SERVER_TYPE IN_CSE
+// IN_CSE, MN_CSE
+#define SERVER_TYPE IN_CSE 
 
-#define SERVER_HOST "127.0.0.1"
+// #define NIC_NAME "eth0" // get ip address from NIC_NAME if defined
+#define SERVER_IP "127.0.0.1"
 #define SERVER_PORT "3000"
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
 
 #if SERVER_TYPE == MN_CSE
-#define REMOTE_CSE_ID "in-cse"
-#define REMOTE_CSE_HOST ""
-#define REMOTE_CSE_PORT ""
+// #define REMOTE_CSE_ID "id-in"
+// #define REMOTE_CSE_NAME "cse-in"
+// #define REMOTE_CSE_HOST "127.0.0.1"
+// #define REMOTE_CSE_PORT 8000
 #endif
 
-#define MONO_THREAD 1 // 0 → multi-thread, 1 → mono-thread
+#define MONO_THREAD 0 // 0 → multi-thread, 1 → mono-thread
+#define RR_INTERVAL 30 // seconds
 
 #define MAX_PAYLOAD_SIZE 65536 
 #define MAX_URI_SIZE 1024
@@ -24,21 +28,23 @@
 #define MAX_TREE_VIEWER_SIZE 65536
 #define DEFAULT_EXPIRE_TIME -3600*24*365*2
 
+#define SOCKET_TIMEOUT 3 // seconds
+
 
 // AE Settings
 // #define ALLOW_AE_ORIGIN "C*,S*" , no blankspace allowed
-#define ALLOW_AE_ORIGIN "C*,S*"
+#define ALLOW_AE_ORIGIN "C*,S*,/*"
 
 // CNT Settings
 #define DEFAULT_MAX_NR_INSTANCES 10
-#define DEFAULT_MAX_BYTE_SIZE 1024
+#define DEFAULT_MAX_BYTE_SIZE 65536
 
 // Group Settings
-#define DEFAULT_CONSISTENCY_POLICY CSY_SET_MIXED
+#define DEFAULT_CONSISTENCY_POLICY CSY_ABANDON_MEMBER
 
 
 // MQTT Settings
-//#define ENABLE_MQTT
+// #define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
 #define MQTT_HOST            "127.0.0.1"
@@ -67,7 +73,7 @@
 
 #endif
 
-#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 #define LOG_BUFFER_SIZE MAX_PAYLOAD_SIZE
 
 #endif

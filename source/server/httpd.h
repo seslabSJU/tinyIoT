@@ -14,38 +14,59 @@
 
 // extern int payload_size;
 
-typedef struct {
+typedef struct _header{
   char *name; 
   char *value;
+  struct _header *next;
 } header_t;
 typedef struct _request {
-    char *method;
-    char *uri;
-    char *qs;
-    char *prot;
-    char *payload;
-    int payload_size;
-    header_t *headers;
-    int header_count;
+    char *method;   // METHOD : GET, POST, PUT, DELETE, OPTIONS (use static string)
+    char *uri;      // 
+    char *qs;       // query string
+    char *prot;     // protocol (HTTP/1.1)
+    char *payload;  // body for POST
+    int payload_size; //  content-size
+    header_t *headers; // header list
 } HTTPRequest;
 
+typedef struct _response {
+    int status_code;
+    char *protocol;
+    char *status_msg;
+    header_t *headers;
+    char *payload;
+    int payload_size;
+} HTTPResponse;
 
-//static header_t reqhdr[17] = {{"\0", "\0"}};
+typedef struct _host {
+    char *host;
+    int port;
+} Host;
+
 
 // Server control functions
 void serve_forever(const char *PORT);
-char *request_header(header_t *h, int cnt, const char *name);
-void set_response_header(char *key, char *value, char *response_headers);
+char *search_header(header_t *h, const char *name);
+void set_header(char *key, char *value, char *response_headers);
 void normalize_payload(char *body);
 Operation http_parse_operation(char *method);
 void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno);
-void http_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt);
-void http_forwarding(oneM2MPrimitive *o2pt, char *host, char *port);
+void http_notify(oneM2MPrimitive *o2pt, char *host, int port);
+void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port);
+
+
 
 // user shall implement this function
 void handle_http_request(HTTPRequest *req, int slotno);
+char *op_to_method(Operation op);
+void send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res);
+void add_header(char *key, char *value, header_t *header);
 
-void http_send_get_request(char *host, int port, char *uri, char *header, char *qs, char *data);
+void parse_http_request(HTTPRequest *req, char *packet);
+
+void free_HTTPRequest(HTTPRequest *req);
+void free_HTTPResponse(HTTPResponse *res);
+
 
 // Response
 #define HTTP_PROTOCOL_VERSION "HTTP/1.1"

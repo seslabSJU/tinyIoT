@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include <malloc.h>
 #include "onem2mTypes.h"
 #include "util.h"
 #include "cJSON.h"
@@ -119,5 +118,9 @@ void parse_filter_criteria(cJSON *fc){
                 cJSON_ReplaceItemInObject(fc, int_Attrs[i], cJSON_CreateNumber(atoi(cJSON_GetStringValue(pjson))));
             }
         }
+    }
+
+    if(!cJSON_GetObjectItem(fc, "fo")){
+        cJSON_AddNumberToObject(fc, "fo", 1);
     }
 }

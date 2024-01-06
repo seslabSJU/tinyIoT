@@ -10,6 +10,12 @@ typedef enum {
 } CSEType;
 
 typedef enum {
+	CSE_RELATIVE = 1, // CSEBase relative  starts with ''
+	SP_RELATIVE = 2, // SP relative starts with '/'
+	ABSOLUTE = 3	// absolute starts with '//'
+} ResourceAddressingType;
+
+typedef enum {
     RSC_ACCEPTED									= 1000,
 	RSC_ACCEPTED_NONBLOCKING_REQUEST_SYNCH			= 1001,
 	RSC_ACCEPTED_NONBLOCKING_REQUEST_ASYNCH			= 1002,
@@ -29,7 +35,7 @@ typedef enum {
 	RSC_GROUP_REQUEST_IDENTIFIER_EXISTS				= 4104,
 	RSC_CONFLICT									= 4105,
 	RSC_ORIGINATOR_HAS_NOT_REGISTERED				= 4106,
-	RSC_SECURIRT_ASSOCIATION_REQUIRED				= 4107,
+	RSC_SECURITY_ASSOCIATION_REQUIRED				= 4107,
 	RSC_INVALID_CHILD_RESOURCETYPE					= 4108,
 	RSC_NO_MEMBERS									= 4109,
 	RSC_GROUPMEMBER_TYPE_INCONSISTENT				= 4110,
@@ -94,6 +100,12 @@ typedef enum {
 	RT_FCI = 58,
 	RT_TSB = 60,
 	RT_ACTR = 63,
+	RT_ACPA = 10001,
+	RT_AEA = 10002,
+	RT_CNTA = 10003,
+	RT_CINA = 10004,
+	RT_CBA = 10005,
+	RT_GRPA = 10009,
 } ResourceType;
 
 typedef enum {
@@ -142,5 +154,10 @@ typedef enum {
 	NET_BLOCKING_UPDATE = 7,
 	NET_REPORT_ON_MISSING_DATA_POINTS = 8
 } NotificationEventType;
+
+typedef enum {
+	AST_UNI_DIRECTIONAL = 1,
+	AST_BI_DIRECTIONAL = 2,
+} AnnounceSyncType;
 
 #endif

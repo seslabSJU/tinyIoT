@@ -12,6 +12,7 @@
 #include "sqlite/sqlite3.h"
 sqlite3* db;
 extern cJSON *ATTRIBUTES;
+extern ResourceTree *rt;
 
 /* DB init */
 int init_dbp(){
@@ -30,7 +31,7 @@ int init_dbp(){
     // Setup Tables
     sql = calloc(1, 1024);
     
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS general ( \
+    strcpy(sql, "CREATE TABLE IF NOT EXISTS general ( id INTEGER PRIMARY KEY AUTOINCREMENT, \
         rn VARCHAR(60), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), \
         uri VARCHAR(255), acpi VARCHAR(255), lbl VARCHAR(255), ty INT );");
     
@@ -43,8 +44,8 @@ int init_dbp(){
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS csr ( \
-        ri VARCHAR(200), cst VARCHAR(45), poa VARCHAR(200), cb VARCHAR(200), csi VARCHAR(200), mei VARCHAR(45), \
-        tri VARCHAR(45), rr INT, nl VARCHAR(45), srv VARCHAR(45));");
+        ri VARCHAR(200), cst INT, poa VARCHAR(200), cb VARCHAR(200), csi VARCHAR(200), mei VARCHAR(45), \
+        tri VARCHAR(45), rr INT, nl VARCHAR(45), srv VARCHAR(45), dcse VARCHAR(200), csz VARCHAR(100)  );");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Cannot create table[csr]: %s", err_msg);
@@ -54,7 +55,7 @@ int init_dbp(){
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS ae ( \
-        ri VARCHAR(40), api VARCHAR(45), aei VARCHAR(200), rr VARCHAR(10), poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45));");
+        ri VARCHAR(40), api VARCHAR(45), aei VARCHAR(200), rr VARCHAR(10), poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT );");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Cannot create table[ae]: %s", err_msg);
@@ -74,7 +75,7 @@ int init_dbp(){
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS cin ( \
-        ri VARCHAR(40), cs INT, cr VARCHAR(45), cnf VARCHAR(45), oref VARCHAR(45), con TEXT);");
+        ri VARCHAR(40), cs INT, cr VARCHAR(45), cnf VARCHAR(45), oref VARCHAR(45), con TEXT, st INT);");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cin]: %s", err_msg);
@@ -114,7 +115,7 @@ int init_dbp(){
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS cb ( \
-        ri VARCHAR(40), cst VARCHAR(45), csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT);");
+        ri VARCHAR(40), cst INT, csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, at VARCHAR(200), aa VARCHAR(100), ast INT );");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cb]: %s", err_msg);
@@ -123,6 +124,26 @@ int init_dbp(){
         return 0;
     }
 
+    strcpy(sql, "CREATE TABLE IF NOT EXISTS cbA ( \
+        ri VARCHAR(40), cst INT, lnk VARCHAR(100), csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT );");
+    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    if(rc != SQLITE_OK){
+        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cbA]: %s", err_msg);
+        sqlite3_close(db);
+        free(sql);
+        return 0;
+    }
+
+    strcpy(sql, "CREATE TABLE IF NOT EXISTS aeA ( \
+        ri VARCHAR(40), api VARCHAR(45), lnk VARCHAR(100), aei VARCHAR(200), rr VARCHAR(10), poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT );");
+    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    if(rc != SQLITE_OK){
+        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[aeA]: %s", err_msg);
+        sqlite3_close(db);
+        free(sql);
+        return 0;
+    }
+    
     free(sql);
     return 1;
 }
@@ -130,7 +151,7 @@ int init_dbp(){
 
 int close_dbp(){
     if(db)
-        sqlite3_close(db);
+        sqlite3_close_v2(db);
     db = NULL;
     return 1;
 }
@@ -199,10 +220,23 @@ char *get_table_name(ResourceType ty){
             break;
         case RT_CSR:
             tableName = "csr";
+            break;
+        case RT_AEA:
+            tableName = "aeA";
+            break;
+        case RT_CBA:
+            tableName = "cbA";
+            break;
     }
     return tableName;
 }
 
+/**
+ * @brief Get resource key from db by resource ID
+ * @param ri Resource ID
+ * @param ty Resource type
+ * @return cJSON* Resource object or NULL
+*/
 cJSON *db_get_resource(char *ri, ResourceType ty){
     char *sql = NULL;
     cJSON *resource = NULL;
@@ -224,6 +258,7 @@ cJSON *db_get_resource(char *ri, ResourceType ty){
 
     if(sqlite3_step(stmt) != SQLITE_ROW){
         free(sql);
+        sqlite3_finalize(stmt);
         return NULL;
     }
 
@@ -240,9 +275,11 @@ cJSON *db_get_resource(char *ri, ResourceType ty){
         colname = sqlite3_column_name(stmt, col);
         bytes = sqlite3_column_bytes(stmt, col);
         coltype = sqlite3_column_type(stmt, col);
+        
 
         if(bytes == 0) continue;
         if(cJSON_GetObjectItem(resource, colname)) continue;
+        if(strcmp(colname, "id") == 0) continue;
         switch(coltype){
             case SQLITE_TEXT:
                 memset(buf, 0, 256);
@@ -252,6 +289,7 @@ cJSON *db_get_resource(char *ri, ResourceType ty){
                     cJSON_AddItemToObject(resource, colname, arr);
                 }else{
                     cJSON_AddItemToObject(resource, colname, cJSON_CreateString(buf));
+                    cJSON_Delete(arr);
                 }
                 break;
             case SQLITE_INTEGER:
@@ -260,10 +298,18 @@ cJSON *db_get_resource(char *ri, ResourceType ty){
         }
     }
 
+    sqlite3_finalize(stmt);
+    free(sql);
     return resource;
 
 }
 
+/**
+ * @brief Store resource to db
+ * @param obj Resource object
+ * @param uri Resource URI
+ * @return 0 if success, -1 if failed
+*/
 int db_store_resource(cJSON *obj, char *uri){
     char *sql = NULL, *err_msg = NULL;
     cJSON *pjson = NULL;
@@ -273,7 +319,6 @@ int db_store_resource(cJSON *obj, char *uri){
     ResourceType ty = cJSON_GetObjectItem(obj, "ty")->valueint;
 
 
-    sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &err_msg);
 
     sql = malloc(1024);
     sprintf(sql, "INSERT INTO general (");
@@ -295,10 +340,13 @@ int db_store_resource(cJSON *obj, char *uri){
     sqlite3_stmt *stmt;
     int rc = 0;
 
+    sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if(rc != SQLITE_OK){
         free(sql);
         logger("DB", LOG_LEVEL_ERROR, "prepare error");
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_finalize(stmt);
         return 0;
     }
 
@@ -319,7 +367,9 @@ int db_store_resource(cJSON *obj, char *uri){
     if(rc != SQLITE_DONE){
         free(sql);
         logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
-        return 0;
+        sqlite3_finalize(stmt);
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        return -1;
     }
 
     sqlite3_finalize(stmt);
@@ -342,11 +392,15 @@ int db_store_resource(cJSON *obj, char *uri){
 
     sql[strlen(sql)-1] = ')';
     strcat(sql, ";");
+
+    // logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "prepare error");
+        logger("DB", LOG_LEVEL_ERROR, "prepare error %d", rc);
         free(sql);
-        return 0;
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        return -1;
     }
 
     for(int i = 0 ; i < cJSON_GetArraySize(specific_attr) ; i++){
@@ -363,12 +417,14 @@ int db_store_resource(cJSON *obj, char *uri){
     if(rc != SQLITE_DONE){
         logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
         free(sql);
-        return 0;
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_finalize(stmt);
+        return -1;
     }
+    sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &err_msg);
     
     sqlite3_finalize(stmt);
     free(sql);
-    sqlite3_exec(db, "COMMIT TRANSACTION", NULL, NULL, &err_msg);
     return 1;
 }
 
@@ -407,6 +463,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty){
         if(rc != SQLITE_OK){
             free(sql);
             logger("DB", LOG_LEVEL_ERROR, "prepare error");
+            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
             return 0;
         }
         int idx = 1;
@@ -423,6 +480,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty){
         if(rc != SQLITE_DONE){
             free(sql);
             logger("DB", LOG_LEVEL_ERROR, "Failed Update SQL: %s, msg : %s", sql, err_msg);
+            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
             return 0;
         }
 
@@ -450,6 +508,8 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty){
         if(rc != SQLITE_OK){
             logger("DB", LOG_LEVEL_ERROR, "prepare error");
             free(sql);
+            sqlite3_finalize(stmt);
+            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
             return 0;
         }
 
@@ -467,14 +527,17 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty){
         if(rc != SQLITE_DONE){
             logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
             free(sql);
+            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
             return 0;
         }
         
         sqlite3_finalize(stmt);
     }
     
-    sqlite3_exec(db, "COMMIT TRANSACTION", NULL, NULL, &err_msg);
+    sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &err_msg);
     free(sql);
+
+    // Update uri of all child resources
     return 1;
 }
 
@@ -535,143 +598,108 @@ int db_delete_onem2m_resource(RTNode *rtnode) {
         return 0;
     }
 
+
+    if(rtnode->ty == RT_CNT){
+        sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
+        sprintf(sql, "DELETE FROM cin WHERE cin.ri IN (SELECT ri FROM general where ty=4 AND uri LIKE '%s/%%');", get_uri_rtnode(rtnode));
+        logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
+        rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+        if(rc != SQLITE_OK){
+            logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from %s/ msg : %s", tableName, err_msg);
+            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            return 0;
+        }
+
+        sprintf(sql, "DELETE FROM general WHERE ty=4 AND uri LIKE '%s/%%';", get_uri_rtnode(rtnode));
+        rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+        if(rc != SQLITE_OK){
+            logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from %s/ msg : %s", tableName, err_msg);
+            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            return 0;
+        }
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+    }
+
+    sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
+
     sprintf(sql, "DELETE FROM general WHERE ri='%s';", get_ri_rtnode(rtnode));
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from general/ msg : %s", err_msg);
-        sqlite3_close(db);
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         return 0;
     }
-
 
     sprintf(sql, "DELETE FROM %s WHERE ri='%s';", tableName, get_ri_rtnode(rtnode));
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from %s/ msg : %s", tableName, err_msg);
-        sqlite3_close(db);
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         return 0;
     }
 
-    if(rtnode->ty == RT_AE){
-        int childResources[3] = {RT_CNT, RT_SUB, RT_GRP, RT_CIN};
+    sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
 
-        for(int i = 0 ; i < 3 ; i++){
-            sprintf(sql, "DELETE FROM %s WHERE ri IN (SELECT ri FROM general where uri LIKE '%s/%%');", get_table_name(childResources[i]), get_uri_rtnode(rtnode));
-            rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-            if(rc != SQLITE_OK){
-                logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from %s/ msg : %s", tableName, err_msg);
-                sqlite3_close(db);
-                return 0;
-            }
-        }
-    }
-
-    if(rtnode->ty == RT_CNT){
-        int childResources[3] = {RT_CNT, RT_SUB, RT_GRP, RT_CIN};
-
-        for(int i = 0 ; i < 3 ; i++){
-            sprintf(sql, "DELETE FROM %s WHERE ri IN (SELECT ri FROM general where uri LIKE '%s/%%');", get_table_name(childResources[i]), get_uri_rtnode(rtnode));
-            rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-            if(rc != SQLITE_OK){
-                logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from %s/ msg : %s", tableName, err_msg);
-                sqlite3_close(db);
-                return 0;
-            }
-        }
-    }
-
-    sprintf(sql, "DELETE FROM general WHERE uri LIKE '%s%%';", get_uri_rtnode(rtnode));
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from %s/ msg : %s", tableName, err_msg);
-        sqlite3_close(db);
-        return 0;
-    }
     return 1;
 }
 
-
-RTNode *db_get_all_csr_rtnode(){
-    logger("DB", LOG_LEVEL_DEBUG, "Call db_get_all_csr_rtnode");
-
-    int rc = 0;
-    int cols = 0;
-    int coltype = 0, bytes = 0;
-    cJSON *json, *root;
-    sqlite3_stmt *res;
-    char *colname = NULL;
+int db_delete_one_cin_mni(RTNode *cnt){
     char sql[1024] = {0};
-    char buf[256] = {0};
+    char *err_msg;
+    sqlite3_stmt *res;
+    int rc; 
 
-    sprintf(sql, "SELECT * FROM general, csr WHERE general.ri = csr.ri;");
+    char *latest_ri = NULL;
+    int latest_cs = 0;
+
+    sprintf(sql, "SELECT general.ri, cs from general, cin WHERE pi='%s' AND general.ri = cin.ri ORDER BY general.lt ASC LIMIT 1;", get_ri_rtnode(cnt));
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Failed select");
+        return -1;
+    }
+
+    if(sqlite3_step(res) != SQLITE_ROW){
         return 0;
     }
 
-    RTNode* head = NULL, *rtnode = NULL;
+    latest_ri = sqlite3_column_text(res, 0);
+    latest_cs = sqlite3_column_int(res, 1);
 
-    rc = sqlite3_step(res);
-    cols = sqlite3_column_count(res);
-    cJSON *arr = NULL;
-    while(rc == SQLITE_ROW){
-        json = cJSON_CreateObject();
-        
-        for(int col = 0 ; col < cols; col++){
-            
-            colname = sqlite3_column_name(res, col);
-            bytes = sqlite3_column_bytes(res, col);
-            coltype = sqlite3_column_type(res, col);
+    logger("DB", LOG_LEVEL_DEBUG, "latest_ri : %s, latest_cs : %d", latest_ri, latest_cs);
 
-            if(bytes == 0) continue;
-            if(cJSON_GetObjectItem(json, colname))
-                continue;
+    sprintf(sql, "DELETE FROM general WHERE ri='%s';", latest_ri);
+    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    if(rc != SQLITE_OK){
+        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from general/ msg : %s", err_msg);
+        return -1;
+    }
 
-            switch(coltype){
-                case SQLITE_TEXT:
-                    memset(buf, 0, 256);
-                    strncpy(buf, sqlite3_column_text(res, col), bytes);
-                    arr = cJSON_Parse(buf);
-                    if(arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)){
-                        cJSON_AddItemToObject(json, colname, arr);
-                    }else{
-                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
-                    }
-                    break;
-                case SQLITE_INTEGER:
-                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
-                    break;
-            }
-        }
-        logger("DB", LOG_LEVEL_DEBUG, "csr : %s", cJSON_PrintUnformatted(json));
-        if(!head) {
-            head = create_rtnode(json,RT_CSR);
-            rtnode = head;
-        } else {
-            rtnode->sibling_right = create_rtnode(json, RT_CSR);
-            rtnode->sibling_right->sibling_left = rtnode;
-            rtnode = rtnode->sibling_right;
-        }  
-        rc = sqlite3_step(res);   
+    sprintf(sql, "DELETE FROM cin WHERE ri='%s';", latest_ri);
+    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    if(rc != SQLITE_OK){
+        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from cin/ msg : %s", err_msg);
+        return -1;
     }
     sqlite3_finalize(res);
-    return head;
+    return latest_cs;
 }
 
-RTNode *db_get_all_ae_rtnode(){
-    logger("DB", LOG_LEVEL_DEBUG, "Call db_get_all_ae_rtnode");
+RTNode *db_get_all_resource_as_rtnode(){
+    logger("DB", LOG_LEVEL_DEBUG, "Call db_get_all_resource_as_rtnode");
 
     int rc = 0;
     int cols = 0;
     int coltype = 0, bytes = 0;
+    int ty = 0;
     cJSON *json, *root;
     sqlite3_stmt *res;
     char *colname = NULL;
     char sql[1024] = {0};
     char buf[256] = {0};
 
-    sprintf(sql, "SELECT * FROM general, ae WHERE general.ri = ae.ri;");
+    sprintf(sql, "SELECT * FROM general WHERE ty != 4 AND ty != 5;");
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Failed select");
@@ -679,10 +707,10 @@ RTNode *db_get_all_ae_rtnode(){
     }
 
     RTNode* head = NULL, *rtnode = NULL;
-    cJSON *arr = NULL;
 
     rc = sqlite3_step(res);
     cols = sqlite3_column_count(res);
+    cJSON *arr = NULL;
     while(rc == SQLITE_ROW){
         json = cJSON_CreateObject();
         
@@ -692,10 +720,10 @@ RTNode *db_get_all_ae_rtnode(){
             bytes = sqlite3_column_bytes(res, col);
             coltype = sqlite3_column_type(res, col);
 
+            if(bytes == 0) continue;
             if(cJSON_GetObjectItem(json, colname))
                 continue;
-
-            if(bytes == 0) continue;
+            if(strcmp(colname, "id") == 0) continue;
             switch(coltype){
                 case SQLITE_TEXT:
                     memset(buf, 0, 256);
@@ -705,6 +733,7 @@ RTNode *db_get_all_ae_rtnode(){
                         cJSON_AddItemToObject(json, colname, arr);
                     }else{
                         cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
+                        cJSON_Delete(arr);
                     }
                     break;
                 case SQLITE_INTEGER:
@@ -712,279 +741,61 @@ RTNode *db_get_all_ae_rtnode(){
                     break;
             }
         }
-        if(!head) {
-            head = create_rtnode(json,RT_AE);
-            rtnode = head;
-        } else {
-            rtnode->sibling_right = create_rtnode(json, RT_AE);
-            rtnode->sibling_right->sibling_left = rtnode;
-            rtnode = rtnode->sibling_right;
-        }  
-        rc = sqlite3_step(res);
-    }
+        char sql2[1024] = {0};
+        ty = cJSON_GetObjectItem(json, "ty")->valueint;
+        sprintf(sql2, "SELECT * FROM %s WHERE ri='%s';", get_table_name(ty), cJSON_GetObjectItem(json, "ri")->valuestring);  
 
-    sqlite3_finalize(res); 
-    return head;
-}
-
-RTNode *db_get_all_cnt_rtnode(){
-    logger("DB", LOG_LEVEL_DEBUG, "Call db_get_all_cnt_rtnode");
-
-    int rc = 0;
-    int cols = 0, bytes = 0, coltype = 0;
-    cJSON *json, *root;
-    sqlite3_stmt *res;
-    char *colname = NULL;
-    char sql[1024] = {0}, buf[256]={0};
-
-    sprintf(sql, "SELECT * FROM general, cnt WHERE general.ri = cnt.ri;");
-    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
-    if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "Failed select");
-        return 0;
-    }
-
-    RTNode* head = NULL, *rtnode = NULL;
-    cJSON *arr = NULL;
-    rc = sqlite3_step(res);
-    cols = sqlite3_column_count(res);
-    while(rc == SQLITE_ROW){
-        json = cJSON_CreateObject();
-        root = cJSON_CreateObject();
-        
-        for(int col = 0 ; col < cols; col++){
-            
-            colname = sqlite3_column_name(res, col);
-            bytes = sqlite3_column_bytes(res, col);
-            coltype = sqlite3_column_type(res, col);
-
-            if(bytes == 0) continue;
-            if(cJSON_GetObjectItem(json, colname)) continue;
-
-            switch(coltype){
-                case SQLITE_TEXT:
-                    memset(buf, 0, 256);
-                    strncpy(buf, sqlite3_column_text(res, col), bytes);
-                    arr = cJSON_Parse(buf);
-                    if(arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)){
-                        cJSON_AddItemToObject(json, colname, arr);
-                    }else{
-                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
-                    }
-                    break;
-                case SQLITE_INTEGER:
-                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
-                    break;
-            }
+        sqlite3_stmt *res2;
+        rc = sqlite3_prepare_v2(db, sql2, -1, &res2, NULL);
+        if(rc != SQLITE_OK){
+            logger("DB", LOG_LEVEL_ERROR, "Failed select");
+            return 0;
         }
-        if(!head) {
-            head = create_rtnode(json,RT_CNT);
-            rtnode = head;
-        } else {
-            rtnode->sibling_right = create_rtnode(json, RT_CNT);
-            rtnode->sibling_right->sibling_left = rtnode;
-            rtnode = rtnode->sibling_right;
-        }   
-        cJSON_Delete(root);
-        rc = sqlite3_step(res);
-    }
 
-    sqlite3_finalize(res); 
-    return head;
-}
+        rc = sqlite3_step(res2);
+        int cols2 = sqlite3_column_count(res2);
+        while(rc == SQLITE_ROW){
+            for(int col = 0 ; col < cols2; col++){
+                colname = sqlite3_column_name(res2, col);
+                bytes = sqlite3_column_bytes(res2, col);
+                coltype = sqlite3_column_type(res2, col);
 
-RTNode *db_get_all_sub_rtnode(){
-    logger("DB", LOG_LEVEL_DEBUG, "Call db_get_all_sub_rtnode");
-
-    int rc = 0;
-    int cols = 0, bytes = 0, coltype = 0;
-    cJSON *json, *root;
-    sqlite3_stmt *res;
-    char *colname = NULL;
-    char sql[1024] = {0}, buf[256] = {0};
-    cJSON *arr = NULL;
-
-    sprintf(sql, "SELECT * FROM general, sub WHERE general.ri = sub.ri;");
-    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
-    if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "Failed select");
-        return 0;
-    }
-
-    RTNode* head = NULL, *rtnode = NULL;
-    rc = sqlite3_step(res);
-
-    while(rc == SQLITE_ROW){
-        json = cJSON_CreateObject();
-        root = cJSON_CreateObject();
-        cols = sqlite3_column_count(res);
-        for(int col = 0 ; col < cols; col++){
-            
-            colname = sqlite3_column_name(res, col);
-            bytes = sqlite3_column_bytes(res, col);
-            coltype = sqlite3_column_type(res, col);
-
-            if(bytes == 0) continue;
-            if(cJSON_GetObjectItem(json, colname)) continue;
-            switch(coltype){
-                case SQLITE_TEXT:
-                    memset(buf, 0, 256);
-                    strncpy(buf, sqlite3_column_text(res, col), bytes);
-                    arr = cJSON_Parse(buf);
-                    if(arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)){
-                        cJSON_AddItemToObject(json, colname, arr);
-                    }else{
-                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
-                    }
-                    break;
-                case SQLITE_INTEGER:
-                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
-                    break;
+                if(bytes == 0) continue;
+                if(cJSON_GetObjectItem(json, colname))
+                    continue;
+                if(strcmp(colname, "id") == 0) continue;
+                switch(coltype){
+                    case SQLITE_TEXT:
+                        memset(buf, 0, 256);
+                        strncpy(buf, sqlite3_column_text(res2, col), bytes);
+                        arr = cJSON_Parse(buf);
+                        if(arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)){
+                            cJSON_AddItemToObject(json, colname, arr);
+                        }else{
+                            cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
+                            cJSON_Delete(arr);
+                        }
+                        break;
+                    case SQLITE_INTEGER:
+                        cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res2, col)));
+                        break;
+                }
             }
+            rc = sqlite3_step(res2);
         }
+
         if(!head) {
-            head = create_rtnode(json,RT_SUB);
+            head = create_rtnode(json, ty);
             rtnode = head;
         } else {
-            rtnode->sibling_right = create_rtnode(json, RT_SUB);
+            rtnode->sibling_right = create_rtnode(json, ty);
             rtnode->sibling_right->sibling_left = rtnode;
             rtnode = rtnode->sibling_right;
-        }   
-        cJSON_Delete(root);
-        root = NULL;
-        rc = sqlite3_step(res);
-    }
 
-    sqlite3_finalize(res); 
-    return head;
-}
-
-RTNode *db_get_all_acp_rtnode(){
-    logger("DB", LOG_LEVEL_DEBUG, "Call db_get_all_acp_rtnode");
-
-    int rc = 0;
-    int cols = 0, bytes = 0, coltype = 0;
-    cJSON *json = NULL, *root = NULL;
-    sqlite3_stmt *res;
-    char *colname = NULL;
-    char sql[1024] = {0}, buf[256] = {0};
-
-    sprintf(sql, "SELECT * FROM general, acp WHERE general.ri = acp.ri;");
-    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
-    if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "Failed select");
-        return 0;
-    }
-
-    RTNode* head = NULL, *rtnode = NULL;
-    rc = sqlite3_step(res);
-    cols = sqlite3_column_count(res);
-    cJSON *arr = NULL;
-
-    while(rc == SQLITE_ROW){
-        json = cJSON_CreateObject();
-        for(int col = 0 ; col < cols; col++){
-            
-            colname = sqlite3_column_name(res, col);
-            bytes = sqlite3_column_bytes(res, col);
-            coltype = sqlite3_column_type(res, col);
-
-            if(bytes == 0) continue;
-            if(cJSON_GetObjectItem(json, colname)) continue;
-            switch(coltype){
-                case SQLITE_TEXT:
-                    memset(buf, 0, 256);
-                    strncpy(buf, sqlite3_column_text(res, col), bytes);
-                    arr = cJSON_Parse(buf);
-                    if(arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)){
-                        cJSON_AddItemToObject(json, colname, arr);
-                    }else{
-                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
-                    }
-                    break;
-                case SQLITE_INTEGER:
-                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
-                    break;
-            }
         }
-        if(!head) {
-            head = create_rtnode(json,RT_ACP);
-            rtnode = head;
-        } else {
-            rtnode->sibling_right = create_rtnode(json, RT_ACP);
-            rtnode->sibling_right->sibling_left = rtnode;
-            rtnode = rtnode->sibling_right;
-        }   
         rc = sqlite3_step(res);
     }
-
-    sqlite3_finalize(res); 
-    return head;
-}
-
-RTNode *db_get_all_grp_rtnode(){
-    logger("DB", LOG_LEVEL_DEBUG, "Call db_get_all_grp_rtnode");
-
-    int rc = 0;
-    int cols = 0, bytes = 0, coltype = 0;
-    cJSON *json = NULL, *root = NULL;
-    sqlite3_stmt *res;
-    char *colname = NULL;
-    char sql[1024] = {0}, buf[256] = {0};
-
-    sprintf(sql, "SELECT * FROM general, grp WHERE general.ri = grp.ri;");
-    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
-    if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "Failed select");
-        return 0;
-    }
-
-    RTNode* head = NULL, *rtnode = NULL;
-    rc = sqlite3_step(res);
-
-    cJSON *arr = NULL;
-    while(rc == SQLITE_ROW){
-        cols = sqlite3_column_count(res);
-        json = cJSON_CreateObject();
-        
-        for(int col = 0 ; col < cols; col++){
-            
-            colname = sqlite3_column_name(res, col);
-            bytes = sqlite3_column_bytes(res, col);
-            coltype = sqlite3_column_type(res, col);
-
-            if(bytes == 0) continue;
-            if(cJSON_GetObjectItem(json, colname)) continue;
-            switch(coltype){
-                case SQLITE_TEXT:
-                    memset(buf, 0, 256);
-                    strncpy(buf, sqlite3_column_text(res, col), bytes);
-                    arr = cJSON_Parse(buf);
-                    if(arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)){
-                        cJSON_AddItemToObject(json, colname, arr);
-                    }else{
-                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
-                    }
-                    break;
-                case SQLITE_INTEGER:
-                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
-                    break;
-            }
-        }
-        
-        if(!head) {
-            head = create_rtnode(json, RT_GRP);
-            rtnode = head;
-        } else {
-            rtnode->sibling_right = create_rtnode(json, RT_GRP);
-            rtnode->sibling_right->sibling_left = rtnode;
-            rtnode = rtnode->sibling_right;
-        }   
-        root = NULL;
-        rc = sqlite3_step(res);
-    }
-
-    sqlite3_finalize(res); 
+    sqlite3_finalize(res);
     return head;
 }
 
@@ -1023,6 +834,7 @@ RTNode* db_get_cin_rtnode_list(RTNode *parent_rtnode) {
             coltype = sqlite3_column_type(res, col);
 
             if(bytes == 0) continue;
+            if(strcmp(colname, "id") == 0) continue;
             switch(coltype){
                 case SQLITE_TEXT:
                     memset(buf,0, 256);
@@ -1032,6 +844,7 @@ RTNode* db_get_cin_rtnode_list(RTNode *parent_rtnode) {
                         cJSON_AddItemToObject(json, colname, arr);
                     }else{
                         cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
+                        cJSON_Delete(arr);
                     }
                     break;
                 case SQLITE_INTEGER:
@@ -1057,7 +870,7 @@ RTNode* db_get_cin_rtnode_list(RTNode *parent_rtnode) {
 
 /**
  * get Latest/Oldest Content Instance
- * Oldest Flag = 0, Latest flag = 1
+ * Latest Flag = 0, Oldest flag = 1
 */
 cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol){
     char sql[1024] = {0}, buf[256] = {0};
@@ -1080,7 +893,8 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol){
             return NULL;
     }
 
-    sprintf(sql, "SELECT * from general, cin WHERE pi='%s' AND general.ri = cin.ri ORDER BY general.lt %s LIMIT 1;", get_ri_rtnode(parent_rtnode), ord);
+    sprintf(sql, "SELECT * from general, cin WHERE pi='%s' AND general.ri = cin.ri ORDER BY general.lt %s, general.id %s LIMIT 1;", get_ri_rtnode(parent_rtnode), ord, ord);
+    logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Failed select");
@@ -1088,6 +902,7 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol){
     }
 
     if(sqlite3_step(res) != SQLITE_ROW){
+        sqlite3_finalize(res);
         return 0;
     }
     cols = sqlite3_column_count(res);
@@ -1100,6 +915,7 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol){
         coltype = sqlite3_column_type(res, col);
 
         if(bytes == 0) continue;
+        if(strcmp(colname, "id") == 0) continue;
         switch(coltype){
             case SQLITE_TEXT:
                 memset(buf,0, 256);
@@ -1116,12 +932,12 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol){
     return json;   
 
 }
-cJSON* db_get_filter_criteria(char *to, cJSON *fc) {
-
+cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     logger("DB", LOG_LEVEL_DEBUG, "call db_get_filter_criteria");
     char buf[256] = {0};
     int rc = 0;
     int cols = 0, bytes = 0, coltype = 0;
+    cJSON *fc = o2pt->fc;
     cJSON *pjson = NULL, *ptr = NULL;
     cJSON *result = NULL, *json = NULL, *prtjson = NULL, *chjson = NULL, *tmp = NULL;
     sqlite3_stmt *res = NULL;
@@ -1129,38 +945,52 @@ cJSON* db_get_filter_criteria(char *to, cJSON *fc) {
     char sql[1024] = {0};
     int jsize = 0, psize = 0 , chsize = 0;
     int fo = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
-    
-    sprintf(buf, "SELECT uri, acpi FROM 'general' WHERE uri LIKE '%s/%%' AND ", to);
+
+    char *uri = o2pt->to;
+    if(strncmp(o2pt->to, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) != 0){
+        uri = ri_to_uri(o2pt->to);
+    }
+
+    sprintf(buf, "SELECT uri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
     strcat(sql, buf);
 
+    if(pjson = cJSON_GetObjectItem(fc, "lvl")){
+        sprintf(buf, "uri NOT LIKE '%s/%%", uri);
+        strcat(sql, buf);
+        for(int i = 0 ; i < pjson->valueint ; i++){
+            strcat(sql, "/%%");
+        }
+        strcat(sql, "' AND ");
+    }
+    
     if(pjson = cJSON_GetObjectItem(fc, "cra")){
-        sprintf(buf, "ct>'%s' ", cJSON_GetStringValue(pjson));
+        sprintf(buf, "ct>'%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
     if(pjson = cJSON_GetObjectItem(fc, "crb")){
-        sprintf(buf, "ct<='%s' ", cJSON_GetStringValue(pjson));
+        sprintf(buf, "ct<='%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
     if(pjson = cJSON_GetObjectItem(fc, "exa")){
-        sprintf(buf, "et>'%s' ", cJSON_GetStringValue(pjson));
+        sprintf(buf, "et>'%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
     if(pjson = cJSON_GetObjectItem(fc, "exb")){
-        sprintf(buf, "et<='%s' ", cJSON_GetStringValue(pjson));
+        sprintf(buf, "et<='%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
     if(pjson = cJSON_GetObjectItem(fc, "ms")){
-        sprintf(buf, "lt>'%s' ", cJSON_GetStringValue(pjson));
+        sprintf(buf, "lt>'%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
     if(pjson = cJSON_GetObjectItem(fc, "us")){
-        sprintf(buf, "lt<='%s' ", cJSON_GetStringValue(pjson));
+        sprintf(buf, "lt<='%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
@@ -1192,7 +1022,7 @@ cJSON* db_get_filter_criteria(char *to, cJSON *fc) {
             }
             sql[strlen(sql) -2] = '\0';
         }else if(cJSON_IsNumber(pjson)){
-            sprintf(buf, " ty = %d", cJSON_GetNumberValue(pjson));
+            sprintf(buf, " ty = %d", pjson->valueint);
             strcat(sql, buf);
         }        
 
@@ -1200,47 +1030,181 @@ cJSON* db_get_filter_criteria(char *to, cJSON *fc) {
         filterOptionStr(fo, sql);
     }
 
+    // get only discoverable resource
+    cJSON *acpiList =  getNonDiscoverableAcp(o2pt, rt->cb);
+    cJSON *forbiddenURI =  getForbiddenUri(acpiList);
+    if(cJSON_GetArraySize(forbiddenURI) > 0){
+        strcat (sql, "(");
+        cJSON_ArrayForEach(ptr, forbiddenURI){
+            if(cJSON_IsString(ptr)){
+                sprintf(buf, "uri NOT LIKE '%s%%' OR ", cJSON_GetStringValue(ptr));
+                strcat(sql, buf);
+            }
+        }
+        sql[strlen(sql)- 3] = '\0';
+        strcat(sql, ")");
+        filterOptionStr(fo, sql);
+    }
+
+    cJSON_Delete(acpiList);
+    cJSON_Delete(forbiddenURI);
+
+    if(pjson = cJSON_GetObjectItem(fc, "ops")){
+        acpiList =  getNoPermAcopDiscovery(o2pt, rt->cb, pjson->valueint);
+        forbiddenURI = getForbiddenUri(acpiList);
+        if(cJSON_GetArraySize(forbiddenURI) > 0){
+            strcat(sql, " (");
+            cJSON_ArrayForEach(ptr, forbiddenURI){
+                if(cJSON_IsString(ptr)){
+                    sprintf(buf, "uri NOT LIKE '%s%%' OR ", cJSON_GetStringValue(ptr));
+                    strcat(sql, buf);
+                }
+            }
+            sql[strlen(sql)- 3] = '\0';
+            strcat(sql, ")");
+            filterOptionStr(fo, sql);
+        }
+        cJSON_Delete(forbiddenURI);
+        cJSON_Delete(acpiList);
+    }
+    
+
     if(pjson = cJSON_GetObjectItem(fc, "sza")){
-        sprintf(buf, " ri IN (SELECT ri FROM 'cin' WHERE cs >= %d) ", cJSON_GetNumberValue(pjson));
+        sprintf(buf, " ri IN (SELECT ri FROM cin WHERE cs >= %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
     if(pjson = cJSON_GetObjectItem(fc, "szb")){
-        sprintf(buf, " ri IN (SELECT ri FROM 'cin' WHERE cs < %d) ", cJSON_GetNumberValue(pjson));
+        sprintf(buf, " ri IN (SELECT ri FROM cin WHERE cs < %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
     if(pjson = cJSON_GetObjectItem(fc, "sts")){
-        sprintf(buf, " ri IN (SELECT ri FROM 'cnt' WHERE st < %d) ", cJSON_GetNumberValue(pjson));
+        sprintf(buf, " ri IN (SELECT ri FROM cnt WHERE st < %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
     if(pjson = cJSON_GetObjectItem(fc, "stb")){
-        sprintf(buf, " ri IN (SELECT ri FROM 'cnt' WHERE st >= %d) ", cJSON_GetNumberValue(pjson));
+        sprintf(buf, " ri IN (SELECT ri FROM cnt WHERE st >= %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
+    if(cJSON_GetObjectItem(fc, "pty") || cJSON_GetObjectItem(fc, "palb")){
+        strcat(sql, "pi IN (SELECT ri from general WHERE ");
+         if(pjson = cJSON_GetObjectItem(fc, "pty")){
+            strcat(sql, "(");
+            
+            if(cJSON_IsArray(pjson)){
+                cJSON_ArrayForEach(ptr, pjson){
+                    sprintf(buf, " ty = %d OR", ptr->valueint);
+                    strcat(sql, buf);
+                }
+                sql[strlen(sql) -2] = '\0';
+            }else if(cJSON_IsNumber(pjson)){
+                sprintf(buf, " ty = %d", pjson->valueint);
+                strcat(sql, buf);
+            }        
+
+            strcat(sql, ") ");
+            filterOptionStr(fo, sql);
+        }
+        
+        if(pjson = cJSON_GetObjectItem(fc, "palb")){
+            if(cJSON_IsArray(pjson)){
+                cJSON_ArrayForEach(ptr, pjson){
+                    sprintf(buf, "lbl LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
+                    strcat(sql, buf);
+                }
+                sql[strlen(sql)- 3] = '\0';
+            }else if(cJSON_IsString(pjson)){
+                sprintf(buf, "lbl LIKE '%%\"%s\"%%'", cJSON_GetStringValue(pjson));
+                strcat(sql, buf);
+            }
+            filterOptionStr(fo, sql);
+        }
+        
+        if(fo == FO_AND){
+            sql[strlen(sql)- 4] = '\0';
+        }else if(fo == FO_OR){
+            sql[strlen(sql) - 3] = '\0';
+        }
+
+        strcat(sql, ")");
+
+        filterOptionStr(fo, sql);
+    }
+
+    if(cJSON_GetObjectItem(fc, "chty") || cJSON_GetObjectItem(fc, "clbl")){
+        strcat(sql, "ri IN (SELECT pi from general WHERE ");
+         if(pjson = cJSON_GetObjectItem(fc, "chty")){
+            strcat(sql, "(");
+            
+            if(cJSON_IsArray(pjson)){
+                cJSON_ArrayForEach(ptr, pjson){
+                    sprintf(buf, " ty = %d OR", ptr->valueint);
+                    strcat(sql, buf);
+                }
+                sql[strlen(sql) -2] = '\0';
+            }else if(cJSON_IsNumber(pjson)){
+                sprintf(buf, " ty = %d", pjson->valueint);
+                strcat(sql, buf);
+            }        
+
+            strcat(sql, ") ");
+            filterOptionStr(fo, sql);
+        }
+        
+        if(pjson = cJSON_GetObjectItem(fc, "clbl")){
+            if(cJSON_IsArray(pjson)){
+                cJSON_ArrayForEach(ptr, pjson){
+                    sprintf(buf, "lbl LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
+                    strcat(sql, buf);
+                }
+                sql[strlen(sql)- 3] = '\0';
+            }else if(cJSON_IsString(pjson)){
+                sprintf(buf, "lbl LIKE '%%\"%s\"%%'", cJSON_GetStringValue(pjson));
+                strcat(sql, buf);
+            }
+            filterOptionStr(fo, sql);
+        }
+        
+        if(fo == FO_AND){
+            sql[strlen(sql)- 4] = '\0';
+        }else if(fo == FO_OR){
+            sql[strlen(sql) - 3] = '\0';
+        }
+
+        strcat(sql, ")");
+
+        filterOptionStr(fo, sql);
+    }
+
     if(fo == FO_AND){
-        sql[strlen(sql) - 4] = '\0';
+        sql[strlen(sql)- 4] = '\0';
     }else if(fo == FO_OR){
         sql[strlen(sql) - 3] = '\0';
     }
+    if(pjson = cJSON_GetObjectItem(fc, "lim")){
+        sprintf(buf, " LIMIT %d", pjson->valueint + 1);
+        strcat(sql, buf);
+    }
+    if( pjson = cJSON_GetObjectItem(fc, "ofst")){
+        sprintf(buf, " OFFSET %d", pjson->valueint);
+        strcat(sql, buf);
+    }
     strcat(sql, ";");
-
-    
-
-    logger("DB", LOG_LEVEL_DEBUG, "%s", sql);
+    logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);
         return 0;
     }
     
-    json = cJSON_CreateObject();
+    json = cJSON_CreateArray();
     rc = sqlite3_step(res);
     while(rc == SQLITE_ROW){
         bytes = sqlite3_column_bytes(res, 0);
@@ -1248,39 +1212,10 @@ cJSON* db_get_filter_criteria(char *to, cJSON *fc) {
             logger("DB", LOG_LEVEL_ERROR, "empty URI");
             break;
         }
-        logger("DB", LOG_LEVEL_DEBUG, "%s", sqlite3_column_text(res, 0));
-        memset(buf,0, 256);
-        strncpy(buf, sqlite3_column_text(res, 0), bytes);
-        if( sqlite3_column_bytes(res, 1) > 0){
-            cJSON_AddItemToObject(json, buf, cJSON_Parse(sqlite3_column_text(res, 1)));        
-        }else{
-            cJSON_AddItemToObject(json, buf, cJSON_CreateNull());
-        }
+        cJSON_AddItemToArray(json, cJSON_CreateString(sqlite3_column_text(res, 0)));
         rc = sqlite3_step(res);
     }
-    sqlite3_finalize(res); 
-
-    logger("DB", LOG_LEVEL_DEBUG, "json\n%s", cJSON_PrintUnformatted(json));
-
-    if(cJSON_GetObjectItem(fc, "pty") || cJSON_GetObjectItem(fc, "palb") || cJSON_GetObjectItem(fc, "patr")){
-        logger("DB", LOG_LEVEL_DEBUG, "find parent");
-        prtjson = db_get_parent_filter_criteria(to, fc);
-        logger("DB", LOG_LEVEL_DEBUG, "%s", cJSON_Print(prtjson));
-        cjson_merge_objs_by_operation(json, prtjson, fo);
-        cJSON_Delete(prtjson);
-        prtjson = NULL;
-    }
-    if(cJSON_GetObjectItem(fc, "chty") || cJSON_GetObjectItem(fc, "clbl") || cJSON_GetObjectItem(fc, "catr")){
-        logger("DB", LOG_LEVEL_DEBUG, "find child");
-        chjson = db_get_child_filter_criteria(to, fc);
-
-        cjson_merge_objs_by_operation(json, chjson, fo);
-
-        cJSON_Delete(chjson);
-        chjson = NULL;
-        logger("DB", LOG_LEVEL_DEBUG, "%s", cJSON_Print(json));    
-    }
-    
+    sqlite3_finalize(res);     
     return json;
 }
 
@@ -1296,249 +1231,42 @@ bool do_uri_exist(cJSON *list, char *uri){
     return false;
 }
 
-void cjson_merge_objs_by_operation(cJSON* obj1, cJSON* obj2, FilterOperation fo){
-    cJSON *result = cJSON_CreateArray();
-    cJSON *ptr = NULL;
-    cJSON *pjson = NULL;
-    int obj1size, obj2size;
-    char buf[256] = {0};
-    bool next = true;
-
-    obj1size = cJSON_GetArraySize(obj1);
-    obj2size = cJSON_GetArraySize(obj2);
-    ptr = obj1->child;
-    while (ptr){
-        next = true;
-        strcpy(buf, ptr->string);
-        pjson = cJSON_GetObjectItem(obj2, buf);
-        switch(fo){
-            case FO_AND:
-                if(!pjson){
-                    ptr = ptr->next;
-                    next = false;
-                    cJSON_DeleteItemFromObject(obj1, buf);
-                }
-                break;
-            case FO_OR:
-                if(!pjson){
-                    cJSON_AddItemToObject(obj1, buf, cJSON_Duplicate(ptr, 1));
-                }
-                break;
-        }
-        if(next)
-            ptr = ptr->next;
-    }
-
-    ptr = obj2->child;
-    while(ptr){
-        strcpy(buf, ptr->string);
-        pjson = cJSON_GetObjectItem(obj1, buf);
-        switch(fo){
-            case FO_AND:
-                break;
-            case FO_OR:
-                if(!pjson){
-                     cJSON_AddItemToObject(obj2, buf, cJSON_Duplicate(ptr, 1));
-                }
-                break;
-        }
-        ptr = ptr->next;
-    }
-}
-
-cJSON *db_get_parent_filter_criteria(char *to, cJSON *fc){
-    logger("DB", LOG_LEVEL_DEBUG, "call db_get_parent_filter_criteria");
+cJSON *getForbiddenUri(cJSON *acp_list){
     char buf[256] = {0};
     int rc = 0;
     int cols = 0, bytes = 0, coltype = 0;
-    cJSON *json, *pjson = NULL, *ptr = NULL;
-    cJSON *chdjson;
+    cJSON *json, *root;
     sqlite3_stmt *res = NULL;
     char *colname = NULL;
-    char sql[1024] = {0};
-    int jsize = 0;
-    int fo = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
+    char sql[2048] = {0};
+    cJSON *ptr = NULL;
+    cJSON *result = cJSON_CreateArray();
 
-    sprintf(sql, "SELECT uri FROM 'general' WHERE uri LIKE '%s/%%' AND ", to);
-
-    if(pjson = cJSON_GetObjectItem(fc, "pty")){
-
-        strcat(sql, "(");
-        
-        if(cJSON_IsArray(pjson)){
-            cJSON_ArrayForEach(ptr, pjson){
-                sprintf(buf, " ty = %d OR", ptr->valueint);
-                strcat(sql, buf);
-            }
-            sql[strlen(sql) -2] = '\0';
-        }else if(cJSON_IsNumber(pjson)){
-            sprintf(buf, " ty = %d", pjson->valueint);
-            strcat(sql, buf);
-        }        
-
-        strcat(sql, ") ");
-        filterOptionStr(fo, sql);
+    if(cJSON_GetArraySize(acp_list) == 0){
+        return result;
     }
-    
-    if(pjson = cJSON_GetObjectItem(fc, "palb")){
-        cJSON_ArrayForEach(ptr, pjson){
-            sprintf(buf, "lbl LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
+
+    strcat(sql, "SELECT uri FROM 'general' WHERE ");
+    cJSON_ArrayForEach(ptr, acp_list){
+        if(cJSON_IsString(ptr)){
+            sprintf(buf, "acpi LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
             strcat(sql, buf);
         }
-        sql[strlen(sql)- 3] = '\0';
-        filterOptionStr(fo, sql);
     }
-
-    // if(fc->patr){ //TODO - patr
-    //     sprintf(buf, "%s LIKE %s",);
-    // }
-    
-    if(fo == FO_AND){
-        sql[strlen(sql)- 4] = '\0';
-    }else if(fo == FO_OR){
-        sql[strlen(sql) - 3] = '\0';
-    }
-
+    sql[strlen(sql) - 3] = '\0';
     strcat(sql, ";");
-
-    logger("DB", LOG_LEVEL_DEBUG, "%s", sql);
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);
         return 0;
     }
-    json = cJSON_CreateArray();
+
     rc = sqlite3_step(res);
     while(rc == SQLITE_ROW){
-        bytes = sqlite3_column_bytes(res, 0);
-        if(bytes == 0){
-            logger("DB", LOG_LEVEL_ERROR, "empty URI");
-            cJSON_AddItemToArray(json, cJSON_CreateString("Internal Server ERROR"));
-        }else{
-            memset(buf,0, 256);
-            strncpy(buf, sqlite3_column_text(res, 0), bytes);
-            cJSON_AddItemToArray(json, cJSON_CreateString(buf));
-        }
+        cJSON_AddItemToArray(result, cJSON_CreateString(sqlite3_column_text(res, 0)));
         rc = sqlite3_step(res);
     }
-    sqlite3_finalize(res);
 
-    jsize = cJSON_GetArraySize(json);
-    chdjson = cJSON_CreateObject();
-
-    for(int i = 0 ; i < jsize ; i++){
-        sprintf(sql, "SELECT uri,acpi FROM general WHERE uri LIKE '%s/%%' AND uri NOT LIKE '%s/%%/%%';", 
-                        cJSON_GetArrayItem(json, i)->valuestring, cJSON_GetArrayItem(json, i)->valuestring);
-
-        if(rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL)){
-            logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);
-            return 0;
-        }
-        rc = sqlite3_step(res);
-        while(rc == SQLITE_ROW){
-            bytes = sqlite3_column_bytes(res, 0);
-            if(bytes == 0){
-                logger("DB", LOG_LEVEL_ERROR, "empty URI");
-                cJSON_AddItemToArray(chdjson, cJSON_CreateString("Internal Server ERROR"));
-            }
-
-            memset(buf,0, 256);
-            strncpy(buf, sqlite3_column_text(res, 0), bytes);
-            if( sqlite3_column_bytes(res, 1) > 0){
-                cJSON_AddItemToObject(chdjson, buf, cJSON_Parse(sqlite3_column_text(res, 1)));        
-            }else{
-                cJSON_AddItemToObject(chdjson, buf, cJSON_CreateNull());
-            }
-            rc = sqlite3_step(res);
-        }
-        sqlite3_finalize(res);
-    }
-    cJSON_Delete(json);
-
-   
-    return chdjson;
-}
-
-cJSON *db_get_child_filter_criteria(char *to, cJSON *fc){
-    logger("DB", LOG_LEVEL_DEBUG, "call db_get_child_filter_criteria");
-    char buf[256] = {0};
-    int rc = 0;
-    int cols = 0, bytes = 0, coltype = 0;
-    cJSON *json;
-    cJSON *ptrjson;
-    cJSON *pjson = NULL, *ptr = NULL;
-    sqlite3_stmt *res = NULL;
-    char *turi = NULL, *cptr = NULL;
-    char sql[1024] = {0};
-    int jsize = 0;
-    int fo = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
-
-    strcat(sql, "SELECT uri, acpi FROM 'general' WHERE ");
-
-    if(pjson = cJSON_GetObjectItem(fc, "chty")){
-        if(cJSON_IsArray(pjson)){
-            cJSON_ArrayForEach(ptr, pjson){
-                sprintf(buf, " ty = %d OR", cJSON_GetNumberValue(ptr));
-                strcat(sql, buf);
-            }
-            sql[strlen(sql) -2] = '\0';
-        }else{
-            sprintf(buf, " ty = %d ", cJSON_GetNumberValue(pjson));
-            strcat(sql, buf);
-        }
-        filterOptionStr(fo, sql);
-    }
-    
-    if(pjson = cJSON_GetObjectItem(fc, "clbl")){
-        cJSON_ArrayForEach(ptr, pjson){
-            sprintf(buf, "lbl LIKE '%%,%s,%%' OR ", cJSON_GetStringValue(ptr));
-            strcat(sql, buf);
-        }
-        sql[strlen(sql)- 3] = '\0';
-        filterOptionStr(fo, sql);
-    }
-
-    // if(fc->catr){ //TODO - catr
-    //     sprintf(buf, "%s LIKE %s",);
-    // }
-
-    if(fo == FO_AND){
-        sql[strlen(sql)- 4] = '\0';
-    }else if(fo == FO_OR){
-        sql[strlen(sql) - 3] = '\0';
-    }
-
-    sprintf(buf, " AND uri LIKE '%s/%%';", to);
-    strcat(sql, buf);
-
-    logger("DB", LOG_LEVEL_DEBUG, "%s", sql);
-    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
-    if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);
-        return 0;
-    }
-    json = cJSON_CreateObject();
-    rc = sqlite3_step(res);
-    while(rc == SQLITE_ROW){
-        bytes = sqlite3_column_bytes(res, 0);
-        if(bytes == 0){
-            logger("DB", LOG_LEVEL_ERROR, "empty URI");
-            cJSON_AddItemToArray(json, cJSON_CreateString("Internal Server ERROR"));
-        }
-
-        memset(buf,0, 256);
-        strncpy(buf, sqlite3_column_text(res, 0), bytes);
-
-        cptr = strrchr(buf, '/');
-        *cptr = '\0';
-
-        if( sqlite3_column_bytes(res, 1) > 0){
-            cJSON_AddItemToObject(json, buf, cJSON_Parse(sqlite3_column_text(res, 1)));        
-        }else{
-            cJSON_AddItemToObject(json, buf, cJSON_CreateNull());
-        }   
-        rc = sqlite3_step(res);
-    }
-    sqlite3_finalize(res);   
-    return json;
+    sqlite3_finalize(res); 
+    return result;
 }

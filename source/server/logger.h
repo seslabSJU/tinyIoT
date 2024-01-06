@@ -19,4 +19,7 @@ RED = 31
 
 int logger(const char* tag,  LOGLEVEL level, const char *msg, ...);
 
+void logger_init();
+void logger_free();
+
 #endif

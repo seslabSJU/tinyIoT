@@ -16,17 +16,47 @@ void free_all_resource(RTNode *rtnode);
 void log_runtime(double start);
 
 void update_resource(cJSON *old, cJSON *new);
-
+int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path);
+RTNode* get_rtnode(oneM2MPrimitive *o2pt);
 RTNode* parse_uri(oneM2MPrimitive *o2pt, RTNode *cb);
 int tree_viewer_api(oneM2MPrimitive *o2pt, RTNode *node);
 void tree_viewer_data(RTNode *node, char **viewer_data, int cin_size) ;
+RTNode *get_remote_resource(char *address);
+
+cJSON *getNonDiscoverableAcp(oneM2MPrimitive *o2pt, RTNode *rtnode);
+cJSON *getNoPermAcopDiscovery(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop);
+
+// Addressing
+ResourceAddressingType checkResourceAddressingType(char *uri);
+bool isSpRelativeLocal(char *address);
+
+// Remote-CSE
+int register_remote_cse();
+int create_local_csr();
+int update_remote_csr_dcse();
+int deRegister_csr();
+void add_rrnode(RRNode *rrnode);
+void detach_rrnode(RRNode *rrnode);
+
+// Subscription
+void add_subs(RTNode *parent, RTNode *sub);
+void detach_subs(RTNode *parent, RTNode *sub);
+
+// Announcement
+int create_remote_cba(char *poa, char **cbA_url);
+int create_remote_aea(RTNode *parent_rtnode, cJSON *ae_obj, cJSON *at_obj);
+int deregister_remote_cba(char *cbA_url);
+int deregister_remote_aea(RTNode *parent_rtnode, cJSON *at_obj);
+
 
 //Resource Tree
 void init_resource_tree();
 int add_child_resource_tree(RTNode *parent, RTNode *child);
-RTNode *find_rtnode_by_uri(RTNode *cb, char *node_uri);
-RTNode *find_rtnode_by_ri(RTNode *cb, char *ri);
-RTNode *find_csr_rtnode_by_uri(RTNode *cb, char *target_uri);
+RTNode *find_rtnode(char *addr);
+RTNode *find_rtnode_by_uri(char *node_uri);
+RTNode *find_rtnode_by_ri(char *ri);
+RTNode *rt_search_ri(RTNode *rtnode, char *ri);
+RTNode *find_csr_rtnode_by_uri(char *target_uri);
 RTNode* find_latest_oldest(RTNode* node, int flag);
 RTNode* latest_cin_list(RTNode *cinList, int num); // use in viewer API
 char *get_ri_rtnode(RTNode *rtnode);
@@ -43,6 +73,8 @@ char *get_uri_rtnode(RTNode *rtnode);
 char *ri_to_uri(char *ri);
 cJSON *getResource(cJSON *root, ResourceType ty);
 
+void notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net);
+
 //validation
 bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg);
 bool is_valid_acr(cJSON *acr);
@@ -53,7 +85,9 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op);
 int validate_acp(oneM2MPrimitive *o2pt, cJSON *acp, Operation op);
 int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp);
 int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new);
+cJSON *validate_grp_member(cJSON *grp, int csy, int mt);
 int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Operation op);
+int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op);
 
 
 //error
@@ -85,10 +119,10 @@ void remove_invalid_char_json(char* json);
 int is_json_valid_char(char c);
 bool is_rn_valid_char(char c);
 int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop);
-
+int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path);
 bool isMinDup(char **mid, int idx, char *new_mid);
 
-ResourceType http_parse_object_type(header_t *headers, int cnt);
+ResourceType http_parse_object_type(header_t *headers);
 ResourceType parse_object_type_cjson(cJSON *cjson);
 
 bool isFopt(char *str);
@@ -96,7 +130,7 @@ bool endswith(char *str, char *match);
 
 int handle_error(oneM2MPrimitive *o2pt, int rsc, char *err);
 
-int rsc_to_http_status(int rsc);
+int rsc_to_http_status(int rsc, char **msg);
 
 char *get_resource_key(ResourceType ty);
 

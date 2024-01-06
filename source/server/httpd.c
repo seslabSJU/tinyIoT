@@ -12,13 +12,14 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <fcntl.h>
 
 #define MAX_CONNECTIONS 1024
 #define BUF_SIZE 65535
-#define QUEUE_SIZE 64
+#define QUEUE_SIZE 128
 
 pthread_mutex_t mutex_lock;
 int listenfd;
@@ -57,16 +58,28 @@ void serve_forever(const char *PORT) {
     // Ignore SIGCHLD to avoid zombie threads
     signal(SIGCHLD, SIG_IGN); 
     // ACCEPT connections
+    int on = 1;
+    struct timeval tv;
+    tv.tv_sec  = SOCKET_TIMEOUT;
+    tv.tv_usec = 0;
     while (1) {
         clients[slot] = accept(listenfd, (struct sockaddr *)&clientaddr, &addrlen);
+        setsockopt(clients[slot], IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));    
+        // set timeout for socket
+        setsockopt(clients[slot], SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv)); 
         if (clients[slot] < 0) {
             perror("accept() error");
             //exit(1);
             clients[slot] = -1;
         } else {
             pthread_t thread_id;
-            pthread_create(&thread_id, NULL, respond_thread, (void*)&slots[slot]);
-            if(MONO_THREAD) pthread_join(thread_id, NULL);
+            if(MONO_THREAD) {
+                respond(slot);
+                close(clients[slot]);
+                clients[slot] = -1;
+            }else{
+                pthread_create(&thread_id, NULL, respond_thread, (void*)&slots[slot]);
+            }
         }
         while (clients[slot] != -1)
             slot = (slot + 1) % MAX_CONNECTIONS;
@@ -79,11 +92,23 @@ void start_server(const char *port) {
     memset(&addr, 0, sizeof(addr));
     // create socket
     addr.sin_family = AF_INET;
-    inet_pton(AF_INET, SERVER_HOST, &(addr.sin_addr.s_addr));
+    inet_pton(AF_INET, "0.0.0.0", &(addr.sin_addr.s_addr));
     addr.sin_port = htons(atoi(port));    
-    listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    listenfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     int option = 1;
+    struct linger {
+        int l_onoff;
+        int l_linger;
+    };
+    struct linger _linger;
+    _linger.l_onoff = 0;
+    _linger.l_linger = 0;
+
     setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+    setsockopt(listenfd, IPPROTO_TCP, TCP_NODELAY, &option, sizeof(option));
+    #ifdef TCP_KEEPALIVE
+    setsockopt(listenfd, IPPROTO_TCP, TCP_KEEPALIVE, &option, sizeof(option));
+    #endif
     if(listenfd == -1) {
         perror("socket() error");
         exit(1);
@@ -100,12 +125,13 @@ void start_server(const char *port) {
     }
 }
 
-// get request header by name
-char *request_header(header_t *h, int cnt, const char *name) {
+// get header by name
+char *search_header(header_t *h, const char *name) {
     if(h == NULL) return NULL;
-    for(int i = 0 ; i < cnt ; i++) {
-        if (strcmp((h+i)->name, name) == 0)
-            return (h+i)->value;
+    header_t *ptr = h;
+    while(ptr){
+        if(strcmp(ptr->name, name) == 0) return ptr->value;
+        ptr = ptr->next;
     }
   return NULL;
 }
@@ -148,84 +174,32 @@ void respond(int slot) {
     buf[slot] = malloc(BUF_SIZE*sizeof(char));
     rcvd = recv(clients[slot], buf[slot], BUF_SIZE, 0); 
 
-
     if (rcvd < 0){ // receive error
         logger("HTTP", LOG_LEVEL_ERROR, "recv() error");
         return;
     } else if (rcvd == 0) { // receive socket closed
         logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
         return;
-    } else { // message received
-        pthread_mutex_lock(&mutex_lock);  
-        buf[slot][rcvd] = '\0';
-        logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf[slot]);
-        memcpy(buffer, buf[slot], rcvd);
-
-        req->method = strtok(buffer, " \t\r\n");
-        req->uri = strtok(NULL, " \t");
-        req->prot = strtok(NULL, " \t\r\n");   
-        if(!req->uri) {
-            logger("HTTP", LOG_LEVEL_ERROR, "URI is NULL");
-            return;
-        } 
-        uri_unescape(req->uri);
-    
-        logger("HTTP", LOG_LEVEL_DEBUG, "\x1b[36m[%s] %s\x1b[0m",req->method, req->uri); 
-        req->qs = strchr(req->uri, '?');    
-        if (req->qs)
-            *req->qs++ = '\0'; // split URI
-        else
-            req->qs = req->uri - 1; // use an empty string  
-
-        req->headers = (header_t *) malloc(sizeof(header_t) * 20);
-        header_t *h = req->headers;
-        char *t, *t2;
-        while (h < req->headers + 16) {
-            char *key, *val;  
-            key = strtok(NULL, "\r\n: \t");
-            if (!key)
-                break;    
-            val = strtok(NULL, "\r\n");
-            while (*val && *val == ' ')
-                val++;    
-            h->name = key;
-            h->value = val;
-            h++;
-            req->header_count++;
-            t = val + 1 + strlen(val);
-            if (t[1] == '\r' && t[2] == '\n')
-                break;
-            //fprintf(stderr, "[H] %s: %s, %x\n", key, val, *t); // print request headers 
-        }
-        //t = strtok(NULL, "\r\n");
-        t = strtok(NULL, "\n");
-        if(t && t[0] == '\r') t+=2; // now the *t shall be the beginning of user payload
-        
-        logger("HTTP", LOG_LEVEL_DEBUG, "Payload: %s", t); // print user payload
-        t2 = request_header(req->headers, req->header_count, "Content-Length"); // and the related header if there is
-        req->payload = t;
-        req->payload_size = t2 ? atol(t2) : 0;
-
-        if(req->payload_size > 0 && (req->payload == NULL)) {
-            flag = true;
-            req->payload = (char *)calloc(MAX_PAYLOAD_SIZE, sizeof(char));
-            recv(clients[slot], req->payload, MAX_PAYLOAD_SIZE, 0);
-        }
-
-        if(req->payload) normalize_payload(req->payload);
-        // bind clientfd to stdout, making it easier to write
-        
-        //dup2(clientfd, STDOUT_FILENO);
-        // call router
-        handle_http_request(req, slot);    
-        // tidy up
-        fflush(stdout);
-        shutdown(STDOUT_FILENO, SHUT_WR);
-        //close(STDOUT_FILENO);
     }
-    if(flag) free(req->payload);
-    free(req->headers);
+    // message received
+    pthread_mutex_lock(&mutex_lock);  
+    buf[slot][rcvd] = '\0';
+    logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf[slot]);
+    memcpy(buffer, buf[slot], rcvd);
+
+    parse_http_request(req, buffer);
+    if(req->payload_size > 0 && ((req->payload == NULL) || strlen(req->payload) == 0) ) {   // if there is payload but it is not in the buffer
+        flag = true;
+        req->payload = (char *)calloc(MAX_PAYLOAD_SIZE, sizeof(char));
+        recv(clients[slot], req->payload, MAX_PAYLOAD_SIZE, 0); // receive payload
+    }
+
+    if(req->payload) normalize_payload(req->payload);
+
+    // call router
+    handle_http_request(req, slot);    
     free(buf[slot]);
+    free_HTTPRequest(req);
     pthread_mutex_unlock(&mutex_lock);
 }
 
@@ -244,52 +218,60 @@ Operation http_parse_operation(char *method){
 void handle_http_request(HTTPRequest *req, int slotno) {
 	oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
     cJSON *fcjson = NULL;
-	char *header = NULL;
-
-    
+	char *header = NULL;    
     
 	if(req->payload) {
-		o2pt->pc = (char *)malloc((req->payload_size + 1) * sizeof(char));
-		strcpy(o2pt->pc, req->payload);
+        o2pt->pc = strdup(req->payload);
 		o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
 	} 
     
 
-	if((header = request_header(req->headers, req->header_count, "X-M2M-Origin"))) {
-		o2pt->fr = (char *)malloc((strlen(header) + 1) * sizeof(char));
-		strcpy(o2pt->fr, header);
+	if((header = search_header(req->headers, "X-M2M-Origin"))) {
+        logger("HTTP", LOG_LEVEL_DEBUG, "fr: %s", header);
+		o2pt->fr = strdup(header);
 	} 
 
-	if((header = request_header(req->headers, req->header_count, "X-M2M-RI")) && header) {
-		o2pt->rqi = (char *)malloc((strlen(header) + 1) * sizeof(char));
-		strcpy(o2pt->rqi, header);
+	if((header = search_header(req->headers, "X-M2M-RI")) && header) {
+		o2pt->rqi = strdup(header);
 	} 
 
-	if((header = request_header(req->headers, req->header_count, "X-M2M-RVI")) && header) {
-		o2pt->rvi = (char *)malloc((strlen(header) + 1) * sizeof(char));
-		strcpy(o2pt->rvi, header);
+	if((header = search_header(req->headers, "X-M2M-RVI")) && header) {
+		o2pt->rvi = strdup(header);
 	} 
     
 	if(req->uri) {
-        o2pt->to = (char *)malloc((strlen(req->uri) + 1) * sizeof(char));
-        strcpy(o2pt->to, req->uri+1);
-       logger("HTTP", LOG_LEVEL_DEBUG, "to: %s", o2pt->to);
+        if(req->uri[1] == '~'){ // SP relative
+            o2pt->to = (char *) malloc(sizeof(char) * (strlen(req->uri+1)));
+            o2pt->to[0] = '/';
+            strcat(o2pt->to, req->uri+3);
+        }else if(req->uri[1] == '_'){ // absolute
+            o2pt->to = (char *) malloc(sizeof(char) * (strlen(req->uri+1) + 1));
+            o2pt->to[0] = '/';
+            o2pt->to[1] = '/';
+            strcat(o2pt->to, req->uri+3);
+        }
+        else{
+            o2pt->to = strdup(req->uri+1);
+        }
+
+        logger("HTTP", LOG_LEVEL_DEBUG, "to: %s", o2pt->to);
 	} 
     
     o2pt->op = http_parse_operation(req->method);    
     logger("HTTP", LOG_LEVEL_INFO, "Request : %s", req->method);
 
+    /* get client ip address */
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
-    getsockname(clients[slotno], (struct sockaddr *)&client_addr, &client_addr_len);
+    getpeername(clients[slotno], (struct sockaddr *)&client_addr, &client_addr_len);
     o2pt->ip = (char *)malloc((INET_ADDRSTRLEN + 1) * sizeof(char));
-     logger("HTTP", LOG_LEVEL_INFO, "Client connected %d.%d.%d.%d\n",
+    logger("HTTP", LOG_LEVEL_INFO, "Client connected %d.%d.%d.%d\n",
          (int)(client_addr.sin_addr.s_addr&0xFF), (int)((client_addr.sin_addr.s_addr&0xFF00)>>8), (int)((client_addr.sin_addr.s_addr&0xFF0000)>>16), (int)((client_addr.sin_addr.s_addr&0xFF000000)>>24));
 
     inet_ntop(AF_INET, &(client_addr.sin_addr.s_addr), o2pt->ip, INET_ADDRSTRLEN);
     logger("HTTP", LOG_LEVEL_DEBUG, "ip: %s", o2pt->ip);
 
-	if(o2pt->op == OP_CREATE) o2pt->ty = http_parse_object_type(req->headers, req->header_count);
+	if(o2pt->op == OP_CREATE) o2pt->ty = http_parse_object_type(req->headers);
     else if(o2pt->op == OP_OPTIONS){
         o2pt->rsc = RSC_OK;
         http_respond_to_client(o2pt, slotno);
@@ -319,8 +301,9 @@ void handle_http_request(HTTPRequest *req, int slotno) {
     free_o2pt(o2pt);
 }
 
-void set_response_header(char *key, char *value, char *response_headers) {
+void set_header(char *key, char *value, char *response_headers) {
     if(!value) return;
+    if(!response_headers) return;
     char header[128];
     sprintf(header, "%s: %s\r\n", key, value);
     strcat(response_headers, header);
@@ -341,42 +324,29 @@ void normalize_payload(char *body) {
 }
 
 void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
-    int status_code = rsc_to_http_status(o2pt->rsc);
+    char *status_msg = NULL;
+    int status_code = rsc_to_http_status(o2pt->rsc, &status_msg);
     char content_length[64];
     char rsc[64];
     char cnst[32], ot[32];
     char response_headers[2048] = {'\0'};
     char buf[BUF_SIZE] = {'\0'};
-    char *status;
 
     sprintf(content_length, "%ld", o2pt->pc ? strlen(o2pt->pc) : 0);
     sprintf(rsc, "%d", o2pt->rsc);
-    set_response_header("Content-Length", content_length, response_headers);
-    set_response_header("X-M2M-RSC", rsc, response_headers);
-    set_response_header("X-M2M-RVI", o2pt->rvi, response_headers);
-    set_response_header("X-M2M-RI", o2pt->rqi, response_headers);
+    set_header("Content-Length", content_length, response_headers);
+    set_header("X-M2M-RSC", rsc, response_headers);
+    set_header("X-M2M-RVI", o2pt->rvi, response_headers);
+    set_header("X-M2M-RI", o2pt->rqi, response_headers);
 
     if(o2pt->cnot > 0){
         sprintf(cnst, "%d", o2pt->cnst);
-        set_response_header("X-M2M-CNST", cnst, response_headers);
+        set_header("X-M2M-CNST", cnst, response_headers);
         sprintf(ot, "%d", o2pt->cnot);
-        set_response_header("X-M2M-CNOT", ot, response_headers);
+        set_header("X-M2M-CNOT", ot, response_headers);
     }
 
-   
-
-    switch(status_code) {
-        case 200: status = "200 OK"; break;
-        case 201: status = "201 Created"; break;
-        case 209: status = "209 Conflict"; break;
-        case 400: status = "400 Bad Request"; break;
-        case 403: status = "403 Forbidden"; break;
-        case 404: status = "404 Not found"; break;
-        case 406: status = "406 Not Acceptable"; break;
-        case 413: status = "413 Payload Too Large"; break;
-        case 500: status = "500 Internal Server Error"; break;
-    }
-    sprintf(buf, "%s %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status, DEFAULT_RESPONSE_HEADERS, response_headers);
+    sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
     if(o2pt->pc){
         strcat(buf, o2pt->pc);
     } 
@@ -384,49 +354,251 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf);
 }
 
-void http_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt) {
+void http_notify(oneM2MPrimitive *o2pt, char *host, int port) {
+    logger("HTTP", LOG_LEVEL_DEBUG, "http_notify %s:%d", host, port);
+    HTTPRequest *req = (HTTPRequest *) calloc(1, sizeof(HTTPRequest));
+    HTTPResponse *res =  (HTTPResponse *) calloc(1, sizeof(HTTPResponse));
+    req->method = op_to_method(o2pt->op);
+    req->payload = strdup(o2pt->pc);
+    req->payload_size = strlen(req->payload);
+    req->uri = strdup(o2pt->to);
+    req->headers = malloc(sizeof(header_t));
+    add_header("X-M2M-Origin", "/"CSE_BASE_RI, req->headers);
+    add_header("X-M2M-RVI", "2a", req->headers);
+    add_header("Content-Type", "application/json", req->headers);
 
-    struct sockaddr_in serv_addr;
-    int sock = socket(PF_INET, SOCK_STREAM, 0);
-    if(sock == -1) {
-        logger("HTTP", LOG_LEVEL_ERROR, "socket error");
-        return;
-    }
-
-    http_send_get_request(nt->host, nt->port, nt->target, DEFAULT_REQUEST_HEADERS, "", noti_json);
+    send_http_request(host, port, req, res);
+    logger("HTTP", LOG_LEVEL_DEBUG, "http_notify response: %d", res->status_code);
+    free_HTTPRequest(req);
+    free_HTTPResponse(res);
 }
 
-void http_send_get_request(char *host, int port, char *uri, char *header, char *qs, char *data){
+void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port){
+    logger("HTTP", LOG_LEVEL_DEBUG, "http_forwarding");
     struct sockaddr_in serv_addr;
+        
+    int rcvd = 0;
+    char buffer[BUF_SIZE];
+    HTTPRequest *req = (HTTPRequest *) calloc(sizeof(HTTPRequest), 1);
+    HTTPResponse *res =  (HTTPResponse *) calloc(sizeof(HTTPResponse), 1);
+
+    ResourceAddressingType rat = checkResourceAddressingType(o2pt->to);
+
+    req->method = op_to_method(o2pt->op);
+    req->uri = calloc(1, sizeof(char) * (strlen(o2pt->to) + 4));
+    req->uri[0] = '/';
+    if(rat == SP_RELATIVE) req->uri[1] = '~';
+    else if(rat == ABSOLUTE) req->uri[1] = '_';
+    strcat(req->uri, o2pt->to);
+    req->headers = (header_t *) calloc(sizeof(header_t), 1);
+    add_header("X-M2M-Origin", o2pt->fr, req->headers);
+    add_header("X-M2M-RVI", "2a", req->headers);
+    add_header("X-M2M-RI", o2pt->rqi, req->headers);
+    if(o2pt->ty > 0){
+        sprintf(buffer, "application/json;ty=%d", o2pt->ty);
+        add_header("Content-Type", buffer, req->headers);
+    }else{
+        add_header("Content-Type", "application/json", req->headers);
+    }
+    if(o2pt->pc){
+        req->payload = strdup(o2pt->pc);
+        req->payload_size = strlen(o2pt->pc);
+    }else{
+        req->payload = NULL;
+        req->payload_size = 0;
+    }
+    logger("HTTP", LOG_LEVEL_DEBUG, "uri: %s", req->uri);
+    send_http_request(host, port, req, res);
+    char *rsc = search_header(res->headers, "X-M2M-RSC");
+    if(rsc) o2pt->rsc = atoi(rsc);
+    if(o2pt->pc) {
+        free(o2pt->pc);
+        o2pt->pc = NULL;
+    }
+    if(res->payload)
+        o2pt->pc = strdup(res->payload);
+
+    free_HTTPRequest(req);
+    free_HTTPResponse(res);
+    return;
+}
+
+void parse_http_request(HTTPRequest *req, char *packet){
+    char *ptr = NULL;
+    
+    req->method = op_to_method(http_parse_operation(strtok(packet, " \t\r\n")));
+    req->uri = strdup(strtok(NULL, " \t"));
+    req->prot = strdup(strtok(NULL, " \t\r\n"));   
+    if(!req->uri) {
+        logger("HTTP", LOG_LEVEL_ERROR, "URI is NULL");
+        return;
+    } 
+    uri_unescape(req->uri);
+
+    logger("HTTP", LOG_LEVEL_DEBUG, "\x1b[36m[%s] %s\x1b[0m",req->method, req->uri); 
+    if( (ptr = strchr(req->uri, '?')) ) {
+        req->qs = strdup(ptr+1);
+        *ptr = '\0';
+    }else{
+        req->qs = NULL;
+    }
+
+    req->headers = (header_t *) calloc(sizeof(header_t),1 );
+    header_t *h = req->headers;
+    char *t, *t2;
+    while (true) {
+        char *key, *val;  
+        key = strtok(NULL, "\r\n: \t");
+        if (!key)
+            break;    
+        val = strtok(NULL, "\r\n");
+        while (*val && *val == ' ')
+            val++; 
+
+        h->name = strdup(key);
+        h->value = strdup(val);
+        
+        t = val + 1 + strlen(val);
+        if (t[1] == '\r' && t[2] == '\n')
+            break;
+        h->next = (header_t *) calloc(sizeof(header_t), 1);
+        h = h->next;
+    }
+    //t = strtok(NULL, "\r\n");
+    t = strtok(NULL, "\n");
+    if(t && t[0] == '\r') t+=2; // now the *t shall be the beginning of user payload
+    t2 = search_header(req->headers, "Content-Length"); // and the related header if there is
+    if(t) req->payload = strdup(t);
+    req->payload_size = t2 ? atol(t2) : 0;
+}
+
+void parse_http_response(HTTPResponse *res, char *packet){
+    char *ptr = NULL;
+    res->protocol = strdup(strtok(packet, " "));
+    res->status_code = atoi(strtok(NULL, " "));
+    res->status_msg = strdup(strtok(NULL, "\r\n"));
+
+    res->headers = (header_t *) calloc(sizeof(header_t),1 );
+    header_t *h = res->headers;
+    char *t, *t2;
+    while (true) {
+        char *key, *val;  
+        key = strtok(NULL, "\r\n: \t");
+        if (!key)
+            break;    
+        val = strtok(NULL, "\r\n");
+        while (*val && *val == ' ')
+            val++; 
+
+        h->name = strdup(key);
+        h->value = strdup(val);
+  
+        
+        t = val + 1 + strlen(val);
+        if (t[1] == '\r' && t[2] == '\n')
+            break;
+        h->next = (header_t *) calloc(sizeof(header_t), 1);
+        h = h->next;
+    }
+    //t = strtok(NULL, "\r\n");
+    t = strtok(NULL, "\n");
+    if(t && t[0] == '\r') t+=2; // now the *t shall be the beginning of user payload
+    t2 = search_header(res->headers, "Content-Length"); // and the related header if there is
+    if(t) res->payload = strdup(t);
+    res->payload_size = t2 ? atol(t2) : 0;  
+}
+
+void send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res){
+    struct sockaddr_in serv_addr;
+    char *bs = "";
+    memset(&serv_addr, 0, sizeof(serv_addr));
     int sock = socket(PF_INET, SOCK_STREAM, 0);
+    int rcvd = 0;
+
     if(sock == -1) {
         logger("HTTP", LOG_LEVEL_ERROR, "socket error");
+        if(res)
+            res->status_code = 500;
         return;
     }
-    char buffer[BUF_SIZE];
-    sprintf(buffer, "GET %s%s %s\r\n%s\r\n%s\r\n", uri, qs, HTTP_PROTOCOL_VERSION, header, data);
-
-    memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr(host);
     serv_addr.sin_port = htons(port);
-
+    if(strcmp(host, "localhost") == 0) {
+        serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    }else{
+        serv_addr.sin_addr.s_addr = inet_addr(host);
+    }
     if(connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
         logger("HTTP", LOG_LEVEL_ERROR, "connect error");
+        if(res)
+            res->status_code = 999;
+        close(sock);
         return;
     }
-    logger("http", LOG_LEVEL_DEBUG, "%s", buffer);
 
+    struct timeval tv;
+    tv.tv_sec  = 5;
+    tv.tv_usec = 0;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
+
+    char header[2048] = {'\0'};
+    char buffer[BUF_SIZE] = {0};
+    
+    sprintf(buffer, "%s:%d", host, port);
+    set_header("Host", buffer, header);
+    header_t *h = req->headers;
+    while(h)
+    {
+        set_header(h->name, h->value, header);
+        h = h->next;
+    }
+    char contentSize[32] = {0};
+    if(req->payload_size > 0) {
+        sprintf(contentSize, "%d", req->payload_size);
+        set_header("Content-Length", contentSize, header);
+    }
+    if(req->qs == NULL) req->qs = bs;
+    sprintf(buffer, "%s %s%s %s\r\n%s\r\n", req->method, req->uri, req->qs, HTTP_PROTOCOL_VERSION, header);
+    if(req->payload) {
+        strcat(buffer, req->payload);
+        strcat(buffer, "\r\n");
+    }
+
+    if(req->qs == bs) req->qs = NULL;
     send(sock, buffer, sizeof(buffer), 0);
+    
+    if(res == NULL){
+        close(sock);
+        return;
+    }
+
+    memset(buffer, 0, BUF_SIZE);
+    rcvd = recv(sock, buffer, BUF_SIZE, 0); 
+
+    if (rcvd < 0){ // receive error
+        logger("HTTP", LOG_LEVEL_ERROR, "recv() error");
+        res->status_code = 500;
+    } else if (rcvd == 0) { // receive socket closed
+        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
+        res->status_code = 500;
+    } else { // message received
+        parse_http_response(res, buffer);
+        if(res->payload_size > 0 && ((res->payload == NULL) || strlen(res->payload) == 0) ) {   // if there is payload but it is not in the buffer
+            res->payload = (char *)calloc(MAX_PAYLOAD_SIZE, sizeof(char));
+            recv(sock, res->payload, MAX_PAYLOAD_SIZE, 0); // receive payload
+        }
+        if(res->payload) normalize_payload(res->payload );
+
+    }
     close(sock);
+    return;
 }
 
-void http_forwarding(oneM2MPrimitive *o2pt, char *host, char *port){
-    struct sockaddr_in serv_addr;
+char *op_to_method(Operation op){
     char *method = NULL;
-    logger("HTTP", LOG_LEVEL_DEBUG, "o2pt->op : %d", o2pt->op);
-    switch (o2pt->op){
+    switch (op){
         case OP_CREATE:
+        case OP_NOTIFY:
             method = "POST";
             break;
         case OP_UPDATE:
@@ -443,127 +615,50 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, char *port){
             method = "OPTIONS";
             break;
     }
+    return method;
+}
+
+void add_header(char *key, char *value, header_t *header){
+    if(!value) return;
+    if(!header) return;
+    header_t *h = header;
+    while(h->next) h = h->next;
+    h->next = (header_t *) calloc(sizeof(header_t), 1);
+    h->next->name = strdup(key);
+    h->next->value = strdup(value);
+    h->next->next = NULL;
+}
+
+void free_HTTPRequest(HTTPRequest *req){
+    header_t *h = req->headers;
+    header_t *tmp;
+    if(req->uri) free(req->uri);
+    if(req->prot) free(req->prot);
+    if(req->payload) free(req->payload);
+    if(req->qs) free(req->qs);
     
-    int rcvd = 0;
-    char *response = (char *)malloc(sizeof(char) * BUF_SIZE);
-    char buffer[BUF_SIZE];
-
-    char *headers[2048] = {0};
-    set_response_header("Host", host, headers);
-    if(o2pt->ty > 0){
-        sprintf(buffer, "application/json;ty=%d", o2pt->ty);
-    }else{
-        sprintf(buffer, "application/json");
+    while(h){
+        tmp = h;
+        h = h->next;
+        free(tmp->name);
+        free(tmp->value);
+        free(tmp);
     }
-    set_response_header("Content-Type", buffer, headers);
-    sprintf(buffer, "%d", strlen(o2pt->pc));
-    set_response_header("Content-Length", buffer, headers);
-    set_response_header("X-M2M-Origin", o2pt->fr, headers);
-    set_response_header("X-M2M-RVI", o2pt->rvi, headers);
-    set_response_header("X-M2M-RI", o2pt->rqi, headers);
+    free(req);
+}
 
-    sprintf(buffer, "%s %s %s\r\n%s\r\n", 
-    method, o2pt->to, HTTP_PROTOCOL_VERSION, headers);
-    if(o2pt->pc && strlen(o2pt->pc) > 0){
-        strcat(buffer, o2pt->pc);
-    }
-
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr(host); 
-    serv_addr.sin_port = htons(atoi(port));
-    logger("http", LOG_LEVEL_DEBUG, "forwarding to %s, %s", host, port);
-
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if(sock == -1) {
-        logger("HTTP", LOG_LEVEL_ERROR, "socket error");
-        return;
-    }
-
-    if(connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
-        logger("HTTP", LOG_LEVEL_ERROR, "connect error");
-        o2pt->rsc = RSC_TARGET_NOT_REACHABLE;
-        free(o2pt->pc);
-        o2pt->pc = strdup("{\"dbg\": \"target not rechable\"}");
-        close(sock);
-        return;
-    }
-
-    // setting timeout
-    struct timeval tv;
-    tv.tv_sec  = 5;
-    tv.tv_usec = 0;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
-
-
-    int sent = 0;
-    logger("http", LOG_LEVEL_DEBUG, "%s", buffer);
-    send(sock, buffer, strlen(buffer), 0);
-    //sent = write(sock, buffer, strlen(buffer));
+void free_HTTPResponse(HTTPResponse *res){
+    header_t *h = res->headers;
+    header_t *tmp;
+    if(res->status_msg) free(res->status_msg);
+    if(res->payload) free(res->payload);
     
-
-    memset(buffer, 0, BUF_SIZE);
-    rcvd = recv(sock, buffer, BUF_SIZE, 0); 
-
-    if (rcvd < 0){ // receive error
-        logger("HTTP", LOG_LEVEL_ERROR, "recv() error");
-        o2pt->rsc = RSC_TARGET_NOT_REACHABLE;
-        set_o2pt_pc(o2pt, "{\"dbg\": \"target not rechable\"}");
-    } else if (rcvd == 0) { // receive socket closed
-        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
-        o2pt->rsc = RSC_TARGET_NOT_REACHABLE;
-        set_o2pt_pc(o2pt, "{\"dbg\": \"target not rechable\"}");
-    } else { // message received
-        char *protocol = strtok(buffer, " \t");
-        char *statuscode = strtok(NULL, " \t");
-        char *statusword = strtok(NULL, " \r\n");   
-        
-        header_t *h = malloc(sizeof(header_t) * 20);
-        header_t *ptr = h;
-        int h_cnt = 0;
-        char *t, *t2;
-        while (ptr < h + 16) {
-            char *key, *val;  
-            key = strtok(NULL, "\r\n: \t");
-            if (!key)
-                break;    
-            val = strtok(NULL, "\r\n");
-            while (*val && *val == ' ')
-                val++;    
-            ptr->name = key;
-            ptr->value = val;
-            ptr++;
-            h_cnt++;
-            t = val + 1 + strlen(val);
-            if (t[1] == '\r' && t[2] == '\n')
-                break;
-            fprintf(stderr, "[H] %s: %s\n", key, val); // print request headers 
-        }
-        t = strtok(NULL, "\n");
-        if(t && t[0] == '\r') t+=2; // now the *t shall be the beginning of user payload
-        char *body = t;
-        
-        t2 = request_header(h, h_cnt, "Content-Length");
-        size_t body_size = t2 ? atol(t2) : 0;
-
-        if(body_size > 0 && (body_size == NULL)) {
-            body = (char *)calloc(MAX_PAYLOAD_SIZE, sizeof(char));
-            recv(sock, body, MAX_PAYLOAD_SIZE, 0);
-        }
-        if(body) normalize_payload(body);
-
-        char *rsc = request_header(h, h_cnt, "X-M2M-RSC");
-        if(rsc) o2pt->rsc = atoi(rsc);
-        if(o2pt->pc) {
-            free(o2pt->pc);
-            o2pt->pc = NULL;
-        }
-        if(body)
-            o2pt->pc = strdup(body);
-        else
-
-        if(h) free(h);
+    while(h){
+        tmp = h;
+        h = h->next;
+        free(tmp->name);
+        free(tmp->value);
+        free(tmp);
     }
-    close(sock);
-    return;
+    free(res);
 }

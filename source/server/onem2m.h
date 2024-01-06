@@ -17,6 +17,7 @@ typedef enum {
 	OP_RETRIEVE,
 	OP_UPDATE,
 	OP_DELETE,
+	OP_NOTIFY,
 	OP_VIEWER = 1000,
 	OP_OPTIONS,
 	OP_DISCOVERY,
@@ -52,20 +53,37 @@ typedef struct {
 	char *uri;
 } CSE;
 
+
+
 //Resource Tree
 typedef struct RTNode {
 	struct RTNode *parent;
 	struct RTNode *child;
+	struct NodeList *subs;
 	struct RTNode *sibling_left;
 	struct RTNode *sibling_right;
 
 	char *uri;
+	int sub_cnt;
 	ResourceType ty;
 	cJSON *obj;
-}RTNode;
+} RTNode;
 
+typedef struct NodeList {
+	struct NodeList *next;
+	RTNode *rtnode;
+	char *uri;
+} NodeList;
+
+//Reachablity Resource
+typedef struct RRNode {
+	struct RRNode *next;
+	char *uri;
+	struct RTNode *rtnode;
+} RRNode;
 typedef struct {  
 	RTNode *cb;
+	RRNode *rr_list;
 }ResourceTree;
 
 typedef enum {
@@ -129,13 +147,9 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
-
-int retrieve_cin(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-int retrieve_cin_latest(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-int retrieve_cin_by_ri(char *ri);
-int retrieve_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-int retrieve_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-int retrieve_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int create_cba(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 
 int update_cse(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
@@ -145,6 +159,7 @@ int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 
 void init_cse(cJSON* cse);
+void init_csr(cJSON *csr);
 
 //resource tree
 RTNode* create_rtnode(cJSON *resource, ResourceType ty);
@@ -155,7 +170,7 @@ void free_rtnode_list(RTNode *rtnode);
 RTNode* restruct_resource_tree(RTNode *node, RTNode *list);
 RTNode* latest_cin_list(RTNode *cinList, int num); // use in viewer API
 RTNode* find_latest_oldest(RTNode* node, int flag);
-void set_node_uri(RTNode* rtnode);
+
 
 //etc
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign);
@@ -167,7 +182,10 @@ void cjson_merge_objs_by_operation(cJSON* obj1, cJSON* obj2, FilterOperation fo)
 
 bool isValidFcAttr(char* attr);
 void parse_filter_criteria(cJSON *fc);
+void route(oneM2MPrimitive *o2pt);
+void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty);
 
+void check_reachablity();
 
 #define ALL_ACOP ACOP_CREATE + ACOP_RETRIEVE + ACOP_UPDATE + ACOP_DELETE + ACOP_NOTIFY + ACOP_DISCOVERY
 

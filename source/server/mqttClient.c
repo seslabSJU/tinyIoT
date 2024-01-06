@@ -626,8 +626,9 @@ int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, char *port, cJSON *csr){
     char topic[1024] = {'\0'};
 
     char notiSbuf[1024], notiRbuf[1024];
+    cJSON *csi = cJSON_GetObjectItem(csr, "csi");
     
-    sprintf(topic, "/oneM2M/req/%s/%s/json", CSE_BASE_RI, csr->csi);
+    sprintf(topic, "/oneM2M/req/%s/%s/json", CSE_BASE_RI, cJSON_GetStringValue(csi));
     logger("MQTT", LOG_LEVEL_DEBUG, "topic : %s", topic);
 
     if(!strcmp(host, MQTT_HOST)){
@@ -677,7 +678,7 @@ int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, char *port, cJSON *csr){
 
     char respTopic[256] = {0};
 
-    sprintf(respTopic, "/oneM2M/resp/%s/%s/#", CSE_BASE_RI, csr->csi);
+    sprintf(respTopic, "/oneM2M/resp/%s/%s/#", CSE_BASE_RI, cJSON_GetStringValue(csi));
     topics[0].topic_filter = respTopic;
     topics[0].qos = MQTT_QOS;
 
