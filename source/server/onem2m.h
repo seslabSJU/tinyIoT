@@ -83,6 +83,8 @@ typedef struct RRNode {
 } RRNode;
 typedef struct {  
 	RTNode *cb;
+	RTNode *registrar_csr;
+	NodeList *csr_list;
 	RRNode *rr_list;
 }ResourceTree;
 
@@ -163,7 +165,7 @@ void init_csr(cJSON *csr);
 
 //resource tree
 RTNode* create_rtnode(cJSON *resource, ResourceType ty);
-int delete_rtnode_and_db_data(oneM2MPrimitive *o2pt, RTNode *rtnode, int flag);
+int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode);
 void free_rtnode(RTNode *rtnode);
 void free_rtnode_list(RTNode *rtnode);
 
@@ -184,7 +186,7 @@ bool isValidFcAttr(char* attr);
 void parse_filter_criteria(cJSON *fc);
 void route(oneM2MPrimitive *o2pt);
 void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty);
-
+char* create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isParent);
 void check_reachablity();
 
 #define ALL_ACOP ACOP_CREATE + ACOP_RETRIEVE + ACOP_UPDATE + ACOP_DELETE + ACOP_NOTIFY + ACOP_DISCOVERY

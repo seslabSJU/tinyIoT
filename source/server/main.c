@@ -36,20 +36,20 @@ int main(int argc, char **argv) {
 	signal(SIGALRM, check_reachablity);
 	alarm(RR_INTERVAL);
 	logger_init();
-	// TODO cse에서 생성하는 attribute들 관리할 수 있도록 ex) st in cin
+	
 	ATTRIBUTES = cJSON_Parse(
 	"{ \
 		\"general\": {\"rn\": \"\", \"ri\": \"\", \"pi\": \"\", \"ct\": \"\", \"et\": \"\", \"lt\": \"\" , \"uri\": \"\" , \"acpi\": [\"\"], \"lbl\": [\"\"], \"ty\":0}, \
-		\"m2m:ae\": {\"ri\": \"\", \"api\": \"\", \"aei\" : \"\", \"rr\": true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"], \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
-		\"m2m:cnt\": {\"ri\":\"\", \"cr\": null, \"mni\":0, \"mbs\":0, \"mia\":0, \"st\":0, \"cni\":0, \"cbs\":0}, \
-		\"m2m:cin\": {\"ri\":\"\", \"cs\":0, \"cr\":null, \"con\":\"\", \"cnf\":\"\", \"st\":\"\"}, \
-		\"m2m:acp\": {\"ri\":\"\", \"pv\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"pvs\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}}, \
-		\"m2m:sub\": {\"ri\":\"\", \"enc\":{\"net\":[1]}, \"exc\":0, \"nu\":[\"\"], \"gpi\":0, \"nfu\":0, \"bn\":0, \"rl\":0, \"sur\":0, \"nct\":0, \"cr\":\"\", \"su\":\"\"},\
-		\"m2m:grp\": {\"ri\":\"\", \"cr\":\"\", \"mt\":0, \"cnm\":0, \"mnm\":0, \"mid\":[\"\"], \"macp\":[\"\"], \"mtv\":true, \"csy\":0, \"gn\":0}, \
-		\"m2m:csr\": {\"ri\":\"\", \"cst\":0, \"poa\":[\"\"], \"cb\":\"\", \"dcse\":[\"\"], \"csi\":\"\", \"mei\":\"\", \"tri\":\"\", \"csz\":[\"\"], \"rr\":true, \"nl\":\"\", \"srv\":[\"\"]},\
-		\"m2m:cb\": {\"ri\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[0], \"rr\":true, \"at\":[], \"aa\":[],\"ast\":0}, \
-		\"m2m:cbA\": {\"ri\":\"\", \"lnk\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[\"\"], \"rr\":true}, \
-		\"m2m:aeA\": {\"ri\":\"\", \"lnk\":\"\", \"api\":\"\", \"aei\":\"\", \"rr\":true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"]} \
+		\"m2m:ae\": {\"api\": \"\", \"aei\" : \"\", \"rr\": true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"], \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
+		\"m2m:cnt\": {\"cr\": null, \"mni\":0, \"mbs\":0, \"st\":0, \"cni\":0, \"cbs\":0,\"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
+		\"m2m:cin\": {\"cs\":0, \"cr\":null, \"con\":\"\", \"cnf\":\"\", \"st\":\"\",\"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
+		\"m2m:acp\": {\"pv\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"pvs\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
+		\"m2m:sub\": {\"enc\":{\"net\":[1]}, \"exc\":0, \"nu\":[\"\"], \"gpi\":0, \"nfu\":0, \"bn\":0, \"rl\":0, \"sur\":0, \"nct\":0, \"cr\":\"\", \"su\":\"\"},\
+		\"m2m:grp\": {\"cr\":\"\", \"mt\":0, \"cnm\":0, \"mnm\":0, \"mid\":[\"\"], \"macp\":[\"\"], \"mtv\":true, \"csy\":0, \"gn\":0}, \
+		\"m2m:csr\": {\"cst\":0, \"poa\":[\"\"], \"cb\":\"\", \"dcse\":[\"\"], \"csi\":\"\", \"mei\":\"\", \"tri\":\"\", \"csz\":[\"\"], \"rr\":true, \"nl\":\"\", \"srv\":[\"\"]},\
+		\"m2m:cb\": {\"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[0], \"rr\":true, \"at\":[], \"aa\":[],\"ast\":0}, \
+		\"m2m:cbA\": {\"lnk\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[\"\"], \"rr\":true}, \
+		\"m2m:aeA\": {\"lnk\":\"\", \"api\":\"\", \"aei\":\"\", \"rr\":true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"]} \
 	 }"
     );
 
@@ -111,6 +111,7 @@ void route(oneM2MPrimitive *o2pt) {
     double start;
 
     start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
+
 	RTNode* target_rtnode = get_rtnode(o2pt);
 	if(o2pt->rsc >= 4000){
 		log_runtime(start);
@@ -141,7 +142,7 @@ void route(oneM2MPrimitive *o2pt) {
 		rsc = handle_onem2m_request(o2pt, target_rtnode);
 	
 		if(o2pt->op != OP_DELETE && target_rtnode->ty == RT_CIN){
-			logger("MAIN", LOG_LEVEL_INFO, "delete cin resource");
+			logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
 			free_rtnode(target_rtnode);
 			target_rtnode = NULL;
 		}

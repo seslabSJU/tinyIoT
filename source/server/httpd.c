@@ -128,8 +128,10 @@ void start_server(const char *port) {
 // get header by name
 char *search_header(header_t *h, const char *name) {
     if(h == NULL) return NULL;
-    header_t *ptr = h;
+    header_t *ptr = h; 
+    // logger("HTTP", LOG_LEVEL_DEBUG, "search_header: %s", name);
     while(ptr){
+        // logger("HTTP", LOG_LEVEL_DEBUG, "hit: %s", ptr->name);
         if(strcmp(ptr->name, name) == 0) return ptr->value;
         ptr = ptr->next;
     }
@@ -231,13 +233,20 @@ void handle_http_request(HTTPRequest *req, int slotno) {
 		o2pt->fr = strdup(header);
 	} 
 
-	if((header = search_header(req->headers, "X-M2M-RI")) && header) {
+	if((header = search_header(req->headers, "X-M2M-RI"))) {
 		o2pt->rqi = strdup(header);
 	} 
 
-	if((header = search_header(req->headers, "X-M2M-RVI")) && header) {
+	if((header = search_header(req->headers, "X-M2M-RVI"))) {
 		o2pt->rvi = strdup(header);
 	} 
+
+
+    if( (header = search_header(req->headers, "Content-Type")) ) {
+        if(strstr(header, "ty=")){
+            o2pt->ty = atoi(strstr(header, "ty=")+3);
+        }
+    }
     
 	if(req->uri) {
         if(req->uri[1] == '~'){ // SP relative
@@ -271,7 +280,13 @@ void handle_http_request(HTTPRequest *req, int slotno) {
     inet_ntop(AF_INET, &(client_addr.sin_addr.s_addr), o2pt->ip, INET_ADDRSTRLEN);
     logger("HTTP", LOG_LEVEL_DEBUG, "ip: %s", o2pt->ip);
 
-	if(o2pt->op == OP_CREATE) o2pt->ty = http_parse_object_type(req->headers);
+	if(o2pt->op == OP_CREATE){
+        o2pt->ty = http_parse_object_type(req->headers);
+        if(o2pt->ty == 0){
+            o2pt->op = OP_NOTIFY;
+            return;
+        }
+    } 
     else if(o2pt->op == OP_OPTIONS){
         o2pt->rsc = RSC_OK;
         http_respond_to_client(o2pt, slotno);
@@ -407,10 +422,10 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port){
         req->payload = NULL;
         req->payload_size = 0;
     }
-    logger("HTTP", LOG_LEVEL_DEBUG, "uri: %s", req->uri);
     send_http_request(host, port, req, res);
     char *rsc = search_header(res->headers, "X-M2M-RSC");
     if(rsc) o2pt->rsc = atoi(rsc);
+    else o2pt->rsc = RSC_TARGET_NOT_REACHABLE;
     if(o2pt->pc) {
         free(o2pt->pc);
         o2pt->pc = NULL;
@@ -443,7 +458,7 @@ void parse_http_request(HTTPRequest *req, char *packet){
         req->qs = NULL;
     }
 
-    req->headers = (header_t *) calloc(sizeof(header_t),1 );
+    req->headers = (header_t *) calloc(1, sizeof(header_t));
     header_t *h = req->headers;
     char *t, *t2;
     while (true) {
@@ -461,7 +476,7 @@ void parse_http_request(HTTPRequest *req, char *packet){
         t = val + 1 + strlen(val);
         if (t[1] == '\r' && t[2] == '\n')
             break;
-        h->next = (header_t *) calloc(sizeof(header_t), 1);
+        h->next = (header_t *) calloc(1, sizeof(header_t));
         h = h->next;
     }
     //t = strtok(NULL, "\r\n");
@@ -508,7 +523,7 @@ void parse_http_response(HTTPResponse *res, char *packet){
     res->payload_size = t2 ? atol(t2) : 0;  
 }
 
-void send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res){
+int send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res){
     struct sockaddr_in serv_addr;
     char *bs = "";
     memset(&serv_addr, 0, sizeof(serv_addr));
@@ -519,7 +534,7 @@ void send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *re
         logger("HTTP", LOG_LEVEL_ERROR, "socket error");
         if(res)
             res->status_code = 500;
-        return;
+        return 500;
     }
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
@@ -531,9 +546,9 @@ void send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *re
     if(connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
         logger("HTTP", LOG_LEVEL_ERROR, "connect error");
         if(res)
-            res->status_code = 999;
+            res->status_code = 504;
         close(sock);
-        return;
+        return 504;
     }
 
     struct timeval tv;
@@ -566,10 +581,9 @@ void send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *re
 
     if(req->qs == bs) req->qs = NULL;
     send(sock, buffer, sizeof(buffer), 0);
-    
     if(res == NULL){
         close(sock);
-        return;
+        return 200;
     }
 
     memset(buffer, 0, BUF_SIZE);
@@ -591,7 +605,7 @@ void send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *re
 
     }
     close(sock);
-    return;
+    return 200;
 }
 
 char *op_to_method(Operation op){

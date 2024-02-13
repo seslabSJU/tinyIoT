@@ -12,18 +12,12 @@ int close_dbp();
 int db_store_resource(cJSON *obj, char *uri);
 int db_update_resource(cJSON *obj, char *ri, ResourceType ty);
 cJSON *db_get_resource(char *ri, ResourceType ty);
-
+cJSON *db_get_resource_by_uri(char *uri, ResourceType ty);
 
 
 int db_delete_onem2m_resource(RTNode *rtnode);
-int db_delete_sub(char* ri);
-int db_delete_acp(char* ri);
-int db_delete_grp(char* ri);
-int db_delete_csr(char* ri);
-
 
 RTNode* db_get_all_resource_as_rtnode();
-
 
 RTNode* db_get_cin_rtnode_list(RTNode *rtnode);
 cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol);

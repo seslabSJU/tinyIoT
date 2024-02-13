@@ -3,23 +3,22 @@
 #include "logger.h"
 
 // IN_CSE, MN_CSE
-#define SERVER_TYPE IN_CSE 
+#define SERVER_TYPE MN_CSE 
 
-// #define NIC_NAME "eth0" // get ip address from NIC_NAME if defined
+// #define NIC_NAME "eth0"
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT "3000"
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
 
 #if SERVER_TYPE == MN_CSE
-// #define REMOTE_CSE_ID "id-in"
-// #define REMOTE_CSE_NAME "cse-in"
-// #define REMOTE_CSE_HOST "127.0.0.1"
-// #define REMOTE_CSE_PORT 8000
+#define REMOTE_CSE_ID ""
+#define REMOTE_CSE_NAME ""
+#define REMOTE_CSE_HOST ""
+#define REMOTE_CSE_PORT 0
 #endif
 
 #define MONO_THREAD 0 // 0 → multi-thread, 1 → mono-thread
-#define RR_INTERVAL 30 // seconds
 
 #define MAX_PAYLOAD_SIZE 65536 
 #define MAX_URI_SIZE 1024
@@ -29,7 +28,7 @@
 #define DEFAULT_EXPIRE_TIME -3600*24*365*2
 
 #define SOCKET_TIMEOUT 3 // seconds
-
+#define MAX_URI_LENGTH 1024
 
 // AE Settings
 // #define ALLOW_AE_ORIGIN "C*,S*" , no blankspace allowed

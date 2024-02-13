@@ -33,20 +33,26 @@ bool isSpRelativeLocal(char *address);
 // Remote-CSE
 int register_remote_cse();
 int create_local_csr();
-int update_remote_csr_dcse();
+int update_remote_csr_dcse(RTNode *created_rtnode);
 int deRegister_csr();
 void add_rrnode(RRNode *rrnode);
 void detach_rrnode(RRNode *rrnode);
+void add_csrlist(RTNode *csr_rtnode);
+void detach_csrlist(RTNode *csr_rtnode);
 
 // Subscription
 void add_subs(RTNode *parent, RTNode *sub);
 void detach_subs(RTNode *parent, RTNode *sub);
 
 // Announcement
+int handle_annc_create(RTNode *parent_rtnode, cJSON* resource_obj, cJSON *at_obj, cJSON *final_at);
+int handle_annc_update(RTNode *target_rtnode, cJSON *at_obj, cJSON *final_at);
+void announce_to_annc(RTNode *target_rtnode);
 int create_remote_cba(char *poa, char **cbA_url);
 int create_remote_aea(RTNode *parent_rtnode, cJSON *ae_obj, cJSON *at_obj);
 int deregister_remote_cba(char *cbA_url);
-int deregister_remote_aea(RTNode *parent_rtnode, cJSON *at_obj);
+int deregister_remote_annc(RTNode* target_rtnode, cJSON *delete_at_list);
+void removeChildAnnc(RTNode *rtnode, char *at);
 
 
 //Resource Tree
@@ -85,10 +91,10 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op);
 int validate_acp(oneM2MPrimitive *o2pt, cJSON *acp, Operation op);
 int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp);
 int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new);
-cJSON *validate_grp_member(cJSON *grp, int csy, int mt);
+bool validate_grp_member(cJSON *grp, cJSON *final_mid , int csy, int mt);
 int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Operation op);
 int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op);
-
+bool checkResourceCseID(char *resourceUri, char* cseID);
 
 //error
 int check_privilege(oneM2MPrimitive *o2pt, RTNode *target_rtnode, ACOP acop);

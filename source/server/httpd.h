@@ -59,7 +59,7 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port);
 // user shall implement this function
 void handle_http_request(HTTPRequest *req, int slotno);
 char *op_to_method(Operation op);
-void send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res);
+int send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res);
 void add_header(char *key, char *value, header_t *header);
 
 void parse_http_request(HTTPRequest *req, char *packet);
