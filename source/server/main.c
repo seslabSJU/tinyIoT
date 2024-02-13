@@ -33,8 +33,6 @@ int mqtt_thread_id;
 
 int main(int argc, char **argv) {
 	signal(SIGINT, stop_server);
-	signal(SIGALRM, check_reachablity);
-	alarm(RR_INTERVAL);
 	logger_init();
 	
 	ATTRIBUTES = cJSON_Parse(
