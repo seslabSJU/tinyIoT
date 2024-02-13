@@ -163,7 +163,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
 	cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
 	cJSON *csr = cJSON_GetObjectItem(root, "m2m:csr");
-	
+
 	int rsc = validate_csr(o2pt, parent_rtnode, csr, OP_CREATE);
 	if(rsc != RSC_OK){
 		cJSON_Delete(root);
@@ -1364,12 +1364,14 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	logger("O2M", LOG_LEVEL_DEBUG, "handle fopt");
 
 
-	if( check_macp_privilege(o2pt, parent_rtnode, o2pt->op) == -1){
-		return o2pt->rsc;
-	}
-	
-	if(check_privilege(o2pt, parent_rtnode, o2pt->op) == -1){
-		return o2pt->rsc;
+	if(cJSON_GetObjectItem(parent_rtnode->obj, "macp")){
+		if( check_macp_privilege(o2pt, parent_rtnode, o2pt->op) == -1){
+			return o2pt->rsc;
+		}
+	}else if(cJSON_GetObjectItem(parent_rtnode->obj, "acpi")){
+		if(check_privilege(o2pt, parent_rtnode, o2pt->op) == -1){
+			return o2pt->rsc;
+		}
 	}
 
 	grp = parent_rtnode->obj;
