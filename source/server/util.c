@@ -1107,15 +1107,6 @@ int check_rn_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 			}
 			child = child->sibling_right;
 		}
-        if(rtnode->ty == RT_CNT) {
-            char invalid_rn[][8] = {"la", "latest", "ol", "oldest"};
-            int invalid_rn_size = sizeof(invalid_rn)/(8*sizeof(char));
-            for(int i=0; i<invalid_rn_size; i++) {
-                if(!strcmp(resource_name, invalid_rn[i])) {
-                    flag = true;
-                }
-            }
-        }
 	}
 
     if(flag) {
@@ -2643,12 +2634,12 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op){
 	pjson = cJSON_GetObjectItem(cnt, "rn");
 	if(pjson){
 		if(!strcmp(pjson->valuestring, "la") || !strcmp(pjson->valuestring, "ol") ){
-			handle_error(o2pt, RSC_BAD_REQUEST, "attribute `rn` is invalid");
+			handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "attribute `rn` is invalid");
 			return RSC_BAD_REQUEST;
 		}
 
 		if(!strcmp(pjson->valuestring, "latest") || !strcmp(pjson->valuestring, "oldest")) {
-			handle_error(o2pt, RSC_BAD_REQUEST, "attribute `rn` is invalid");
+			handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "attribute `rn` is invalid");
 			return RSC_BAD_REQUEST;
 		}
 	}
