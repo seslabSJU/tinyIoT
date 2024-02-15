@@ -280,6 +280,9 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 	if(o2pt->fr && strlen(o2pt->fr) > 0) {
 		cJSON* ri = cJSON_GetObjectItem(ae, "ri");
 		cJSON_SetValuestring(ri, o2pt->fr);
+	}else{
+		if(o2pt->fr) free(o2pt->fr);
+		o2pt->fr = strdup(cJSON_GetObjectItem(ae, "ri")->valuestring);
 	}
 	cJSON_AddStringToObject(ae, "aei", cJSON_GetObjectItem(ae, "ri")->valuestring);
 	
