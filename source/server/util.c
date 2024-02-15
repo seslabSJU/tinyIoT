@@ -2422,9 +2422,15 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op){
 			if((acop & op) == op){
 				break;
 			}
+		}else{
+			acop = (acop | get_acop_origin(o2pt, acp, 0));
+			logger("UTIL", LOG_LEVEL_DEBUG, "acop-pv : %d, op : %d", acop, op);
+			if((acop & op) == op){
+				break;
+			}
 		}
 	}
-	if(!strcmp(o2pt->fr, "CAdmin")){
+	if(o2pt->fr && !strcmp(o2pt->fr, "CAdmin")){
 
 	}
 	else if((acop & op) != op){
