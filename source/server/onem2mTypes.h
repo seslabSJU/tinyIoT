@@ -12,7 +12,8 @@ typedef enum {
 typedef enum {
 	CSE_RELATIVE = 1, // CSEBase relative  starts with ''
 	SP_RELATIVE = 2, // SP relative starts with '/'
-	ABSOLUTE = 3	// absolute starts with '//'
+	ABSOLUTE = 3,	// absolute starts with '//'
+	PROTOCOL_BINDING = 4, // protocol binding starts with 'http://, coap://, mqtt://'
 } ResourceAddressingType;
 
 typedef enum {

@@ -12,8 +12,8 @@
 
 #include "onem2m.h"
 #include "util.h"
-#include "httpd.h"
 #include "logger.h"
+#include "httpd.h"
 #include "onem2mTypes.h"
 #include "config.h"
 #include "dbmanager.h"
@@ -2158,7 +2158,7 @@ void requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode){
 					req->payload = strdup(o2pt->pc);
 					req->payload_size = strlen(o2pt->pc);
 					req->qs = NULL;
-					req->headers = malloc(sizeof(header_t));
+					req->headers = calloc(1, sizeof(header_t));
 					add_header("X-M2M-Origin", o2pt->fr, req->headers);
 					add_header("X-M2M-RI", o2pt->rqi, req->headers);
 					add_header("Content-Type", "application/json", req->headers);
@@ -2198,7 +2198,6 @@ void notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net) {
 	if(!net_obj) return;
 
 	noti_json = cJSON_PrintUnformatted(noti_cjson);
-	logger("UTIL", LOG_LEVEL_DEBUG, "noti_json : %s", noti_json);
 
 	o2pt->op = OP_NOTIFY;
 	o2pt->fr = strdup("/"CSE_BASE_RI);
@@ -2232,7 +2231,7 @@ void notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net) {
 				free_rtnode(rtnode);
 				rtnode = NULL;
 			}
-		}else{
+		}else if (rat == PROTOCOL_BINDING){
 			logger("UTIL", LOG_LEVEL_DEBUG, "protocol binding");
 			Protocol prot;
 			char *host, *path;
@@ -3629,6 +3628,8 @@ ResourceAddressingType checkResourceAddressingType(char *uri){
 		return ABSOLUTE;
 	}else if(uri[0] == '/'){
 		return SP_RELATIVE;
+	}else if(strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0){
+		return PROTOCOL_BINDING;
 	}else{
 		return CSE_RELATIVE;
 	}
