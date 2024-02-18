@@ -76,3 +76,6 @@
 #define LOG_BUFFER_SIZE MAX_PAYLOAD_SIZE
 
 #endif
+
+// CoAP Settings
+// #define ENABLE_COAP

@@ -19,6 +19,7 @@
 #include "dbmanager.h"
 #include "jsonparser.h"
 #include "mqttClient.h"
+#include "coap.h"
 
 extern ResourceTree *rt;
 
@@ -389,6 +390,25 @@ ResourceType http_parse_object_type(header_t *headers) {
 	return ty;
 }
 
+ResourceType coap_parse_object_type(int object_type) {
+	ResourceType ty;
+	
+	switch(object_type) {
+	case 1 : ty = RT_ACP; break;
+	case 2 : ty = RT_AE; break;
+	case 3 : ty = RT_CNT; break;
+	case 4 : ty = RT_CIN; break;
+	case 5 : ty = RT_CSE; break;
+	case 9 : ty = RT_GRP; break;
+	case 16: ty = RT_CSR; break;
+	case 23 : ty = RT_SUB; break;
+	case 10002: ty = RT_AEA; break;
+	case 10005: ty = RT_CBA; break;
+	default : ty = RT_MIXED; break;
+	}
+	
+	return ty;
+}
 
 char *get_local_time(int diff) {
 	time_t t = time(NULL) - diff;
@@ -1777,6 +1797,123 @@ int rsc_to_http_status(int rsc, char **msg){
 	}
 }
 
+int rsc_to_coap_status(int rsc){
+    switch(rsc){
+        // case RSC_ACCEPTED: // Not used
+        case RSC_ACCEPTED_NONBLOCKING_REQUEST_SYNCH: 
+        case RSC_ACCEPTED_NONBLOCKING_REQUEST_ASYNCH: 
+        case RSC_CREATED: 
+            return 201; // 2.01 Created
+		case RSC_DELETED: 
+            return 202; // 2.02 Deleted
+		// case 2000: // OK for NOTIFY operation
+        case RSC_UPDATED: 
+            return 204; // 2.04 Changed
+        case RSC_OK: 
+            return 205; // 2.05 Content
+        case RSC_BAD_REQUEST: 
+        case RSC_CONTENTS_UNACCEPTABLE:
+        case RSC_GROUP_REQUEST_IDENTIFIER_EXISTS: 
+        case RSC_GROUPMEMBER_TYPE_INCONSISTENT: 
+		case RSC_ILLEGAL_TRANSACTION_STATE_TRANSITION_ATTEMPTED:
+		case RSC_BLOCKING_SUBSCRIPTION_ALREADY_EXISTS:
+		case RSC_ONTOLOGY_MAPPING_POLICY_NOT_MATCHED: 
+		case RSC_BAD_FACT_INPUTS_FOR_REASONING:
+        case RSC_BAD_RULE_INPUTS_FOR_REASONING: 
+        case RSC_PRIMITIVE_PROFILE_BAD_REQUEST: 
+        case RSC_INVALID_SPARQL_QUERY: 
+        case RSC_ALREADY_EXISTS: 
+		case RSC_MAX_NUMBER_OF_MEMBER_EXCEEDED:
+        case RSC_INVALID_CMDTYPE:
+        case RSC_INVALID_ARGUMENTS: 
+        case RSC_INSUFFICIENT_ARGUMENTS: 
+        case RSC_ALREADY_COMPLETE:
+        case RSC_MGMT_COMMAND_NOT_CANCELLABLE:
+            return 400; // 4.00 Bad Request
+		case RSC_INVALID_SEMANTICS:
+		case RSC_INVALID_TRIGGER_PURPOSE: 
+			return 402; // 4.02 Bad Option
+		case RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE: 
+		case RSC_ORIGINATOR_HAS_NO_PRIVILEGE: 
+		case RSC_CONFLICT: 
+		case RSC_ORIGINATOR_HAS_NOT_REGISTERED: 
+		case RSC_SECURITY_ASSOCIATION_REQUIRED: 
+		case RSC_INVALID_CHILD_RESOURCETYPE: 
+		case RSC_NO_MEMBERS: 
+		case RSC_ESPRIM_UNSUPPORTED_OPTION: 
+		case RSC_ESPRIM_UNKNOWN_KEY_ID: 
+		case RSC_ESPRIM_UNKNOWN_ORIG_RAND_ID: 
+		case RSC_ESPRIM_UNKNOWN_RECV_RAND_ID: 
+		case RSC_ESPRIM_BAD_MAC: 
+		case RSC_ESPRIM_IMPERSONATION_ERROR: 
+		case RSC_ORIGINATOR_HAS_ALREADY_REGISTERD: 
+		case RSC_APP_RULE_VALIDATION_FAILED: 
+		case RSC_OPERATION_DENIED_BY_REMOTE_ENTITY: 
+		case RSC_SERVICE_SUBSCRIPTION_NOT_ESTABLISHED: 
+		case RSC_DISCOVERY_LIMIT_EXCEEDED: 
+		case RSC_PRIMITIVE_PROFILE_NOT_ACCESSIBLE: 
+		case RSC_UNAUTHORIZED_USER: 
+		case RSC_SERVICE_SUBSCRIPTION_NOT_ACTIVE: 
+		case RSC_SOFTWARE_CAMPAIGN_CONFLICT: 
+		case RSC_RECEIVER_HAS_NO_PRIVILEGES: 
+		case RSC_TARGET_NOT_SUBSCRIBABLE:
+		case RSC_SUBSCRIPTION_HOST_HAS_NO_PRIVILEGE:
+		case RSC_DISCOVERY_DENIED_BY_IPE: 
+		case RSC_TARGET_HAS_NO_SESSION_CAPABILITY: 
+		case RSC_SESSION_IS_ONLINE: 
+		case RSC_TRANSACTION_PROCESSING_IS_INCOMPLETE: 
+		case RSC_REQUESTED_ACTIVITY_PATTERN_NOT_PERMITTED: 
+			return 403; // 4.03 Forbidden
+		case RSC_NOT_FOUND: 
+		case RSC_ONTOLOGY_NOT_AVAILABLE: 
+		case RSC_LINKED_SEMANTICS_NOT_AVAILABLE: 
+		case RSC_MASHUP_MEMBER_NOT_FOUND: 
+		case RSC_ONTOLOGY_MAPPING_ALGORITHM_NOT_AVAILABLE: 
+		case RSC_ONTOLOGY_MAPPING_NOT_AVAILABLE: 
+		case RSC_TARGET_NOT_REACHABLE: 
+		case RSC_REMOTE_ENTITY_NOT_REACHABLE: 
+		case RSC_EXTERNAL_OBJECT_NOT_REACHABLE: 
+		case RSC_EXTERNAL_OBJECT_NOT_FOUND: 
+			return 404; // 4.04 Not Found
+    	case RSC_OPERATION_NOT_ALLOWED: 
+            return 405; // 4.05 Method Not Allowed
+		case RSC_NOT_ACCEPTABLE: 
+            return 406; // 4.06 Not Acceptable
+		case RSC_UNSUPPORTED_MEDIATYPE: 
+            return 415; // 4.15 Unsupported Content-Format
+		case RSC_INTERNAL_SERVER_ERROR: 
+		case RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED: 
+		case RSC_GROUP_MEMBERS_NOT_RESPONDED: 
+		case RSC_ESPRIM_DECRYPTION_ERROR: 
+		case RSC_ESPRIM_ENCRYPTION_ERROR: 
+		case RSC_SPARQL_UPDATE_ERROR: 
+		case RSC_JOIN_MULTICAST_GROUP_FAILED: 
+		case RSC_LEAVE_MULTICAST_GROUP_FAILED:  
+		case RSC_CROSS_RESOURCE_OPERATION_FAILURE: 
+		case RSC_ONTOLOGY_MAPPING_ALGORITHM_FAILED: 
+		case RSC_ONTOLOGY_CONVERSION_FAILED: 
+		case RSC_REASONING_PROCESSING_FAILED: 
+		case RSC_MGMT_SESSION_CANNOT_BE_ESTABLISHED: 
+		case RSC_MGMT_SESSION_ESTABLISHMENT_TIMEOUT: 
+		case RSC_MGMT_CONVERSION_ERROR: 
+		case RSC_MGMT_CANCELLATION_FAILED: 
+			return 500; // 5.00 Internal Server Error
+        case RSC_RELEASE_VERSION_NOT_SUPPORTED: 
+		case RSC_SPECIALIZATION_SCHEMA_NOT_FOUND: 
+		case RSC_NOT_IMPLEMENTED:
+		case RSC_NON_BLOCKING_SYNCH_REQUEST_NOT_SUPPORTED: 
+			return 501; // 5.01 Not Implemented
+		case RSC_TRIGGERING_DISABLED_FOR_RECIPIENT: 
+		case RSC_UNABLE_TO_REPLACE_GROUP_MEMBER: 
+		case RSC_UNABLE_TO_RECALL_REQUEST:
+		case RSC_NETWORK_QOS_CONFIG_ERROR: 
+			return 503; // 5.03 Service Unavailable
+        case RSC_REQUEST_TIMEOUT: 
+		case RSC_EXTERNAL_OBJECT_NOT_REACHABLE_BEFORE_RQET_TIMEOUT: 
+		case RSC_EXTERNAL_OBJECT_NOT_REACHABLE_BEFORE_OET_TIMEOUT: 
+			return 504; // 5.04 Gateway Timeout
+    }
+}
 
 cJSON *o2pt_to_json(oneM2MPrimitive *o2pt){
 	cJSON *json = cJSON_CreateObject();
@@ -2252,6 +2389,11 @@ void notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net) {
 					mqtt_notify(o2pt, noti_json, nt);
 					break;
 				#endif
+				#ifdef ENABLE_COAP
+				case PROT_COAP:
+					coap_notify(o2pt, noti_json, nt);
+					break;
+				#endif
 			}
 		}
 		free(noti_uri);
@@ -2406,7 +2548,7 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op){
 		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` is empty");
 	}
 
-	
+
 
 	cJSON *acpi = NULL;
 	int acop = 0;
@@ -2949,7 +3091,7 @@ int create_local_csr(){
 
 	cJSON_Delete(root);
 
-	
+
 
 	// int rsc = validate_csr(o2pt, parent_rtnode, csr, OP_CREATE);
 	// if(rsc != RSC_OK){

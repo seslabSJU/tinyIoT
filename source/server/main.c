@@ -17,6 +17,7 @@
 #include "config.h"
 #include "onem2mTypes.h"
 #include "mqttClient.h"
+#include "coap.h"
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
@@ -26,9 +27,16 @@ void stop_server(int sig);
 cJSON *ATTRIBUTES;
 char *PORT = SERVER_PORT;
 int terminate = 0;
+int call_stop = 0;
+
 #ifdef ENABLE_MQTT
 pthread_t mqtt;
 int mqtt_thread_id;
+#endif
+
+#ifdef ENABLE_COAP
+pthread_t coap;
+int coap_thread_id;
 #endif
 
 int main(int argc, char **argv) {
@@ -92,6 +100,14 @@ int main(int argc, char **argv) {
 	}
 	#endif
 
+	#ifdef ENABLE_COAP
+	coap_thread_id = pthread_create(&coap, NULL, coap_serve, "CoAP Server");
+	if(coap_thread_id < 0){
+		fprintf(stderr, "CoAP thread create error\n");
+		return 0;
+	}
+	#endif
+
 	serve_forever(PORT); // main oneM2M operation logic in void route()    
 
 	#ifdef ENABLE_MQTT
@@ -99,6 +115,10 @@ int main(int argc, char **argv) {
 	if(terminate){
 		return 0;
 	}
+	#endif
+
+	#ifdef ENABLE_COAP
+	pthread_join(coap, NULL);
 	#endif
 
 	return 0;
@@ -200,6 +220,12 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 }
 
 void stop_server(int sig){
+	if(call_stop){
+		logger("MAIN", LOG_LEVEL_WARN, "Server is already shutting down...");
+		return;
+	}
+	call_stop = 1;
+
 	logger("MAIN", LOG_LEVEL_INFO, "Shutting down server...");
 
 	logger("MAIN", LOG_LEVEL_INFO, "De-registrating cse...");
@@ -210,6 +236,9 @@ void stop_server(int sig){
 	}
 	#ifdef ENABLE_MQTT
 	pthread_kill(mqtt, SIGINT);
+	#endif
+	#ifdef ENABLE_COAP
+	pthread_kill(coap, SIGINT);
 	#endif
 	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
 	close_dbp();

@@ -15,6 +15,7 @@
 #include "config.h"
 #include "util.h"
 #include "cJSON.h"
+#include "coap.h"
 
 extern ResourceTree *rt;
 
@@ -1784,6 +1785,12 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 		#ifdef ENABLE_MQTT
 		else if(protocol == PROT_MQTT){
 			mqtt_forwarding(o2pt, host, port, csr);
+		}
+		#endif
+
+		#ifdef ENABLE_COAP
+		else if(protocol == PROT_COAP){
+			coap_forwarding(o2pt, host, port);
 		}
 		#endif
 		free(host);

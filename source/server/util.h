@@ -129,6 +129,7 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 bool isMinDup(char **mid, int idx, char *new_mid);
 
 ResourceType http_parse_object_type(header_t *headers);
+ResourceType coap_parse_object_type(int object_type);
 ResourceType parse_object_type_cjson(cJSON *cjson);
 
 bool isFopt(char *str);
@@ -137,6 +138,7 @@ bool endswith(char *str, char *match);
 int handle_error(oneM2MPrimitive *o2pt, int rsc, char *err);
 
 int rsc_to_http_status(int rsc, char **msg);
+int rsc_to_coap_status(int rsc);
 
 char *get_resource_key(ResourceType ty);
 
