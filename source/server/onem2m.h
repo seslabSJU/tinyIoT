@@ -8,7 +8,8 @@
 //enum
 typedef enum {
 	PROT_HTTP = 1,
-	PROT_MQTT
+	PROT_MQTT,
+	PROT_COAP = 3
 }Protocol;
 
 typedef enum {
