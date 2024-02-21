@@ -62,7 +62,7 @@ typedef struct RTNode {
 	struct NodeList *subs;
 	struct RTNode *sibling_left;
 	struct RTNode *sibling_right;
-
+	char *rn;
 	char *uri;
 	int sub_cnt;
 	ResourceType ty;

@@ -731,20 +731,21 @@ RTNode *db_get_all_resource_as_rtnode(){
         logger("DB", LOG_LEVEL_ERROR, "Failed select from general");
         return 0;
     }
-
+    // logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
     RTNode* head = NULL, *rtnode = NULL;
     rc = sqlite3_step(res);
     cols = sqlite3_column_count(res);
+        // logger("DB", LOG_LEVEL_DEBUG, "cols : %d", cols);
     cJSON *arr = NULL;
     while(rc == SQLITE_ROW){
         json = cJSON_CreateObject();
-        
         for(int col = 0 ; col < cols; col++){
             
             colname = sqlite3_column_name(res, col);
             bytes = sqlite3_column_bytes(res, col);
             coltype = sqlite3_column_type(res, col);
 
+            // logger("DB", LOG_LEVEL_DEBUG, "rc : %s", colname);
             if(bytes == 0) continue;
             // if(strcmp(colname, "id") == 0) continue;
             switch(coltype){
@@ -767,6 +768,7 @@ RTNode *db_get_all_resource_as_rtnode(){
         char sql2[1024] = {0};
         ty = cJSON_GetObjectItem(json, "ty")->valueint;
         sprintf(sql2, "SELECT * FROM %s WHERE id='%d';", get_table_name(ty), cJSON_GetObjectItem(json, "id")->valueint);  
+        // logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql2);
 
         sqlite3_stmt *res2;
         rc = sqlite3_prepare_v2(db, sql2, -1, &res2, NULL);
@@ -774,7 +776,6 @@ RTNode *db_get_all_resource_as_rtnode(){
             logger("DB", LOG_LEVEL_ERROR, "Failed select from %s", get_table_name(ty));
             return 0;
         }
-
         rc = sqlite3_step(res2);
         int cols2 = sqlite3_column_count(res2);
         while(rc == SQLITE_ROW){
@@ -889,6 +890,71 @@ RTNode* db_get_cin_rtnode_list(RTNode *parent_rtnode) {
 
     sqlite3_finalize(res); 
     return head;
+}
+
+RTNode * db_get_latest_cins(){
+    char sql[1024] = {0};
+    char buf[256] = {0};
+    char *colname;
+    int rc = 0;
+    int cols, bytes, coltype;
+    cJSON *json, *root;
+    sqlite3_stmt *res = NULL;
+    RTNode *head, *rtnode = NULL;
+
+    sprintf(sql, "SELECT  * FROM general, cin WHERE general.id IN (SELECT max(id) FROM general WHERE ty=4 GROUP BY pi)  AND general.id=cin.id");
+    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    if(rc != SQLITE_OK){
+        logger("DB", LOG_LEVEL_ERROR, "Failed select");
+        return 0;
+    }
+    rc = sqlite3_step(res);
+    while(rc == SQLITE_ROW){
+        cols = sqlite3_column_count(res);
+        json = cJSON_CreateObject();
+        cJSON *arr = NULL;
+        
+        for(int col = 0 ; col < cols; col++){
+            
+            colname = sqlite3_column_name(res, col);
+            bytes = sqlite3_column_bytes(res, col);
+            coltype = sqlite3_column_type(res, col);
+
+            if(bytes == 0) continue;
+            if(strcmp(colname, "id") == 0) continue;
+            switch(coltype){
+                case SQLITE_TEXT:
+                    memset(buf, 0, 256);
+                    strncpy(buf, sqlite3_column_text(res, col), bytes);
+                    arr = cJSON_Parse(buf);
+                    if(arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)){
+                        cJSON_AddItemToObject(json, colname, arr);
+                    }else{
+                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
+                        cJSON_Delete(arr);
+                    }
+                    break;
+                case SQLITE_INTEGER:
+                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
+                    break;
+            }
+        }
+
+        if(!head) {
+            head = create_rtnode(json, RT_CIN);
+            rtnode = head;
+        } else {
+            rtnode->sibling_right = create_rtnode(json, RT_CIN);
+            rtnode->sibling_right->sibling_left = rtnode;
+            rtnode = rtnode->sibling_right;
+
+        }
+        rc = sqlite3_step(res);
+    }
+
+    sqlite3_finalize(res);
+    return head;
+
 }
 
 /**

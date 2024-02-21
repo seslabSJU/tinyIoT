@@ -529,6 +529,10 @@ int send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res
     memset(&serv_addr, 0, sizeof(serv_addr));
     int sock = socket(PF_INET, SOCK_STREAM, 0);
     int rcvd = 0;
+    struct timeval tv;
+    tv.tv_sec  = SOCKET_TIMEOUT;
+    tv.tv_usec = 0;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
 
     if(sock == -1) {
         logger("HTTP", LOG_LEVEL_ERROR, "socket error");
@@ -551,10 +555,6 @@ int send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res
         return 504;
     }
 
-    struct timeval tv;
-    tv.tv_sec  = SOCKET_TIMEOUT;
-    tv.tv_usec = 0;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
 
     char header[2048] = {'\0'};
     char buffer[BUF_SIZE] = {0};

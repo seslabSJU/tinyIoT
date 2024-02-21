@@ -212,7 +212,7 @@ RTNode *find_rtnode_by_uri(char *uri) {
 
 	while(ptr){
 		while(rtnode) {
-			if(!strcmp(get_rn_rtnode(rtnode), ptr)) break;
+			if(!strcmp(rtnode->rn, ptr)) break;
 			rtnode = rtnode->sibling_right;
 		}
 		if(!rtnode) break;
@@ -227,10 +227,9 @@ RTNode *find_rtnode_by_uri(char *uri) {
 	int flag = -1;
 	if(parent_rtnode) {
 		if(parent_rtnode->ty == RT_CNT) {
+			logger("UTIL", LOG_LEVEL_DEBUG, "CNT");
 			cJSON *cin = NULL;
-			if(!strcmp(ptr, "la") || !strcmp(ptr, "latest")) {
-				flag = 0;
-			} else if(!strcmp(ptr, "ol") || !strcmp(ptr, "oldest")) {
+			if(!strcmp(ptr, "ol") || !strcmp(ptr, "oldest")) {
 				flag = 1;
 			}
 			if(!strtok(NULL, "/")){ // if next '/' doesn't exist
@@ -245,7 +244,7 @@ RTNode *find_rtnode_by_uri(char *uri) {
 				}
 			}
 		}
-		else if(parent_rtnode->ty == RT_GRP && ptr) {
+		if(parent_rtnode->ty == RT_GRP && ptr) {
 			if(!strcmp(ptr, "fopt")) { // fopt
 				rtnode = parent_rtnode;
 			}
@@ -324,10 +323,10 @@ int add_child_resource_tree(RTNode *parent, RTNode *child) {
 	RTNode *node = parent->child;
 	child->parent = parent;
 
-	char *uri = malloc(strlen(parent->uri) + strlen(get_rn_rtnode(child)) + 2);
+	char *uri = malloc(strlen(parent->uri) + strlen(child->rn) + 2);
 	strcpy(uri, parent->uri);
 	strcat(uri, "/");
-	strcat(uri, get_rn_rtnode(child));
+	strcat(uri, child->rn);
 	child->uri = uri;
 
 	logger("O2M", LOG_LEVEL_DEBUG, "Add Resource Tree Node [Parent-ID] : %s, [Child-ID] : %s",get_ri_rtnode(parent), get_ri_rtnode(child));
@@ -752,13 +751,23 @@ void init_server() {
 void init_resource_tree(){
 	RTNode *rtnode_list = (RTNode *)calloc(1,sizeof(RTNode));
 	RTNode *tail = rtnode_list;
-
+	logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree");
 	RTNode *resource_list = db_get_all_resource_as_rtnode();
 	tail->sibling_right = resource_list;
 	if(resource_list) resource_list->sibling_left = tail;
 	while(tail->sibling_right) tail = tail->sibling_right;
 
-	RTNode *temp = rtnode_list;
+	RTNode *temp = db_get_latest_cins();
+	if(temp) {
+		tail->sibling_right = temp;
+		temp->sibling_left = tail;
+		while(tail->sibling_right){
+			tail = tail->sibling_right;
+			tail->rn = strdup("la");
+		} 
+	}
+
+	temp = rtnode_list;
 	rtnode_list = rtnode_list->sibling_right;
 	if(rtnode_list) rtnode_list->sibling_left = NULL;
 	free_rtnode(temp);
@@ -1101,7 +1110,7 @@ int check_rn_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 	if(rn) {
 		char *resource_name = rn->valuestring;
 		while(child) {
-			if(get_rn_rtnode(child) && !strcmp(get_rn_rtnode(child), resource_name)) {
+			if(!strcmp(child->rn, resource_name)) {
                 flag = true; 
                 break;
 			}
@@ -2132,7 +2141,7 @@ void requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode){
 	if(!rtnode) return;
 	logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource [%s]", get_uri_rtnode(rtnode));
 	if(rtnode->ty == RT_AE){
-		logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource AE [%s]", get_rn_rtnode(rtnode));
+		logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource AE [%s]", rtnode->rn);
 		cJSON *ae = rtnode->obj;
 		cJSON *poa = cJSON_GetObjectItem(ae, "poa");
 		cJSON *rr = cJSON_GetObjectItem(ae, "rr");

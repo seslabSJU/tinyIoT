@@ -129,20 +129,8 @@ RTNode* create_rtnode(cJSON *obj, ResourceType ty){
 		rtnode->uri = strdup(uri->valuestring);
 		cJSON_DeleteItemFromObject(obj, "uri");
 	}
-
-	// if(ty == RT_CSR){
-	// 	cJSON *rr = cJSON_GetObjectItem(obj, "rr");
-	// 	cJSON *csi = cJSON_GetObjectItem(obj, "csi");
-	// 	if(rr && rr->type == cJSON_True){
-	// 		logger("UTIL", LOG_LEVEL_INFO, "add rrnode");
-	// 		RRNode *rrnode = (RRNode *)calloc(1, sizeof(RRNode));
-	// 		rrnode->uri = malloc(strlen(csi->valuestring) + strlen(CSE_BASE_RI) + 2);
-	// 		sprintf(rrnode->uri, "%s/%s", csi->valuestring, CSE_BASE_RI);
-	// 		rrnode->rtnode = rtnode;
-	// 		rrnode->next = NULL;
-	// 		add_rrnode(rrnode);
-	// 	}
-	// }
+	
+	rtnode->rn = strdup(cJSON_GetObjectItem(obj, "rn")->valuestring);
 	
 	return rtnode;
 }
@@ -560,9 +548,17 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		free_rtnode(cin_rtnode);
 		return o2pt->rsc;
 	}
+	if(parent_rtnode->child){
+		cJSON_Delete(parent_rtnode->child->obj);
+		parent_rtnode->child->obj = cJSON_Duplicate(cin, 1);
+		free_rtnode(cin_rtnode);
+	}else{
+		parent_rtnode->child = cin_rtnode;
+		cin_rtnode->parent = parent_rtnode;
+		cin_rtnode->rn = strdup("la");
+	}
 	cJSON_Delete(root);
 	cin_rtnode->obj = NULL;
-	free_rtnode(cin_rtnode);
 	return RSC_CREATED;
 }
 
@@ -1041,6 +1037,11 @@ void free_rtnode(RTNode *rtnode) {
 	if(rtnode->uri){
 		free(rtnode->uri);
 		rtnode->uri = NULL;
+	}
+	if(rtnode->rn){
+		free(rtnode->rn);
+		rtnode->rn = NULL;
+	
 	}
 	if(rtnode->obj);
 		cJSON_Delete(rtnode->obj);
