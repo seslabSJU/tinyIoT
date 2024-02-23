@@ -3779,7 +3779,7 @@ ResourceAddressingType checkResourceAddressingType(char *uri){
 		return ABSOLUTE;
 	}else if(uri[0] == '/'){
 		return SP_RELATIVE;
-	}else if(strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0){
+	}else if(strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strcmp(uri, "coap://") == 0){
 		return PROTOCOL_BINDING;
 	}else{
 		return CSE_RELATIVE;

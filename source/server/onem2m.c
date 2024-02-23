@@ -1483,10 +1483,10 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 	cJSON *pjson = NULL, *pjson2 = NULL;
 	cJSON *acpi_obj = NULL;
 	cJSON *root = cJSON_CreateObject();
-	cJSON *uril = NULL;
+	cJSON *uril = NULL, *list = NULL;
 	cJSON *json = NULL;
 
-	int urilSize = 0;
+	int lSize = 0;
 	if(check_privilege(o2pt, target_rtnode, ACOP_DISCOVERY) == -1){
 		uril = cJSON_CreateArray();
 		cJSON_AddItemToObject(root, "m2m:uril", uril);
@@ -1501,8 +1501,8 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 		return RSC_BAD_REQUEST;
 	}
 
-	uril = db_get_filter_criteria(o2pt);
-	urilSize = cJSON_GetArraySize(uril);
+	list = db_get_filter_criteria(o2pt);
+	lSize = cJSON_GetArraySize(list);
 	cJSON *lim_obj = cJSON_GetObjectItem(fc, "lim");
 	cJSON *ofst_obj = cJSON_GetObjectItem(fc, "ofst");
 	int lim = INT_MAX;
@@ -1514,13 +1514,16 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 		ofst = cJSON_GetNumberValue(ofst_obj);
 	}
 	
-	if(urilSize > lim){
+	if(lSize > lim){
 		logger("O2M", LOG_LEVEL_DEBUG, "limit exceeded");
-		cJSON_DeleteItemFromArray(uril, urilSize);
+		cJSON_DeleteItemFromArray(list, lSize);
 		o2pt->cnst = CS_PARTIAL_CONTENT;
 		o2pt->cnot = ofst + lim;
 	}
-	cJSON_AddItemToObject(root, "m2m:uril", uril);
+
+    int drt = cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->drt, "drt"));
+	if(drt == DRT_STRUCTURED) cJSON_AddItemToObject(root, "m2m:uril", list);
+	else cJSON_AddItemToObject(root, "m2m:rrl", list);
 
 	if(o2pt->pc)
 		free(o2pt->pc);

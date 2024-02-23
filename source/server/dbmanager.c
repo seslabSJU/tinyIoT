@@ -1047,8 +1047,14 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
         uri = ri_to_uri(o2pt->to);
     }
 
-    sprintf(buf, "SELECT uri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
-    strcat(sql, buf);
+    int drt = cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->drt, "drt"));
+    if(drt == DRT_STRUCTURED){
+        sprintf(buf, "SELECT uri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
+        strcat(sql, buf);
+    } else{
+        sprintf(buf, "SELECT ri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
+        strcat(sql, buf);
+    }
 
     if(pjson = cJSON_GetObjectItem(fc, "lvl")){
         sprintf(buf, "uri NOT LIKE '%s/%%", uri);

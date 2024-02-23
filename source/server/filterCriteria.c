@@ -124,3 +124,20 @@ void parse_filter_criteria(cJSON *fc){
         cJSON_AddNumberToObject(fc, "fo", 1);
     }
 }
+
+void parse_qs(cJSON *qs){
+    char int_Attrs[15][5] = {"ty", "sts", "stb", "sza", "szb", "lim", "fo", "fu", "lvl", "ofst", "ops", "la", "pty", "chty",
+                            "drt"};
+    cJSON *pjson = NULL, *ptr = NULL;
+    for(int i = 0 ; i < 15 ; i++){
+        if(pjson = cJSON_GetObjectItem(qs, int_Attrs[i])){
+            if(cJSON_IsString(pjson)){
+                cJSON_ReplaceItemInObject(qs, int_Attrs[i], cJSON_CreateNumber(atoi(cJSON_GetStringValue(pjson))));
+            }
+        }
+    }
+
+    if(!cJSON_GetObjectItem(qs, "fo")){
+        cJSON_AddNumberToObject(qs, "fo", 1);
+    }
+}

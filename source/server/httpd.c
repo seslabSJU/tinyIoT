@@ -300,12 +300,31 @@ void handle_http_request(HTTPRequest *req, int slotno) {
 
     
 
+    // if(req->qs && strlen(req->qs) > 0){
+    //     o2pt->fc = qs_to_json(req->qs);
+    //     parse_filter_criteria(o2pt->fc);
+    //     if(cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->fc, "fu")) == FU_DISCOVERY){
+    //         o2pt->op = OP_DISCOVERY;
+    //     }
+    // }
+
+
     if(req->qs && strlen(req->qs) > 0){
-        o2pt->fc = qs_to_json(req->qs);
-        parse_filter_criteria(o2pt->fc);
-        if(cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->fc, "fu")) == FU_DISCOVERY){
+        cJSON *qs = qs_to_json(req->qs);
+        parse_qs(qs);
+
+        o2pt->drt = cJSON_CreateObject();
+        if(cJSON_GetObjectItem(qs, "drt")){
+            cJSON_AddNumberToObject(o2pt->drt, "drt", cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "drt")));
+        } else {
+            cJSON_AddNumberToObject(o2pt->drt, "drt", DRT_STRUCTURED);
+        }
+        cJSON_DeleteItemFromObject(qs, "drt");
+
+        if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) == FU_DISCOVERY){
             o2pt->op = OP_DISCOVERY;
         }
+        o2pt->fc = qs;
     }
     
     pthread_mutex_trylock(&mutex_lock);
