@@ -17,7 +17,7 @@
 #include "config.h"
 #include "onem2mTypes.h"
 #include "mqttClient.h"
-// #include "coap.h"
+#include "coap.h"
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;

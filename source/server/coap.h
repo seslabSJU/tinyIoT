@@ -1,4 +1,4 @@
-#include <coap3/coap.h>
+#include "libcoap/coap.h"
 #include "onem2m.h"
 
 // Current CoAP attributes

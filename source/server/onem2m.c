@@ -15,7 +15,7 @@
 #include "config.h"
 #include "util.h"
 #include "cJSON.h"
-// #include "coap.h"
+#include "coap.h"
 
 extern ResourceTree *rt;
 

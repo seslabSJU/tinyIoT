@@ -19,7 +19,7 @@
 #include "dbmanager.h"
 #include "jsonparser.h"
 #include "mqttClient.h"
-// #include "coap.h"
+#include "coap.h"
 
 extern ResourceTree *rt;
 
