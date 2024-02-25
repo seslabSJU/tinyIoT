@@ -552,12 +552,13 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		cJSON_Delete(parent_rtnode->child->obj);
 		parent_rtnode->child->obj = cJSON_Duplicate(cin, 1);
 		free_rtnode(cin_rtnode);
+		// cJSON_Delete(root);
 	}else{
 		parent_rtnode->child = cin_rtnode;
 		cin_rtnode->parent = parent_rtnode;
+		if(cin_rtnode->rn) free(cin_rtnode->rn);
 		cin_rtnode->rn = strdup("la");
 	}
-	cJSON_Delete(root);
 	cin_rtnode->obj = NULL;
 	return RSC_CREATED;
 }
@@ -1117,7 +1118,6 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 }
 
 int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
-	int e = 1;
 	int rsc = 0;
 	if( parent_rtnode->ty != RT_AE && parent_rtnode->ty != RT_CSE ) {
 		return o2pt->rsc = RSC_INVALID_CHILD_RESOURCETYPE;
@@ -1132,8 +1132,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 
 	rsc = validate_grp(o2pt, grp);
 	if(rsc >= 4000){
-		logger("O2M", LOG_LEVEL_DEBUG, "Group Validation failed");
-		return o2pt->rsc = rsc;
+		return logger("O2M", LOG_LEVEL_DEBUG, "Group Validation failed");
 	}
 	
 	if(o2pt->pc) free(o2pt->pc);

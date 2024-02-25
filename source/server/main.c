@@ -140,9 +140,11 @@ void route(oneM2MPrimitive *o2pt) {
 		rsc = handle_onem2m_request(o2pt, target_rtnode);
 	
 		if(o2pt->op != OP_DELETE && target_rtnode->ty == RT_CIN){
-			logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
-			free_rtnode(target_rtnode);
-			target_rtnode = NULL;
+			if(strcmp(target_rtnode->rn, "la")){
+				logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
+				free_rtnode(target_rtnode);
+				target_rtnode = NULL;
+			}
 		}
 	}
 

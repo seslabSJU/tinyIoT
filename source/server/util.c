@@ -229,10 +229,16 @@ RTNode *find_rtnode_by_uri(char *uri) {
 		if(parent_rtnode->ty == RT_CNT) {
 			logger("UTIL", LOG_LEVEL_DEBUG, "CNT");
 			cJSON *cin = NULL;
-			if(!strcmp(ptr, "ol") || !strcmp(ptr, "oldest")) {
-				flag = 1;
-			}
-			if(!strtok(NULL, "/")){ // if next '/' doesn't exist
+			
+			if(parent_rtnode->child){
+				if(strcmp(cJSON_GetObjectItem(parent_rtnode->child->obj, "rn")->valuestring, ptr) == 0){
+					logger("UTIL", LOG_LEVEL_DEBUG, "resource is latest");
+					rtnode = parent_rtnode->child;
+				}
+			}else i	(!strtok(NULL, "/")){ // if next '/' doesn't exist
+				if(!strcmp(ptr, "ol") || !strcmp(ptr, "oldest")) {
+					flag = 1;
+				}
 				if(flag == 0 || flag == 1){
 					cin = db_get_cin_laol(parent_rtnode, flag);
 				}else{
@@ -1524,7 +1530,7 @@ bool validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt){
 
 		if(resourceLocation == 2) free_rtnode(rt_node);
 	}
-	return final_mid;
+	return true;
 }
 
 int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new){
@@ -2785,8 +2791,6 @@ int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Opera
 			handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "originator has already registered");
 			return o2pt->rsc;
 		}
-	}else{
-		return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
 	}
 
 	return RSC_OK;
