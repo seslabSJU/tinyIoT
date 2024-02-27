@@ -1521,7 +1521,7 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 		o2pt->cnot = ofst + lim;
 	}
 
-    int drt = cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->drt, "drt"));
+	int drt = cJSON_GetObjectItem(o2pt->drt, "drt") ? cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->drt, "drt")) : DRT_STRUCTURED;	
 	if(drt == DRT_STRUCTURED) cJSON_AddItemToObject(root, "m2m:uril", list);
 	else cJSON_AddItemToObject(root, "m2m:rrl", list);
 
