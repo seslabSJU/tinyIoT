@@ -227,7 +227,6 @@ RTNode *find_rtnode_by_uri(char *uri) {
 	int flag = -1;
 	if(parent_rtnode) {
 		if(parent_rtnode->ty == RT_CNT) {
-			logger("UTIL", LOG_LEVEL_DEBUG, "CNT");
 			cJSON *cin = NULL;
 			
 			if(parent_rtnode->child){
@@ -235,14 +234,15 @@ RTNode *find_rtnode_by_uri(char *uri) {
 					logger("UTIL", LOG_LEVEL_DEBUG, "resource is latest");
 					rtnode = parent_rtnode->child;
 				}
-			}else i	(!strtok(NULL, "/")){ // if next '/' doesn't exist
+			}
+			if(!rtnode && !strtok(NULL, "/")){ // if next '/' doesn't exist
 				if(!strcmp(ptr, "ol") || !strcmp(ptr, "oldest")) {
 					flag = 1;
 				}
 				if(flag == 0 || flag == 1){
 					cin = db_get_cin_laol(parent_rtnode, flag);
-				}else{
-					cin = db_get_resource(ptr, RT_CIN);
+				}else{					
+					cin = db_get_resource_by_uri(uri, RT_CIN);
 				}
 				if(cin){
 					rtnode = create_rtnode(cin, RT_CIN);
@@ -1121,6 +1121,11 @@ int check_rn_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode) {
                 break;
 			}
 			child = child->sibling_right;
+		}
+		if(o2pt->ty == RT_CIN) {
+			if(db_check_cin_rn_dup(rn->valuestring, cJSON_GetObjectItem(rtnode->obj, "ri")->valuestring)){
+				flag = true;
+			}
 		}
 	}
 
@@ -3047,6 +3052,14 @@ int update_remote_csr_dcse(RTNode *skip_rtnode){
 	cJSON_AddItemToObject(csr, "dcse", dcse);
 
 	RTNode *rtnode = NULL;
+	oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+	o2pt->op = OP_UPDATE;
+	o2pt->fr = strdup("/"CSE_BASE_RI);
+	o2pt->rqi = strdup("update-csr");
+	o2pt->rvi = strdup("2a");
+	o2pt->pc = cJSON_PrintUnformatted(root);
+	cJSON_Delete(root);
+		logger("UTIL", LOG_LEVEL_DEBUG, "skip_rtnode: %s", skip_rtnode->uri);
 	while(node){
 		rtnode = node->rtnode;
 		node = node->next;
@@ -3054,18 +3067,15 @@ int update_remote_csr_dcse(RTNode *skip_rtnode){
 		logger("UTIL", LOG_LEVEL_DEBUG, "rtnode: %s", rtnode->uri);
 		if(rtnode == skip_rtnode) 
 			continue;
-		oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
-		o2pt->op = OP_UPDATE;
-		o2pt->fr = strdup("/"CSE_BASE_RI);
+
 		sprintf(buf, "%s/%s", cJSON_GetObjectItem(rtnode->obj, "csi")->valuestring, CSE_BASE_RI);
 		o2pt->to = strdup(buf);
-		o2pt->rqi = strdup("update-csr");
-		o2pt->rvi = strdup("2a");
-		o2pt->pc = cJSON_PrintUnformatted(root);
-		cJSON_Delete(root);
 
 		forwarding_onem2m_resource(o2pt, rtnode);
+
 	}
+
+	free_o2pt(o2pt);
 }
 
 

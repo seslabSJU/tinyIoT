@@ -23,6 +23,7 @@ RTNode* db_get_cin_rtnode_list(RTNode *rtnode);
 cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol);
 cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt);
 RTNode * db_get_latest_cins();
+bool db_check_cin_rn_dup(char *rn, char *pi);
 
 int db_delete_one_cin_mni(RTNode *cnt);
 cJSON *getForbiddenUri(cJSON *acp_list);

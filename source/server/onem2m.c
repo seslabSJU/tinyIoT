@@ -478,12 +478,12 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 	cJSON *cin = cJSON_GetObjectItem(root, "m2m:cin");
 
 	// check if rn exists
-	cJSON *rn = cJSON_GetObjectItem(cin, "rn");
-	if(rn != NULL){
-		handle_error(o2pt, RSC_NOT_IMPLEMENTED, "rn attribute for cin is assigned by CSE");
-		cJSON_Delete(root);
-		return o2pt->rsc;
-	}
+	// cJSON *rn = cJSON_GetObjectItem(cin, "rn");
+	// if(rn != NULL){
+	// 	handle_error(o2pt, RSC_NOT_IMPLEMENTED, "rn attribute for cin is assigned by CSE");
+	// 	cJSON_Delete(root);
+	// 	return o2pt->rsc;
+	// }
 
 	add_general_attribute(cin, parent_rtnode, RT_CIN);
 	
@@ -538,7 +538,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
 	// Add uri attribute
 	char ptr[1024] = {0};
-	rn = cJSON_GetObjectItem(cin, "rn");
+	cJSON *rn = cJSON_GetObjectItem(cin, "rn");
 	sprintf(ptr, "%s/%s", get_uri_rtnode(parent_rtnode), rn->valuestring);
 
 	// Store to DB
@@ -1198,7 +1198,7 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 	if(e != -1) e = check_payload_format(o2pt);
 	if(e != -1) e = check_resource_type_equal(o2pt);
 	if(e != -1) e = check_privilege(o2pt, parent_rtnode, ACOP_CREATE);
-	if(e != -1 && o2pt->ty != RT_CIN) e = check_rn_duplicate(o2pt, parent_rtnode);
+	if(e != -1) e = check_rn_duplicate(o2pt, parent_rtnode);
 	if(e == -1) return o2pt->rsc;
 
 	if(!is_attr_valid(o2pt->cjson_pc, o2pt->ty, err_msg)){

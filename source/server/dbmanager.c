@@ -702,12 +702,12 @@ int db_delete_one_cin_mni(RTNode *cnt){
         return -1;
     }
 
-    sprintf(sql, "DELETE FROM cin WHERE ri='%s';", latest_ri);
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from cin/ msg : %s", err_msg);
-        return -1;
-    }
+    // sprintf(sql, "DELETE FROM cin WHERE ='%s';", latest_ri);
+    // rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    // if(rc != SQLITE_OK){
+    //     logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from cin/ msg : %s", err_msg);
+    //     return -1;
+    // }
     sqlite3_finalize(res);
     return latest_cs;
 }
@@ -1026,8 +1026,8 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol){
 
     sqlite3_finalize(res);
     return json;   
-
 }
+
 cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     logger("DB", LOG_LEVEL_DEBUG, "call db_get_filter_criteria");
     char buf[256] = {0};
@@ -1313,6 +1313,31 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     }
     sqlite3_finalize(res);     
     return json;
+}
+
+bool db_check_cin_rn_dup(char *rn, char *pi){
+    if(!rn || !pi) return false;
+    char sql[1024] = {0};
+    int rc = 0;
+    int cols = 0, bytes = 0, coltype = 0;
+    cJSON *json, *root;
+    sqlite3_stmt *res = NULL;
+    char *colname = NULL;
+    char buf[256] = {0};
+
+    sprintf(sql, "SELECT * FROM general WHERE rn='%s' AND pi='%s';", rn, pi);
+    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    if(rc != SQLITE_OK){
+        logger("DB", LOG_LEVEL_ERROR, "Failed select from general");
+        return 0;
+    }
+    rc = sqlite3_step(res);
+    if(rc == SQLITE_ROW){
+        sqlite3_finalize(res);
+        return true;
+    }
+    sqlite3_finalize(res);
+    return false;
 }
 
 bool do_uri_exist(cJSON *list, char *uri){
