@@ -94,7 +94,7 @@ RTNode* get_rtnode(oneM2MPrimitive *o2pt){
 
 	if(rtnode && rtnode->ty == RT_GRP){
 		if(strlen(target_uri) > strlen(get_uri_rtnode(rtnode))){
-			char *fopt_start = target_uri + strlen(get_uri_rtnode(rtnode));
+			char *fopt_start = strstr(target_uri, "/fopt");
 			if(strlen(fopt_start) == 5){
 				if(strncmp(fopt_start, "/fopt", 5) == 0){
 					o2pt->isFopt = true;
@@ -148,9 +148,11 @@ RTNode *find_csr_rtnode_by_uri(char *uri){
 */
 RTNode *find_rtnode(char *addr){
 	if(!addr) return NULL;
-	
+
 	RTNode *rtnode = NULL;
-	if(strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 && addr[strlen(CSE_BASE_NAME)] == '/' || strcmp(addr, CSE_BASE_NAME) == 0){
+	if(strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 
+		&& addr[strlen(CSE_BASE_NAME)] == '/' 
+		|| strcmp(addr, CSE_BASE_NAME) == 0){
 		logger("UTIL", LOG_LEVEL_DEBUG, "Hierarchical Addressing");
 		rtnode = find_rtnode_by_uri(addr);
 	}else{
@@ -270,6 +272,7 @@ RTNode *find_rtnode_by_uri(char *uri) {
 RTNode *find_rtnode_by_ri(char *ri){
 	cJSON *resource = NULL;
 	RTNode *rtnode = NULL;
+	char * fopt = strstr(ri, "/fopt");
 	logger("UTIL", LOG_LEVEL_DEBUG, "RI : %s", ri);
 	if(strncmp(ri, "4-", 2) == 0){
 		logger("UTIL", LOG_LEVEL_DEBUG, "CIN");
@@ -277,8 +280,17 @@ RTNode *find_rtnode_by_ri(char *ri){
 		rtnode = create_rtnode(resource, RT_CIN);
 		rtnode->parent = find_rtnode_by_ri(get_pi_rtnode(rtnode));
 		return rtnode;
+	}else if(strncmp(ri, "9-", 2) == 0){
+		logger("UTIL", LOG_LEVEL_DEBUG, "GRP");
+		if(fopt){
+			*fopt = '\0';
+		}
 	}
-	return rt_search_ri(rt->cb, ri);
+	rtnode = rt_search_ri(rt->cb, ri);
+	if(fopt){
+		*fopt = '/';
+	}
+	return rtnode;
 }
 
 /**
@@ -290,10 +302,15 @@ RTNode *find_rtnode_by_ri(char *ri){
 RTNode *rt_search_ri(RTNode *rtnode, char *ri){
 	RTNode *ret = NULL;
 	if(!rtnode) return NULL;
-	if(!strcmp(get_ri_rtnode(rtnode), ri)) return rtnode;
-	if(rtnode->child) ret = rt_search_ri(rtnode->child, ri);
-	if(ret) return ret;
-	if(rtnode->sibling_right) ret = rt_search_ri(rtnode->sibling_right, ri);
+	while(rtnode) {
+		if(rtnode->child) ret = rt_search_ri(rtnode->child, ri);
+		if(!strcmp(get_ri_rtnode(rtnode), ri)){
+			ret = rtnode;
+			break;
+		} 
+		rtnode = rtnode->sibling_right;
+	}
+
 	return ret;
 }
 
@@ -577,7 +594,9 @@ void delete_cin_under_cnt_mni_mbs(RTNode *rtnode) {
 		}
 		cbs -= tmp;
 		cni--;
-	}else{
+	}
+
+	if(cbs > mbs) {
 		RTNode *head = db_get_cin_rtnode_list(rtnode);
 		RTNode *right;
 
@@ -1386,8 +1405,8 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp){
 
 	cJSON *final_mid = cJSON_CreateArray();
 	bool mtv = validate_grp_member(grp, final_mid, csy, mt);
-	cJSON_SetBoolValue(cJSON_GetObjectItem(grp, "mtv"), mtv);
-	
+	// logger("UTIL", LOG_LEVEL_DEBUG, "mtv : %d", mtv);
+	cJSON_AddBoolToObject(grp, "mtv", mtv);
 
 	cJSON_DeleteItemFromObject(grp, "mid");
 	cJSON_AddItemToObject(grp, "mid", final_mid);
