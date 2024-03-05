@@ -1351,6 +1351,8 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	int rsc = 0;
 	int cnt = 0;
 	int cnm = 0;
+	int idx = 0;
+	bool updated = false;
 
 	RTNode *target_rtnode = NULL;
 	oneM2MPrimitive *req_o2pt = NULL;
@@ -1359,6 +1361,7 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	cJSON *rsp = NULL;
 	cJSON *json = NULL;
 	cJSON *grp = NULL;
+	cJSON *delete_list = NULL;
 	
 	if(parent_rtnode == NULL){
 		o2pt->rsc = RSC_NOT_FOUND;
@@ -1393,9 +1396,13 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	new_pc = cJSON_CreateObject();
 	cJSON_AddItemToObject(new_pc, "m2m:agr", agr = cJSON_CreateObject());
 	cJSON_AddItemToObject(agr, "m2m:rsp", rsp = cJSON_CreateArray());
+	cJSON *mid_arr = cJSON_GetObjectItem(grp, "mid");
 	cJSON *mid_obj = NULL;
+	cJSON_InsertItemInArray(mid_arr, 0, cJSON_CreateString(""));
+	cJSON_AddItemToArray(mid_arr, cJSON_CreateString(""));
 
-	cJSON_ArrayForEach(mid_obj, cJSON_GetObjectItem(grp, "mid")){
+	cJSON_ArrayForEach(mid_obj, mid_arr){
+		rsc = 0;
 		char *mid = cJSON_GetStringValue(mid_obj);
 		if(req_o2pt->to) free(req_o2pt->to);
 		if(req_o2pt->pc) free(req_o2pt->pc);
@@ -1427,10 +1434,6 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 			}
 		}
 
-		// target_rtnode =  find_rtnode_by_uri(mid);
-		// if(target_rtnode && target_rtnode->ty == RT_AE){
-		// 	req_o2pt->fr = strdup(get_ri_rtnode(target_rtnode));
-		// }
 		json = o2pt_to_json(req_o2pt);
 		// logger("O2M", LOG_LEVEL_DEBUG, "reqo2pt : %s", cJSON_PrintUnformatted(json));
 		if(target_rtnode){
@@ -1458,12 +1461,25 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 				cJSON_AddItemToArray(rsp, o2pt_to_json(req_o2pt));
 			}
 		}
+		if(rsc == RSC_DELETED){
+			updated = true;
+			mid_obj = mid_obj->prev;
+			cJSON_DeleteItemFromArray(mid_arr, idx);
+			idx--;
+		}
+		idx++;
+	}
+	cJSON_DeleteItemFromArray(mid_arr, 0);
+	cJSON_DeleteItemFromArray(mid_arr, cJSON_GetArraySize(mid_arr) - 1);
+	if(updated){
+		db_update_resource(grp, cJSON_GetObjectItem(grp, "ri")->valuestring, RT_GRP);
 	}
 
-	if(o2pt->pc) free(o2pt->pc); //TODO double free bug
+	if(o2pt->pc) free(o2pt->pc);
 	o2pt->pc = cJSON_PrintUnformatted(new_pc);
 
 	cJSON_Delete(new_pc);
+	cJSON_Delete(delete_list);
 	
 	o2pt->rsc = RSC_OK;	
 
