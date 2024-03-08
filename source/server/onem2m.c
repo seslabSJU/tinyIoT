@@ -1579,15 +1579,15 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 	int lim = INT_MAX;
 	int ofst = 0;
 	if(lim_obj){
-		lim = cJSON_GetNumberValue(lim_obj);
+		lim = lim_obj->valueint;
 	}
 	if(ofst_obj){
-		ofst = cJSON_GetNumberValue(ofst_obj);
+		ofst = ofst_obj->valueint;
 	}
 	
 	if(urilSize > lim){
 		logger("O2M", LOG_LEVEL_DEBUG, "limit exceeded");
-		cJSON_DeleteItemFromArray(uril, urilSize);
+		cJSON_DeleteItemFromArray(uril, urilSize - 1);
 		o2pt->cnst = CS_PARTIAL_CONTENT;
 		o2pt->cnot = ofst + lim;
 	}
