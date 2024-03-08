@@ -117,16 +117,19 @@ char* get_local_time(int diff);
 char* resource_identifier(ResourceType ty, char *ct);
 void delete_cin_under_cnt_mni_mbs(RTNode *rtnode);
 int net_to_bit(cJSON *net);
-int get_acop(oneM2MPrimitive *o2pt, RTNode *node);
-int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode);
-int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag);
 int get_value_querystring_int(char *key);
 void remove_invalid_char_json(char* json);
 int is_json_valid_char(char c);
 bool is_rn_valid_char(char c);
-int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop);
 int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path);
 bool isMinDup(char **mid, int idx, char *new_mid);
+
+//privilege
+int get_acop(oneM2MPrimitive *o2pt, RTNode *node);
+int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode);
+int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag);
+int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop);
+int has_acpi_update_privilege(oneM2MPrimitive *o2pt, char *acpi);
 
 ResourceType http_parse_object_type(header_t *headers);
 ResourceType parse_object_type_cjson(cJSON *cjson);
@@ -147,9 +150,4 @@ int get_number_from_cjson(cJSON *json);
 cJSON *qs_to_json(char* qs);
 cJSON *handle_uril(cJSON *uril, char *new_uri, FilterOperation fo);
 void filterOptionStr(FilterOperation fo , char *sql);
-
-#ifdef BERKELEY_DB
-cJSON *fc_scan_resource_tree(RTNode *rtnode, FilterCriteria *fc, int lvl);
-#endif
-
 #endif

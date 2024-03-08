@@ -476,14 +476,16 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
 	cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
 	cJSON *cin = cJSON_GetObjectItem(root, "m2m:cin");
-
+	cJSON *rn = NULL;
+	#if !ALLOW_CIN_RN
 	// check if rn exists
-	// cJSON *rn = cJSON_GetObjectItem(cin, "rn");
-	// if(rn != NULL){
-	// 	handle_error(o2pt, RSC_NOT_IMPLEMENTED, "rn attribute for cin is assigned by CSE");
-	// 	cJSON_Delete(root);
-	// 	return o2pt->rsc;
-	// }
+	rn = cJSON_GetObjectItem(cin, "rn");
+	if(rn != NULL){
+		handle_error(o2pt, RSC_NOT_IMPLEMENTED, "rn attribute for cin is assigned by CSE");
+		cJSON_Delete(root);
+		return o2pt->rsc;
+	}
+	#endif
 
 	add_general_attribute(cin, parent_rtnode, RT_CIN);
 	
@@ -538,7 +540,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
 	// Add uri attribute
 	char ptr[1024] = {0};
-	cJSON *rn = cJSON_GetObjectItem(cin, "rn");
+	rn = cJSON_GetObjectItem(cin, "rn");
 	sprintf(ptr, "%s/%s", get_uri_rtnode(parent_rtnode), rn->valuestring);
 
 	// Store to DB
@@ -725,6 +727,29 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode) { // TODO deannounce
 	}
 
 	int result = validate_ae(o2pt, m2m_ae, OP_UPDATE);
+	cJSON* acpi_obj = NULL;
+	bool acpi_flag = false;
+	if(cJSON_GetObjectItem(m2m_ae, "acpi")){
+		cJSON_ArrayForEach(acpi_obj, cJSON_GetObjectItem(target_rtnode->obj, "acpi")){
+			acpi_flag = false;
+			cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(m2m_ae, "acpi")){
+				if(strcmp(acpi_obj->valuestring, pjson->valuestring) != 0){
+					acpi_flag = true;
+					break;
+				}
+			}
+			if(!acpi_flag) {
+				logger("UTIL", LOG_LEVEL_INFO, "acpi %s", acpi_obj->valuestring);
+				if(!has_acpi_update_privilege(o2pt, acpi_obj->valuestring)){
+					return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
+				}
+			}
+		}
+		
+		if(validate_acpi(o2pt, pjson, OP_UPDATE) != RSC_OK){
+			return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
+		}
+	}
 	
 	if(result != RSC_OK){
 		logger("O2", LOG_LEVEL_ERROR, "validation failed");
@@ -823,8 +848,40 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	cJSON* cnt = target_rtnode->obj;
 	int result;
 	cJSON *pjson = NULL;
+	cJSON *acpi_obj = NULL;
+	bool acpi_flag = false;
 
 	result = validate_cnt(o2pt, m2m_cnt, OP_UPDATE); //TODO - add UPDATE validation
+
+	//update acpi
+	if(cJSON_GetObjectItem(m2m_cnt, "acpi")){
+
+		//delete removed acpi
+		cJSON_ArrayForEach(acpi_obj, cJSON_GetObjectItem(cnt, "acpi")){
+			acpi_flag = false;
+			cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(m2m_cnt, "acpi")){
+				if(strcmp(acpi_obj->valuestring, pjson->valuestring) != 0){
+					acpi_flag = true;
+					break;
+				}
+			}
+			if(!acpi_flag) {
+				logger("UTIL", LOG_LEVEL_INFO, "acpi %s", acpi_obj->valuestring);
+				if(!has_acpi_update_privilege(o2pt, acpi_obj->valuestring)){
+					return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
+				}
+			}
+		}
+
+		//validate new acpi
+		if(cJSON_GetArraySize(cJSON_GetObjectItem(m2m_cnt, "acpi")) > 0){
+			if(validate_acpi(o2pt, cJSON_GetObjectItem(m2m_cnt, "acpi"), OP_UPDATE) != RSC_OK){
+				return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
+			}
+		}	
+	}
+
+
 	if(result != RSC_OK) return result;
 
 	cJSON_AddNumberToObject(m2m_cnt, "st", cJSON_GetObjectItem(cnt, "st")->valueint + 1);

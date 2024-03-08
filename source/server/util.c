@@ -852,6 +852,13 @@ int result_parse_uri(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 	} 
 }
 
+/**
+ * @brief check privilege of originator
+ * @param o2pt oneM2MPrimitive
+ * @param rtnode resource node
+ * @param acop access control operation
+ * @return 0 if success, -1 if fail
+*/
 int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop) {
 	bool deny = false;
 
@@ -875,7 +882,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop) {
 	if(rtnode->ty == RT_CIN) rtnode = rtnode->parent;
 
 	if(rtnode->ty != RT_CSE) {
-		if(get_acpi_rtnode(rtnode) || rtnode->ty == RT_ACP) {
+		if((get_acpi_rtnode(rtnode) && cJSON_GetArraySize(get_acpi_rtnode(rtnode)) > 0) || rtnode->ty == RT_ACP) {
 			deny = true;
 			if((get_acop(o2pt, rtnode) & acop) == acop) {
 				deny = false;
@@ -921,7 +928,6 @@ int check_macp_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop){
 
 int get_acop(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 	int acop = 0;
-	logger("UTIL", LOG_LEVEL_DEBUG, "get_acop : %s", o2pt->fr);
 	char *origin = NULL;
 	if(!o2pt->fr) {
 		origin = strdup("all");
@@ -1121,6 +1127,21 @@ int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop) {
 	return 0;
 }
 
+int has_acpi_update_privilege(oneM2MPrimitive *o2pt, char *acpi){
+	char *origin = o2pt->fr;
+	if(!origin) return 0;
+	if(!acpi) return 1;
+
+	RTNode *acp = find_rtnode(acpi);
+	int result = get_acop_origin(o2pt, acp, 1);
+	if( (result & ACOP_UPDATE) == ACOP_UPDATE) {
+		return 1;
+	}
+	return 0;
+
+}
+
+
 int check_rn_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 	if(!rtnode) return 0;
 	cJSON *root = o2pt->cjson_pc;
@@ -1141,11 +1162,13 @@ int check_rn_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 			}
 			child = child->sibling_right;
 		}
+		#if ALLOW_CIN_RN
 		if(o2pt->ty == RT_CIN) {
 			if(db_check_cin_rn_dup(rn->valuestring, cJSON_GetObjectItem(rtnode->obj, "ri")->valuestring)){
 				flag = true;
 			}
 		}
+		#endif
 	}
 
     if(flag) {
@@ -2441,11 +2464,6 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op){
 	if( !cJSON_IsArray(acpiAttr) && !cJSON_IsNull(acpiAttr)){
 		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` is in invalid form");
 	}
-	if(cJSON_IsArray(acpiAttr) && cJSON_GetArraySize(acpiAttr) == 0){
-		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` is empty");
-	}
-
-	
 
 	cJSON *acpi = NULL;
 	int acop = 0;
@@ -2688,14 +2706,16 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op){
 		}
 	}
 	
-	pjson = cJSON_GetObjectItem(cnt, "acpi");
-	if(pjson){
-		int result = validate_acpi(o2pt, pjson, op);
-		if(result != RSC_OK) return result;
+	if(op == OP_CREATE){
+		pjson = cJSON_GetObjectItem(cnt, "acpi");
+		if(pjson && cJSON_GetArraySize(pjson) > 0){
+			int result = validate_acpi(o2pt, pjson, op);
+			if(result != RSC_OK) return result;
+		}
 	}
 
 	if(op == OP_UPDATE){
-		if(pjson && cJSON_GetArraySize(pjson) > 1){
+		if(cnt && cJSON_GetArraySize(cnt) > 1){
 			handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
 			return RSC_BAD_REQUEST;
 		}

@@ -284,7 +284,6 @@ void handle_http_request(HTTPRequest *req, int slotno) {
         o2pt->ty = http_parse_object_type(req->headers);
         if(o2pt->ty == 0){
             o2pt->op = OP_NOTIFY;
-            return;
         }
     } 
     else if(o2pt->op == OP_OPTIONS){
@@ -590,7 +589,7 @@ int send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res
     rcvd = recv(sock, buffer, BUF_SIZE, 0); 
 
     if (rcvd < 0){ // receive error
-        logger("HTTP", LOG_LEVEL_ERROR, "recv() error");
+        // logger("HTTP", LOG_LEVEL_ERROR, "recv() error");
         res->status_code = 500;
     } else if (rcvd == 0) { // receive socket closed
         logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
