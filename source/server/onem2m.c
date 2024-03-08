@@ -1185,12 +1185,13 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 
 	add_general_attribute(grp, parent_rtnode, RT_GRP);
 
-	cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
 
 	rsc = validate_grp(o2pt, grp);
 	if(rsc >= 4000){
 		return logger("O2M", LOG_LEVEL_DEBUG, "Group Validation failed");
 	}
+	
+	cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
 	
 	if(o2pt->pc) free(o2pt->pc);
 	o2pt->pc = cJSON_PrintUnformatted(root);
