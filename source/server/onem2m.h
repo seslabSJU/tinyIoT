@@ -122,7 +122,7 @@ typedef struct _o{
 	ContentStatus cnst;
 	int cnot;
 	cJSON *fc;
-	cJSON *drt;
+	int drt;
 }oneM2MPrimitive;
 
 typedef struct _n{

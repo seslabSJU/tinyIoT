@@ -313,13 +313,11 @@ void handle_http_request(HTTPRequest *req, int slotno) {
         cJSON *qs = qs_to_json(req->qs);
         parse_qs(qs);
 
-        o2pt->drt = cJSON_CreateObject();
         if(cJSON_GetObjectItem(qs, "drt")){
-            cJSON_AddNumberToObject(o2pt->drt, "drt", cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "drt")));
+            o2pt->drt = cJSON_GetObjectItem(qs, "drt")->valueint;
         } else {
-            cJSON_AddNumberToObject(o2pt->drt, "drt", DRT_STRUCTURED);
+            o2pt->drt = DRT_STRUCTURED;
         }
-        cJSON_DeleteItemFromObject(qs, "drt");
 
         if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) == FU_DISCOVERY){
             o2pt->op = OP_DISCOVERY;
