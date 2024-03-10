@@ -17,6 +17,7 @@
 #define BUF_SIZE 65535
 
 coapPacket* req = NULL;
+int rel5 = 0;
 
 /* oneM2M/CoAP options */
 char *coap_opt_name(int opt) {
@@ -91,10 +92,10 @@ int op_to_code(Operation op){
 Operation coap_parse_operation(char *method){
 	Operation op;
 
-	if(strcmp(method, "POST") == 0)         op = OP_CREATE;
-	else if(strcmp(method, "GET") == 0)     op = OP_RETRIEVE;
-	else if (strcmp(method, "PUT") == 0)    op = OP_UPDATE;
-	else if (strcmp(method, "DELETE") == 0) op = OP_DELETE;
+	if(!strcmp(method, "POST"))                                 op = OP_CREATE;
+	else if(!strcmp(method, "GET") || !strcmp(method, "FETCH")) op = OP_RETRIEVE;
+	else if (!strcmp(method, "PUT"))                            op = OP_UPDATE;
+	else if (!strcmp(method, "DELETE"))                         op = OP_DELETE;
 
 	return op;
 }
@@ -114,6 +115,7 @@ char *coap_parse_req_code(coap_pdu_code_t code){
         case COAP_REQUEST_POST:     return "POST";
         case COAP_REQUEST_PUT:      return "PUT";
         case COAP_REQUEST_DELETE:   return "DELETE";
+        case COAP_REQUEST_FETCH:    return "FETCH";
     }
 }
 
@@ -145,12 +147,21 @@ void coap_respond_to_client(oneM2MPrimitive *o2pt, coap_resource_t *r, coap_sess
     char buf[BUF_SIZE] = {'\0'};
     sprintf(buf, "\n%s %s %d\r\n", coap_parse_type(COAP_MESSAGE_ACK), status, o2pt->rsc);
 
+    sprintf(buf + strlen(buf), "\r\n");
+    sprintf(buf + strlen(buf), "RQI: %s\r\n", o2pt->rqi);
+    sprintf(buf + strlen(buf), "RVI: %s\r\n", o2pt->rvi);
+
     if(o2pt->pc){
         sprintf(buf + strlen(buf), "\r\n");
         normalize_payload(o2pt->pc);
         strcat(buf, o2pt->pc);
         sprintf(buf + strlen(buf), "\r\n");
-    } 
+    }
+
+    if(o2pt->cnot){
+        sprintf(buf + strlen(buf), "CNOT: %d\r\n", o2pt->cnot);
+        sprintf(buf + strlen(buf), "CNST: %d\r\n", o2pt->cnst);
+    }
     
     coap_pdu_set_type(res_pdu, COAP_MESSAGE_ACK);
     coap_pdu_set_code(res_pdu, COAP_RESPONSE_CODE(status_code));
@@ -176,11 +187,19 @@ void opt_to_o2pt(oneM2MPrimitive *o2pt, int opt_num, char *opt_buf) {
             }
             break;
         case COAP_OPTION_URI_QUERY: 
-            o2pt->fc = qs_to_json(opt_buf);
-            parse_filter_criteria(o2pt->fc);
-            if(cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->fc, "fu")) == FU_DISCOVERY){
+            cJSON *qs = qs_to_json(opt_buf);
+            parse_qs(qs);
+
+            if(cJSON_GetObjectItem(qs, "drt")){
+                o2pt->drt = cJSON_GetObjectItem(qs, "drt")->valueint;
+            } else {
+                o2pt->drt = DRT_STRUCTURED;
+            }
+
+            if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) == FU_DISCOVERY){
                 o2pt->op = OP_DISCOVERY;
             }
+            o2pt->fc = qs;
             break;
 
         /* oneM2M Options */
@@ -189,9 +208,37 @@ void opt_to_o2pt(oneM2MPrimitive *o2pt, int opt_num, char *opt_buf) {
         case oneM2M_RQI:
             o2pt->rqi = strdup(opt_buf); break;
         case oneM2M_RVI:
-            o2pt->rvi = strdup(opt_buf); break;
+            o2pt->rvi = strdup(opt_buf); 
+            if(!strcmp(o2pt->rvi, "5")) rel5 = 1;
+            break;
         case oneM2M_TY:
             o2pt->ty = coap_parse_object_type(atoi(opt_buf)); break;    
+    }
+}
+
+void payload_opt_to_o2pt(oneM2MPrimitive *o2pt, cJSON *cjson_payload) {
+    o2pt->fr = strdup(cJSON_GetObjectItem(cjson_payload, "fr")->valuestring);
+    o2pt->rqi = strdup(cJSON_GetObjectItem(cjson_payload, "rqi")->valuestring);
+    o2pt->rvi = strdup(cJSON_GetObjectItem(cjson_payload, "rvi")->valuestring);
+
+    if(cJSON_GetObjectItem(cjson_payload, "ty"))
+        o2pt->ty = coap_parse_object_type(cJSON_GetObjectItem(cjson_payload, "ty")->valueint);
+    if(cJSON_GetObjectItem(cjson_payload, "fc")) {
+        o2pt->fc = cJSON_GetObjectItem(cjson_payload, "fc");
+        parse_filter_criteria(o2pt->fc);
+        if(cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->fc, "fu")) == FU_DISCOVERY){
+            o2pt->op = OP_DISCOVERY;
+        }
+    }
+    if(cJSON_GetObjectItem(cjson_payload, "drt")) {
+        o2pt->drt = cJSON_GetObjectItem(cjson_payload, "drt")->valueint;
+    } else {
+        o2pt->drt = DRT_STRUCTURED;
+    }
+
+    if(cJSON_GetObjectItem(cjson_payload, "pc")) {
+        o2pt->pc = cJSON_Print(cJSON_GetObjectItem(cjson_payload, "pc"));
+        o2pt->cjson_pc = cJSON_GetObjectItem(cjson_payload, "pc");
     }
 }
 
@@ -267,13 +314,37 @@ void hnd_coap_req(coap_resource_t *r, coap_session_t *session, const coap_pdu_t 
                 }
                 break;
             /* Value: Number */
-            case COAP_OPTION_CONTENT_TYPE:
             case oneM2M_RSC:
-            case oneM2M_TY:
             case oneM2M_CTO:
             case oneM2M_CTS:
                 sprintf(opt_buf, "%d", *opt_val);
                 sprintf(buf + strlen(buf), "%d", *opt_val);
+                break;
+            case oneM2M_TY:
+                char *ty;
+                switch(*opt_val) {
+                    case 49 : ty = "ACP"; break;
+                    case 50 : ty = "AE"; break;
+                    case 51 : ty = "CNT"; break;
+                    case 52 : ty = "CIN"; break;
+                    case 53 : ty = "CSE"; break;
+                    case 57 : ty = "GRP"; break;
+                    case 64 : ty = "CSR"; break;
+                    case 71 : ty = "SUB"; break;
+                }
+                sprintf(opt_buf, "%d", *opt_val);
+                sprintf(buf + strlen(buf), "%s", ty);
+                break;
+            case COAP_OPTION_CONTENT_FORMAT:
+                if(*opt_val == COAP_MEDIATYPE_APPLICATION_JSON) {
+                    strncpy(opt_buf, "application/json", strlen("application/json"));
+                    sprintf(buf + strlen(buf), "%s", opt_buf);
+                } else {
+                    logger(LOG_TAG, LOG_LEVEL_ERROR, "Unsupported Content-Format");
+                    o2pt->rsc = RSC_UNSUPPORTED_MEDIATYPE;
+                    coap_respond_to_client(o2pt, r, session, req_pdu, res_pdu);
+                    return;
+                }
                 break;
             /* Value: String */
             default:
@@ -368,8 +439,27 @@ void hnd_coap_req(coap_resource_t *r, coap_session_t *session, const coap_pdu_t 
 
     if(data_so_far->length) {
         sprintf(buf + strlen(buf), "\nPayload:\r\n\n%s\r\n", data_so_far->s);
-        o2pt->pc = strdup(data_so_far->s);
-        o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
+
+        char *payload = strdup(data_so_far->s);
+        cJSON *cjson_payload = cJSON_Parse(payload);
+
+        if(cJSON_GetObjectItem(cjson_payload, "rvi")) {
+            if(!strcmp(cJSON_GetObjectItem(cjson_payload, "rvi")->valuestring, "5")) rel5 = 1;
+        }
+
+        // If Release 5
+        if(rel5 == 1) { 
+            payload_opt_to_o2pt(o2pt, cjson_payload);
+        } else {
+            if(req->code == COAP_REQUEST_FETCH) {
+                o2pt->rsc = RSC_BAD_REQUEST;
+                coap_respond_to_client(o2pt, r, session, req_pdu, res_pdu);
+                return;
+            } else {
+                o2pt->pc = strdup(data_so_far->s);
+                o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
+            }
+        }
     }
     if(!o2pt->pc) o2pt->pc = strdup("");
     
@@ -415,10 +505,11 @@ void hnd_unknown(coap_resource_t *resource COAP_UNUSED,
     */
     r = coap_resource_init((coap_str_const_t *)uri_path,
                             COAP_RESOURCE_FLAGS_RELEASE_URI | COAP_RESOURCE_FLAGS_NOTIFY_CON);
-    coap_register_request_handler(r, COAP_REQUEST_PUT, hnd_coap_req);
-    coap_register_request_handler(r, COAP_REQUEST_POST, hnd_coap_req);
-    coap_register_request_handler(r, COAP_REQUEST_DELETE, hnd_coap_req);
     coap_register_request_handler(r, COAP_REQUEST_GET, hnd_coap_req);
+    coap_register_request_handler(r, COAP_REQUEST_POST, hnd_coap_req);
+    coap_register_request_handler(r, COAP_REQUEST_PUT, hnd_coap_req);
+    coap_register_request_handler(r, COAP_REQUEST_DELETE, hnd_coap_req);
+    coap_register_request_handler(r, COAP_REQUEST_FETCH, hnd_coap_req);
     coap_add_resource(coap_session_get_context(session), r);
 
     /* Do for this first call */
@@ -488,8 +579,8 @@ void* coap_serve(void) {
     coap_address_init(&serv_addr);
     serv_addr.addr.sin.sin_family = AF_INET;
     serv_addr.addr.sin.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.addr.sin.sin_port = htons(5683); // Default CoAP port
-
+    serv_addr.addr.sin.sin_port = htons(COAP_PORT);
+    
     coap_context_t *ctx = coap_new_context(NULL);
     if (!ctx) {
         logger(LOG_TAG, LOG_LEVEL_ERROR, "Not Created Context");
@@ -538,6 +629,7 @@ void* coap_serve(void) {
     coap_register_handler(r, COAP_REQUEST_POST, hnd_unknown);
     coap_register_handler(r, COAP_REQUEST_PUT, hnd_unknown);
     coap_register_handler(r, COAP_REQUEST_DELETE, hnd_unknown);
+    coap_register_handler(r, COAP_REQUEST_FETCH, hnd_unknown);
     coap_add_resource(ctx, r);
 
     /* Block transfer */

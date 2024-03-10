@@ -393,16 +393,14 @@ ResourceType coap_parse_object_type(int object_type) {
 	ResourceType ty;
 	
 	switch(object_type) {
-	case 1 : ty = RT_ACP; break;
-	case 2 : ty = RT_AE; break;
-	case 3 : ty = RT_CNT; break;
-	case 4 : ty = RT_CIN; break;
-	case 5 : ty = RT_CSE; break;
-	case 9 : ty = RT_GRP; break;
-	case 16: ty = RT_CSR; break;
-	case 23 : ty = RT_SUB; break;
-	case 10002: ty = RT_AEA; break;
-	case 10005: ty = RT_CBA; break;
+	case 49 : ty = RT_ACP; break;	// 1
+	case 50 : ty = RT_AE; break;	// 2
+	case 51 : ty = RT_CNT; break;	// 3
+	case 52 : ty = RT_CIN; break;	// 4
+	case 53 : ty = RT_CSE; break;	// 5
+	case 57 : ty = RT_GRP; break;	// 9
+	case 64 : ty = RT_CSR; break;	// 16
+	case 71 : ty = RT_SUB; break;	// 23
 	default : ty = RT_MIXED; break;
 	}
 	
