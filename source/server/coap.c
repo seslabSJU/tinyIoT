@@ -314,12 +314,6 @@ void hnd_coap_req(coap_resource_t *r, coap_session_t *session, const coap_pdu_t 
                 }
                 break;
             /* Value: Number */
-            case oneM2M_RSC:
-            case oneM2M_CTO:
-            case oneM2M_CTS:
-                sprintf(opt_buf, "%d", *opt_val);
-                sprintf(buf + strlen(buf), "%d", *opt_val);
-                break;
             case oneM2M_TY:
                 char *ty;
                 switch(*opt_val) {
