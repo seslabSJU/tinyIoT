@@ -561,7 +561,6 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		if(cin_rtnode->rn) free(cin_rtnode->rn);
 		cin_rtnode->rn = strdup("la");
 	}
-	cin_rtnode->obj = NULL;
 	return RSC_CREATED;
 }
 
@@ -990,8 +989,10 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
  * @return int 1 for success, -1 for fail
 */
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign) {
+	if(!cnt_rtnode || !cin_rtnode) return -1;
 	cJSON *cnt = cnt_rtnode->obj;
 	cJSON *cin = cin_rtnode->obj;
+	if(!cnt || !cin) return -1;
 	cJSON *cni = cJSON_GetObjectItem(cnt, "cni");
 	cJSON *cbs = cJSON_GetObjectItem(cnt, "cbs");
 	cJSON *st = cJSON_GetObjectItem(cnt, "st");
@@ -1031,6 +1032,7 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode) {
 
 int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 	cJSON *csr, *dcse, *dcse_item;
+	if(rtnode->child) delete_process(o2pt, rtnode->child);
 	switch(rtnode->ty) {
 		case RT_ACP :
 			break;
@@ -1040,6 +1042,10 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 			break;
 		case RT_CIN :
 			update_cnt_cin(rtnode->parent, rtnode,-1);
+			if(strcmp(rtnode->rn, "la") != 0){
+				rtnode->parent->child = NULL;
+			}
+
 			break;
 		case RT_SUB :
 			detach_subs(rtnode->parent, rtnode);
@@ -1087,7 +1093,7 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 		forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
 	}
 	
-	if(rtnode->child) delete_process(o2pt, rtnode->child);
+	
 	return 1;
 }
 
@@ -1185,13 +1191,12 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 
 	add_general_attribute(grp, parent_rtnode, RT_GRP);
 
+	cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
 
 	rsc = validate_grp(o2pt, grp);
 	if(rsc >= 4000){
 		return logger("O2M", LOG_LEVEL_DEBUG, "Group Validation failed");
 	}
-	
-	cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
 	
 	if(o2pt->pc) free(o2pt->pc);
 	o2pt->pc = cJSON_PrintUnformatted(root);
@@ -1409,7 +1414,7 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	int rsc = 0;
 	int cnt = 0;
 	int cnm = 0;
-	int idx = 0;
+	int idx = 1;
 	bool updated = false;
 
 	RTNode *target_rtnode = NULL;
@@ -1462,11 +1467,12 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	cJSON_ArrayForEach(mid_obj, mid_arr){
 		rsc = 0;
 		char *mid = cJSON_GetStringValue(mid_obj);
+		if(strlen(mid) == 0) continue;
 		if(req_o2pt->to) free(req_o2pt->to);
 		if(req_o2pt->pc) free(req_o2pt->pc);
 		req_o2pt->pc = strdup(o2pt->pc);
 		if(o2pt->fopt){
-			if(strncmp(mid, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) != 0 && mid[strlen(CSE_BASE_NAME) ] != '/'){
+			if(strncmp(mid, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) != 0){
 				mid = ri_to_uri(mid);
 			}
 			req_o2pt->to = malloc(strlen(mid) + strlen(o2pt->fopt) + 2);
@@ -1477,7 +1483,6 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 		}
 		req_o2pt->isFopt = false;
 		ResourceAddressingType RAT = checkResourceAddressingType(mid);
-		logger("O2M", LOG_LEVEL_DEBUG, "mid : %s", mid);
 		if(RAT == CSE_RELATIVE){
 			target_rtnode = find_rtnode(req_o2pt->to);
 		}else if(RAT == SP_RELATIVE){
@@ -1492,12 +1497,8 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 			}
 		}
 
-		json = o2pt_to_json(req_o2pt);
-		// logger("O2M", LOG_LEVEL_DEBUG, "reqo2pt : %s", cJSON_PrintUnformatted(json));
 		if(target_rtnode){
 			rsc = handle_onem2m_request(req_o2pt, target_rtnode);
-			json = o2pt_to_json(req_o2pt);
-			// logger("O2M", LOG_LEVEL_DEBUG, "reqo2pt2 : %s", cJSON_PrintUnformatted(json));
 			if(rsc < 4000) cnt++;
 			json = o2pt_to_json(req_o2pt);
 			if(json) {
@@ -1580,15 +1581,15 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 	int lim = INT_MAX;
 	int ofst = 0;
 	if(lim_obj){
-		lim = lim_obj->valueint;
+		lim = cJSON_GetNumberValue(lim_obj);
 	}
 	if(ofst_obj){
-		ofst = ofst_obj->valueint;
+		ofst = cJSON_GetNumberValue(ofst_obj);
 	}
 	
 	if(urilSize > lim){
 		logger("O2M", LOG_LEVEL_DEBUG, "limit exceeded");
-		cJSON_DeleteItemFromArray(uril, urilSize - 1);
+		cJSON_DeleteItemFromArray(uril, urilSize);
 		o2pt->cnst = CS_PARTIAL_CONTENT;
 		o2pt->cnot = ofst + lim;
 	}

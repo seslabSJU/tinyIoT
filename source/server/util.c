@@ -774,15 +774,17 @@ void init_server() {
 }
 
 void init_resource_tree(){
+	RTNode *temp = NULL;
 	RTNode *rtnode_list = (RTNode *)calloc(1,sizeof(RTNode));
 	RTNode *tail = rtnode_list;
+
 	logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree");
 	RTNode *resource_list = db_get_all_resource_as_rtnode();
 	tail->sibling_right = resource_list;
 	if(resource_list) resource_list->sibling_left = tail;
 	while(tail->sibling_right) tail = tail->sibling_right;
 
-	RTNode *temp = db_get_latest_cins();
+	temp = db_get_latest_cins();
 	if(temp) {
 		tail->sibling_right = temp;
 		temp->sibling_left = tail;
@@ -2715,7 +2717,8 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op){
 	}
 
 	if(op == OP_UPDATE){
-		if(cnt && cJSON_GetArraySize(cnt) > 1){
+		pjson = cJSON_GetObjectItem(cnt, "acpi");
+		if(pjson && cJSON_GetArraySize(cnt) > 1){
 			handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
 			return RSC_BAD_REQUEST;
 		}
