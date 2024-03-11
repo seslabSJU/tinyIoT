@@ -91,7 +91,7 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op);
 int validate_acp(oneM2MPrimitive *o2pt, cJSON *acp, Operation op);
 int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp);
 int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new);
-bool validate_grp_member(cJSON *grp, cJSON *final_mid , int csy, int mt);
+int validate_grp_member(cJSON *grp, cJSON *final_mid , int csy, int mt);
 int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Operation op);
 int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op);
 bool checkResourceCseID(char *resourceUri, char* cseID);

@@ -1429,9 +1429,17 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp){
 	}
 
 	cJSON *final_mid = cJSON_CreateArray();
-	bool mtv = validate_grp_member(grp, final_mid, csy, mt);
-	// logger("UTIL", LOG_LEVEL_DEBUG, "mtv : %d", mtv);
-	cJSON_AddBoolToObject(grp, "mtv", mtv);
+	
+	int result = validate_grp_member(grp, final_mid, csy, mt);
+	if(result >= RSC_BAD_REQUEST){
+		return handle_error(o2pt, result, "GRP member is invalid");
+	}
+
+	if(result == 0){
+		cJSON_AddBoolToObject(grp, "mtv", false);
+	}else if(result == 1){
+		cJSON_AddBoolToObject(grp, "mtv", true);
+	}
 
 	cJSON_DeleteItemFromObject(grp, "mid");
 	cJSON_AddItemToObject(grp, "mid", final_mid);
@@ -1444,9 +1452,9 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp){
  * @param final_mid cJSON of validated grp member ids
  * @param csy consistency policy
  * @param mt member type
- * @return true if mtv = true, false if mtv = false
+ * @return 0 if mtv is false, 1 if mtv is true, RSC error code if error
 */
-bool validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt){
+int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt){
 	bool isLocalResource = false;
 	cJSON *mid_obj = NULL;
 	cJSON *midArr = cJSON_GetObjectItem(grp, "mid");
@@ -1499,14 +1507,14 @@ bool validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt){
 						if(csy == CSY_ABANDON_GROUP) return RSC_RECEIVER_HAS_NO_PRIVILEGES;
 					}
 
-					if(csy == CSY_ABANDON_GROUP) return RSC_BAD_REQUEST;
+					if(csy == CSY_ABANDON_GROUP) return RSC_GROUPMEMBER_TYPE_INCONSISTENT;
 					else if(csy == CSY_ABANDON_MEMBER) {
 						// CSY_ABANDON_MEMBER - member unsaved
 						continue;
 					}
 				}
 				if(rt_node == NULL){
-					return false;
+					return 0;
 				}
 
 			}
@@ -1529,7 +1537,10 @@ bool validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt){
 
 		if(!hasFopt && mt != 0 && rt_node->ty != mt){
 			logger("UTIL", LOG_LEVEL_DEBUG, "GRP member %s type is inconsistent", tStr);
-			if(csy == CSY_ABANDON_GROUP) return RSC_GROUPMEMBER_TYPE_INCONSISTENT;
+			if(csy == CSY_ABANDON_GROUP) {
+				if(resourceLocation == 2) free_rtnode(rt_node);
+				return RSC_GROUPMEMBER_TYPE_INCONSISTENT;
+			}
 			else if(csy == CSY_SET_MIXED) {
 				cJSON_SetIntValue(cJSON_GetObjectItem(grp, "mt"), RT_MIXED);
 				mt = RT_MIXED;
@@ -1579,7 +1590,7 @@ bool validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt){
 
 		if(resourceLocation == 2) free_rtnode(rt_node);
 	}
-	return true;
+	return 1;
 }
 
 int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new){
