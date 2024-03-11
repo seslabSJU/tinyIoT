@@ -194,7 +194,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 			break;
 	
 		default:
-			handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "{\"m2m:dbg\": \"internal server error\"}");
+			handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "internal server error");
 			return RSC_INTERNAL_SERVER_ERROR;
 		}
 		

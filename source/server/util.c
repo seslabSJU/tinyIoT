@@ -3085,7 +3085,7 @@ int update_remote_csr_dcse(RTNode *skip_rtnode){
 	cJSON *root = cJSON_CreateObject();
 	cJSON *dcse = cJSON_GetObjectItem(rt->cb->obj, "dcse");
 	if(!dcse){
-		logger("UTIL", LOG_LEVEL_ERROR, "dcse not found");
+		logger("UTIL", LOG_LEVEL_DEBUG, "dcse not found");
 		return -1;
 	}
 	dcse = cJSON_Duplicate(dcse, 1);

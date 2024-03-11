@@ -160,6 +160,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
 	add_general_attribute(csr, parent_rtnode, RT_CSR);
 	cJSON_AddStringToObject(csr, "csi", o2pt->fr);
+	cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
 	cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate( cJSON_GetObjectItem(csr, "rn"), 1));
 
 
@@ -975,7 +976,6 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	result = db_update_resource(m2m_csr, cJSON_GetStringValue(cJSON_GetObjectItem(csr, "ri")), RT_CSR);
 	
 	update_remote_csr_dcse(target_rtnode);
-	if(o2pt->pc) free(o2pt->pc);
 
 	cJSON *root = cJSON_CreateObject();
 	cJSON_AddItemToObject(root, "m2m:csr", target_rtnode->obj);
@@ -1200,7 +1200,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	if(rsc >= 4000){
 		return logger("O2M", LOG_LEVEL_DEBUG, "Group Validation failed");
 	}
-	
+
 	cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
 	
 	if(o2pt->pc) free(o2pt->pc);
