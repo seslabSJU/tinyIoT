@@ -408,6 +408,11 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port){
     add_header("X-M2M-Origin", o2pt->fr, req->headers);
     add_header("X-M2M-RVI", "2a", req->headers);
     add_header("X-M2M-RI", o2pt->rqi, req->headers);
+
+    if(o2pt->fc){
+        req->qs = fc_to_qs(o2pt->fc);
+    }
+    
     if(o2pt->ty > 0){
         sprintf(buffer, "application/json;ty=%d", o2pt->ty);
         add_header("Content-Type", buffer, req->headers);
@@ -572,7 +577,7 @@ int send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res
         set_header("Content-Length", contentSize, header);
     }
     if(req->qs == NULL) req->qs = bs;
-    sprintf(buffer, "%s %s%s %s\r\n%s\r\n", req->method, req->uri, req->qs, HTTP_PROTOCOL_VERSION, header);
+    sprintf(buffer, "%s %s%s%s %s\r\n%s\r\n", req->method, req->uri, req->qs ? "?" : "", req->qs, HTTP_PROTOCOL_VERSION, header);
     if(req->payload) {
         strcat(buffer, req->payload);
         strcat(buffer, "\r\n");

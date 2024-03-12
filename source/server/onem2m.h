@@ -178,6 +178,7 @@ RTNode* find_latest_oldest(RTNode* node, int flag);
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign);
 
 int validate_filter_criteria(oneM2MPrimitive *o2pt);
+char *fc_to_qs(cJSON *fc);
 
 bool do_uri_exist(cJSON* list, char *uri);
 void cjson_merge_objs_by_operation(cJSON* obj1, cJSON* obj2, FilterOperation fo);

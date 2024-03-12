@@ -124,3 +124,40 @@ void parse_filter_criteria(cJSON *fc){
         cJSON_AddNumberToObject(fc, "fo", 1);
     }
 }
+
+char *fc_to_qs(cJSON *fc){
+    char *qs = NULL;
+    char *key = NULL;
+    char *value = NULL;
+    cJSON *pjson = NULL, *ptr = NULL;
+    cJSON *fc_copy = fc;
+    pjson = fc_copy->child;
+
+    qs = (char *)malloc(256);
+    while(pjson != NULL){
+        key = pjson->string;
+        strcat(qs, key);
+        if(cJSON_IsArray(pjson)){
+            strcat(qs, "=");
+            value = cJSON_PrintUnformatted(pjson);
+            strcat(qs, value);
+            free(value);
+        }
+        else if(cJSON_IsNumber(pjson)){
+            strcat(qs, "=");
+            value = cJSON_PrintUnformatted(pjson);
+            strcat(qs, value);
+            free(value);
+        }
+        else if(cJSON_IsString(pjson)){
+            strcat(qs, "=");
+            value = cJSON_PrintUnformatted(pjson);
+            strcat(qs, value);
+            free(value);
+        }
+        strcat(qs, "&");
+        pjson = pjson->next;
+    }
+    qs[strlen(qs) - 1] = '\0';
+    return qs;
+}
