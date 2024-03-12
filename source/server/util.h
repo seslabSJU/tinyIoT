@@ -21,7 +21,7 @@ RTNode* get_rtnode(oneM2MPrimitive *o2pt);
 RTNode* parse_uri(oneM2MPrimitive *o2pt, RTNode *cb);
 int tree_viewer_api(oneM2MPrimitive *o2pt, RTNode *node);
 void tree_viewer_data(RTNode *node, char **viewer_data, int cin_size) ;
-RTNode *get_remote_resource(char *address);
+RTNode *get_remote_resource(char *address, int *rsc);
 
 cJSON *getNonDiscoverableAcp(oneM2MPrimitive *o2pt, RTNode *rtnode);
 cJSON *getNoPermAcopDiscovery(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop);
@@ -150,4 +150,5 @@ int get_number_from_cjson(cJSON *json);
 cJSON *qs_to_json(char* qs);
 cJSON *handle_uril(cJSON *uril, char *new_uri, FilterOperation fo);
 void filterOptionStr(FilterOperation fo , char *sql);
+ACOP op_to_acop(Operation op);
 #endif

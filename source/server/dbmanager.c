@@ -1050,7 +1050,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     sprintf(buf, "SELECT uri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
     strcat(sql, buf);
 
-    if(pjson = cJSON_GetObjectItem(fc, "lvl")){
+    if( (pjson = cJSON_GetObjectItem(fc, "lvl")) ){
         sprintf(buf, "uri NOT LIKE '%s/%%", uri);
         strcat(sql, buf);
         for(int i = 0 ; i < pjson->valueint ; i++){
@@ -1059,33 +1059,33 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
         strcat(sql, "' AND ");
     }
     
-    if(pjson = cJSON_GetObjectItem(fc, "cra")){
+    if( (pjson = cJSON_GetObjectItem(fc, "cra")) ){
         sprintf(buf, "ct>'%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
-    if(pjson = cJSON_GetObjectItem(fc, "crb")){
+    if( (pjson = cJSON_GetObjectItem(fc, "crb")) ){
         sprintf(buf, "ct<='%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
-    if(pjson = cJSON_GetObjectItem(fc, "exa")){
+    if( (pjson = cJSON_GetObjectItem(fc, "exa")) ){
         sprintf(buf, "et>'%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
-    if(pjson = cJSON_GetObjectItem(fc, "exb")){
+    if( (pjson = cJSON_GetObjectItem(fc, "exb")) ){
         sprintf(buf, "et<='%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "ms")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ms")) ){
         sprintf(buf, "lt>'%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
-    if(pjson = cJSON_GetObjectItem(fc, "us")){
+    if( (pjson = cJSON_GetObjectItem(fc, "us")) ){
         sprintf(buf, "lt<='%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
@@ -1093,7 +1093,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
 
 
 
-    if(pjson = cJSON_GetObjectItem(fc, "lbl")){
+    if( (pjson = cJSON_GetObjectItem(fc, "lbl")) ){
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 sprintf(buf, "lbl LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
@@ -1107,7 +1107,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "ty")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ty")) ){
 
         strcat(sql, "(");
         
@@ -1145,7 +1145,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     cJSON_Delete(acpiList);
     cJSON_Delete(forbiddenURI);
 
-    if(pjson = cJSON_GetObjectItem(fc, "ops")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ops"))){
         acpiList =  getNoPermAcopDiscovery(o2pt, rt->cb, pjson->valueint);
         forbiddenURI = getForbiddenUri(acpiList);
         if(cJSON_GetArraySize(forbiddenURI) > 0){
@@ -1165,25 +1165,25 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     }
     
 
-    if(pjson = cJSON_GetObjectItem(fc, "sza")){
+    if( (pjson = cJSON_GetObjectItem(fc, "sza")) ){
         sprintf(buf, " ri IN (SELECT ri FROM cin WHERE cs >= %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "szb")){
+    if( (pjson = cJSON_GetObjectItem(fc, "szb")) ){
         sprintf(buf, " ri IN (SELECT ri FROM cin WHERE cs < %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "sts")){
+    if( (pjson = cJSON_GetObjectItem(fc, "sts")) ){
         sprintf(buf, " ri IN (SELECT ri FROM cnt WHERE st < %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "stb")){
+    if( (pjson = cJSON_GetObjectItem(fc, "stb")) ){
         sprintf(buf, " ri IN (SELECT ri FROM cnt WHERE st >= %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
@@ -1191,7 +1191,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
 
     if(cJSON_GetObjectItem(fc, "pty") || cJSON_GetObjectItem(fc, "palb")){
         strcat(sql, "pi IN (SELECT ri from general WHERE ");
-         if(pjson = cJSON_GetObjectItem(fc, "pty")){
+         if( (pjson = cJSON_GetObjectItem(fc, "pty")) ){
             strcat(sql, "(");
             
             if(cJSON_IsArray(pjson)){
@@ -1209,7 +1209,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
             filterOptionStr(fo, sql);
         }
         
-        if(pjson = cJSON_GetObjectItem(fc, "palb")){
+        if( (pjson = cJSON_GetObjectItem(fc, "palb")) ){
             if(cJSON_IsArray(pjson)){
                 cJSON_ArrayForEach(ptr, pjson){
                     sprintf(buf, "lbl LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
@@ -1236,7 +1236,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
 
     if(cJSON_GetObjectItem(fc, "chty") || cJSON_GetObjectItem(fc, "clbl")){
         strcat(sql, "ri IN (SELECT pi from general WHERE ");
-         if(pjson = cJSON_GetObjectItem(fc, "chty")){
+         if( (pjson = cJSON_GetObjectItem(fc, "chty")) ){
             strcat(sql, "(");
             
             if(cJSON_IsArray(pjson)){
@@ -1254,7 +1254,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
             filterOptionStr(fo, sql);
         }
         
-        if(pjson = cJSON_GetObjectItem(fc, "clbl")){
+        if( (pjson = cJSON_GetObjectItem(fc, "clbl")) ){
             if(cJSON_IsArray(pjson)){
                 cJSON_ArrayForEach(ptr, pjson){
                     sprintf(buf, "lbl LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
@@ -1284,16 +1284,15 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     }else if(fo == FO_OR){
         sql[strlen(sql) - 3] = '\0';
     }
-    if(pjson = cJSON_GetObjectItem(fc, "lim")){
+    if( (pjson = cJSON_GetObjectItem(fc, "lim")) ){
         sprintf(buf, " LIMIT %d", pjson->valueint + 1);
         strcat(sql, buf);
     }
-    if( pjson = cJSON_GetObjectItem(fc, "ofst")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ofst")) ){
         sprintf(buf, " OFFSET %d", pjson->valueint);
         strcat(sql, buf);
     }
     strcat(sql, ";");
-    logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);

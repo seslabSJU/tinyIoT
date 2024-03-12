@@ -23,7 +23,7 @@ bool isFCAttrValid(cJSON *fc){
     if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "lvl")) < 0) return false;
     if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "ofst")) < 0) return false;
 
-    if(pjson = cJSON_GetObjectItem(fc, "ty")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ty")) ){
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 if(cJSON_GetNumberValue(ptr) < 0){
@@ -38,7 +38,7 @@ bool isFCAttrValid(cJSON *fc){
         }
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "chty")){
+    if( (pjson = cJSON_GetObjectItem(fc, "chty")) ){
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 if(cJSON_GetNumberValue(ptr) < 0){
@@ -53,7 +53,7 @@ bool isFCAttrValid(cJSON *fc){
         }
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "pty")){
+    if( (pjson = cJSON_GetObjectItem(fc, "pty")) ){
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 if(cJSON_GetNumberValue(ptr) < 0){
@@ -86,7 +86,7 @@ int validate_filter_criteria(oneM2MPrimitive *o2pt){
     cJSON *pjson = NULL;
     cJSON *fc = o2pt->fc;
     char buf[256] = {0};
-    if(!fc) return NULL;
+    if(!fc) return 0;
     pjson = fc->child;
 
     //check FilterUsage == Discovery
@@ -113,7 +113,7 @@ void parse_filter_criteria(cJSON *fc){
     "ofst", "ops", "la", "pty", "chty"};
     cJSON *pjson = NULL, *ptr = NULL;
     for(int i = 0 ; i < 14 ; i++){
-        if(pjson = cJSON_GetObjectItem(fc, int_Attrs[i])){
+        if( (pjson = cJSON_GetObjectItem(fc, int_Attrs[i])) ){
             if(cJSON_IsString(pjson)){
                 cJSON_ReplaceItemInObject(fc, int_Attrs[i], cJSON_CreateNumber(atoi(cJSON_GetStringValue(pjson))));
             }
