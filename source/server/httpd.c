@@ -183,8 +183,7 @@ void respond(int slot) {
         logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
         return;
     }
-    // message received
-    pthread_mutex_lock(&mutex_lock);  
+    // message received 
     buf[slot][rcvd] = '\0';
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf[slot]);
     memcpy(buffer, buf[slot], rcvd);
@@ -202,7 +201,6 @@ void respond(int slot) {
     handle_http_request(req, slot);    
     free(buf[slot]);
     free_HTTPRequest(req);
-    pthread_mutex_unlock(&mutex_lock);
 }
 
 Operation http_parse_operation(char *method){
@@ -344,7 +342,7 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
     char rsc[64];
     char cnst[32], ot[32];
     char response_headers[2048] = {'\0'};
-    char buf[BUF_SIZE] = {'\0'};
+    char buf[BUF_SIZE] = {0,};
 
     sprintf(content_length, "%ld", o2pt->pc ? strlen(o2pt->pc) : 0);
     sprintf(rsc, "%d", o2pt->rsc);
@@ -360,11 +358,9 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
         set_header("X-M2M-CNOT", ot, response_headers);
     }
 
-    sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
-    if(o2pt->pc){
-        strncat(buf, o2pt->pc, BUF_SIZE-1);
-    } 
-    write(clients[slotno], buf, BUF_SIZE); 
+    sprintf(buf, "%s %d %s\r\n%s%s\r\n%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers, o2pt->pc ? o2pt->pc : "");
+    
+    write(clients[slotno], buf, strlen(buf)); 
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf);
 }
 
