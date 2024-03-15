@@ -362,9 +362,9 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
 
     sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
     if(o2pt->pc){
-        strcat(buf, o2pt->pc);
+        strncat(buf, o2pt->pc, BUF_SIZE-1);
     } 
-    write(clients[slotno], buf, strlen(buf)); 
+    write(clients[slotno], buf, BUF_SIZE); 
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf);
 }
 

@@ -1287,6 +1287,9 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     if( (pjson = cJSON_GetObjectItem(fc, "lim")) ){
         sprintf(buf, " LIMIT %d", pjson->valueint + 1);
         strcat(sql, buf);
+    }else{
+        sprintf(buf, " LIMIT %d", DEFAULT_DISCOVERY_LIMIT);
+        strcat(sql, buf);
     }
     if( (pjson = cJSON_GetObjectItem(fc, "ofst")) ){
         sprintf(buf, " OFFSET %d", pjson->valueint);

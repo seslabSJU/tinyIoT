@@ -38,8 +38,15 @@
 #define DEFAULT_MAX_NR_INSTANCES 10
 #define DEFAULT_MAX_BYTE_SIZE 65536
 
+// CIN Settings
+#define ALLOW_CIN_RN true // true → allow, false → not allow
+
 // Group Settings
 #define DEFAULT_CONSISTENCY_POLICY CSY_ABANDON_MEMBER
+
+
+// Discovery Settings
+#define DEFAULT_DISCOVERY_LIMIT 150
 
 
 // MQTT Settings

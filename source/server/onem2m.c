@@ -250,6 +250,7 @@ int create_cba(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
 	RTNode* rtnode = create_rtnode(cba, RT_CBA);
 	add_child_resource_tree(parent_rtnode, rtnode);
+	return RSC_CREATED;
 }
 
 int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
@@ -506,7 +507,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		return rsc;
 	}
 	cJSON *pjson = NULL;
-	if(pjson = cJSON_GetObjectItem(cin, "cr")){
+	if( (pjson = cJSON_GetObjectItem(cin, "cr")) ){
 		if(pjson->type == cJSON_NULL){
 			cJSON_DeleteItemFromObject(cin, "cr");
 			cJSON_AddStringToObject(cin, "cr", o2pt->fr);
@@ -579,7 +580,7 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 	int rsc = validate_sub(o2pt, sub, OP_CREATE);
 
 	cJSON *pjson = NULL;
-	if(pjson = cJSON_GetObjectItem(sub, "cr")){
+	if( (pjson = cJSON_GetObjectItem(sub, "cr")) ){
 		if(pjson->type == cJSON_NULL){
 			cJSON_DeleteItemFromObject(sub, "cr");
 			cJSON_AddStringToObject(sub, "cr", o2pt->fr);
