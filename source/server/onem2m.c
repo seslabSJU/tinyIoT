@@ -1585,6 +1585,8 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 	int ofst = 0;
 	if(lim_obj){
 		lim = cJSON_GetNumberValue(lim_obj);
+	}else{
+		lim = DEFAULT_DISCOVERY_LIMIT;
 	}
 	if(ofst_obj){
 		ofst = cJSON_GetNumberValue(ofst_obj);
