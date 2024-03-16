@@ -33,6 +33,7 @@
 <p align = "center">
 <img src = "https://private-user-images.githubusercontent.com/136944859/313413626-86b037ce-4081-4997-aa25-00f788867bff.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTA2MDI4MjMsIm5iZiI6MTcxMDYwMjUyMywicGF0aCI6Ii8xMzY5NDQ4NTkvMzEzNDEzNjI2LTg2YjAzN2NlLTQwODEtNDk5Ny1hYTI1LTAwZjc4ODg2N2JmZi5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjQwMzE2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI0MDMxNlQxNTIyMDNaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0yYzNkNDcwYWNmZmM4NWM3Nzc3ZmFiYzE2N2ZjODExOTg2NjQ3ODFjZmExNDA1YjM5YjgxYmQ4YWI5MWM1MGFlJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZhY3Rvcl9pZD0wJmtleV9pZD0wJnJlcG9faWQ9MCJ9.gLIuFOjl3vUYBj_EskjjZZS84-7AiNOVFmgjhrrO2Hk" >
 </p>
+<br>
 
 # tinyIoT supports the following features
 
@@ -43,7 +44,7 @@
 - Discovery
 - Bindings: HTTP and MQTT (CoAP will be added in 2024 first quarter)
 - Group management 
-
+<br>
 
 # Installation & Development Environment
 Configure your running environment with the config.h file. You can configure IP address, Port number, supported binding protocols, etc. 
@@ -84,6 +85,7 @@ In order to run MQTT, Mosquitto MQTT broker should be installed on your machine.
   - HTTP: foxweb/pico
   - MQTT: Mosquitto
   - CoAP: To be added
+<br>
 
 # Documentation
 
