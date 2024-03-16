@@ -72,4 +72,6 @@ In order to run MQTT, Mosquitto MQTT broker should be installed on your machine.
 
 # Documentation
 
+We are managing our development documentation through GitHub files. For more information, please see below. You can view our development process and documentation within these files.
 
+<a href = "홈페이지url" target="_blank"><b>documentation</b></a>
