@@ -13,11 +13,16 @@
 
 # What is the tinyIoT?
 
-oneM2M is a global partnership project founded in 2012 to create a global technical standard for interoperability concerning the architecture, API specifications, security and enrolments solutions for Internet of Things (IoT) technologies based on requirements contributed by its members. The standardised specifications produced by oneM2M enable an Eco-System to support a wide range of applications and services such as smart cities, smart grid, connected car, home automation, public safety, and health.
+<b>tinyIoT</b> is a secure, fast, lightweight and very flexible oneM2M service layer platform compliant with oneM2M specifications.
 
-tinyIoT is a secure, fast, lightweight and very flexible oneM2M service layer platform compliant with oneM2M specifications. tinyIoT uses memory and CPU efficiently and has low resource use. tinyIoT is implemented in C and uses lightweight open source components for database (SQLite), JSON parser (cJSON), http server (pico) and mqtt client (wolfMQTT) . tinyIoT also comes with a web-based dashboard implemented using Vue. 
+<b>tinyIoT</b> uses memory  and CPU efficiently and has low resource use.
 
-tinyIoT supports the following features: 
+<b>tinyIoT</b> is implemented id C and uses lightweight open source components for database (SQLite), JSON parser (cJSON), http server (pico) and mqtt client (wolfMQTT)
+
+<b>tinyIoT</b> also comes with a web-based dashboard implemented using Vue.
+
+
+# tinyIoT supports the following features
 
 - Registration of IoT 
 - AcessControlPolicy (ACP), Application Entity (AE), Container (CNT), contentInstance (CIN) resources
