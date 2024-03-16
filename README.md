@@ -15,13 +15,14 @@
 <img src="https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white"/>&nbsp
 <img src="https://img.shields.io/badge/json-000000?style=flat-square&logo=json&logoColor=white"/>&nbsp
 <img src="https://img.shields.io/badge/MQTT-660066?style=flat-square&logo=mqtt&logoColor=white"/>&nbsp
+<img src="https://img.shields.io/badge/Vue-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white"/>&nbsp
 </p>
 <br><br>
 
 
 # What is the tinyIoT?
 
-<b>tinyIoT</b> is a secure, fast, lightweight and very flexible oneM2M service layer platform compliant with oneM2M specifications.
+<b>tinyIoT</b> is a secure, fast, lightweight and very flexible <div style="background-color: grey;">oneM2M service layer platform </div>compliant with oneM2M specifications.
 
 <b>tinyIoT</b> uses memory  and CPU efficiently and has low resource use.
 
