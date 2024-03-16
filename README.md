@@ -72,10 +72,10 @@ Default IP address and port number are 127.0.0.1 and 3000.
 	```
  
  
-You can configure port number and ip address as parameters, for example, 
-
-  $ ./server -p [port] (port = 3000 by default)
-   
+etc. You can configure port number and ip address as parameters, for example, 
+	```
+	$ ./server -p [port] (port = 3000 by default)
+	```
 
 For binding protocols, tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later. 
 In order to run MQTT, Mosquitto MQTT broker should be installed on your machine. 
