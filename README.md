@@ -50,7 +50,7 @@
 Configure your running environment with the config.h file. You can configure IP address, Port number, supported binding protocols, etc. 
 Default IP address and port number are 127.0.0.1 and 3000. 
 
-### Tested Operating System: 
+### Tested Operating System
   - Linux Ubuntu 22.04
 
 ### Install with script
@@ -79,12 +79,16 @@ Default IP address and port number are 127.0.0.1 and 3000.
 	$ ./server -p [port] (port = 3000 by default)
 	```
 
-For binding protocols, tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later. 
+### For binding protocols
+tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later. 
 In order to run MQTT, Mosquitto MQTT broker should be installed on your machine. 
 
-  - HTTP: foxweb/pico
-  - MQTT: Mosquitto
-  - CoAP: To be added
+|Protocol|Implementation/Tool|Description|
+|--------|-------------------|-----------|
+|HTTP|foxweb/pico|Server/library for HTTP|
+|MQTT|Mosquitto|Message broker for MQTT protocol|
+|CoAP|To be added|Future CoAP bindings|
+
 <br>
 
 # Documentation
