@@ -8,7 +8,8 @@
 </div>
 
 <p align = "center"> Let's get started your oneM2M service projects by using 'oneM2M service layer platform', <a href = "홈페이지url" target="_blank"><b>TinyIoT</b></a>!🎮 </p>
-<p align = "center"> <img src="https://img.shields.io/badge/node-339933?style=flat-square&logo=nodedotjs&logoColor=white"/>&nbsp <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=white"/>&nbsp </p>
+<p align = "center"> <img src="https://img.shields.io/badge/node-339933?style=flat-square&logo=nodedotjs&logoColor=white"/>&nbsp <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=white"/>&nbsp 
+<img src="https://img.shields.io/badge/Ubuntu-E95420?style=falt-square&logo=ubuntu&logoColors=white"/>&nbsp </p>
 <br><br>
 
 
