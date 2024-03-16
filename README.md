@@ -22,16 +22,10 @@
 
 # What is the tinyIoT?
 
-<div>
-<b>tinyIoT</b> is a secure, fast, lightweight and very flexible <span style="background-color: #D3D3D3;">oneM2M service layer platform</span>compliant with oneM2M specifications.💪
-<br>
+<b>tinyIoT</b> is a secure, fast, lightweight and very flexible 'oneM2M service layer platform' compliant with oneM2M specifications.💪
 <b>tinyIoT</b> uses memory  and CPU efficiently and has low resource use.
-<br>
 <b>tinyIoT</b> is implemented in C and uses lightweight open source components for database (SQLite), JSON parser (cJSON), http server (pico) and mqtt client (wolfMQTT)
-<br>
 <b>tinyIoT</b> also comes with a web-based dashboard implemented using Vue.
-<br>
-</div>
 <br><br>
 
 # tinyIoT supports the following features
