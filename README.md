@@ -17,7 +17,7 @@
 
 <b>tinyIoT</b> uses memory  and CPU efficiently and has low resource use.
 
-<b>tinyIoT</b> is implemented id C and uses lightweight open source components for database (SQLite), JSON parser (cJSON), http server (pico) and mqtt client (wolfMQTT)
+<b>tinyIoT</b> is implemented in C and uses lightweight open source components for database (SQLite), JSON parser (cJSON), http server (pico) and mqtt client (wolfMQTT)
 
 <b>tinyIoT</b> also comes with a web-based dashboard implemented using Vue.
 
