@@ -1,7 +1,4 @@
 # tinyIoT
-<p align = "center">
-  <img src = "https://private-user-images.githubusercontent.com/136944859/313384740-901c8832-0181-42fd-8078-e3710b91e19b.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTA1NzM3NjAsIm5iZiI6MTcxMDU3MzQ2MCwicGF0aCI6Ii8xMzY5NDQ4NTkvMzEzMzg0NzQwLTkwMWM4ODMyLTAxODEtNDJmZC04MDc4LWUzNzEwYjkxZTE5Yi5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjQwMzE2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI0MDMxNlQwNzE3NDBaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT02YjJhYjJmN2ViZGNjODRlMjRjMTQwYmYzZjRjYTkyYTQ4MTdkYWI1ZDMxMjRiNjc0MDZlOWY0Mzk5OWQwMzA4JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZhY3Rvcl9pZD0wJmtleV9pZD0wJnJlcG9faWQ9MCJ9.AWt6zSWhqxd4cCu1ivSUsDiwnD0e-SrhyVIjh38c_Qw" width = "50%" height = "50%">
-</p>
 
 oneM2M is a global partnership project founded in 2012 to create a global technical standard for interoperability concerning the architecture, API specifications, security and enrolments solutions for Internet of Things (IoT) technologies based on requirements contributed by its members. The standardised specifications produced by oneM2M enable an Eco-System to support a wide range of applications and services such as smart cities, smart grid, connected car, home automation, public safety, and health.
 
