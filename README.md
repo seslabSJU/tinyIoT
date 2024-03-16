@@ -9,6 +9,7 @@
 
 <p align = "center"> Let's get started your oneM2M service projects by using 'oneM2M service layer platform', <a href = "홈페이지url" target="_blank"><b>TinyIoT</b></a>!🎮 </p>
 <img src="https://img.shields.io/badge/node-339933?style=flat-square&logo=nodedotjs&logoColor=white"/></a>&nbsp
+<img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=white"/>&nbsp
 <br><br>
 
 
