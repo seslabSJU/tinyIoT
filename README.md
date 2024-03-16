@@ -42,13 +42,12 @@
 - Group management 
 
 
-### Tested Operating System: 
-  - Linux Ubuntu 22.04
-
-
 # Installation & Development Environment
 Configure your running environment with the config.h file. You can configure IP address, Port number, supported binding protocols, etc. 
 Default IP address and port number are 127.0.0.1 and 3000. 
+
+### Tested Operating System: 
+  - Linux Ubuntu 22.04
 
 ### Install with script
 1. Clone our repository!
