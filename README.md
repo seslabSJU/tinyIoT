@@ -22,7 +22,7 @@
 
 # What is the tinyIoT?
 
-<b>tinyIoT</b> is a secure, fast, lightweight and very flexible <div style="background-color: grey;">oneM2M service layer platform </div>compliant with oneM2M specifications.
+<b>tinyIoT</b> is a secure, fast, lightweight and very flexible <div style="background-color: #efefef;"> oneM2M service layer platform </div> compliant with oneM2M specifications.
 
 <b>tinyIoT</b> uses memory  and CPU efficiently and has low resource use.
 
