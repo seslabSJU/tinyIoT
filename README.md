@@ -31,7 +31,7 @@
 <b>tinyIoT</b> also comes with a web-based dashboard implemented using Vue.
 <br>
 <p align = "center">
-<img src = "https://private-user-images.githubusercontent.com/136944859/313413626-86b037ce-4081-4997-aa25-00f788867bff.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTA2MDI4MjMsIm5iZiI6MTcxMDYwMjUyMywicGF0aCI6Ii8xMzY5NDQ4NTkvMzEzNDEzNjI2LTg2YjAzN2NlLTQwODEtNDk5Ny1hYTI1LTAwZjc4ODg2N2JmZi5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjQwMzE2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI0MDMxNlQxNTIyMDNaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0yYzNkNDcwYWNmZmM4NWM3Nzc3ZmFiYzE2N2ZjODExOTg2NjQ3ODFjZmExNDA1YjM5YjgxYmQ4YWI5MWM1MGFlJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZhY3Rvcl9pZD0wJmtleV9pZD0wJnJlcG9faWQ9MCJ9.gLIuFOjl3vUYBj_EskjjZZS84-7AiNOVFmgjhrrO2Hk" >
+<img src = "https://private-user-images.githubusercontent.com/136944859/313413626-86b037ce-4081-4997-aa25-00f788867bff.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTA2MDUzOTYsIm5iZiI6MTcxMDYwNTA5NiwicGF0aCI6Ii8xMzY5NDQ4NTkvMzEzNDEzNjI2LTg2YjAzN2NlLTQwODEtNDk5Ny1hYTI1LTAwZjc4ODg2N2JmZi5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjQwMzE2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI0MDMxNlQxNjA0NTZaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1lMDk2YmY1ODI4NDk5MDc5YzI5MzVmMTc1OGMxMWI5NjliNGIwZmI0NGNmMDhmYjEzODhmODIyZmQyMGQ3M2Q0JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZhY3Rvcl9pZD0wJmtleV9pZD0wJnJlcG9faWQ9MCJ9.WXGJXvYXf20MnuNlZRVRfdmBwtM6vnGE7Njoc1jK3F0" >
 </p>
 <br>
 
@@ -80,7 +80,7 @@ Default IP address and port number are 127.0.0.1 and 3000.
 	```
 
 ### For binding protocols
-tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later. 
+tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later.<br> 
 In order to run MQTT, Mosquitto MQTT broker should be installed on your machine. 
 
 |Protocol|Implementation/Tool|Description|
@@ -93,8 +93,8 @@ In order to run MQTT, Mosquitto MQTT broker should be installed on your machine.
 
 # Documentation
 
-We are managing our development documentation through GitHub files.📂
-For more information, please see below. 
+We are managing our development documentation through GitHub files.📂<br>
+For more information, please see below.<br> 
 You can view our development process and documentation within these files!👀
 
 <a href = "https://github.com/seslabSJU/tinyIoT/tree/main/documents" target="_blank"><b>documentation</b></a>
