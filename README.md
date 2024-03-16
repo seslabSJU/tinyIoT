@@ -71,8 +71,7 @@ Default IP address and port number are 127.0.0.1 and 3000.
 	./server
 	```
  
- 
-etc. You can configure port number and ip address as parameters, for example, 
+ 5. You can configure port number and ip address as parameters, for example, 
 	```
 	$ ./server -p [port] (port = 3000 by default)
 	```
