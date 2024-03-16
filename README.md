@@ -52,9 +52,9 @@ Default IP address and port number are 127.0.0.1 and 3000.
 
 ### Install with script
 1. Clone our repository!
-   
-	git clone --recursive https://github.com/LAMXkE/oneM2M-tinyIoT-server/tree/tokyo-test-fix.git	
-
+```
+git clone --recursive https://github.com/LAMXkE/oneM2M-tinyIoT-server/tree/tokyo-test-fix.git	
+```
     
 2. Please enter the pico path of the file       
 
