@@ -11,7 +11,7 @@ Let's get started your oneM2M service projects by using 'oneM2M service layer pl
 
 
 
-#What is the TinyIoT?
+# What is the TinyIoT?
 
 oneM2M is a global partnership project founded in 2012 to create a global technical standard for interoperability concerning the architecture, API specifications, security and enrolments solutions for Internet of Things (IoT) technologies based on requirements contributed by its members. The standardised specifications produced by oneM2M enable an Eco-System to support a wide range of applications and services such as smart cities, smart grid, connected car, home automation, public safety, and health.
 
