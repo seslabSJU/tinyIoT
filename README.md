@@ -45,6 +45,8 @@
 Tested Operating System: 
   - Linux Ubuntu 22.04
 
+
+# Installation & Development Environment
 Configure your running environment with the config.h file. You can configure IP address, Port number, supported binding protocols, etc. 
 Default IP address and port number are 127.0.0.1 and 3000. 
 
@@ -67,5 +69,7 @@ In order to run MQTT, Mosquitto MQTT broker should be installed on your machine.
   - HTTP: foxweb/pico
   - MQTT: Mosquitto
   - CoAP: To be added
+
+# Documentation
 
 
