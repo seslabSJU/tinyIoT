@@ -50,6 +50,39 @@
 Configure your running environment with the config.h file. You can configure IP address, Port number, supported binding protocols, etc. 
 Default IP address and port number are 127.0.0.1 and 3000. 
 
+## Install with script
+1. Clone our repository!
+        
+```
+git clone --recursive https://github.com/LAMXkE/oneM2M-tinyIoT-server/tree/tokyo-test-fix.git
+```
+    
+2. Please enter the pico path of the file       
+```
+cd pico
+```
+        
+3. To make an excutable tinyIoT server, simply execute the make file.       
+```
+ $ make
+```
+        
+ 4. Use the following command to run tinyIoT server:
+```
+./server
+```
+
+
+
+
+
+
+
+
+
+
+
+
 To make an excutable tinyIoT server, simply execute the make file. 
 
   $ make
