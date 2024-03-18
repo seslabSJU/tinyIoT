@@ -343,6 +343,11 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
     char cnst[32], ot[32];
     char response_headers[2048] = {'\0'};
     char buf[BUF_SIZE] = {0,};
+    memset(buf, 0, BUF_SIZE);
+
+    if(o2pt->pc && strlen(o2pt->pc) >= BUF_SIZE-1){
+        handle_error(o2pt, RSC_NOT_ACCEPTABLE, "result size too big");
+    }
 
     sprintf(content_length, "%ld", o2pt->pc ? strlen(o2pt->pc) : 0);
     sprintf(rsc, "%d", o2pt->rsc);
@@ -358,7 +363,11 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
         set_header("X-M2M-CNOT", ot, response_headers);
     }
 
-    sprintf(buf, "%s %d %s\r\n%s%s\r\n%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers, o2pt->pc ? o2pt->pc : "");
+    sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
+    if(o2pt->pc){
+        strncat(buf, o2pt->pc, BUF_SIZE - strlen(buf) - 1);
+        strncat(buf, "\r\n", BUF_SIZE - strlen(buf) - 1);
+    } 
     
     write(clients[slotno], buf, strlen(buf)); 
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf);
