@@ -1267,6 +1267,19 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 
 	if(e == -1) return o2pt->rsc;
 	cJSON *root = cJSON_CreateObject();
+	cJSON *pjson;
+	switch(o2pt->rsc){
+		case RCN_ATTRIBUTES:
+			o2pt->pc = cJSON_PrintUnformatted(target_rtnode->obj);
+			break;
+		case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
+			pjson = cJSON_GetObjectItem(o2pt->fc, "lim");
+			build_rcn4(o2pt, target_rtnode, root, pjson ? pjson->valueint : 1000);
+			break;
+		default:
+			o2pt->pc = cJSON_PrintUnformatted(root);
+			break;
+	}
 
 	cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);
 
@@ -1694,7 +1707,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 			if(strcmp(pjson->valuestring, "lnk") == 0) continue;
 			if(!cJSON_GetObjectItem(attr, pjson->valuestring)){
 				logger("UTIL", LOG_LEVEL_ERROR, "invalid attribute in aa");
-				return -1;
+				return NULL;
 			}
 			cJSON *temp =  cJSON_GetObjectItem(obj, pjson->valuestring);
 			cJSON_AddItemToObject(annc, pjson->valuestring, cJSON_Duplicate(temp, true));

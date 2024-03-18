@@ -312,6 +312,10 @@ void handle_http_request(HTTPRequest *req, int slotno) {
     if(req->qs && strlen(req->qs) > 0){
         cJSON *qs = qs_to_json(req->qs);
         parse_qs(qs);
+        if(cJSON_GetObjectItem(qs, "rcn")){
+            o2pt->rcn = cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "rcn"));
+            cJSON_DeleteItemFromObject(qs, "rcn");
+        }
 
         o2pt->drt = cJSON_CreateObject();
         if(cJSON_GetObjectItem(qs, "drt")){

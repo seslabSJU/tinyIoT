@@ -659,35 +659,50 @@ int tree_viewer_api(oneM2MPrimitive *o2pt, RTNode *node) {
 	o2pt->pc = res;
 }
 
-void tree_viewer_data(RTNode *rtnode, char **viewer_data, int cin_size) {
-	char *json = rtnode_to_json(rtnode);
+void build_rcn8(){
 
-	strcat(*viewer_data, ",");
-	strcat(*viewer_data, json);
-	free(json); json = NULL;
+}
 
-	RTNode *child = rtnode->child;
-	while(child) {
-		tree_viewer_data(child, viewer_data, cin_size);
-		child = child->sibling_right;
+void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int limit) {
+	cJSON *pjson;
+	if (limit <= 0) return NULL;
+
+	if(isResourceAptFC(o2pt, rtnode, o2pt->fc)) {
+		if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty))) {
+			cJSON_AddItemToArray(pjson, rtnode->obj);
+		}else{
+			pjson = cJSON_CreateArray();
+			cJSON_AddItemToArray(pjson, rtnode->obj);
+			cJSON_AddItemToObject(result_obj, get_resource_key(rtnode->ty), pjson);
+		}
 	}
-
-	if(rtnode->ty == RT_CNT) {
+	if(rtnode->ty == RT_CNT && limit > 0) {
 		RTNode *cin_list_head = db_get_cin_rtnode_list(rtnode);
 
-		if(cin_list_head) cin_list_head = latest_cin_list(cin_list_head, cin_size);
+		if(cin_list_head) cin_list_head = latest_cin_list(cin_list_head, 5);
 
 		RTNode *cin = cin_list_head;
 
 		while(cin) {
-			json = rtnode_to_json(cin);
-			strcat(*viewer_data, ",");
-			strcat(*viewer_data, json);
-			free(json); json = NULL;
-			cin = cin->sibling_right;		
+			if(isResourceAptFC(o2pt, cin, o2pt->fc)) {
+				if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(cin->ty))) {
+					cJSON_AddItemToArray(pjson, cin->obj);
+				}else{
+					pjson = cJSON_CreateArray();
+					cJSON_AddItemToArray(pjson, cin->obj);
+					cJSON_AddItemToObject(result_obj, get_resource_key(cin->ty), pjson);
+				}
+			}
 		}
 		free_rtnode_list(cin_list_head);
 	}
+
+	RTNode *child = rtnode->child;
+	while(child) {
+		build_rcn4(o2pt, child, result_obj, limit-1);
+		child = child->sibling_right;
+	}
+
 }
 
 RTNode *latest_cin_list(RTNode* cinList, int num) {

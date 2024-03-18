@@ -141,3 +141,478 @@ void parse_qs(cJSON *qs){
         cJSON_AddNumberToObject(qs, "fo", 1);
     }
 }
+
+
+bool FC_isAptCrb(char *fcCrb, RTNode *rtnode){
+    if(!rtnode || !fcCrb) return false;
+
+    char *ct = get_ct_rtnode(rtnode);
+    if(strcmp(fcCrb, ct) > 0) return true;
+
+    return false;
+}
+
+bool FC_isAptCra(char* fcCra, RTNode *rtnode){
+    if(!rtnode || !fcCra) return false;
+
+    char* ct = get_ct_rtnode(rtnode);
+
+    if(strcmp(fcCra, ct) <= 0) return true;
+
+    return false;
+}
+
+bool FC_isAptMs(char *fcMs, RTNode *rtnode){
+    if(!rtnode || !fcMs) return false;
+
+    char *lt = get_lt_rtnode(rtnode);
+    if(strcmp(fcMs, lt) <= 0) return true;
+
+    return false;
+}
+
+bool FC_isAptUs(char *fcUs, RTNode *rtnode){
+    if(!rtnode || !fcUs) return false;
+
+    char *lt = get_lt_rtnode(rtnode);
+    if(strcmp(fcUs, lt) > 0) return true;
+
+    return false;
+}
+
+bool FC_isAptStb(int fcStb, RTNode *rtnode){
+    if(!rtnode) return false;
+
+    int st = get_st_rtnode(rtnode);
+    if(st == -1) return false;
+    if(fcStb <= st) return true;
+
+    return false;
+}
+
+bool FC_isAptSts(int fcSts, RTNode *rtnode){
+    if(!rtnode) return false;
+
+    int st = get_st_rtnode(rtnode);
+    if(st == -1) return false;
+    if(st < fcSts) return true;
+
+    return false;
+}
+
+bool FC_isAptExa(char *fcExa, RTNode *rtnode){
+    if(!rtnode || !fcExa) return false;
+
+    char *et = get_et_rtnode(rtnode);
+    if(strcmp(fcExa, et) >= 0) return false;
+
+    return true;
+}
+
+bool FC_isAptExb(char *fcExb, RTNode *rtnode){
+    if(!rtnode || !fcExb) return false;
+
+    char *et = get_et_rtnode(rtnode);
+    if(strcmp(fcExb, et) < 0) return false;
+
+    return true;
+}
+
+bool FC_isAptLbl(cJSON* fcLbl, RTNode *rtnode){
+    bool result = false;
+    int nodeSize = 0, fcSize = 0;
+
+    if(!rtnode || !fcLbl) return false;
+
+    cJSON *nodelbl = NULL;
+
+
+    char * lbl = get_lbl_rtnode(rtnode);
+    if(!lbl) return result; // if no lbl return false
+
+    nodelbl = string_to_cjson_string_list_item(lbl);
+    nodeSize = cJSON_GetArraySize(nodelbl);
+    
+    fcSize = cJSON_GetArraySize(fcLbl);
+    
+    for(int i = 0 ; i < nodeSize ; i++){
+        for(int j = 0 ; j < fcSize ; j++){
+            if(!strcmp(cJSON_GetArrayItem(fcLbl, j)->valuestring, cJSON_GetArrayItem(nodelbl, i)->valuestring)){
+                result = true;
+                break;
+            }
+        }
+        if(result) break;
+    }
+
+    cJSON_Delete(nodelbl);
+    return result;
+}
+
+bool FC_isAptPalb(cJSON *fcPalb, RTNode *rtnode){
+    bool result = false;
+    int nodeSize = 0, fcSize = 0;
+    if(!rtnode || !fcPalb) return false;
+    if(!rtnode->parent) return false;
+
+    cJSON *nodelbl = NULL;
+    char *lbl = get_lbl_rtnode(rtnode->parent);
+    if(!lbl) return result;
+
+    nodelbl = string_to_cjson_string_list_item(lbl);
+    nodeSize = cJSON_GetArraySize(nodelbl);
+
+    fcSize = cJSON_GetArraySize(fcPalb);
+
+    for(int i = 0 ; i < nodeSize ; i++){
+        for(int j = 0 ; j < fcSize ; j++){
+            if(!strcmp(cJSON_GetArrayItem(fcPalb, j)->valuestring, cJSON_GetArrayItem(nodelbl, i)->valuestring)){
+                result = true;
+                break;
+            }
+        }
+        if(result) break;
+    }
+
+    cJSON_Delete(nodelbl);
+    return result;
+}
+
+bool FC_isAptClbl(cJSON *fcClbl, RTNode *rtnode){
+    bool result = false;
+    int nodeSize = 0, fcSize = 0;
+    RTNode *prt = NULL;
+    if(!rtnode || !fcClbl) return false;
+    if(!rtnode->child) return false;
+
+    cJSON *nodelbl = NULL;
+
+    prt = rtnode->child;
+
+    while(prt){
+        char *lbl = get_lbl_rtnode(prt);
+        if(!lbl) return result;
+
+        nodelbl = string_to_cjson_string_list_item(lbl);
+        nodeSize = cJSON_GetArraySize(nodelbl);
+
+        fcSize = cJSON_GetArraySize(fcClbl);
+
+        for(int i = 0 ; i < nodeSize ; i++){
+            for(int j = 0 ; j < fcSize ; j++){
+                if(!strcmp(cJSON_GetArrayItem(fcClbl, j)->valuestring, cJSON_GetArrayItem(nodelbl, i)->valuestring)){
+                    result = true;
+                    break;
+                }
+            }
+            if(result) break;
+        }
+        cJSON_Delete(nodelbl);
+        nodelbl = NULL;
+        if(result) break;
+        prt = prt->sibling_right;
+    }
+    
+
+    
+    return result;
+}
+
+bool FC_isAptTy(cJSON *ty_list, int ty){
+    cJSON *ty_list_ptr = NULL;
+    cJSON_ArrayForEach(ty_list_ptr, ty_list){
+        if(ty == ty_list_ptr->valueint) return true;
+    }
+
+    return false;
+}
+
+bool FC_isAptChty(cJSON *chty_list, int ty){
+    cJSON *chty_list_ptr = NULL;
+    cJSON_ArrayForEach(chty_list_ptr, chty_list){
+        if(ty == chty_list_ptr->valueint) return true;
+    }
+
+    return false;
+}
+
+bool FC_isAptPty(int *fcPty, int tycnt, int ty){
+    
+    for(int i = 0 ; i < tycnt; i++){
+        if(ty == fcPty[i]) return true;
+    }
+ 
+    return false;
+}
+
+bool FC_isAptSza(int fcSza, RTNode *rtnode){
+    int cs = get_cs_rtnode(rtnode);
+    if(cs == -1) return false;
+    if(fcSza <= cs) return true;
+
+    return false;
+}
+
+bool FC_isAptSzb(int fcSzb, RTNode *rtnode){
+    int cs = get_cs_rtnode(rtnode);
+    if(cs == -1) return false;
+    if(cs < fcSzb) return true;
+
+    return false;
+}
+
+bool FC_isAptOps(ACOP fcAcop, oneM2MPrimitive *o2pt, RTNode *rtnode){
+    if(check_privilege(o2pt, rtnode, fcAcop) == -1)
+        return false;
+
+    return true;
+}
+
+bool isResourceAptFC(oneM2MPrimitive* o2pt, RTNode *rtnode, cJSON *fc){
+    void *obj;
+    int flag = 0;
+	RTNode *prtnode = NULL;
+	FilterOperation fo = cJSON_GetObjectItem(fc, "fo")->valueint;
+    cJSON *pjson, *pjson2;
+    if(!rtnode || !fc) return false;
+
+	// check Created Time
+    pjson = cJSON_GetObjectItem(fc, "cra");
+    pjson2 = cJSON_GetObjectItem(fc, "crb");
+	if(pjson && pjson2){
+		if(strcmp(pjson->valuestring, pjson2->valuestring) >= 0 && fo == FO_AND) return false;
+	}
+    if(pjson){
+		if(!FC_isAptCra(pjson->valuestring, rtnode)) {
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+    }
+	if(pjson2){
+		if(!FC_isAptCrb(pjson2->valuestring, rtnode)){
+			if(fo == FO_AND)
+				return false;
+		}else{
+			if(fo == FO_OR)
+				return true;
+		}
+	}
+
+	// check Last Modified
+    pjson = cJSON_GetObjectItem(fc, "ms");
+    pjson2 = cJSON_GetObjectItem(fc, "us");
+    if(pjson && pjson2){
+        if(strcmp(pjson->valuestring, pjson2->valuestring) >= 0 && fo == FO_AND) return false;
+    }
+
+    if(pjson){
+        if(!FC_isAptMs(pjson->valuestring, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+    if(pjson2){
+        if(!FC_isAptUs(pjson2->valuestring, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+    
+
+	// check state tag
+    pjson = cJSON_GetObjectItem(fc, "stb");
+    pjson2 = cJSON_GetObjectItem(fc, "sts");
+
+    if(pjson && pjson2){
+        if(pjson->valueint >= pjson2->valueint && fo == FO_AND) return false;
+    }
+
+    if(pjson){
+        if(!FC_isAptStb(pjson->valueint, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+    if(pjson2){
+        if(!FC_isAptSts(pjson2->valueint, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+
+	// check Expiration Time
+    pjson = cJSON_GetObjectItem(fc, "exa");
+    pjson2 = cJSON_GetObjectItem(fc, "exb");
+    if(pjson && pjson2){
+        if(strcmp(pjson->valuestring, pjson2->valuestring) >= 0 && fo == FO_AND) return false;
+    }
+
+    if(pjson){
+        if(!FC_isAptExa(pjson->valuestring, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+    if(pjson2){
+        if(!FC_isAptExb(pjson2->valuestring, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+	// check label
+    pjson = cJSON_GetObjectItem(fc, "lbl");
+    if(pjson){
+        if(!FC_isAptLbl(pjson, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    
+    }
+
+    // check clbl
+    pjson = cJSON_GetObjectItem(fc, "clbl");
+    if(pjson){
+        if(!FC_isAptClbl(pjson, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+
+    // check palb
+    pjson = cJSON_GetObjectItem(fc, "palb");
+
+    if(pjson){
+        if(!FC_isAptPalb(pjson, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+
+	// check TY
+    pjson = cJSON_GetObjectItem(fc, "ty");
+    if(pjson){
+        if(!FC_isAptTy(pjson, rtnode->ty)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+    
+	// check chty
+    pjson = cJSON_GetObjectItem(fc, "chty");
+    if(pjson){
+        if(!rtnode->child){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            prtnode = rtnode->child;
+            while(prtnode){
+                if(FC_isAptChty(pjson, prtnode->ty)){
+                    flag = 1;
+                    break;
+                }
+                prtnode = prtnode->sibling_right;
+            }
+            if(flag){
+                if(fo == FO_OR)
+                    return true;
+            }else{
+                if(fo == FO_AND)
+                    return false;
+            }
+        }
+        
+    
+    }
+
+	// check pty
+    pjson = cJSON_GetObjectItem(fc, "pty");
+
+    if(pjson){
+        if(!rtnode->parent){
+            if(fo == FO_AND)
+                return false;
+        }
+        if(!FC_isAptPty(pjson, cJSON_GetArraySize(pjson), rtnode->ty)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+
+	//check cs
+    pjson = cJSON_GetObjectItem(fc, "sza");
+    pjson2 = cJSON_GetObjectItem(fc, "szb");
+
+    if(pjson && pjson2){
+        if(pjson->valueint >= pjson2->valueint && fo == FO_AND) return false;
+    }
+
+    if(pjson){
+        if(!FC_isAptSza(pjson->valueint, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+
+    if(pjson2){
+        if(!FC_isAptSzb(pjson2->valueint, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+
+    // check ops
+    pjson = cJSON_GetObjectItem(fc, "ops");
+    if(pjson){
+        if(!FC_isAptOps(pjson->valueint, o2pt, rtnode)){
+            if(fo == FO_AND)
+                return false;
+        }else{
+            if(fo == FO_OR)
+                return true;
+        }
+    }
+
+    return true;
+}

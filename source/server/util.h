@@ -81,6 +81,9 @@ cJSON *getResource(cJSON *root, ResourceType ty);
 
 void notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net);
 
+// rcn
+void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int limit);
+
 //validation
 bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg);
 bool is_valid_acr(cJSON *acr);

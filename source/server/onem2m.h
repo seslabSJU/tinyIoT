@@ -111,6 +111,7 @@ typedef struct _o{
 	char *pc;
 	Operation op;
 	cJSON *cjson_pc;
+	int rcn;
 	int rsc;
 	int ty;
 	char *origin;
@@ -174,6 +175,7 @@ void free_rtnode_list(RTNode *rtnode);
 RTNode* restruct_resource_tree(RTNode *node, RTNode *list);
 RTNode* latest_cin_list(RTNode *cinList, int num); // use in viewer API
 RTNode* find_latest_oldest(RTNode* node, int flag);
+bool isResourceAptFC(oneM2MPrimitive* o2pt, RTNode *rtnode, cJSON *fc);
 
 
 //etc
