@@ -3,7 +3,7 @@
 <div>
 	<a href = "홈페이지url" target="_blank">
 	<p align = "center">
-	  <img src = "https://private-user-images.githubusercontent.com/136944859/313551976-5d107ae0-40f9-480e-8309-eba805223906.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTA3MzcyMjcsIm5iZiI6MTcxMDczNjkyNywicGF0aCI6Ii8xMzY5NDQ4NTkvMzEzNTUxOTc2LTVkMTA3YWUwLTQwZjktNDgwZS04MzA5LWViYTgwNTIyMzkwNi5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjQwMzE4JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI0MDMxOFQwNDQyMDdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1jZGRlMDFhMzFlYzIyNzliNmE4ZTEyZTY2MWUxMzFhZTk0MWExN2M1MTYyNDIwOTBiYjRiNmM4ZjgzYmY5N2M4JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZhY3Rvcl9pZD0wJmtleV9pZD0wJnJlcG9faWQ9MCJ9.9OuzhK_Ze1Cfp2BQhrL-o0KpMlBEPbnSBFw9YKcIqlA" width = "40%" height = "50%">
+	  <img src = "https://github.com/seslabSJU/tinyIoT/issues/25#issue-2189826780" width = "40%" height = "50%">
 	</p></a>
 </div>
 
