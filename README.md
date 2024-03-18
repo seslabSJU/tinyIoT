@@ -31,7 +31,7 @@
 <b>tinyIoT</b> also comes with a web-based dashboard implemented using Vue.
 <br>
 <p align = "center">
-<img src = "https://private-user-images.githubusercontent.com/136944859/313552186-91193081-b84c-486e-b5a7-6870d83fa647.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTA3MzcyODgsIm5iZiI6MTcxMDczNjk4OCwicGF0aCI6Ii8xMzY5NDQ4NTkvMzEzNTUyMTg2LTkxMTkzMDgxLWI4NGMtNDg2ZS1iNWE3LTY4NzBkODNmYTY0Ny5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjQwMzE4JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI0MDMxOFQwNDQzMDhaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT02OWU4OGFkNWQ2ODA0NzFiN2Y2NGM0OTVkMWJlMTRmMTdkYmNkNjFhZmYyNzg2MGY5ZmY4Mzk4YWU3MDcwMjg1JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZhY3Rvcl9pZD0wJmtleV9pZD0wJnJlcG9faWQ9MCJ9.I39GlmhulhCqeJWY4jplwBcHvwtLW-LsBOV2aqOCq64" >
+<img src = "https://github.com/seslabSJU/tinyIoT/assets/136944859/91193081-b84c-486e-b5a7-6870d83fa647" >
 </p>
 <br>
 
