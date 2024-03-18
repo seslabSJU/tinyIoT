@@ -181,7 +181,27 @@ bool isResourceAptFC(oneM2MPrimitive* o2pt, RTNode *rtnode, cJSON *fc);
 //etc
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign);
 
+
+// filter criteria
 int validate_filter_criteria(oneM2MPrimitive *o2pt);
+char *fc_to_qs(cJSON *fc);
+bool FC_isAptCrb(char *fcCrb, RTNode *rtnode);
+bool FC_isAptCra(char *fcCra, RTNode *rtnode);
+bool FC_isAptMs(char *fcMs, RTNode *rtnode);
+bool FC_isAptUs(char *fcUs, RTNode *rtnode);
+bool FC_isAptStb(int fcStb, RTNode *rtnode);
+bool FC_isAptSts(int fcSts, RTNode *rtnode);
+bool FC_isAptExa(char *fcExa, RTNode *rtnode);
+bool FC_isAptExb(char *fcExb, RTNode *rtnode);
+bool FC_isAptLbl(cJSON *fcLbl, RTNode *rtnode);
+bool FC_isAptPalb(cJSON *fcPalb, RTNode *rtnode);
+bool FC_isAptClbl(cJSON *fcClbl, RTNode *rtnode);
+bool FC_isAptTy(cJSON *ty_list, int ty);
+bool FC_isAptChty(cJSON *chty_list, int ty);
+bool FC_isAptPty(cJSON *fcPty, int ty);
+bool FC_isAptSza(int fcSza, RTNode *rtnode);
+bool FC_isAptSzb(int fcSzb, RTNode *rtnode);
+bool FC_isAptOps(ACOP fcAcop, oneM2MPrimitive *o2pt, RTNode *rtnode);
 
 bool do_uri_exist(cJSON* list, char *uri);
 void cjson_merge_objs_by_operation(cJSON* obj1, cJSON* obj2, FilterOperation fo);

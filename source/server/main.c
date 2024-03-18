@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
 		\"m2m:cin\": {\"cs\":0, \"cr\":null, \"con\":\"\", \"cnf\":\"\", \"st\":\"\",\"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
 		\"m2m:acp\": {\"pv\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"pvs\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
 		\"m2m:sub\": {\"enc\":{\"net\":[1]}, \"exc\":0, \"nu\":[\"\"], \"gpi\":0, \"nfu\":0, \"bn\":0, \"rl\":0, \"sur\":0, \"nct\":0, \"cr\":\"\", \"su\":\"\"},\
-		\"m2m:grp\": {\"cr\":\"\", \"mt\":0, \"cnm\":0, \"mnm\":0, \"mid\":[\"\"], \"macp\":[\"\"], \"mtv\":true, \"csy\":0, \"gn\":0}, \
+		\"m2m:grp\": {\"cr\":\"\", \"mt\":0, \"cnm\":0, \"mnm\":0, \"mid\":[\"\"], \"macp\":[\"\"], \"mtv\":true, \"csy\":0}, \
 		\"m2m:csr\": {\"cst\":0, \"poa\":[\"\"], \"cb\":\"\", \"dcse\":[\"\"], \"csi\":\"\", \"mei\":\"\", \"tri\":\"\", \"csz\":[\"\"], \"rr\":true, \"nl\":\"\", \"srv\":[\"\"]},\
 		\"m2m:cb\": {\"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[0], \"rr\":true, \"at\":[], \"aa\":[],\"ast\":0}, \
 		\"m2m:cbA\": {\"lnk\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[\"\"], \"rr\":true}, \
@@ -160,9 +160,11 @@ void route(oneM2MPrimitive *o2pt) {
 		rsc = handle_onem2m_request(o2pt, target_rtnode);
 	
 		if(o2pt->op != OP_DELETE && target_rtnode->ty == RT_CIN){
-			logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
-			free_rtnode(target_rtnode);
-			target_rtnode = NULL;
+			if(strcmp(target_rtnode->rn, "la")){
+				logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
+				free_rtnode(target_rtnode);
+				target_rtnode = NULL;
+			}
 		}
 	}
 
@@ -212,7 +214,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 			break;
 	
 		default:
-			handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "{\"m2m:dbg\": \"internal server error\"}");
+			handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "internal server error");
 			return RSC_INTERNAL_SERVER_ERROR;
 		}
 		

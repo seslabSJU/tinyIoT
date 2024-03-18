@@ -108,7 +108,7 @@ int init_dbp(){
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS sub ( id INTEGER, \
-        enc VARCHAR(45), exc VARCHAR(45), nu VARCHAR(200), gpi VARCHAR(45), nfu VARCAHR(45), bn VARCHAR(45), rl VARCHAR(45), \
+        enc VARCHAR(45), exc VARCHAR(45), nu VARCHAR(200), gpi VARCHAR(45), nfu VARCHAR(45), bn VARCHAR(45), rl VARCHAR(45), \
         sur VARCHAR(200), nct VARCHAR(45), net VARCHAR(45), cr VARCHAR(45), su VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
         CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
@@ -120,7 +120,7 @@ int init_dbp(){
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS grp ( id INTEGER, \
-        cr VARCHAR(45), mt INT, cnm INT, mnm INT, mid TEXT, macp TEXT, mtv INT, csy INT, gn VARCAHR(30), at VARCHAR(200), aa VARCHAR(100), ast INT,\
+        cr VARCHAR(45), mt INT, cnm INT, mnm INT, mid TEXT, macp TEXT, mtv INT, csy INT, gn VARCHAR(30), at VARCHAR(200), aa VARCHAR(100), ast INT,\
         CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if(rc != SQLITE_OK){
@@ -702,12 +702,12 @@ int db_delete_one_cin_mni(RTNode *cnt){
         return -1;
     }
 
-    sprintf(sql, "DELETE FROM cin WHERE ri='%s';", latest_ri);
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from cin/ msg : %s", err_msg);
-        return -1;
-    }
+    // sprintf(sql, "DELETE FROM cin WHERE ='%s';", latest_ri);
+    // rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    // if(rc != SQLITE_OK){
+    //     logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from cin/ msg : %s", err_msg);
+    //     return -1;
+    // }
     sqlite3_finalize(res);
     return latest_cs;
 }
@@ -1026,8 +1026,8 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol){
 
     sqlite3_finalize(res);
     return json;   
-
 }
+
 cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     logger("DB", LOG_LEVEL_DEBUG, "call db_get_filter_criteria");
     char buf[256] = {0};
@@ -1056,7 +1056,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
         strcat(sql, buf);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "lvl")){
+    if( (pjson = cJSON_GetObjectItem(fc, "lvl")) ){
         sprintf(buf, "uri NOT LIKE '%s/%%", uri);
         strcat(sql, buf);
         for(int i = 0 ; i < pjson->valueint ; i++){
@@ -1065,33 +1065,33 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
         strcat(sql, "' AND ");
     }
     
-    if(pjson = cJSON_GetObjectItem(fc, "cra")){
+    if( (pjson = cJSON_GetObjectItem(fc, "cra")) ){
         sprintf(buf, "ct>'%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
-    if(pjson = cJSON_GetObjectItem(fc, "crb")){
+    if( (pjson = cJSON_GetObjectItem(fc, "crb")) ){
         sprintf(buf, "ct<='%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
-    if(pjson = cJSON_GetObjectItem(fc, "exa")){
+    if( (pjson = cJSON_GetObjectItem(fc, "exa")) ){
         sprintf(buf, "et>'%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
-    if(pjson = cJSON_GetObjectItem(fc, "exb")){
+    if( (pjson = cJSON_GetObjectItem(fc, "exb")) ){
         sprintf(buf, "et<='%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "ms")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ms")) ){
         sprintf(buf, "lt>'%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
-    if(pjson = cJSON_GetObjectItem(fc, "us")){
+    if( (pjson = cJSON_GetObjectItem(fc, "us")) ){
         sprintf(buf, "lt<='%s' ", pjson->valuestring);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
@@ -1099,7 +1099,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
 
 
 
-    if(pjson = cJSON_GetObjectItem(fc, "lbl")){
+    if( (pjson = cJSON_GetObjectItem(fc, "lbl")) ){
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 sprintf(buf, "lbl LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
@@ -1113,7 +1113,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "ty")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ty")) ){
 
         strcat(sql, "(");
         
@@ -1151,7 +1151,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     cJSON_Delete(acpiList);
     cJSON_Delete(forbiddenURI);
 
-    if(pjson = cJSON_GetObjectItem(fc, "ops")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ops"))){
         acpiList =  getNoPermAcopDiscovery(o2pt, rt->cb, pjson->valueint);
         forbiddenURI = getForbiddenUri(acpiList);
         if(cJSON_GetArraySize(forbiddenURI) > 0){
@@ -1171,25 +1171,25 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     }
     
 
-    if(pjson = cJSON_GetObjectItem(fc, "sza")){
+    if( (pjson = cJSON_GetObjectItem(fc, "sza")) ){
         sprintf(buf, " ri IN (SELECT ri FROM cin WHERE cs >= %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "szb")){
+    if( (pjson = cJSON_GetObjectItem(fc, "szb")) ){
         sprintf(buf, " ri IN (SELECT ri FROM cin WHERE cs < %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "sts")){
+    if( (pjson = cJSON_GetObjectItem(fc, "sts")) ){
         sprintf(buf, " ri IN (SELECT ri FROM cnt WHERE st < %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "stb")){
+    if( (pjson = cJSON_GetObjectItem(fc, "stb")) ){
         sprintf(buf, " ri IN (SELECT ri FROM cnt WHERE st >= %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
@@ -1197,7 +1197,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
 
     if(cJSON_GetObjectItem(fc, "pty") || cJSON_GetObjectItem(fc, "palb")){
         strcat(sql, "pi IN (SELECT ri from general WHERE ");
-         if(pjson = cJSON_GetObjectItem(fc, "pty")){
+         if( (pjson = cJSON_GetObjectItem(fc, "pty")) ){
             strcat(sql, "(");
             
             if(cJSON_IsArray(pjson)){
@@ -1215,7 +1215,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
             filterOptionStr(fo, sql);
         }
         
-        if(pjson = cJSON_GetObjectItem(fc, "palb")){
+        if( (pjson = cJSON_GetObjectItem(fc, "palb")) ){
             if(cJSON_IsArray(pjson)){
                 cJSON_ArrayForEach(ptr, pjson){
                     sprintf(buf, "lbl LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
@@ -1242,7 +1242,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
 
     if(cJSON_GetObjectItem(fc, "chty") || cJSON_GetObjectItem(fc, "clbl")){
         strcat(sql, "ri IN (SELECT pi from general WHERE ");
-         if(pjson = cJSON_GetObjectItem(fc, "chty")){
+         if( (pjson = cJSON_GetObjectItem(fc, "chty")) ){
             strcat(sql, "(");
             
             if(cJSON_IsArray(pjson)){
@@ -1260,7 +1260,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
             filterOptionStr(fo, sql);
         }
         
-        if(pjson = cJSON_GetObjectItem(fc, "clbl")){
+        if( (pjson = cJSON_GetObjectItem(fc, "clbl")) ){
             if(cJSON_IsArray(pjson)){
                 cJSON_ArrayForEach(ptr, pjson){
                     sprintf(buf, "lbl LIKE '%%\"%s\"%%' OR ", cJSON_GetStringValue(ptr));
@@ -1290,16 +1290,18 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     }else if(fo == FO_OR){
         sql[strlen(sql) - 3] = '\0';
     }
-    if(pjson = cJSON_GetObjectItem(fc, "lim")){
-        sprintf(buf, " LIMIT %d", pjson->valueint + 1);
+    if( (pjson = cJSON_GetObjectItem(fc, "lim")) ){
+        sprintf(buf, " LIMIT %d", pjson->valueint > DEFAULT_DISCOVERY_LIMIT ? DEFAULT_DISCOVERY_LIMIT + 1 : pjson->valueint + 1);
+        strcat(sql, buf);
+    }else{
+        sprintf(buf, " LIMIT %d", DEFAULT_DISCOVERY_LIMIT + 1);
         strcat(sql, buf);
     }
-    if( pjson = cJSON_GetObjectItem(fc, "ofst")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ofst")) ){
         sprintf(buf, " OFFSET %d", pjson->valueint);
         strcat(sql, buf);
     }
     strcat(sql, ";");
-    logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);
@@ -1319,6 +1321,31 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     }
     sqlite3_finalize(res);     
     return json;
+}
+
+bool db_check_cin_rn_dup(char *rn, char *pi){
+    if(!rn || !pi) return false;
+    char sql[1024] = {0};
+    int rc = 0;
+    int cols = 0, bytes = 0, coltype = 0;
+    cJSON *json, *root;
+    sqlite3_stmt *res = NULL;
+    char *colname = NULL;
+    char buf[256] = {0};
+
+    sprintf(sql, "SELECT * FROM general WHERE rn='%s' AND pi='%s';", rn, pi);
+    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    if(rc != SQLITE_OK){
+        logger("DB", LOG_LEVEL_ERROR, "Failed select from general");
+        return 0;
+    }
+    rc = sqlite3_step(res);
+    if(rc == SQLITE_ROW){
+        sqlite3_finalize(res);
+        return true;
+    }
+    sqlite3_finalize(res);
+    return false;
 }
 
 bool do_uri_exist(cJSON *list, char *uri){

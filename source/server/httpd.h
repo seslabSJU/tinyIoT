@@ -70,7 +70,7 @@ void free_HTTPResponse(HTTPResponse *res);
 
 // Response
 #define HTTP_PROTOCOL_VERSION "HTTP/1.1"
-#define DEFAULT_RESPONSE_HEADERS "Connection: Close\nAccept: application/json\nContent-Type: application/json; charset=utf-8\nAccess-Control-Allow-Origin: *\nAccess-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI\nAccess-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS\nAccess-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS\n"
+#define DEFAULT_RESPONSE_HEADERS "Connection: Close\r\nAccept: application/json\r\nContent-Type: application/json; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI\r\nAccess-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS\r\nAccess-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS\r\n"
 #define DEFAULT_REQUEST_HEADERS "Content-Type: application/json\r\n"
 
 #endif

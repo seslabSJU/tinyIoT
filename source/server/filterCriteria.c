@@ -23,7 +23,7 @@ bool isFCAttrValid(cJSON *fc){
     if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "lvl")) < 0) return false;
     if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "ofst")) < 0) return false;
 
-    if(pjson = cJSON_GetObjectItem(fc, "ty")){
+    if( (pjson = cJSON_GetObjectItem(fc, "ty")) ){
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 if(cJSON_GetNumberValue(ptr) < 0){
@@ -38,7 +38,7 @@ bool isFCAttrValid(cJSON *fc){
         }
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "chty")){
+    if( (pjson = cJSON_GetObjectItem(fc, "chty")) ){
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 if(cJSON_GetNumberValue(ptr) < 0){
@@ -53,7 +53,7 @@ bool isFCAttrValid(cJSON *fc){
         }
     }
 
-    if(pjson = cJSON_GetObjectItem(fc, "pty")){
+    if( (pjson = cJSON_GetObjectItem(fc, "pty")) ){
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 if(cJSON_GetNumberValue(ptr) < 0){
@@ -86,13 +86,13 @@ int validate_filter_criteria(oneM2MPrimitive *o2pt){
     cJSON *pjson = NULL;
     cJSON *fc = o2pt->fc;
     char buf[256] = {0};
-    if(!fc) return NULL;
+    if(!fc) return 0;
     pjson = fc->child;
 
     //check FilterUsage == Discovery
-    if ( cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fu")) != FU_DISCOVERY ){
-        return handle_error(o2pt, RSC_NOT_IMPLEMENTED, "Only filter usage DISCOVERY supported");
-    }
+    // if ( cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fu")) != FU_DISCOVERY ){
+    //     return handle_error(o2pt, RSC_NOT_IMPLEMENTED, "Only filter usage DISCOVERY supported");
+    // }
 
     while(pjson != NULL){
         if(!isValidFcAttr(pjson->string)){
@@ -113,7 +113,7 @@ void parse_filter_criteria(cJSON *fc){
     "ofst", "ops", "la", "pty", "chty"};
     cJSON *pjson = NULL, *ptr = NULL;
     for(int i = 0 ; i < 14 ; i++){
-        if(pjson = cJSON_GetObjectItem(fc, int_Attrs[i])){
+        if( (pjson = cJSON_GetObjectItem(fc, int_Attrs[i])) ){
             if(cJSON_IsString(pjson)){
                 cJSON_ReplaceItemInObject(fc, int_Attrs[i], cJSON_CreateNumber(atoi(cJSON_GetStringValue(pjson))));
             }
@@ -126,10 +126,10 @@ void parse_filter_criteria(cJSON *fc){
 }
 
 void parse_qs(cJSON *qs){
-    char int_Attrs[15][5] = {"ty", "sts", "stb", "sza", "szb", "lim", "fo", "fu", "lvl", "ofst", "ops", "la", "pty", "chty",
-                            "drt"};
+    char int_Attrs[16][5] = {"ty", "sts", "stb", "sza", "szb", "lim", "fo", "fu", "lvl", "ofst", "ops", "la", "pty", "chty",
+                            "drt", "rcn"};
     cJSON *pjson = NULL, *ptr = NULL;
-    for(int i = 0 ; i < 15 ; i++){
+    for(int i = 0 ; i < 16; i++){
         if(pjson = cJSON_GetObjectItem(qs, int_Attrs[i])){
             if(cJSON_IsString(pjson)){
                 cJSON_ReplaceItemInObject(qs, int_Attrs[i], cJSON_CreateNumber(atoi(cJSON_GetStringValue(pjson))));
@@ -142,11 +142,47 @@ void parse_qs(cJSON *qs){
     }
 }
 
+char *fc_to_qs(cJSON *fc){
+    char *qs = NULL;
+    char *key = NULL;
+    char *value = NULL;
+    cJSON *pjson = NULL, *ptr = NULL;
+    cJSON *fc_copy = fc;
+    pjson = fc_copy->child;
+
+    qs = (char *)malloc(256);
+    while(pjson != NULL){
+        key = pjson->string;
+        strcat(qs, key);
+        if(cJSON_IsArray(pjson)){
+            strcat(qs, "=");
+            value = cJSON_PrintUnformatted(pjson);
+            strcat(qs, value);
+            free(value);
+        }
+        else if(cJSON_IsNumber(pjson)){
+            strcat(qs, "=");
+            value = cJSON_PrintUnformatted(pjson);
+            strcat(qs, value);
+            free(value);
+        }
+        else if(cJSON_IsString(pjson)){
+            strcat(qs, "=");
+            value = cJSON_PrintUnformatted(pjson);
+            strcat(qs, value);
+            free(value);
+        }
+        strcat(qs, "&");
+        pjson = pjson->next;
+    }
+    qs[strlen(qs) - 1] = '\0';
+    return qs;
+}
 
 bool FC_isAptCrb(char *fcCrb, RTNode *rtnode){
     if(!rtnode || !fcCrb) return false;
-
-    char *ct = get_ct_rtnode(rtnode);
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "ct");
+    char *ct = pjson->valuestring;
     if(strcmp(fcCrb, ct) > 0) return true;
 
     return false;
@@ -154,8 +190,8 @@ bool FC_isAptCrb(char *fcCrb, RTNode *rtnode){
 
 bool FC_isAptCra(char* fcCra, RTNode *rtnode){
     if(!rtnode || !fcCra) return false;
-
-    char* ct = get_ct_rtnode(rtnode);
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "ct");
+    char *ct = pjson->valuestring;
 
     if(strcmp(fcCra, ct) <= 0) return true;
 
@@ -165,7 +201,8 @@ bool FC_isAptCra(char* fcCra, RTNode *rtnode){
 bool FC_isAptMs(char *fcMs, RTNode *rtnode){
     if(!rtnode || !fcMs) return false;
 
-    char *lt = get_lt_rtnode(rtnode);
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "lt");
+    char *lt = pjson->valuestring;
     if(strcmp(fcMs, lt) <= 0) return true;
 
     return false;
@@ -173,8 +210,8 @@ bool FC_isAptMs(char *fcMs, RTNode *rtnode){
 
 bool FC_isAptUs(char *fcUs, RTNode *rtnode){
     if(!rtnode || !fcUs) return false;
-
-    char *lt = get_lt_rtnode(rtnode);
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "lt");
+    char *lt = pjson->valuestring;
     if(strcmp(fcUs, lt) > 0) return true;
 
     return false;
@@ -183,8 +220,9 @@ bool FC_isAptUs(char *fcUs, RTNode *rtnode){
 bool FC_isAptStb(int fcStb, RTNode *rtnode){
     if(!rtnode) return false;
 
-    int st = get_st_rtnode(rtnode);
-    if(st == -1) return false;
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "st");
+    if(!pjson) return false;
+    int st = pjson->valueint;
     if(fcStb <= st) return true;
 
     return false;
@@ -193,8 +231,11 @@ bool FC_isAptStb(int fcStb, RTNode *rtnode){
 bool FC_isAptSts(int fcSts, RTNode *rtnode){
     if(!rtnode) return false;
 
-    int st = get_st_rtnode(rtnode);
-    if(st == -1) return false;
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "st");
+    if(!pjson) return false;
+
+
+    int st = pjson->valueint;
     if(st < fcSts) return true;
 
     return false;
@@ -203,7 +244,10 @@ bool FC_isAptSts(int fcSts, RTNode *rtnode){
 bool FC_isAptExa(char *fcExa, RTNode *rtnode){
     if(!rtnode || !fcExa) return false;
 
-    char *et = get_et_rtnode(rtnode);
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "et");
+    if(!pjson) return false;
+
+    char *et = pjson->valuestring;
     if(strcmp(fcExa, et) >= 0) return false;
 
     return true;
@@ -212,30 +256,27 @@ bool FC_isAptExa(char *fcExa, RTNode *rtnode){
 bool FC_isAptExb(char *fcExb, RTNode *rtnode){
     if(!rtnode || !fcExb) return false;
 
-    char *et = get_et_rtnode(rtnode);
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "et");
+    if(!pjson) return false;
+
+    char *et = pjson->valuestring;
     if(strcmp(fcExb, et) < 0) return false;
 
     return true;
 }
 
 bool FC_isAptLbl(cJSON* fcLbl, RTNode *rtnode){
+
+    // TODO
     bool result = false;
     int nodeSize = 0, fcSize = 0;
 
     if(!rtnode || !fcLbl) return false;
 
-    cJSON *nodelbl = NULL;
-
-
-    char * lbl = get_lbl_rtnode(rtnode);
-    if(!lbl) return result; // if no lbl return false
-
-    nodelbl = string_to_cjson_string_list_item(lbl);
-    nodeSize = cJSON_GetArraySize(nodelbl);
-    
+    cJSON *nodelbl = cJSON_GetObjectItem(rtnode->obj, "lbl");
     fcSize = cJSON_GetArraySize(fcLbl);
     
-    for(int i = 0 ; i < nodeSize ; i++){
+    for(int i = 0 ; i < cJSON_GetArraySize(nodelbl) ; i++){
         for(int j = 0 ; j < fcSize ; j++){
             if(!strcmp(cJSON_GetArrayItem(fcLbl, j)->valuestring, cJSON_GetArrayItem(nodelbl, i)->valuestring)){
                 result = true;
@@ -255,13 +296,8 @@ bool FC_isAptPalb(cJSON *fcPalb, RTNode *rtnode){
     if(!rtnode || !fcPalb) return false;
     if(!rtnode->parent) return false;
 
-    cJSON *nodelbl = NULL;
-    char *lbl = get_lbl_rtnode(rtnode->parent);
-    if(!lbl) return result;
-
-    nodelbl = string_to_cjson_string_list_item(lbl);
+    cJSON *nodelbl = cJSON_GetObjectItem(rtnode->parent->obj, "lbl");
     nodeSize = cJSON_GetArraySize(nodelbl);
-
     fcSize = cJSON_GetArraySize(fcPalb);
 
     for(int i = 0 ; i < nodeSize ; i++){
@@ -290,10 +326,8 @@ bool FC_isAptClbl(cJSON *fcClbl, RTNode *rtnode){
     prt = rtnode->child;
 
     while(prt){
-        char *lbl = get_lbl_rtnode(prt);
-        if(!lbl) return result;
 
-        nodelbl = string_to_cjson_string_list_item(lbl);
+        nodelbl = cJSON_GetObjectItem(prt->obj, "lbl");
         nodeSize = cJSON_GetArraySize(nodelbl);
 
         fcSize = cJSON_GetArraySize(fcClbl);
@@ -336,26 +370,27 @@ bool FC_isAptChty(cJSON *chty_list, int ty){
     return false;
 }
 
-bool FC_isAptPty(int *fcPty, int tycnt, int ty){
-    
-    for(int i = 0 ; i < tycnt; i++){
-        if(ty == fcPty[i]) return true;
+bool FC_isAptPty(cJSON *fcPty, int ty){
+    cJSON *pty_list_ptr = NULL;
+    cJSON_ArrayForEach(pty_list_ptr, fcPty){
+        if(ty == pty_list_ptr->valueint) return true;
     }
- 
     return false;
 }
 
 bool FC_isAptSza(int fcSza, RTNode *rtnode){
-    int cs = get_cs_rtnode(rtnode);
-    if(cs == -1) return false;
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "cs");
+    if(!pjson) return false;
+    int cs = pjson->valueint;
     if(fcSza <= cs) return true;
 
     return false;
 }
 
 bool FC_isAptSzb(int fcSzb, RTNode *rtnode){
-    int cs = get_cs_rtnode(rtnode);
-    if(cs == -1) return false;
+    cJSON *pjson = cJSON_GetObjectItem(rtnode->obj, "cs");
+    if(!pjson) return false;
+    int cs = pjson->valueint;
     if(cs < fcSzb) return true;
 
     return false;
@@ -565,7 +600,7 @@ bool isResourceAptFC(oneM2MPrimitive* o2pt, RTNode *rtnode, cJSON *fc){
             if(fo == FO_AND)
                 return false;
         }
-        if(!FC_isAptPty(pjson, cJSON_GetArraySize(pjson), rtnode->ty)){
+        if(!FC_isAptPty(pjson, rtnode->ty)){
             if(fo == FO_AND)
                 return false;
         }else{
