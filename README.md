@@ -3,7 +3,7 @@
 <div>
 	<a href = "홈페이지url" target="_blank">
 	<p align = "center">
-	  <img src = "https://github.com/seslabSJU/tinyIoT/issues/25#issue-2189826780" width = "40%" height = "50%">
+	  <img src = "https://github.com/seslabSJU/tinyIoT/assets/136944859/5d107ae0-40f9-480e-8309-eba805223906" width = "40%" height = "50%">
 	</p></a>
 </div>
 
