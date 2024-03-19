@@ -835,7 +835,7 @@ RTNode* db_get_cin_rtnode_list(RTNode *parent_rtnode) {
     char *colname = NULL;
     char *sql;
 
-    sql = "SELECT * FROM 'general', 'cin' WHERE general.pi=? AND general.id=cin.id ORDER BY ct ASC;";
+    sql = "SELECT * FROM 'general', 'cin' WHERE general.pi=? AND general.id=cin.id ORDER BY id ASC;";
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if(rc != SQLITE_OK){
         logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);

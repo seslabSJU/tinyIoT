@@ -224,7 +224,7 @@ void handle_http_request(HTTPRequest *req, int slotno) {
         o2pt->pc = strdup(req->payload);
 		o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
 	} 
-    
+
 
 	if((header = search_header(req->headers, "X-M2M-Origin"))) {
         logger("HTTP", LOG_LEVEL_DEBUG, "fr: %s", header);
@@ -266,6 +266,17 @@ void handle_http_request(HTTPRequest *req, int slotno) {
     
     o2pt->op = http_parse_operation(req->method);    
     logger("HTTP", LOG_LEVEL_INFO, "Request : %s", req->method);
+    // Setting default rcn
+    switch(o2pt->op){
+        case OP_CREATE:
+        case OP_RETRIEVE:
+        case OP_UPDATE:
+            o2pt->rcn = RCN_ATTRIBUTES;
+            break;
+        case OP_DELETE:
+            o2pt->rcn = RCN_NOTHING;
+            break;
+    }
 
     /* get client ip address */
     struct sockaddr_in client_addr;
@@ -309,13 +320,7 @@ void handle_http_request(HTTPRequest *req, int slotno) {
     if(req->qs && strlen(req->qs) > 0){
         cJSON *qs = qs_to_json(req->qs);
         parse_qs(qs);
-        if(cJSON_GetObjectItem(qs, "rcn")){
-            logger("HTTP", LOG_LEVEL_DEBUG, "rcn: %d", cJSON_GetObjectItem(qs, "rcn")->valueint);
-            o2pt->rcn = cJSON_GetObjectItem(qs, "rcn")->valueint;
-            logger("HTTP", LOG_LEVEL_DEBUG, "rcn: %d", o2pt->rcn);
-            cJSON_DeleteItemFromObject(qs, "rcn");
-        }
-
+        
         o2pt->drt = cJSON_CreateObject();
         if(cJSON_GetObjectItem(qs, "drt")){
             cJSON_AddNumberToObject(o2pt->drt, "drt", cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "drt")));
@@ -326,7 +331,14 @@ void handle_http_request(HTTPRequest *req, int slotno) {
 
         if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) == FU_DISCOVERY){
             o2pt->op = OP_DISCOVERY;
+            o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
         }
+        
+        if(cJSON_GetObjectItem(qs, "rcn")){
+            o2pt->rcn = cJSON_GetObjectItem(qs, "rcn")->valueint;
+            cJSON_DeleteItemFromObject(qs, "rcn");
+        }
+
         o2pt->fc = qs;
     }
     

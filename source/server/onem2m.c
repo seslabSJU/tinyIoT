@@ -1026,14 +1026,35 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode) {
 	if(check_privilege(o2pt, target_rtnode, ACOP_DELETE) == -1) {
 		return o2pt->rsc;
 	}
+	cJSON *root = NULL, *lim = NULL, *ofst = NULL;
+	switch(o2pt->rcn){
+		case RCN_ATTRIBUTES:
+			break;
+		case RCN_CHILD_RESOURCES:
+			root= cJSON_CreateObject();
+			build_rcn8(o2pt, target_rtnode, root);
+			break;
+		case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
+			root = cJSON_CreateObject();
+			lim = cJSON_GetObjectItem(o2pt->fc, "lim");
+			ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
+			build_rcn4(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : 1000);
+			break;
+		case RCN_CHILD_RESOURCE_REFERENCES:
+			break;
+
+	}
+	if(o2pt->pc) free(o2pt->pc);
+	if(root){
+		o2pt->pc = cJSON_PrintUnformatted(root);
+		cJSON_Delete(root);
+	}
 	
 	delete_process(o2pt, target_rtnode);
 		
 	db_delete_onem2m_resource(target_rtnode);
 	free_rtnode(target_rtnode);
 	target_rtnode = NULL;
-	if(o2pt->pc) free(o2pt->pc);
-	o2pt->pc = NULL;
 	o2pt->rsc = RSC_DELETED;
 	return RSC_DELETED;
 }
@@ -1333,7 +1354,7 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 
 	if(e == -1) return o2pt->rsc;
 	cJSON *root = cJSON_CreateObject();
-	cJSON *pjson;
+	cJSON *lim, *ofst;
 	if(o2pt->pc) {
 		free(o2pt->pc);
 		o2pt->pc = NULL;
@@ -1346,8 +1367,14 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 			break;
 		case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
 			logger("O2M", LOG_LEVEL_INFO, "Retrieve Child Resources");
-			pjson = cJSON_GetObjectItem(o2pt->fc, "lim");
-			build_rcn4(o2pt, target_rtnode, root, pjson ? pjson->valueint : 1000);
+			lim = cJSON_GetObjectItem(o2pt->fc, "lim");
+			ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
+			build_rcn4(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : 1000);
+			o2pt->pc = cJSON_PrintUnformatted(root);
+			break;
+		case RCN_CHILD_RESOURCES:
+			logger("O2M", LOG_LEVEL_INFO, "Retrieve Child Resources");
+			build_rcn8(o2pt, target_rtnode, root);
 			o2pt->pc = cJSON_PrintUnformatted(root);
 			break;
 		default:

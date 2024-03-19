@@ -139,6 +139,7 @@ void route(oneM2MPrimitive *o2pt) {
 		log_runtime(start);
 		return;
 	}
+
 	int e = result_parse_uri(o2pt, target_rtnode);
 	if(e != -1) e = check_payload_size(o2pt);
 	if(e == -1) {
@@ -186,23 +187,65 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 	switch(o2pt->op) {
 		
 		case OP_CREATE:	
+			if(o2pt->rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCES || 
+				o2pt->rcn == RCN_CHILD_RESOURCES ||
+				o2pt->rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES ||
+				o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES ||
+				o2pt->rcn == RCN_ORIGINAL_RESOURCE ||
+				o2pt->rcn == RCN_SEMANTIC_CONTENT
+				){
+				handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for create operation");
+				break;
+			} 			
 			rsc = create_onem2m_resource(o2pt, target_rtnode); 
 			break;
 		
 		case OP_RETRIEVE:
+			if(
+				o2pt->rcn == RCN_MODIFIED_ATTRIBUTES ||
+				o2pt->rcn == RCN_HIERARCHICAL_ADDRESS ||
+				o2pt->rcn == RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES ||
+				// o2pt->rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES ||
+				// o2pt->rcn == RCN_CHILD_RESOURCES ||
+				// o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES ||
+				o2pt->rcn == RCN_NOTHING
+				){
+				handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for retrieve operation");
+				break;
+			}
 			rsc = retrieve_onem2m_resource(o2pt, target_rtnode); 
 			break;
 			
 		case OP_UPDATE: 
+			if(o2pt->rcn == RCN_MODIFIED_ATTRIBUTES || 
+				o2pt->rcn == RCN_HIERARCHICAL_ADDRESS ||
+				o2pt->rcn == RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES ||
+				o2pt->rcn == RCN_CHILD_RESOURCES ||
+				o2pt->rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES ||
+				o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES ||
+				o2pt->rcn == RCN_ORIGINAL_RESOURCE ||
+				o2pt->rcn == RCN_SEMANTIC_CONTENT ||
+				o2pt->rcn == RCN_PERMISSIONS
+				){
+				handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for update operation");
+				break;
+			}
 			rsc = update_onem2m_resource(o2pt, target_rtnode); 
 			break;
 			
 		case OP_DELETE:
+			if(
+				o2pt->rcn == RCN_MODIFIED_ATTRIBUTES ||
+				o2pt->rcn == RCN_HIERARCHICAL_ADDRESS ||
+				o2pt->rcn == RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES ||
+				o2pt->rcn == RCN_ORIGINAL_RESOURCE ||
+				o2pt->rcn == RCN_SEMANTIC_CONTENT ||
+				o2pt->rcn == RCN_PERMISSIONS
+			){
+				handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for delete operation");
+				break;
+			}
 			rsc = delete_onem2m_resource(o2pt, target_rtnode); 
-			break;
-
-		case OP_VIEWER:
-			rsc = tree_viewer_api(o2pt, target_rtnode); 
 			break;
 		
 		case OP_OPTIONS:
@@ -210,6 +253,14 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 			set_o2pt_pc(o2pt, "{\"m2m:dbg\": \"response about options method\"}");
 			break;
 		case OP_DISCOVERY:
+			// Note : discovery operation rcn validation is reversed with other operations
+			if(
+				o2pt->rcn != RCN_CHILD_RESOURCE_REFERENCES &&
+				o2pt->rcn != RCN_DISCOVERY_RESULT_REFERENCES 
+			){
+				handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for discovery operation");
+				break;
+			}
 			rsc = discover_onem2m_resource(o2pt, target_rtnode); 
 			break;
 	

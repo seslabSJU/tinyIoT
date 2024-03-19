@@ -685,15 +685,15 @@ int tree_viewer_api(oneM2MPrimitive *o2pt, RTNode *node) {
 	o2pt->pc = res;
 }
 
-void build_rcn8(){
-
+void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj) {
+	build_rcn4(o2pt, rtnode, result_obj, 1, 1000);
 }
 
-void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int limit) {
+void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int offset, int limit) {
 	cJSON *pjson;
 	if (limit <= 0) return;
 
-	if(isResourceAptFC(o2pt, rtnode, o2pt->fc)) {
+	if(offset <= 0 && isResourceAptFC(o2pt, rtnode, o2pt->fc)) {
 		if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty))) {
 			cJSON_AddItemReferenceToArray(pjson, rtnode->obj);
 		}else{
@@ -702,31 +702,31 @@ void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int li
 			cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), pjson);
 		}
 	}
-	// if(rtnode->ty == RT_CNT && limit > 0) {
-	// 	RTNode *cin_list_head = db_get_cin_rtnode_list(rtnode);
+	if(offset <= 1 && limit > 0 && rtnode->ty == RT_CNT) {
+		RTNode *cin_list_head = db_get_cin_rtnode_list(rtnode);
 
-	// 	if(cin_list_head) cin_list_head = latest_cin_list(cin_list_head, 5);
+		// if(cin_list_head) cin_list_head = latest_cin_list(cin_list_head, 5);
 
-	// 	RTNode *cin = cin_list_head;
+		RTNode *cin = cin_list_head;
 
-	// 	while(cin) {
-	// 		if(isResourceAptFC(o2pt, cin, o2pt->fc)) {
-	// 			if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(cin->ty))) {
-	// 				cJSON_AddItemToArray(pjson, cin->obj);
-	// 			}else{
-	// 				pjson = cJSON_CreateArray();
-	// 				cJSON_AddItemToArray(pjson, cin->obj);
-	// 				cJSON_AddItemToObject(result_obj, get_resource_key(cin->ty), pjson);
-	// 			}
-	// 		}
-	// 		cin = cin->sibling_right;
-	// 	}
-	// 	free_rtnode_list(cin_list_head);
-	// }
+		while(cin) {
+			if(isResourceAptFC(o2pt, cin, o2pt->fc)) {
+				if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(cin->ty))) {
+					cJSON_AddItemToArray(pjson, cJSON_Duplicate(cin->obj, true) );
+				}else{
+					pjson = cJSON_CreateArray();
+					cJSON_AddItemToArray(pjson, cJSON_Duplicate(cin->obj, true));
+					cJSON_AddItemToObject(result_obj, get_resource_key(cin->ty), pjson);
+				}
+			}
+			cin = cin->sibling_right;
+		}
+		free_rtnode_list(cin_list_head);
+	}
 
 	RTNode *child = rtnode->child;
-	while(child) {
-		build_rcn4(o2pt, child, result_obj, limit-1);
+	while(child && child->ty != RT_CIN) {
+		build_rcn4(o2pt, child, result_obj, offset-1, limit-1);
 		child = child->sibling_right;
 	}
 
