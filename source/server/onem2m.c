@@ -1026,19 +1026,24 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode) {
 	if(check_privilege(o2pt, target_rtnode, ACOP_DELETE) == -1) {
 		return o2pt->rsc;
 	}
-	cJSON *root = NULL, *lim = NULL, *ofst = NULL;
+	cJSON *root = NULL, *lim = NULL, *ofst = NULL, *lvl = NULL;
+	lim = cJSON_GetObjectItem(o2pt->fc, "lim");	
+	ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
+	lvl = cJSON_GetObjectItem(o2pt->fc, "lvl");
 	switch(o2pt->rcn){
 		case RCN_ATTRIBUTES:
 			break;
 		case RCN_CHILD_RESOURCES:
 			root= cJSON_CreateObject();
-			build_rcn8(o2pt, target_rtnode, root);
+			
+			build_rcn8(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : 1000, lvl ? lvl->valueint : 10000);
 			break;
 		case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
 			root = cJSON_CreateObject();
 			lim = cJSON_GetObjectItem(o2pt->fc, "lim");
 			ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
-			build_rcn4(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : 1000);
+			build_rcn4(o2pt, target_rtnode, cJSON_AddObjectToObject(root, get_resource_key(target_rtnode->ty)), 
+			ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
 			break;
 		case RCN_CHILD_RESOURCE_REFERENCES:
 			break;
@@ -1354,11 +1359,14 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 
 	if(e == -1) return o2pt->rsc;
 	cJSON *root = cJSON_CreateObject();
-	cJSON *lim, *ofst;
+	cJSON *lim, *ofst, *lvl;
 	if(o2pt->pc) {
 		free(o2pt->pc);
 		o2pt->pc = NULL;
 	}
+	lvl = cJSON_GetObjectItem(o2pt->fc, "lvl");
+	lim = cJSON_GetObjectItem(o2pt->fc, "lim");
+	ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
 	switch(o2pt->rcn){
 		case RCN_ATTRIBUTES:
 			cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);
@@ -1367,14 +1375,12 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 			break;
 		case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
 			logger("O2M", LOG_LEVEL_INFO, "Retrieve Child Resources");
-			lim = cJSON_GetObjectItem(o2pt->fc, "lim");
-			ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
-			build_rcn4(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : 1000);
+			build_rcn4(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
 			o2pt->pc = cJSON_PrintUnformatted(root);
 			break;
 		case RCN_CHILD_RESOURCES:
 			logger("O2M", LOG_LEVEL_INFO, "Retrieve Child Resources");
-			build_rcn8(o2pt, target_rtnode, root);
+			build_rcn8(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
 			o2pt->pc = cJSON_PrintUnformatted(root);
 			break;
 		default:
@@ -1383,8 +1389,6 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 			cJSON_DetachItemFromObject(root, get_resource_key(target_rtnode->ty));
 			break;
 	}
-
-	// cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);
 
 	cJSON_Delete(root);
 	

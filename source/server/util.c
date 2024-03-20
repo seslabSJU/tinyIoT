@@ -685,51 +685,38 @@ int tree_viewer_api(oneM2MPrimitive *o2pt, RTNode *node) {
 	o2pt->pc = res;
 }
 
-void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj) {
-	build_rcn4(o2pt, rtnode, result_obj, 1, 1000);
-}
-
-void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int offset, int limit) {
-	cJSON *pjson;
-	if (limit <= 0) return;
-
-	if(offset <= 0 && isResourceAptFC(o2pt, rtnode, o2pt->fc)) {
-		if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty))) {
-			cJSON_AddItemReferenceToArray(pjson, rtnode->obj);
-		}else{
-			pjson = cJSON_CreateArray();
-			cJSON_AddItemReferenceToArray(pjson, rtnode->obj);
-			cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), pjson);
-		}
-	}
-	if(offset <= 1 && limit > 0 && rtnode->ty == RT_CNT) {
-		RTNode *cin_list_head = db_get_cin_rtnode_list(rtnode);
-
-		// if(cin_list_head) cin_list_head = latest_cin_list(cin_list_head, 5);
-
-		RTNode *cin = cin_list_head;
-
-		while(cin) {
-			if(isResourceAptFC(o2pt, cin, o2pt->fc)) {
-				if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(cin->ty))) {
-					cJSON_AddItemToArray(pjson, cJSON_Duplicate(cin->obj, true) );
-				}else{
-					pjson = cJSON_CreateArray();
-					cJSON_AddItemToArray(pjson, cJSON_Duplicate(cin->obj, true));
-					cJSON_AddItemToObject(result_obj, get_resource_key(cin->ty), pjson);
-				}
-			}
-			cin = cin->sibling_right;
-		}
-		free_rtnode_list(cin_list_head);
-	}
-
+/**
+ * @brief build rcn RCN_CHILD_RESOURCES 
+ * @param o2pt oneM2MPrimitive
+ * @param rtnode target resource tree node
+ * @param result_obj cJSON object
+ * @remark Internally call rcn4 with offset 1
+*/
+void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level) {
 	RTNode *child = rtnode->child;
-	while(child && child->ty != RT_CIN) {
-		build_rcn4(o2pt, child, result_obj, offset-1, limit-1);
+	cJSON *target = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty));
+	if(!target) target = cJSON_AddObjectToObject(result_obj, get_resource_key(rtnode->ty));
+	while(child){
+		if(child->ty != RT_CIN) {
+			build_child_structure(o2pt, child, target, &ofst, &lim, level-1);
+		}
 		child = child->sibling_right;
 	}
+}
 
+
+/**
+ * @brief build rcn RCN_ATTRIBUTE_AND_CHILD_RESOURCES 
+ * @param o2pt oneM2MPrimitive
+ * @param rtnode target resource tree node
+ * @param result_obj cJSON object
+ * @param offset offset
+ * @param limit limit
+ * @remark build json with rcn 4
+*/
+void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level) {
+	cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), rtnode->obj);
+	build_rcn8(o2pt, rtnode, result_obj, ofst, lim, level-1);
 }
 
 RTNode *latest_cin_list(RTNode* cinList, int num) {
@@ -748,6 +735,62 @@ RTNode *latest_cin_list(RTNode* cinList, int num) {
 	}
 	
 	return head;
+}
+
+void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level){
+	cJSON *pjson = NULL, *target = NULL;
+	if (level <= 0) return;
+	if(*lim <= 0) return;
+	if(*ofst <= 0 && *lim > 0){
+		if(isResourceAptFC(o2pt, rtnode, o2pt->fc)) {
+			if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty))) {
+				target = cJSON_Duplicate(rtnode->obj, true);
+				cJSON_AddItemToArray(pjson, target);
+			}else{
+				pjson = cJSON_CreateArray();
+				target = cJSON_Duplicate(rtnode->obj, true);
+				cJSON_AddItemToArray(pjson, target);
+				cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), pjson);
+			}
+			*lim -= 1;
+		}
+	}else{
+		*ofst -= 1;
+	}
+	if(level > 0 && rtnode->ty == RT_CNT) {
+		RTNode *cin_list_head = db_get_cin_rtnode_list(rtnode);
+
+		RTNode *cin = cin_list_head;
+
+		while(cin) {
+			if(*ofst <= 0 && *lim > 0){
+				if(isResourceAptFC(o2pt, cin, o2pt->fc)) {
+					if(pjson = cJSON_GetObjectItem(target ? target : result_obj, get_resource_key(RT_CIN))) {
+						cJSON_AddItemToArray(pjson, cJSON_Duplicate(cin->obj, true) );
+					}else{
+						pjson = cJSON_CreateArray();
+						cJSON_AddItemToArray(pjson, cJSON_Duplicate(cin->obj, true));
+						cJSON_AddItemToObject(target ? target : result_obj, get_resource_key(cin->ty), pjson);
+					}
+					*lim -= 1;
+				}
+			}else{
+				*ofst -= 1;
+			}
+			cin = cin->sibling_right;
+		}
+		free_rtnode_list(cin_list_head);
+	}
+
+	RTNode *child = rtnode->child;
+	while(child && child->ty != RT_CIN) {
+		if(target) {	
+			build_child_structure(o2pt, child, target, ofst, lim, level-1);
+		}else{
+			build_child_structure(o2pt, child, result_obj, ofst, lim, level-1);
+		}
+		child = child->sibling_right;
+	}
 }
 
 void log_runtime(double start) {
@@ -2214,6 +2257,7 @@ cJSON *qs_to_json(char* qs){
 	char *buf = calloc(1, 256);
 	char *temp = calloc(1, 256);
 	char *key = NULL, *value = NULL;
+	char *ptr = NULL;
 
 	size_t qslen = strlen(qs);
 	cJSON *json;
@@ -2233,8 +2277,12 @@ cJSON *qs_to_json(char* qs){
 		}
 
 		if(key != NULL && value != NULL){
-			if(value[0] == '['){
-				sprintf(temp, "\"%s\":%s,", key, value);
+			if((ptr = strstr(value, "+"))!= NULL){
+				while(ptr != NULL){
+					*ptr = ',';
+					ptr = strstr(ptr+1, "+");
+				}
+				sprintf(temp, "\"%s\":[%s],", key, value);
 			}else{
 				sprintf(temp, "\"%s\":\"%s\",", key, value);
 			}

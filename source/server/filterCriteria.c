@@ -137,6 +137,12 @@ void parse_qs(cJSON *qs){
         }
     }
 
+    if(pjson = cJSON_GetObjectItem(qs, "ty")){
+        if(cJSON_IsNumber(pjson)){
+            cJSON_ReplaceItemInObject(qs, "ty", cJSON_CreateIntArray(&pjson->valueint, 1));
+        }
+    }
+
     if(!cJSON_GetObjectItem(qs, "fo")){
         cJSON_AddNumberToObject(qs, "fo", 1);
     }

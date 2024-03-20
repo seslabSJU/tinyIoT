@@ -328,7 +328,7 @@ void handle_http_request(HTTPRequest *req, int slotno) {
             cJSON_AddNumberToObject(o2pt->drt, "drt", DRT_STRUCTURED);
         }
         cJSON_DeleteItemFromObject(qs, "drt");
-
+    
         if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) == FU_DISCOVERY){
             o2pt->op = OP_DISCOVERY;
             o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;

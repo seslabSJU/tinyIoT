@@ -82,8 +82,9 @@ cJSON *getResource(cJSON *root, ResourceType ty);
 void notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net);
 
 // rcn
-void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int limit);
-void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj);
+void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level);
+void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level);
+void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level);
 
 //validation
 bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg);
