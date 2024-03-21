@@ -704,6 +704,10 @@ void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 		}
 		child = child->sibling_right;
 	}
+	logger("UTIL", LOG_LEVEL_DEBUG, "ofst : %d, lim : %d", ofst, lim);
+	if(lim < 0){
+		o2pt->cnst = CS_PARTIAL_CONTENT;
+	}
 }
 
 
@@ -721,31 +725,16 @@ void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 	build_rcn8(o2pt, rtnode, result_obj, ofst, lim, level-1);
 }
 
-RTNode *latest_cin_list(RTNode* cinList, int num) {
-	RTNode *head, *tail;
-	head = tail = cinList;
-	int cnt = 1;
-	
-	while(tail->sibling_right) {
-		tail = tail->sibling_right;
-		cnt++;
-	}
-	
-	for(int i=0; i < cnt-num; i++) {
-		head = head->sibling_right;
-		free_rtnode(head->sibling_left); head->sibling_left = NULL;
-	}
-	
-	return head;
-}
-
 void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level){
 	// logger("UTIL", LOG_LEVEL_DEBUG, "build_child_structure %s", rtnode->uri);
 	cJSON *pjson = NULL, *target = NULL;
 	if (level <= 0) return;
-	if(*lim <= 0) return;
-	if(*ofst <= 0 && *lim > 0){
-		if(isResourceAptFC(o2pt, rtnode, o2pt->fc)) {
+	if(*lim <= 0) {
+		*lim = -1;
+		return;
+	}
+	if(*lim > 0){
+		if(*ofst <= 0 && isResourceAptFC(o2pt, rtnode, o2pt->fc)) {
 			// logger("UTIL", LOG_LEVEL_DEBUG, "isResourceAptFC : %s", rtnode->uri);
 			target = cJSON_Duplicate(rtnode->obj, true);
 			if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty))) {
@@ -760,7 +749,7 @@ void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_
 			*ofst -= 1;
 		}
 	}
-	if(level > 0 && rtnode->ty == RT_CNT) {
+	if(*lim > 0 && level > 0 && rtnode->ty == RT_CNT) {
 		RTNode *cin_list_head = db_get_cin_rtnode_list(rtnode);
 
 		RTNode *cin = cin_list_head;
@@ -798,6 +787,24 @@ void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_
 		}
 		child = child->sibling_right;
 	}
+}
+
+RTNode *latest_cin_list(RTNode* cinList, int num) {
+	RTNode *head, *tail;
+	head = tail = cinList;
+	int cnt = 1;
+	
+	while(tail->sibling_right) {
+		tail = tail->sibling_right;
+		cnt++;
+	}
+	
+	for(int i=0; i < cnt-num; i++) {
+		head = head->sibling_right;
+		free_rtnode(head->sibling_left); head->sibling_left = NULL;
+	}
+	
+	return head;
 }
 
 void log_runtime(double start) {
@@ -2080,10 +2087,10 @@ cJSON *o2pt_to_json(oneM2MPrimitive *o2pt){
     cJSON_AddStringToObject(json, "fr", o2pt->fr);
     cJSON_AddStringToObject(json, "rvi", o2pt->rvi);
     if(o2pt->pc) cJSON_AddStringToObject(json, "pc", o2pt->pc);
-	if(o2pt->cnot){
-		cJSON_AddNumberToObject(json, "cnst", CS_PARTIAL_CONTENT);
+	if(o2pt->cnst)
+		cJSON_AddNumberToObject(json, "cnst", o2pt->cnst);
+	if(o2pt->cnot)
 		cJSON_AddNumberToObject(json, "cnot", o2pt->cnot);
-	}
     //if(o2pt->ty >= 0) cJSON_AddNumberToObject(json, "ty", o2pt->ty);
 	
 	return json;

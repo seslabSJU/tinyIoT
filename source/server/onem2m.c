@@ -1406,6 +1406,13 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	}
 
 	cJSON_Delete(root);
+
+	if(o2pt->cnst == CS_PARTIAL_CONTENT){
+		o2pt->cnot = ofst ? ofst->valueint : 0;
+		o2pt->cnot  += lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT;
+	}else{
+		o2pt->cnst = CS_FULL_CONTENT;
+	}
 	
 	o2pt->rsc = RSC_OK;
 	return RSC_OK;

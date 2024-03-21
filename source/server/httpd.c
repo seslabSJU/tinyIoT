@@ -393,9 +393,12 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
     set_header("X-M2M-RVI", o2pt->rvi, response_headers);
     set_header("X-M2M-RI", o2pt->rqi, response_headers);
 
-    if(o2pt->cnot > 0){
+    if(o2pt->cnst > 0){
         sprintf(cnst, "%d", o2pt->cnst);
         set_header("X-M2M-CNST", cnst, response_headers);
+    }
+
+    if(o2pt->cnot > 0){
         sprintf(ot, "%d", o2pt->cnot);
         set_header("X-M2M-CNOT", ot, response_headers);
     }
