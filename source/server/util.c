@@ -149,11 +149,13 @@ RTNode *find_csr_rtnode_by_uri(char *uri){
 */
 RTNode *find_rtnode(char *addr){
 	if(!addr) return NULL;
-
 	RTNode *rtnode = NULL;
+	if(strcmp(addr, CSE_BASE_NAME) == 0){
+		return rt->cb;
+	}
+	
 	if(strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 
-		&& addr[strlen(CSE_BASE_NAME)] == '/' 
-		|| strcmp(addr, CSE_BASE_NAME) == 0){
+		&& addr[strlen(CSE_BASE_NAME)] == '/' ){
 		logger("UTIL", LOG_LEVEL_DEBUG, "Hierarchical Addressing");
 		rtnode = find_rtnode_by_uri(addr);
 	}else{
@@ -738,24 +740,25 @@ RTNode *latest_cin_list(RTNode* cinList, int num) {
 }
 
 void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level){
+	logger("UTIL", LOG_LEVEL_DEBUG, "build_child_structure %s", rtnode->uri);
 	cJSON *pjson = NULL, *target = NULL;
 	if (level <= 0) return;
 	if(*lim <= 0) return;
 	if(*ofst <= 0 && *lim > 0){
 		if(isResourceAptFC(o2pt, rtnode, o2pt->fc)) {
+			logger("UTIL", LOG_LEVEL_DEBUG, "isResourceAptFC : %s", rtnode->uri);
+			target = cJSON_Duplicate(rtnode->obj, true);
 			if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty))) {
-				target = cJSON_Duplicate(rtnode->obj, true);
 				cJSON_AddItemToArray(pjson, target);
 			}else{
 				pjson = cJSON_CreateArray();
-				target = cJSON_Duplicate(rtnode->obj, true);
 				cJSON_AddItemToArray(pjson, target);
-				cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), pjson);
+				cJSON_AddItemToObject(result_obj, get_resource_key(rtnode->ty), pjson);
 			}
 			*lim -= 1;
+		}else{
+			*ofst -= 1;
 		}
-	}else{
-		*ofst -= 1;
 	}
 	if(level > 0 && rtnode->ty == RT_CNT) {
 		RTNode *cin_list_head = db_get_cin_rtnode_list(rtnode);
@@ -783,7 +786,11 @@ void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_
 	}
 
 	RTNode *child = rtnode->child;
-	while(child && child->ty != RT_CIN) {
+	while(child) {
+		if(child->ty == RT_CIN) {
+			child = child->sibling_right;
+			continue;
+		}
 		if(target) {	
 			build_child_structure(o2pt, child, target, ofst, lim, level-1);
 		}else{
@@ -886,11 +893,11 @@ void init_resource_tree(){
 }
 
 RTNode* restruct_resource_tree(RTNode *parent_rtnode, RTNode *list) {
-	logger("UTIL", LOG_LEVEL_DEBUG, "restruct_resource_tree");
+	// logger("UTIL", LOG_LEVEL_DEBUG, "restruct_resource_tree");
 	RTNode *rtnode = list;
 	while(rtnode) {
 		RTNode *right = rtnode->sibling_right;
-		logger("UTIL", LOG_LEVEL_DEBUG, "restruct_resource_tree : %s", get_ri_rtnode(rtnode));
+		// logger("UTIL", LOG_LEVEL_DEBUG, "restruct_resource_tree : %s, pi %s", get_ri_rtnode(rtnode), get_pi_rtnode(rtnode));
 		if(!strcmp(get_ri_rtnode(parent_rtnode), get_pi_rtnode(rtnode))) {
 			RTNode *left = rtnode->sibling_left;
 			

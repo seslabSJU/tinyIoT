@@ -1036,7 +1036,7 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode) {
 		case RCN_CHILD_RESOURCES:
 			root= cJSON_CreateObject();
 			
-			build_rcn8(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : 1000, lvl ? lvl->valueint : 10000);
+			build_rcn8(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
 			break;
 		case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
 			root = cJSON_CreateObject();
