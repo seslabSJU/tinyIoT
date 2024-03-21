@@ -717,7 +717,7 @@ void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
  * @remark build json with rcn 4
 */
 void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level) {
-	cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), rtnode->obj);
+	cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), cJSON_Duplicate(rtnode->obj,true));
 	build_rcn8(o2pt, rtnode, result_obj, ofst, lim, level-1);
 }
 
