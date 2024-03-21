@@ -740,13 +740,13 @@ RTNode *latest_cin_list(RTNode* cinList, int num) {
 }
 
 void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level){
-	logger("UTIL", LOG_LEVEL_DEBUG, "build_child_structure %s", rtnode->uri);
+	// logger("UTIL", LOG_LEVEL_DEBUG, "build_child_structure %s", rtnode->uri);
 	cJSON *pjson = NULL, *target = NULL;
 	if (level <= 0) return;
 	if(*lim <= 0) return;
 	if(*ofst <= 0 && *lim > 0){
 		if(isResourceAptFC(o2pt, rtnode, o2pt->fc)) {
-			logger("UTIL", LOG_LEVEL_DEBUG, "isResourceAptFC : %s", rtnode->uri);
+			// logger("UTIL", LOG_LEVEL_DEBUG, "isResourceAptFC : %s", rtnode->uri);
 			target = cJSON_Duplicate(rtnode->obj, true);
 			if(pjson = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty))) {
 				cJSON_AddItemToArray(pjson, target);

@@ -900,7 +900,7 @@ RTNode * db_get_latest_cins(){
     int cols, bytes, coltype;
     cJSON *json, *root;
     sqlite3_stmt *res = NULL;
-    RTNode *head, *rtnode = NULL;
+    RTNode *head = NULL, *rtnode = NULL;
 
     sprintf(sql, "SELECT  * FROM general, cin WHERE general.id IN (SELECT max(id) FROM general WHERE ty=4 GROUP BY pi)  AND general.id=cin.id");
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);

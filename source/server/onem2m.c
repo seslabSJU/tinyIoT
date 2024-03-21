@@ -553,16 +553,28 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		free_rtnode(cin_rtnode);
 		return o2pt->rsc;
 	}
-	if(parent_rtnode->child){
-		cJSON_Delete(parent_rtnode->child->obj);
-		parent_rtnode->child->obj = cJSON_Duplicate(cin, 1);
-		free_rtnode(cin_rtnode);
-		// cJSON_Delete(root);
-	}else{
-		parent_rtnode->child = cin_rtnode;
-		cin_rtnode->parent = parent_rtnode;
-		if(cin_rtnode->rn) free(cin_rtnode->rn);
+
+	RTNode *rtnode = parent_rtnode->child;
+	if(!rtnode){
+		add_child_resource_tree(parent_rtnode, cin_rtnode);
+		if(cin_rtnode->rn)
+			free(cin_rtnode->rn);
 		cin_rtnode->rn = strdup("la");
+	}else{
+		while(rtnode && strcmp(rtnode->rn, "la") != 0){
+			rtnode = rtnode->sibling_right;
+		}
+		if(!rtnode){
+			add_child_resource_tree(parent_rtnode, cin_rtnode);
+			if(cin_rtnode->rn)
+				free(cin_rtnode->rn);
+			cin_rtnode->rn = strdup("la");
+		}else{
+			cJSON_Delete(rtnode->obj);
+			rtnode->obj = cJSON_Duplicate(cin, 1);
+			free_rtnode(cin_rtnode);
+		}
+		// cJSON_Delete(root);
 	}
 	return RSC_CREATED;
 }
@@ -597,10 +609,6 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		return rsc;
 	}
 
-	if(o2pt->pc) free(o2pt->pc);
-	o2pt->pc = cJSON_PrintUnformatted(root);
-	o2pt->rsc = RSC_CREATED;
-
 	// Add uri attribute
 	char ptr[1024];
 	cJSON *rn = cJSON_GetObjectItem(sub, "rn");
@@ -616,6 +624,10 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
 	RTNode* child_rtnode = create_rtnode(sub, RT_SUB);
 	add_child_resource_tree(parent_rtnode,child_rtnode);
+
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = cJSON_PrintUnformatted(root);
+	o2pt->rsc = RSC_CREATED;
 
 	cJSON_DetachItemFromObject(root, "m2m:sub");
 	cJSON_Delete(root);
@@ -1049,7 +1061,10 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode) {
 			break;
 
 	}
-	if(o2pt->pc) free(o2pt->pc);
+	if(o2pt->pc) {
+		free(o2pt->pc);
+		o2pt->pc = NULL;
+	}
 	if(root){
 		o2pt->pc = cJSON_PrintUnformatted(root);
 		cJSON_Delete(root);
@@ -1694,7 +1709,8 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
 	cJSON_AddItemToObject(sgn, "nev", nev = cJSON_CreateObject());
 	cJSON_AddNumberToObject(nev, "net", net);
-	cJSON_AddStringToObject(nev, "rep", o2pt->pc);
+	cJSON_AddItemToObject(nev, "rep", cJSON_Parse(o2pt->pc));
+	// cJSON_AddStringToObject(nev, "rep", o2pt->pc);
 
 	if(o2pt->op == OP_CREATE && o2pt->ty == RT_SUB) {
 		cJSON_AddItemToObject(sgn, "vrq", cJSON_CreateBool(true));
