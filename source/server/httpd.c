@@ -183,8 +183,7 @@ void respond(int slot) {
         logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
         return;
     }
-    // message received
-    pthread_mutex_lock(&mutex_lock);  
+    // message received 
     buf[slot][rcvd] = '\0';
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf[slot]);
     memcpy(buffer, buf[slot], rcvd);
@@ -202,7 +201,6 @@ void respond(int slot) {
     handle_http_request(req, slot);    
     free(buf[slot]);
     free_HTTPRequest(req);
-    pthread_mutex_unlock(&mutex_lock);
 }
 
 Operation http_parse_operation(char *method){
@@ -226,7 +224,7 @@ void handle_http_request(HTTPRequest *req, int slotno) {
         o2pt->pc = strdup(req->payload);
 		o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
 	} 
-    
+
 
 	if((header = search_header(req->headers, "X-M2M-Origin"))) {
         logger("HTTP", LOG_LEVEL_DEBUG, "fr: %s", header);
@@ -268,6 +266,17 @@ void handle_http_request(HTTPRequest *req, int slotno) {
     
     o2pt->op = http_parse_operation(req->method);    
     logger("HTTP", LOG_LEVEL_INFO, "Request : %s", req->method);
+    // Setting default rcn
+    switch(o2pt->op){
+        case OP_CREATE:
+        case OP_RETRIEVE:
+        case OP_UPDATE:
+            o2pt->rcn = RCN_ATTRIBUTES;
+            break;
+        case OP_DELETE:
+            o2pt->rcn = RCN_NOTHING;
+            break;
+    }
 
     /* get client ip address */
     struct sockaddr_in client_addr;
@@ -284,7 +293,6 @@ void handle_http_request(HTTPRequest *req, int slotno) {
         o2pt->ty = http_parse_object_type(req->headers);
         if(o2pt->ty == 0){
             o2pt->op = OP_NOTIFY;
-            return;
         }
     } 
     else if(o2pt->op == OP_OPTIONS){
@@ -321,6 +329,12 @@ void handle_http_request(HTTPRequest *req, int slotno) {
 
         if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) == FU_DISCOVERY){
             o2pt->op = OP_DISCOVERY;
+            o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
+        }
+        
+        if(cJSON_GetObjectItem(qs, "rcn")){
+            o2pt->rcn = cJSON_GetObjectItem(qs, "rcn")->valueint;
+            cJSON_DeleteItemFromObject(qs, "rcn");
         }
         o2pt->fc = qs;
     }
@@ -362,7 +376,12 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
     char rsc[64];
     char cnst[32], ot[32];
     char response_headers[2048] = {'\0'};
-    char buf[BUF_SIZE] = {'\0'};
+    char buf[BUF_SIZE] = {0,};
+    memset(buf, 0, BUF_SIZE);
+
+    if(o2pt->pc && strlen(o2pt->pc) >= BUF_SIZE-1){
+        handle_error(o2pt, RSC_NOT_ACCEPTABLE, "result size too big");
+    }
 
     sprintf(content_length, "%ld", o2pt->pc ? strlen(o2pt->pc) : 0);
     sprintf(rsc, "%d", o2pt->rsc);
@@ -371,17 +390,22 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
     set_header("X-M2M-RVI", o2pt->rvi, response_headers);
     set_header("X-M2M-RI", o2pt->rqi, response_headers);
 
-    if(o2pt->cnot > 0){
+    if(o2pt->cnst > 0){
         sprintf(cnst, "%d", o2pt->cnst);
         set_header("X-M2M-CNST", cnst, response_headers);
+    }
+
+    if(o2pt->cnot > 0){
         sprintf(ot, "%d", o2pt->cnot);
         set_header("X-M2M-CNOT", ot, response_headers);
     }
 
     sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
     if(o2pt->pc){
-        strcat(buf, o2pt->pc);
+        strncat(buf, o2pt->pc, BUF_SIZE - strlen(buf) - 1);
+        strncat(buf, "\r\n", BUF_SIZE - strlen(buf) - 1);
     } 
+    
     write(clients[slotno], buf, strlen(buf)); 
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf);
 }
@@ -426,6 +450,11 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port){
     add_header("X-M2M-Origin", o2pt->fr, req->headers);
     add_header("X-M2M-RVI", "2a", req->headers);
     add_header("X-M2M-RI", o2pt->rqi, req->headers);
+
+    if(o2pt->fc){
+        req->qs = fc_to_qs(o2pt->fc);
+    }
+    
     if(o2pt->ty > 0){
         sprintf(buffer, "application/json;ty=%d", o2pt->ty);
         add_header("Content-Type", buffer, req->headers);
@@ -590,7 +619,7 @@ int send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res
         set_header("Content-Length", contentSize, header);
     }
     if(req->qs == NULL) req->qs = bs;
-    sprintf(buffer, "%s %s%s %s\r\n%s\r\n", req->method, req->uri, req->qs, HTTP_PROTOCOL_VERSION, header);
+    sprintf(buffer, "%s %s%s%s %s\r\n%s\r\n", req->method, req->uri, req->qs ? "?" : "", req->qs, HTTP_PROTOCOL_VERSION, header);
     if(req->payload) {
         strcat(buffer, req->payload);
         strcat(buffer, "\r\n");
@@ -607,7 +636,7 @@ int send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res
     rcvd = recv(sock, buffer, BUF_SIZE, 0); 
 
     if (rcvd < 0){ // receive error
-        logger("HTTP", LOG_LEVEL_ERROR, "recv() error");
+        // logger("HTTP", LOG_LEVEL_ERROR, "recv() error");
         res->status_code = 500;
     } else if (rcvd == 0) { // receive socket closed
         logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");

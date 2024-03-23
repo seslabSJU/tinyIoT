@@ -3,7 +3,7 @@
 #include "logger.h"
 
 // IN_CSE, MN_CSE
-#define SERVER_TYPE MN_CSE 
+#define SERVER_TYPE IN_CSE 
 
 // #define NIC_NAME "eth0"
 #define SERVER_IP "127.0.0.1"
@@ -38,8 +38,15 @@
 #define DEFAULT_MAX_NR_INSTANCES 10
 #define DEFAULT_MAX_BYTE_SIZE 65536
 
+// CIN Settings
+#define ALLOW_CIN_RN true // true → allow, false → not allow
+
 // Group Settings
 #define DEFAULT_CONSISTENCY_POLICY CSY_ABANDON_MEMBER
+
+
+// Discovery Settings
+#define DEFAULT_DISCOVERY_LIMIT 150
 
 
 // MQTT Settings

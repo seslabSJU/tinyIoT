@@ -21,7 +21,7 @@ RTNode* get_rtnode(oneM2MPrimitive *o2pt);
 RTNode* parse_uri(oneM2MPrimitive *o2pt, RTNode *cb);
 int tree_viewer_api(oneM2MPrimitive *o2pt, RTNode *node);
 void tree_viewer_data(RTNode *node, char **viewer_data, int cin_size) ;
-RTNode *get_remote_resource(char *address);
+RTNode *get_remote_resource(char *address, int *rsc);
 
 cJSON *getNonDiscoverableAcp(oneM2MPrimitive *o2pt, RTNode *rtnode);
 cJSON *getNoPermAcopDiscovery(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop);
@@ -81,6 +81,11 @@ cJSON *getResource(cJSON *root, ResourceType ty);
 
 void notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net);
 
+// rcn
+void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level);
+void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level);
+void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level);
+
 //validation
 bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg);
 bool is_valid_acr(cJSON *acr);
@@ -91,7 +96,7 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op);
 int validate_acp(oneM2MPrimitive *o2pt, cJSON *acp, Operation op);
 int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp);
 int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new);
-bool validate_grp_member(cJSON *grp, cJSON *final_mid , int csy, int mt);
+int validate_grp_member(cJSON *grp, cJSON *final_mid , int csy, int mt);
 int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Operation op);
 int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op);
 bool checkResourceCseID(char *resourceUri, char* cseID);
@@ -117,16 +122,19 @@ char* get_local_time(int diff);
 char* resource_identifier(ResourceType ty, char *ct);
 void delete_cin_under_cnt_mni_mbs(RTNode *rtnode);
 int net_to_bit(cJSON *net);
-int get_acop(oneM2MPrimitive *o2pt, RTNode *node);
-int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode);
-int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag);
 int get_value_querystring_int(char *key);
 void remove_invalid_char_json(char* json);
 int is_json_valid_char(char c);
 bool is_rn_valid_char(char c);
-int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop);
 int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path);
 bool isMinDup(char **mid, int idx, char *new_mid);
+
+//privilege
+int get_acop(oneM2MPrimitive *o2pt, RTNode *node);
+int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode);
+int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag);
+int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop);
+int has_acpi_update_privilege(oneM2MPrimitive *o2pt, char *acpi);
 
 ResourceType http_parse_object_type(header_t *headers);
 ResourceType coap_parse_object_type(int object_type);
@@ -149,9 +157,5 @@ int get_number_from_cjson(cJSON *json);
 cJSON *qs_to_json(char* qs);
 cJSON *handle_uril(cJSON *uril, char *new_uri, FilterOperation fo);
 void filterOptionStr(FilterOperation fo , char *sql);
-
-#ifdef BERKELEY_DB
-cJSON *fc_scan_resource_tree(RTNode *rtnode, FilterCriteria *fc, int lvl);
-#endif
-
+ACOP op_to_acop(Operation op);
 #endif
