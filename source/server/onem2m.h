@@ -113,6 +113,7 @@ typedef struct _o{
 	cJSON *cjson_pc;
 	int rcn;
 	int rsc;
+	int coap_rsc;
 	int ty;
 	char *origin;
 	bool isFopt;

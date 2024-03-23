@@ -417,14 +417,22 @@ ResourceType coap_parse_object_type(int object_type) {
 	ResourceType ty;
 	
 	switch(object_type) {
-	case 49 : ty = RT_ACP; break;	// 1
-	case 50 : ty = RT_AE; break;	// 2
-	case 51 : ty = RT_CNT; break;	// 3
-	case 52 : ty = RT_CIN; break;	// 4
-	case 53 : ty = RT_CSE; break;	// 5
-	case 57 : ty = RT_GRP; break;	// 9
-	case 64 : ty = RT_CSR; break;	// 16
-	case 71 : ty = RT_SUB; break;	// 23
+	case 1 : case 49 : 
+		ty = RT_ACP; break;
+	case 2 : case 50 :
+		ty = RT_AE; break;	
+	case 3 : case 51 : 
+		ty = RT_CNT; break;
+	case 4 : case 52 :
+		ty = RT_CIN; break;
+	case 5 : case 53 :
+		ty = RT_CSE; break;	
+	case 9 : case 57 :
+		ty = RT_GRP; break;
+	case 16 : case 64 :
+		ty = RT_CSR; break;	
+	case 23 : case 71 :
+		ty = RT_SUB; break;	
 	default : ty = RT_MIXED; break;
 	}
 	
@@ -853,10 +861,15 @@ void init_server() {
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 	#endif
 	sprintf(poa, "http://%s:%s", SERVER_IP, SERVER_PORT);
-	cJSON_AddItemToObject(poa_obj, "poa", cJSON_CreateString(poa));
+	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 
 	#ifdef ENABLE_MQTT
 	sprintf(poa, "mqtt://%s:%s", SERVER_IP, MQTT_PORT);
+	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
+	#endif
+
+	#ifdef ENABLE_COAP
+	sprintf(poa, "coap://%s:%d", SERVER_IP, COAP_PORT);
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 	#endif
 
@@ -2073,6 +2086,8 @@ int rsc_to_coap_status(int rsc){
 		case RSC_EXTERNAL_OBJECT_NOT_REACHABLE_BEFORE_RQET_TIMEOUT: 
 		case RSC_EXTERNAL_OBJECT_NOT_REACHABLE_BEFORE_OET_TIMEOUT: 
 			return 504; // 5.04 Gateway Timeout
+		default:
+			return 0;
     }
 }
 
@@ -3808,6 +3823,8 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 		*prot = PROT_HTTP;
 	}else if(!strncmp(poa_str, "mqtt://", 7)) {
 		*prot = PROT_MQTT;
+	}else if(!strncmp(poa_str, "coap://", 7)) {
+		*prot = PROT_COAP;
 	}else{
 		free(p);
 		return -1;
@@ -3831,6 +3848,8 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 		*port = 80;
 	}else if(*prot == PROT_MQTT && port == 0){
 		*port = 1883;
+	}else if(*prot == PROT_COAP && port == 0){
+		*port = 5683;
 	}
 	return 0;
 }

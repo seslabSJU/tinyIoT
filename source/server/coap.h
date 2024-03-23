@@ -1,12 +1,34 @@
 #include "libcoap/coap.h"
-#include "onem2m.h"
+// #include <coap3/coap.h>
+#include "util.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <pthread.h>
+#include <ctype.h>
+#include <inttypes.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <signal.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <dirent.h>
+#include <syslog.h>
 
 // Current CoAP attributes
-#define COAP_PORT 5683
 #define COAP_VERSION 1
 #define COAP_HEADER_SIZE 4
 #define COAP_OPTION_HEADER_SIZE 1
 #define COAP_PAYLOAD_MARKER 0xFF
+
+#define LOG_TAG "COAP"
+#define BUF_SIZE 65535
 
 typedef struct {
     uint8_t ver;
