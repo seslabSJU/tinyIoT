@@ -739,6 +739,10 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode) { // TODO deannounce
 	}
 
 	int result = validate_ae(o2pt, m2m_ae, OP_UPDATE);
+	if(result != RSC_OK){
+		logger("O2", LOG_LEVEL_ERROR, "validation failed");
+		return result;
+	}
 	cJSON* acpi_obj = NULL;
 	bool acpi_flag = false;
 	if(cJSON_GetObjectItem(m2m_ae, "acpi")){
@@ -763,10 +767,6 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode) { // TODO deannounce
 		}
 	}
 	
-	if(result != RSC_OK){
-		logger("O2", LOG_LEVEL_ERROR, "validation failed");
-		return result;
-	}
 
 	cJSON *at = NULL;
 	if( (at = cJSON_GetObjectItem(m2m_ae, "at")) ){
@@ -1071,9 +1071,19 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode) {
 	}
 	
 	delete_process(o2pt, target_rtnode);
-		
+	
 	db_delete_onem2m_resource(target_rtnode);
-	free_rtnode(target_rtnode);
+
+	if(target_rtnode->ty == RT_CIN){
+		cJSON *pjson = cJSON_GetObjectItem(target_rtnode->parent->obj, "cni");
+		if( pjson && pjson->valueint > 0){
+			cJSON_Delete(target_rtnode->obj);
+			target_rtnode->obj = db_get_cin_laol(target_rtnode->parent, 0);
+		}
+	}else{
+		free_rtnode(target_rtnode);
+	}
+	
 	target_rtnode = NULL;
 	o2pt->rsc = RSC_DELETED;
 	return RSC_DELETED;

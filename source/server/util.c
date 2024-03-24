@@ -45,6 +45,10 @@ RTNode* get_rtnode(oneM2MPrimitive *o2pt){
 		logger("UTIL", LOG_LEVEL_DEBUG, "SP_RELATIVE");
 		char *ptr = NULL;
 		if(isSpRelativeLocal(target_uri)){
+			if(strcmp(target_uri+1, CSE_BASE_RI) == 0){
+				handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
+				return NULL;
+			}
 			ptr = target_uri + strlen(CSE_BASE_RI) + 2; // for first / and end /
 			if(strlen(ptr) == 0){
 				logger("UTIL", LOG_LEVEL_DEBUG, "addr is empty");
@@ -150,12 +154,12 @@ RTNode *find_csr_rtnode_by_uri(char *uri){
 RTNode *find_rtnode(char *addr){
 	if(!addr) return NULL;
 	RTNode *rtnode = NULL;
-	if(strcmp(addr, CSE_BASE_NAME) == 0){
+	if(strcmp(addr, CSE_BASE_NAME) == 0 || strcmp(addr, "-") == 0){
 		return rt->cb;
 	}
-	
-	if(strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 
-		&& addr[strlen(CSE_BASE_NAME)] == '/' ){
+	logger("UTIL", LOG_LEVEL_DEBUG, "addr : %s", addr);
+	if( (strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 && addr[strlen(CSE_BASE_NAME)] == '/') 
+	|| (addr[0] == '-' && addr[1] == '/')){
 		logger("UTIL", LOG_LEVEL_DEBUG, "Hierarchical Addressing");
 		rtnode = find_rtnode_by_uri(addr);
 	}else{
@@ -213,8 +217,14 @@ RTNode *find_rtnode_by_uri(char *uri) {
 	char *target_uri = strdup(uri);
 	char *ptr = strtok(target_uri, "/");
 	if(!ptr) return NULL;
+	if(!strcmp(ptr, "-")) {
+		logger("UTIL", LOG_LEVEL_DEBUG, "root node -");
+		rtnode = rt->cb->child;
+		ptr = strtok(NULL, "/");
+	}
 
 	while(ptr){
+		logger("UTIL", LOG_LEVEL_DEBUG, "ptr : %s", ptr);
 		while(rtnode) {
 			if(!strcmp(rtnode->rn, ptr)) break;
 			rtnode = rtnode->sibling_right;
@@ -275,7 +285,7 @@ RTNode *find_rtnode_by_ri(char *ri){
 	cJSON *resource = NULL;
 	RTNode *rtnode = NULL;
 	char * fopt = strstr(ri, "/fopt");
-	logger("UTIL", LOG_LEVEL_DEBUG, "RI : %s", ri);
+	// logger("UTIL", LOG_LEVEL_DEBUG, "RI : %s", ri);
 	if(strncmp(ri, "4-", 2) == 0){
 		logger("UTIL", LOG_LEVEL_DEBUG, "CIN");
 		resource = db_get_resource(ri, RT_CIN);
@@ -619,7 +629,7 @@ void delete_cin_under_cnt_mni_mbs(RTNode *rtnode) {
 		cni--;
 	}
 
-	if(cbs > mbs) {
+	if(cni > mni || cbs > mbs) {
 		RTNode *head = db_get_cin_rtnode_list(rtnode);
 		RTNode *right;
 
@@ -1188,7 +1198,8 @@ int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag) {
 	cJSON_ArrayForEach(acr, cJSON_GetObjectItem(privilege, "acr")){
 		cJSON_ArrayForEach(acor, cJSON_GetObjectItem(acr, "acor")){
 			if( (asterisk = strchr(acor->valuestring, '*')) ){
-				if(!strncmp(acor->valuestring, origin, asterisk - acor->valuestring) && !strcmp(asterisk+1, origin + (asterisk - acor->valuestring))){ 
+				if(!strncmp(acor->valuestring, origin, asterisk - acor->valuestring) 
+				&& !strcmp(asterisk+1, origin + strlen(origin) - strlen(asterisk+1))){ 
 					if(check_acco(cJSON_GetObjectItem(acr, "acco"), o2pt->ip)){
 						ret_acop = (ret_acop | cJSON_GetObjectItem(acr, "acop")->valueint);
 					}
@@ -1208,6 +1219,7 @@ int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag) {
 			}
 		}
 	}
+	logger( "UTIL", LOG_LEVEL_DEBUG, "get_acop_origin [%s]: %d", origin, ret_acop);
 	free(origin);
 	return ret_acop;
 }
@@ -1831,8 +1843,13 @@ void remove_mid(char **mid, int idx, int cnm){
 bool isSpRelativeLocal(char *address){
 	if(!address) return false;
 	if(address[0] != '/') return false;
-	if(strlen(address) < strlen(CSE_BASE_RI) + 2) return false;
-	if(strncmp(address+1, CSE_BASE_RI, strlen(CSE_BASE_RI)) == 0 && address[strlen(CSE_BASE_RI) + 1] == '/') return true;
+	char *ptr = strchr(address+1, '/');
+	if(ptr) *ptr = '\0';
+	if(strncmp(address+1, CSE_BASE_RI, strlen(CSE_BASE_RI)) == 0 ) {
+		if(ptr) *ptr = '/';
+		return true;
+	}
+	if(ptr) *ptr = '/';
 	return false;
 }
 
@@ -2698,7 +2715,7 @@ bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg){
 */
 int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op){
 	if(!acpiAttr) {
-		return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
+		return RSC_OK;
 	}
 	if( !cJSON_IsArray(acpiAttr) && !cJSON_IsNull(acpiAttr)){
 		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` is in invalid form");
@@ -2722,20 +2739,21 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op){
 			if((acop & op) == op){
 				break;
 			}
-		}else{
-			acop = (acop | get_acop_origin(o2pt, acp, 0));
-			logger("UTIL", LOG_LEVEL_DEBUG, "acop-pv : %d, op : %d", acop, op);
-			if((acop & op) == op){
-				break;
-			}
+		}else if(op == OP_CREATE){
+			acop = ACOP_CREATE;
+			// Create does not need to check acop
+			// acop = (acop | get_acop_origin(o2pt, acp, 0));
+			// logger("UTIL", LOG_LEVEL_DEBUG, "acop-pv : %d, op : %d", acop, op);
+			// if((acop & op) == op){
+			// 	break;
+			// }
 		}
 	}
 	if(o2pt->fr && !strcmp(o2pt->fr, "CAdmin")){
 
 	}
 	else if((acop & op) != op){
-		handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "originator has no privilege");
-		return RSC_ORIGINATOR_HAS_NO_PRIVILEGE;
+		return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "originator has no privilege");
 	}
 	
 
@@ -2889,9 +2907,11 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op){
 			return RSC_CONTENTS_UNACCEPTABLE;
 		}
 		ptr = pjson->valuestring;
-		if(ptr[0] != 'R' && ptr[0] != 'N') {
-			handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
-			return RSC_BAD_REQUEST;
+		if(!strcmp(o2pt->rvi, "4")){
+			if(ptr[0] != 'R' && ptr[0] != 'N') {
+				handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
+				return RSC_BAD_REQUEST;
+			}
 		}
 	}
 	cJSON *attrs = cJSON_GetObjectItem(ATTRIBUTES, "m2m:ae");
@@ -2926,14 +2946,21 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op){
 
 	pjson = cJSON_GetObjectItem(ae, "acpi");
 	if(pjson){
-		int result = validate_acpi(o2pt, pjson, op);
-		if(result != RSC_OK) return result;
-	}
+		if(op == OP_CREATE){
+			if(pjson){
+				int result = validate_acpi(o2pt, pjson, op);
+				if(result != RSC_OK) return result;
+			}
+		}
+		else if(op == OP_UPDATE){
+			if(pjson && cJSON_GetArraySize(pjson) > 1){
+				handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
+				return RSC_BAD_REQUEST;
+			}
+		}
 
-	if(op == OP_UPDATE){
-		if(pjson && cJSON_GetArraySize(pjson) > 1){
-			handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
-			return RSC_BAD_REQUEST;
+		if(!cJSON_IsNull(pjson) && cJSON_GetArraySize(pjson) == 0){
+			return handle_error(o2pt, RSC_BAD_REQUEST, "empty `acpi` is not allowed");	
 		}
 	}
 
@@ -3035,6 +3062,10 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
 				return RSC_NOT_ACCEPTABLE;
 			}
 		}
+	}
+
+	if ( (pjson = cJSON_GetObjectItem(cin, "cnf")) ){
+		// check cnf
 	}
 
 	cJSON* aa = cJSON_GetObjectItem(cin, "aa");

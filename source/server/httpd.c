@@ -248,11 +248,11 @@ void handle_http_request(HTTPRequest *req, int slotno) {
     
 	if(req->uri) {
         if(req->uri[1] == '~'){ // SP relative
-            o2pt->to = (char *) malloc(sizeof(char) * (strlen(req->uri+1)));
+            o2pt->to = (char *) calloc((strlen(req->uri+1)), sizeof(char));
             o2pt->to[0] = '/';
             strcat(o2pt->to, req->uri+3);
         }else if(req->uri[1] == '_'){ // absolute
-            o2pt->to = (char *) malloc(sizeof(char) * (strlen(req->uri+1) + 1));
+            o2pt->to = (char *) calloc((strlen(req->uri+1)), sizeof(char));
             o2pt->to[0] = '/';
             o2pt->to[1] = '/';
             strcat(o2pt->to, req->uri+3);
