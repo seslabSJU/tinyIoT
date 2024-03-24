@@ -320,15 +320,13 @@ void handle_http_request(HTTPRequest *req, int slotno) {
     if(req->qs && strlen(req->qs) > 0){
         cJSON *qs = qs_to_json(req->qs);
         parse_qs(qs);
-        
-        o2pt->drt = cJSON_CreateObject();
+
         if(cJSON_GetObjectItem(qs, "drt")){
-            cJSON_AddNumberToObject(o2pt->drt, "drt", cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "drt")));
+            o2pt->drt = cJSON_GetObjectItem(qs, "drt")->valueint;
         } else {
-            cJSON_AddNumberToObject(o2pt->drt, "drt", DRT_STRUCTURED);
+            o2pt->drt = DRT_STRUCTURED;
         }
-        cJSON_DeleteItemFromObject(qs, "drt");
-    
+
         if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) == FU_DISCOVERY){
             o2pt->op = OP_DISCOVERY;
             o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
@@ -338,7 +336,6 @@ void handle_http_request(HTTPRequest *req, int slotno) {
             o2pt->rcn = cJSON_GetObjectItem(qs, "rcn")->valueint;
             cJSON_DeleteItemFromObject(qs, "rcn");
         }
-
         o2pt->fc = qs;
     }
     

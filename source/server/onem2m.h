@@ -113,6 +113,7 @@ typedef struct _o{
 	cJSON *cjson_pc;
 	int rcn;
 	int rsc;
+	int coap_rsc;
 	int ty;
 	char *origin;
 	bool isFopt;
@@ -123,7 +124,7 @@ typedef struct _o{
 	ContentStatus cnst;
 	int cnot;
 	cJSON *fc;
-	cJSON *drt;
+	int drt;
 }oneM2MPrimitive;
 
 typedef struct _n{

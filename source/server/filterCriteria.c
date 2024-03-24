@@ -72,11 +72,12 @@ bool isFCAttrValid(cJSON *fc){
 }
 
 bool isValidFcAttr(char* attr){
-    char *fcAttr[33] = {
+    char *fcAttr[34] = {
     "crb", "cra", "ms", "us", "sts", "stb", "exb", "exa", "lbl","clbl", "palb", "lbq", "ty", "chty", "pty", "sza", "szb", "cty", 
-    "atr", "catr", "patr", "fu", "lim", "smf", "fo", "cfs", "cfq", "lvl", "ofst", "arp", "gq", "ops", "la"};
+    "atr", "catr", "patr", "fu", "lim", "smf", "fo", "cfs", "cfq", "lvl", "ofst", "arp", "gq", "ops", "la",
+    "drt"};
 
-    for(int i = 0 ; i < 33 ; i++){
+    for(int i = 0 ; i < 34 ; i++){
         if(!strcmp(attr, fcAttr[i])) return true;
     }
     return false;
