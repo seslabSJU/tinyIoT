@@ -619,9 +619,6 @@ void* coap_serve(void) {
 
     coap_context_t *ctx = get_context();
 
-    /* Need PKI/RPK/PSK set up before we set up (D)TLS endpoints */
-    fill_keystore(ctx);
-
     coap_address_t serv_addr;
     coap_address_init(&serv_addr);
     serv_addr.addr.sin.sin_family = AF_INET;
