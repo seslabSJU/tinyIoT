@@ -130,6 +130,11 @@ RTNode* create_rtnode(cJSON *obj, ResourceType ty){
 		rtnode->uri = strdup(uri->valuestring);
 		cJSON_DeleteItemFromObject(obj, "uri");
 	}
+
+	rtnode->memberOf = (NodeList *)calloc(1, sizeof(NodeList));
+	rtnode->memberOf->next = NULL;
+	rtnode->memberOf->rtnode = NULL;
+	rtnode->memberOf->uri = NULL;
 	
 	rtnode->rn = strdup(cJSON_GetObjectItem(obj, "rn")->valuestring);
 	
@@ -269,7 +274,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
 	add_general_attribute(ae, parent_rtnode, RT_AE);
 	int rsc = validate_ae(o2pt, ae, OP_CREATE);
-	
+
 	if(o2pt->fr && strlen(o2pt->fr) > 0) {
 		cJSON* ri = cJSON_GetObjectItem(ae, "ri");
 		cJSON_SetValuestring(ri, o2pt->fr);
@@ -1102,6 +1107,8 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode) {
 
 int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 	cJSON *csr, *dcse, *dcse_item;
+	cJSON *pjson = NULL;
+	RTNode *ptr_rtnode = NULL;
 	if(rtnode->child) delete_process(o2pt, rtnode->child);
 	switch(rtnode->ty) {
 		case RT_ACP :
@@ -1134,12 +1141,38 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 			detach_csrlist(rtnode);
 			break;
 		case RT_GRP:
+			cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(rtnode->obj, "mid")){
+				ptr_rtnode = find_rtnode(pjson->valuestring);
+				logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", ptr_rtnode->uri, pjson->valuestring);
+				deleteNodeList(ptr_rtnode->memberOf, rtnode);
+			}
 			break;
 		case RT_AEA:
 			break;
 		case RT_CBA:
 			break;
 	}
+
+	NodeList *nl = NULL;
+	int idx = -1;
+	nl = rtnode->memberOf->next;
+	while(nl){
+		logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", rtnode->uri, nl->uri);
+		if(!nl->rtnode){
+			nl = nl->next;
+			continue;
+		}
+		pjson = cJSON_GetObjectItem(nl->rtnode->obj, "mid");
+		idx = cJSON_getArrayIdx(pjson, rtnode->uri);
+		if(idx >= 0){
+			cJSON_DeleteItemFromArray(pjson, idx);
+			cJSON_SetIntValue(cJSON_GetObjectItem(nl->rtnode->obj, "cnm"), cJSON_GetArraySize(pjson));
+		}
+		logger("O2M", LOG_LEVEL_DEBUG, "new mid =  %s", cJSON_Print(pjson));
+		db_update_resource(nl->rtnode->obj, cJSON_GetObjectItem(nl->rtnode->obj, "ri")->valuestring, nl->rtnode->ty);
+		nl = nl->next;
+	}
+	
 
 	notify_onem2m_resource(o2pt, rtnode);
 
@@ -1163,6 +1196,18 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 	return 1;
 }
 
+int cJSON_getArrayIdx(cJSON *arr, char *value){
+	cJSON *item = NULL;
+	int idx = 0;
+	cJSON_ArrayForEach(item, arr){
+		if(strcmp(item->valuestring, value) == 0){
+			return idx;
+		}
+		idx++;
+	}
+	return -1;
+}
+
 void free_rtnode(RTNode *rtnode) {
 	if(rtnode->uri){
 		free(rtnode->uri);
@@ -1171,10 +1216,11 @@ void free_rtnode(RTNode *rtnode) {
 	if(rtnode->rn){
 		free(rtnode->rn);
 		rtnode->rn = NULL;
-	
 	}
-	if(rtnode->obj)
+	if(rtnode->obj){
 		cJSON_Delete(rtnode->obj);
+		rtnode->obj = NULL;
+	}
 	if(rtnode->parent && rtnode->parent->child == rtnode){
 		rtnode->parent->child = rtnode->sibling_right;
 	}
@@ -1186,6 +1232,17 @@ void free_rtnode(RTNode *rtnode) {
 	}
 	if(rtnode->child){
 		free_rtnode_list(rtnode->child);
+		rtnode->child = NULL;
+	}
+
+	if(rtnode->subs){
+		free_all_nodelist(rtnode->subs);
+		rtnode->subs = NULL;
+	}
+
+	if(rtnode->memberOf){
+		free_all_nodelist(rtnode->memberOf);
+		rtnode->memberOf = NULL;
 	}
 
 	
@@ -1233,6 +1290,8 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 		return RSC_INTERNAL_SERVER_ERROR;
 	}
 
+	set_grp_member(target_rtnode);
+
 	cJSON *root = cJSON_CreateObject();
 	cJSON_AddItemToObject(root, "m2m:grp", target_rtnode->obj);
 	if(o2pt->pc) free(o2pt->pc);
@@ -1255,12 +1314,23 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
 	cJSON *grp = cJSON_GetObjectItem(root, "m2m:grp");
 
+	
+
 	add_general_attribute(grp, parent_rtnode, RT_GRP);
-
-
 	rsc = validate_grp(o2pt, grp);
 	if(rsc >= 4000){
 		return logger("O2M", LOG_LEVEL_DEBUG, "Group Validation failed");
+	}
+	cJSON *pjson = NULL;
+	// Add cr attribute
+	if( (pjson = cJSON_GetObjectItem(grp, "cr")) ){
+		if(pjson->type == cJSON_NULL){
+			cJSON_AddStringToObject(grp, "cr", o2pt->fr);
+		}else{
+			handle_error(o2pt, RSC_BAD_REQUEST, "creator attribute with arbitary value is not allowed");
+			cJSON_Delete(root);
+			return o2pt->rsc;
+		}
 	}
 
 	cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
@@ -1284,6 +1354,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 
 	RTNode *child_rtnode = create_rtnode(grp, RT_GRP);
 	add_child_resource_tree(parent_rtnode, child_rtnode);
+	set_grp_member(child_rtnode);
 
 	make_response_body(o2pt, child_rtnode, NULL);
 
@@ -1559,6 +1630,7 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 	cJSON_AddItemToObject(agr, "m2m:rsp", rsp = cJSON_CreateArray());
 	cJSON *mid_arr = cJSON_GetObjectItem(grp, "mid");
 	cJSON *mid_obj = NULL;
+	cJSON * mid_prev = NULL;
 	cJSON_InsertItemInArray(mid_arr, 0, cJSON_CreateString(""));
 	cJSON_AddItemToArray(mid_arr, cJSON_CreateString(""));
 
@@ -1593,7 +1665,7 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 				}
 			}
 		}
-
+		mid_prev = mid_obj->prev;
 		if(target_rtnode){
 			rsc = handle_onem2m_request(req_o2pt, target_rtnode);
 			if(rsc < 4000) cnt++;
@@ -1619,11 +1691,11 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 		}
 		if(rsc == RSC_DELETED){
 			updated = true;
-			mid_obj = mid_obj->prev;
-			cJSON_DeleteItemFromArray(mid_arr, idx);
-			idx--;
+			mid_obj = mid_prev;
+			// cJSON_DeleteItemFromArray(mid_arr, idx);
+			// idx--;
 		}
-		idx++;
+		// idx++;
 	}
 	cJSON_DeleteItemFromArray(mid_arr, 0);
 	cJSON_DeleteItemFromArray(mid_arr, cJSON_GetArraySize(mid_arr) - 1);

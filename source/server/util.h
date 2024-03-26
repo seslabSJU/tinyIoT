@@ -130,6 +130,11 @@ int is_json_valid_char(char c);
 bool is_rn_valid_char(char c);
 int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path);
 bool isMinDup(char **mid, int idx, char *new_mid);
+int set_grp_member(RTNode *grp_rtnode);
+int addNodeList(NodeList *target, RTNode *rtnode);
+int deleteNodeList(NodeList *target, RTNode *rtnode);
+void free_all_nodelist(NodeList *nl);
+void free_nodelist(NodeList *nl);
 
 //privilege
 int get_acop(oneM2MPrimitive *o2pt, RTNode *node);

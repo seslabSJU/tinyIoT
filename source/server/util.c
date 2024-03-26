@@ -224,7 +224,6 @@ RTNode *find_rtnode_by_uri(char *uri) {
 	}
 
 	while(ptr){
-		logger("UTIL", LOG_LEVEL_DEBUG, "ptr : %s", ptr);
 		while(rtnode) {
 			if(!strcmp(rtnode->rn, ptr)) break;
 			rtnode = rtnode->sibling_right;
@@ -1895,12 +1894,96 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new){
 		cJSON *final_mid = cJSON_CreateArray();
 		bool mtv = validate_grp_member(grp_new, final_mid, csy, mt);
 		cJSON_SetBoolValue(cJSON_GetObjectItem(grp_new, "mtv"), mtv);
+
+		cJSON_ArrayForEach(mid_obj, midArr){
+			char *mid = cJSON_GetStringValue(mid_obj);
+			if( cJSON_getArrayIdx(final_mid, mid) == -1 ){
+				deleteNodeList(find_rtnode(mid)->memberOf, find_rtnode(mid));
+			}
+			
+		}
+
 		if(final_mid != NULL){
 			cJSON_DeleteItemFromObject(grp_new, "mid");
 			cJSON_AddItemToObject(grp_new, "mid", final_mid);
 		}
 	}
 	return RSC_OK;
+}
+
+int set_grp_member(RTNode *grp_rtnode){
+	cJSON *mid_Arr = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
+	cJSON *mid_obj = NULL;
+	NodeList *nl = NULL;
+	bool duplicated = false;
+
+	cJSON_ArrayForEach(mid_obj, mid_Arr){
+		char *mid = cJSON_GetStringValue(mid_obj);
+		RTNode *mid_rtnode = find_rtnode(mid);
+		if(mid_rtnode){	
+			duplicated = false;
+			nl = mid_rtnode->memberOf;
+			while(nl){
+				if(nl->rtnode == grp_rtnode){
+					duplicated = true;
+					break;
+				}
+				nl = nl->next;
+			}
+
+			if(!duplicated){
+				logger("UTIL", LOG_LEVEL_DEBUG, "set_grp_member : %s is now member of %s", mid, grp_rtnode->uri);
+				addNodeList(mid_rtnode->memberOf, grp_rtnode);
+			}else{
+				logger("UTIL", LOG_LEVEL_DEBUG, "set_grp_member : %s is already member of %s", mid, grp_rtnode->uri);
+			}
+		}
+	
+	}
+}
+
+int addNodeList(NodeList *target, RTNode *rtnode){
+	if(!target || !rtnode) return -1;
+
+	NodeList *newNode = (NodeList *)malloc(sizeof(NodeList));
+	newNode->rtnode = rtnode;
+	newNode->uri = strdup(rtnode->uri);
+	newNode->next = NULL;
+
+	if(target->next == NULL){
+		target->next = newNode;
+	}else{
+		NodeList *cur = target->next;
+		while(cur->next != NULL){
+			cur = cur->next;
+		}
+		cur->next = newNode;
+	}
+	return 0;
+}
+
+int deleteNodeList(NodeList *target, RTNode *rtnode){
+	if(!target || !rtnode) return -1;
+
+	NodeList *cur = target;
+	NodeList *prev = NULL;
+
+	while(cur){
+		if(cur->rtnode == rtnode){
+			if(prev){
+				prev->next = cur->next;
+			}else{
+				target->next = cur->next;
+			}
+			free(cur->uri);
+			free(cur);
+			cur = NULL;
+			return 0;
+		}
+		prev = cur;
+		cur = cur->next;
+	}
+	return 0;
 }
 
 int handle_csy(cJSON *grp, cJSON *mid, int csy, int i){
@@ -2209,7 +2292,7 @@ cJSON *o2pt_to_json(oneM2MPrimitive *o2pt){
     cJSON_AddStringToObject(json, "to", o2pt->to);    
     cJSON_AddStringToObject(json, "fr", o2pt->fr);
     cJSON_AddStringToObject(json, "rvi", o2pt->rvi);
-    if(o2pt->pc) cJSON_AddStringToObject(json, "pc", o2pt->pc);
+    if(o2pt->pc) cJSON_AddItemToObject(json, "pc", cJSON_Parse(o2pt->pc));
 	if(o2pt->cnst)
 		cJSON_AddNumberToObject(json, "cnst", o2pt->cnst);
 	if(o2pt->cnot)
@@ -2217,6 +2300,25 @@ cJSON *o2pt_to_json(oneM2MPrimitive *o2pt){
     //if(o2pt->ty >= 0) cJSON_AddNumberToObject(json, "ty", o2pt->ty);
 	
 	return json;
+}
+
+void free_all_nodelist(NodeList *nl){
+	NodeList *del;
+	while(nl){
+		del = nl;
+		nl = nl->next;
+		free(del->uri);
+		free(del);
+		del = NULL;
+	}
+}
+
+void free_nodelist(NodeList *nl){
+	if(nl){
+		free(nl->uri);
+		free(nl);
+		nl = NULL;
+	}
 }
 
 void free_o2pt(oneM2MPrimitive *o2pt){
@@ -2258,6 +2360,9 @@ void o2ptcpy(oneM2MPrimitive **dest, oneM2MPrimitive *src){
 	if(src->cjson_pc) (*dest)->cjson_pc = cJSON_Parse((*dest)->pc);
 	if(src->rvi) (*dest)->rvi = strdup(src->rvi);
 	if(src->fopt) (*dest)->fopt = strdup(src->fopt);
+	if(src->ip) (*dest)->ip = strdup(src->ip);
+	if(src->fopt) (*dest)->fopt = strdup(src->fopt);
+	(*dest)->rcn = src->rcn;
 	(*dest)->ty = src->ty;
 	(*dest)->op = src->op;
 	(*dest)->isFopt = src->isFopt;

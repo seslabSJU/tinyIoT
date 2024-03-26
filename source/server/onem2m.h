@@ -61,11 +61,13 @@ typedef struct RTNode {
 	struct RTNode *parent;
 	struct RTNode *child;
 	struct NodeList *subs;
+	struct NodeList *memberOf;
 	struct RTNode *sibling_left;
 	struct RTNode *sibling_right;
 	char *rn;
 	char *uri;
 	int sub_cnt;
+	
 	ResourceType ty;
 	cJSON *obj;
 } RTNode;
@@ -180,6 +182,7 @@ bool isResourceAptFC(oneM2MPrimitive* o2pt, RTNode *rtnode, cJSON *fc);
 
 
 //etc
+int cJSON_getArrayIdx(cJSON *arr, char *value);
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign);
 
 
