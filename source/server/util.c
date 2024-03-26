@@ -1527,7 +1527,13 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode, cJSON *requ
 			cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);		
 			break;
 		case RCN_HIERARCHICAL_ADDRESS:
-			// TODO
+			cJSON_AddItemReferenceToObject(root, "m2m:uri", cJSON_CreateString(target_rtnode->uri));
+			break;
+		case RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES:
+			pjson = cJSON_CreateObject();
+			cJSON_AddItemToObject(pjson, get_resource_key(target_rtnode->ty), target_rtnode->obj);
+			cJSON_AddItemToObject(pjson, "uri", cJSON_CreateString(target_rtnode->uri));
+			cJSON_AddItemReferenceToObject(root, "m2m:rce", pjson);
 			break;
 		case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
 			build_rcn4(o2pt, target_rtnode, root, ofst, lim, lvl);
@@ -3005,6 +3011,10 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op){
 	if(!ae) {
 		return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
 	}
+	if(cJSON_GetObjectItem(ae, "aei")){
+		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `aei` is not allowed");
+	}
+
 	if(op == OP_CREATE){
 		pjson = cJSON_GetObjectItem(ae, "api");
 		if(!pjson){

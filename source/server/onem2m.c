@@ -268,6 +268,8 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 	cJSON *ae = cJSON_GetObjectItem(root, "m2m:ae");
 
 	add_general_attribute(ae, parent_rtnode, RT_AE);
+	int rsc = validate_ae(o2pt, ae, OP_CREATE);
+	
 	if(o2pt->fr && strlen(o2pt->fr) > 0) {
 		cJSON* ri = cJSON_GetObjectItem(ae, "ri");
 		cJSON_SetValuestring(ri, o2pt->fr);
@@ -277,7 +279,6 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 	}
 	cJSON_AddStringToObject(ae, "aei", cJSON_GetObjectItem(ae, "ri")->valuestring);
 	
-	int rsc = validate_ae(o2pt, ae, OP_CREATE);
 
 	if(rsc != RSC_OK){
 		cJSON_Delete(root);
