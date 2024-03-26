@@ -1115,7 +1115,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     if( (pjson = cJSON_GetObjectItem(fc, "ty")) ){
 
         strcat(sql, "(");
-        
+        logger( "DB", LOG_LEVEL_DEBUG, "ty : %s", cJSON_Print(pjson));
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 sprintf(buf, " ty = %d OR", ptr->valueint);
@@ -1303,7 +1303,7 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     strcat(sql, ";");
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if(rc != SQLITE_OK){
-        logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);
+        logger("DB", LOG_LEVEL_ERROR, "Failed select, %s (%d)", sql, rc);
         return 0;
     }
     

@@ -82,6 +82,7 @@ cJSON *getResource(cJSON *root, ResourceType ty);
 void notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net);
 
 // rcn
+int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode, cJSON *update_obj);
 void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level);
 void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level);
 void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level);
@@ -102,6 +103,7 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op);
 bool checkResourceCseID(char *resourceUri, char* cseID);
 
 //error
+int check_mandatory_attributes(oneM2MPrimitive *o2pt);
 int check_privilege(oneM2MPrimitive *o2pt, RTNode *target_rtnode, ACOP acop);
 int check_payload_empty(oneM2MPrimitive *o2pt);
 int check_rn_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode);

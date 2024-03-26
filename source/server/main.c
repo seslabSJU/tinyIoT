@@ -142,9 +142,8 @@ void route(oneM2MPrimitive *o2pt) {
 
 	int e = result_parse_uri(o2pt, target_rtnode);
 	if(e != -1) e = check_payload_size(o2pt);
+	if(e != -1) e = check_mandatory_attributes(o2pt);
 	if(e == -1) {
-		if(target_rtnode)
-			free_rtnode(target_rtnode);
 		log_runtime(start);
 		return;
 	}
@@ -177,13 +176,10 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode){
 	logger("MAIN", LOG_LEVEL_DEBUG, "handle_onem2m_request");
 	int rsc = 0;
 	if(!o2pt || !target_rtnode){
-		logger("MAIN", LOG_LEVEL_ERROR, "handle_onem2m_request: o2pt or target_rtnode is NULL");
+		logger("MAIN", LOG_LEVEL_ERROR, "INTERNAL SERVER ERROR");
 		return o2pt->rsc = RSC_INTERNAL_SERVER_ERROR;
 	}
 
-	if(o2pt->op == OP_CREATE && o2pt->fc){
-		return o2pt->rsc = rsc = RSC_BAD_REQUEST;
-	}
 	switch(o2pt->op) {
 		
 		case OP_CREATE:	

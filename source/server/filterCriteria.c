@@ -127,10 +127,10 @@ void parse_filter_criteria(cJSON *fc){
 }
 
 void parse_qs(cJSON *qs){
-    char int_Attrs[16][5] = {"ty", "sts", "stb", "sza", "szb", "lim", "fo", "fu", "lvl", "ofst", "ops", "la", "pty", "chty",
+    char int_Attrs[15][5] = {"sts", "stb", "sza", "szb", "lim", "fo", "fu", "lvl", "ofst", "ops", "la", "pty", "chty",
                             "drt", "rcn"};
     cJSON *pjson = NULL, *ptr = NULL;
-    for(int i = 0 ; i < 16; i++){
+    for(int i = 0 ; i < 15; i++){
         if(pjson = cJSON_GetObjectItem(qs, int_Attrs[i])){
             if(cJSON_IsString(pjson)){
                 cJSON_ReplaceItemInObject(qs, int_Attrs[i], cJSON_CreateNumber(atoi(cJSON_GetStringValue(pjson))));
@@ -139,8 +139,44 @@ void parse_qs(cJSON *qs){
     }
 
     if(pjson = cJSON_GetObjectItem(qs, "ty")){
-        if(cJSON_IsNumber(pjson)){
-            cJSON_ReplaceItemInObject(qs, "ty", cJSON_CreateIntArray(&pjson->valueint, 1));
+        if(cJSON_IsArray(pjson)){
+            cJSON_ArrayForEach(ptr, pjson){
+                if(cJSON_IsString(ptr)){
+                    cJSON_SetIntValue(ptr, atoi(ptr->valuestring));
+                    
+                    // ptr->valueint = atoi(ptr->valuestring);
+                    // ptr->type = cJSON_;
+                    // free(ptr->valuestring);
+                    // ptr->valuestring = NULL;
+                }
+            }
+        }
+        else if(cJSON_IsString(pjson)){
+            ptr = cJSON_CreateArray();
+            cJSON_AddItemToArray(ptr, cJSON_CreateNumber(atoi(pjson->valuestring)));
+            cJSON_ReplaceItemInObject(qs, "ty", ptr);
+        }
+    }
+
+    if( (pjson = cJSON_GetObjectItem(qs, "lbl")) ){
+        if(cJSON_IsString(pjson)){
+            ptr = cJSON_CreateArray();
+            cJSON_AddItemToArray(ptr, cJSON_CreateString(pjson->valuestring));
+            cJSON_ReplaceItemInObject(qs, "lbl", ptr); 
+        }
+    }
+    if( (pjson = cJSON_GetObjectItem(qs, "clbl")) ){
+        if(cJSON_IsString(pjson)){
+            ptr = cJSON_CreateArray();
+            cJSON_AddItemToArray(ptr, cJSON_CreateString(pjson->valuestring));
+            cJSON_ReplaceItemInObject(qs, "clbl", ptr); 
+        }
+    }
+    if( (pjson = cJSON_GetObjectItem(qs, "palb")) ){
+        if(cJSON_IsString(pjson)){
+            ptr = cJSON_CreateArray();
+            cJSON_AddItemToArray(ptr, cJSON_CreateString(pjson->valuestring));
+            cJSON_ReplaceItemInObject(qs, "palb", ptr); 
         }
     }
 
@@ -282,9 +318,10 @@ bool FC_isAptLbl(cJSON* fcLbl, RTNode *rtnode){
 
     cJSON *nodelbl = cJSON_GetObjectItem(rtnode->obj, "lbl");
     fcSize = cJSON_GetArraySize(fcLbl);
-    
     for(int i = 0 ; i < cJSON_GetArraySize(nodelbl) ; i++){
+        // logger("fc", LOG_LEVEL_DEBUG, "nodelbl: %s\n", cJSON_GetArrayItem(nodelbl, i)->valuestring);
         for(int j = 0 ; j < fcSize ; j++){
+            // logger("fc", LOG_LEVEL_DEBUG, "fcLbl: %s\n", cJSON_GetArrayItem(fcLbl, j)->valuestring);
             if(!strcmp(cJSON_GetArrayItem(fcLbl, j)->valuestring, cJSON_GetArrayItem(nodelbl, i)->valuestring)){
                 result = true;
                 break;
@@ -292,8 +329,6 @@ bool FC_isAptLbl(cJSON* fcLbl, RTNode *rtnode){
         }
         if(result) break;
     }
-
-    cJSON_Delete(nodelbl);
     return result;
 }
 
@@ -316,8 +351,6 @@ bool FC_isAptPalb(cJSON *fcPalb, RTNode *rtnode){
         }
         if(result) break;
     }
-
-    cJSON_Delete(nodelbl);
     return result;
 }
 
@@ -333,7 +366,6 @@ bool FC_isAptClbl(cJSON *fcClbl, RTNode *rtnode){
     prt = rtnode->child;
 
     while(prt){
-
         nodelbl = cJSON_GetObjectItem(prt->obj, "lbl");
         nodeSize = cJSON_GetArraySize(nodelbl);
 
@@ -348,8 +380,6 @@ bool FC_isAptClbl(cJSON *fcClbl, RTNode *rtnode){
             }
             if(result) break;
         }
-        cJSON_Delete(nodelbl);
-        nodelbl = NULL;
         if(result) break;
         prt = prt->sibling_right;
     }

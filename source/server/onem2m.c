@@ -313,8 +313,11 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 		cJSON_DeleteItemFromObject(ae, "at");
 	}
 	
-	if(o2pt->pc) free(o2pt->pc);
-	o2pt->pc = cJSON_PrintUnformatted(root);
+	// if(o2pt->pc) free(o2pt->pc);
+	// o2pt->pc = cJSON_PrintUnformatted(root);
+
+	
+
 	// Add uri attribute
 	char *ptr = malloc(1024);
 	cJSON *rn = cJSON_GetObjectItem(ae, "rn");
@@ -334,6 +337,8 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 	// Add to resource tree
 	RTNode* child_rtnode = create_rtnode(ae, RT_AE);
 	add_child_resource_tree(parent_rtnode, child_rtnode); 
+
+	make_response_body(o2pt, child_rtnode, ae);
 
 	cJSON_DetachItemFromObject(root, "m2m:ae");
 	cJSON_Delete(root);
@@ -794,8 +799,9 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode) { // TODO deannounce
 	cJSON *root = cJSON_CreateObject();
 	cJSON_AddItemToObject(root, "m2m:ae", target_rtnode->obj);
 
-	if(o2pt->pc) free(o2pt->pc);
-	o2pt->pc = cJSON_PrintUnformatted(root);
+	// if(o2pt->pc) free(o2pt->pc);
+	// o2pt->pc = cJSON_PrintUnformatted(root);
+	make_response_body(o2pt, target_rtnode, m2m_ae);
 	o2pt->rsc = RSC_UPDATED;
 
 	cJSON_DetachItemFromObject(root, "m2m:ae");
@@ -916,8 +922,10 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	cJSON *root = cJSON_CreateObject();
 	cJSON_AddItemToObject(root, "m2m:cnt", target_rtnode->obj);
 
-	if(o2pt->pc) free(o2pt->pc);
-	o2pt->pc = cJSON_PrintUnformatted(root);
+	// if(o2pt->pc) free(o2pt->pc);
+	// o2pt->pc = cJSON_PrintUnformatted(root);
+
+	make_response_body(o2pt, target_rtnode, m2m_cnt);
 	o2pt->rsc = RSC_UPDATED;
 
 	cJSON_DetachItemFromObject(root, "m2m:cnt");
@@ -954,15 +962,17 @@ int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	
 	result = db_update_resource(m2m_acp, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_ACP);
 
-	cJSON *root = cJSON_CreateObject();
-	cJSON_AddItemToObject(root, "m2m:acp", target_rtnode->obj);
+	// cJSON *root = cJSON_CreateObject();
+	// cJSON_AddItemToObject(root, "m2m:acp", target_rtnode->obj);
 
-	if(o2pt->pc) free(o2pt->pc);
-	o2pt->pc = cJSON_PrintUnformatted(root);
+	// if(o2pt->pc) free(o2pt->pc);
+	// o2pt->pc = cJSON_PrintUnformatted(root);
+	make_response_body(o2pt, target_rtnode, m2m_acp);
+
 	o2pt->rsc = RSC_UPDATED;
 
-	cJSON_DetachItemFromObject(root, "m2m:acp");
-	cJSON_Delete(root);
+	// cJSON_DetachItemFromObject(root, "m2m:acp");
+	// cJSON_Delete(root);
 	return RSC_UPDATED;
 }
 
@@ -1254,8 +1264,10 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 
 	cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
 	
-	if(o2pt->pc) free(o2pt->pc);
-	o2pt->pc = cJSON_PrintUnformatted(root);
+	// if(o2pt->pc) free(o2pt->pc);
+	// o2pt->pc = cJSON_PrintUnformatted(root);
+
+
 	o2pt->rsc = RSC_CREATED;
 
 	cJSON *rn = cJSON_GetObjectItem(grp, "rn");
@@ -1271,6 +1283,8 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode){
 
 	RTNode *child_rtnode = create_rtnode(grp, RT_GRP);
 	add_child_resource_tree(parent_rtnode, child_rtnode);
+
+	make_response_body(o2pt, child_rtnode, NULL);
 
 	cJSON_DetachItemFromObject(root, "m2m:grp");
 	cJSON_Delete(root);
@@ -1381,48 +1395,42 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 	int rsc = 0;
 	int e = check_privilege(o2pt, target_rtnode, ACOP_RETRIEVE);
-
 	if(e == -1) return o2pt->rsc;
-	cJSON *root = cJSON_CreateObject();
-	cJSON *lim, *ofst, *lvl;
-	if(o2pt->pc) {
-		free(o2pt->pc);
-		o2pt->pc = NULL;
-	}
-	lvl = cJSON_GetObjectItem(o2pt->fc, "lvl");
-	lim = cJSON_GetObjectItem(o2pt->fc, "lim");
-	ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
-	switch(o2pt->rcn){
-		case RCN_ATTRIBUTES:
-			cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);
-			o2pt->pc = cJSON_PrintUnformatted(root);
-			cJSON_DetachItemFromObject(root, get_resource_key(target_rtnode->ty));
-			break;
-		case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
-			logger("O2M", LOG_LEVEL_INFO, "Retrieve Child Resources");
-			build_rcn4(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
-			o2pt->pc = cJSON_PrintUnformatted(root);
-			break;
-		case RCN_CHILD_RESOURCES:
-			logger("O2M", LOG_LEVEL_INFO, "Retrieve Child Resources");
-			build_rcn8(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
-			o2pt->pc = cJSON_PrintUnformatted(root);
-			break;
-		default:
-			logger("O2M", LOG_LEVEL_INFO, "Retrieve Resource Default");
-			o2pt->pc = cJSON_PrintUnformatted(root);
-			cJSON_DetachItemFromObject(root, get_resource_key(target_rtnode->ty));
-			break;
-	}
+	// cJSON *root = cJSON_CreateObject();
+	
+	// if(o2pt->pc) {
+	// 	free(o2pt->pc);
+	// 	o2pt->pc = NULL;
+	// }
+	// lvl = cJSON_GetObjectItem(o2pt->fc, "lvl");
+	// lim = cJSON_GetObjectItem(o2pt->fc, "lim");
+	// ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
+	// switch(o2pt->rcn){
+	// 	case RCN_ATTRIBUTES:
+	// 		cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);
+	// 		o2pt->pc = cJSON_PrintUnformatted(root);
+	// 		cJSON_DetachItemFromObject(root, get_resource_key(target_rtnode->ty));
+	// 		break;
+	// 	case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
+	// 		logger("O2M", LOG_LEVEL_INFO, "Retrieve Child Resources");
+	// 		build_rcn4(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
+	// 		o2pt->pc = cJSON_PrintUnformatted(root);
+	// 		break;
+	// 	case RCN_CHILD_RESOURCES:
+	// 		logger("O2M", LOG_LEVEL_INFO, "Retrieve Child Resources");
+	// 		build_rcn8(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
+	// 		o2pt->pc = cJSON_PrintUnformatted(root);
+	// 		break;
+	// 	default:
+	// 		logger("O2M", LOG_LEVEL_INFO, "Retrieve Resource Default");
+	// 		o2pt->pc = cJSON_PrintUnformatted(root);
+	// 		cJSON_DetachItemFromObject(root, get_resource_key(target_rtnode->ty));
+	// 		break;
+	// }
 
-	cJSON_Delete(root);
+	// cJSON_Delete(root);
 
-	if(o2pt->cnst == CS_PARTIAL_CONTENT){
-		o2pt->cnot = ofst ? ofst->valueint : 0;
-		o2pt->cnot  += lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT;
-	}else{
-		o2pt->cnst = CS_FULL_CONTENT;
-	}
+	make_response_body(o2pt, target_rtnode, NULL);
 	
 	o2pt->rsc = RSC_OK;
 	return RSC_OK;

@@ -969,6 +969,17 @@ int result_parse_uri(oneM2MPrimitive *o2pt, RTNode *rtnode) {
 	} 
 }
 
+int check_mandatory_attributes(oneM2MPrimitive *o2pt){
+	if(!o2pt->rvi){
+		handle_error(o2pt, RSC_BAD_REQUEST, "rvi is mandatory");
+		return -1;
+	}
+	if(!o2pt->fr && o2pt->ty != RT_AE){
+		handle_error(o2pt, RSC_BAD_REQUEST, "originator is mandatory");
+		return -1;
+	}
+}
+
 /**
  * @brief check privilege of originator
  * @param o2pt oneM2MPrimitive
@@ -1483,6 +1494,82 @@ bool endswith(char *str, char *match){
 		return false;
 
 	return strncmp(str + str_len - match_len, match, match_len);
+}
+
+int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode, cJSON *request_obj){
+	if(o2pt->pc) free(o2pt->pc);
+	o2pt->pc = NULL;
+	if(o2pt->rcn == RCN_NOTHING){
+		return 0;
+	}
+
+	cJSON *root = NULL;
+	cJSON *pjson = NULL;
+	int lim = DEFAULT_DISCOVERY_LIMIT;
+	int ofst = 0;
+	int lvl = 99999;
+	
+	if( (pjson = cJSON_GetObjectItem(o2pt->fc, "lim")) ){
+		lim = pjson->valueint;
+	}
+	if( (pjson = cJSON_GetObjectItem(o2pt->fc, "ofst")) ){
+		ofst = pjson->valueint;
+	}
+	if( (pjson = cJSON_GetObjectItem(o2pt->fc, "lvl")) ){
+		lvl = pjson->valueint;
+	}
+	
+	root = cJSON_CreateObject();
+	switch(o2pt->rcn){
+		case RCN_NOTHING:
+			break;
+		case RCN_ATTRIBUTES:
+			cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);		
+			break;
+		case RCN_HIERARCHICAL_ADDRESS:
+			// TODO
+			break;
+		case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
+			build_rcn4(o2pt, target_rtnode, root, ofst, lim, lvl);
+			break;
+		case RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES:
+			// TODO
+			break;
+		case RCN_CHILD_RESOURCE_REFERENCES:
+			// TODO
+			break;
+		case RCN_ORIGINAL_RESOURCE:
+			// TODO
+			break;
+		case RCN_CHILD_RESOURCES:
+			build_rcn8(o2pt, target_rtnode, root, ofst, lim, lvl);
+			break;
+		case RCN_MODIFIED_ATTRIBUTES:
+			if(!request_obj){
+				return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "Internal Server Error");
+			}
+			// TODO
+			break;
+		case RCN_SEMANTIC_CONTENT:
+			break;
+		case RCN_DISCOVERY_RESULT_REFERENCES:
+			break;
+		case RCN_PERMISSIONS:
+			break;
+
+	}
+
+	if(root){
+		o2pt->pc = cJSON_PrintUnformatted(root);
+		cJSON_Delete(root);
+	}
+
+	if(o2pt->cnst == CS_PARTIAL_CONTENT){
+		o2pt->cnot = ofst + lim;
+	}else{
+		o2pt->cnst = CS_FULL_CONTENT;
+	}
+	return 0;
 }
 
 int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp){
@@ -2321,12 +2408,18 @@ cJSON *qs_to_json(char* qs){
 		}
 
 		if(key != NULL && value != NULL){
-			if((ptr = strstr(value, "+"))!= NULL){
+			logger("UTIL", LOG_LEVEL_DEBUG, "key = %s, value = %s", key, value);
+			if(strstr(value, "+") != NULL){
+				ptr = strtok(value, "+");
+				sprintf(temp, "\"%s\":[\"", key);
+				
 				while(ptr != NULL){
-					*ptr = ',';
-					ptr = strstr(ptr+1, "+");
+					strcat(temp, ptr);
+					strcat(temp, "\",\"");
+					ptr = strtok(NULL, "+");
 				}
-				sprintf(temp, "\"%s\":[%s],", key, value);
+			    temp[strlen(temp)-2] = ']';
+				temp[strlen(temp)-1] = ',';
 			}else{
 				sprintf(temp, "\"%s\":\"%s\",", key, value);
 			}
@@ -2910,21 +3003,24 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op){
 
 	char *ptr = NULL;
 	if(!ae) {
-		handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
-		return RSC_CONTENTS_UNACCEPTABLE;
+		return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
 	}
 	if(op == OP_CREATE){
 		pjson = cJSON_GetObjectItem(ae, "api");
 		if(!pjson){
-			handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
-			return RSC_CONTENTS_UNACCEPTABLE;
+			return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
 		}
 		ptr = pjson->valuestring;
 		if(!strcmp(o2pt->rvi, "4")){
 			if(ptr[0] != 'R' && ptr[0] != 'N') {
-				handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
-				return RSC_BAD_REQUEST;
+				return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
 			}
+		}
+	}
+
+	if( (pjson = cJSON_GetObjectItem(ae, "rn")) ){
+		if(strstr(pjson->valuestring, "/")){
+			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `rn` is invalid");
 		}
 	}
 	cJSON *attrs = cJSON_GetObjectItem(ATTRIBUTES, "m2m:ae");
@@ -3866,7 +3962,7 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 		*port = atoi(ptr+1);
 	}
 	*host = strdup(p+7);
-	*ptr = ':';
+	if(ptr) *ptr = ':';
 	ptr = strchr(p+7, '/');
 	if(ptr){
 		*path = strdup(ptr);

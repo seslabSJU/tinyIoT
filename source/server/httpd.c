@@ -301,21 +301,7 @@ void handle_http_request(HTTPRequest *req, int slotno) {
         free_o2pt(o2pt);
         return;
     }
-    // else if(o2pt->op == OP_FORWARDING){
-    //     o2pt->pc = strndup(buf[slotno], BUF_SIZE);
-    // }
     o2pt->errFlag = false;
-
-    
-
-    // if(req->qs && strlen(req->qs) > 0){
-    //     o2pt->fc = qs_to_json(req->qs);
-    //     parse_filter_criteria(o2pt->fc);
-    //     if(cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->fc, "fu")) == FU_DISCOVERY){
-    //         o2pt->op = OP_DISCOVERY;
-    //     }
-    // }
-
 
     if(req->qs && strlen(req->qs) > 0){
         cJSON *qs = qs_to_json(req->qs);
