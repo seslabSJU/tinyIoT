@@ -396,7 +396,8 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno) {
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n",buf);
 }
 
-void http_notify(oneM2MPrimitive *o2pt, char *host, int port) {
+int http_notify(oneM2MPrimitive *o2pt, char *host, int port) {
+    int rsc = 0;
     logger("HTTP", LOG_LEVEL_DEBUG, "http_notify %s:%d", host, port);
     HTTPRequest *req = (HTTPRequest *) calloc(1, sizeof(HTTPRequest));
     HTTPResponse *res =  (HTTPResponse *) calloc(1, sizeof(HTTPResponse));
@@ -404,15 +405,16 @@ void http_notify(oneM2MPrimitive *o2pt, char *host, int port) {
     req->payload = strdup(o2pt->pc);
     req->payload_size = strlen(req->payload);
     req->uri = strdup(o2pt->to);
-    req->headers = malloc(sizeof(header_t));
+    req->headers = calloc(1, sizeof(header_t));
     add_header("X-M2M-Origin", "/"CSE_BASE_RI, req->headers);
     add_header("X-M2M-RVI", "2a", req->headers);
     add_header("Content-Type", "application/json", req->headers);
-
     send_http_request(host, port, req, res);
     logger("HTTP", LOG_LEVEL_DEBUG, "http_notify response: %d", res->status_code);
+    rsc = res->status_code;
     free_HTTPRequest(req);
     free_HTTPResponse(res);
+    return rsc;
 }
 
 void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port){

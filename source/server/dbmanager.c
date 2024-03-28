@@ -1115,7 +1115,6 @@ cJSON* db_get_filter_criteria(oneM2MPrimitive *o2pt) {
     if( (pjson = cJSON_GetObjectItem(fc, "ty")) ){
 
         strcat(sql, "(");
-        logger( "DB", LOG_LEVEL_DEBUG, "ty : %s", cJSON_Print(pjson));
         if(cJSON_IsArray(pjson)){
             cJSON_ArrayForEach(ptr, pjson){
                 sprintf(buf, " ty = %d OR", ptr->valueint);

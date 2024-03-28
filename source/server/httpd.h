@@ -51,7 +51,7 @@ void set_header(char *key, char *value, char *response_headers);
 void normalize_payload(char *body);
 Operation http_parse_operation(char *method);
 void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno);
-void http_notify(oneM2MPrimitive *o2pt, char *host, int port);
+int http_notify(oneM2MPrimitive *o2pt, char *host, int port);
 void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port);
 
 
