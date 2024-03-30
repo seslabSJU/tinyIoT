@@ -190,6 +190,12 @@ void opt_to_o2pt(oneM2MPrimitive *o2pt, int opt_num, char *opt_buf) {
 
         if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) == FU_DISCOVERY){
             o2pt->op = OP_DISCOVERY;
+            o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
+        }
+
+        if(cJSON_GetObjectItem(qs, "rcn")){
+            o2pt->rcn = cJSON_GetObjectItem(qs, "rcn")->valueint;
+            cJSON_DeleteItemFromObject(qs, "rcn");
         }
         o2pt->fc = qs;
         break;
@@ -222,12 +228,16 @@ void payload_opt_to_o2pt(oneM2MPrimitive *o2pt, cJSON *cjson_payload) {
         parse_filter_criteria(o2pt->fc);
         if(cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->fc, "fu")) == FU_DISCOVERY){
             o2pt->op = OP_DISCOVERY;
+            o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
         }
     }
     if(cJSON_GetObjectItem(cjson_payload, "drt")) {
         o2pt->drt = cJSON_GetObjectItem(cjson_payload, "drt")->valueint;
     } else {
         o2pt->drt = DRT_STRUCTURED;
+    }
+    if(cJSON_GetObjectItem(cjson_payload, "rcn")){
+        o2pt->rcn = cJSON_GetObjectItem(cjson_payload, "rcn")->valueint;
     }
     
     if(cJSON_GetObjectItem(cjson_payload, "pc")) {
@@ -280,6 +290,18 @@ void hnd_coap_req(coap_resource_t *r, coap_session_t *session, const coap_pdu_t 
     // oneM2M Primitive
     oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive)); 
     o2pt->op = coap_parse_operation(method);  
+
+    // Setting default rcn
+    switch(o2pt->op){
+    case OP_CREATE:
+    case OP_RETRIEVE:
+    case OP_UPDATE:
+        o2pt->rcn = RCN_ATTRIBUTES;
+        break;
+    case OP_DELETE:
+        o2pt->rcn = RCN_NOTHING;
+        break;
+    }
 
     /* Options */
     coap_opt_iterator_t opt_iter;
