@@ -3217,7 +3217,13 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op){
 			return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
 		}
 		ptr = pjson->valuestring;
-		if(!strcmp(o2pt->rvi, "4")){
+		if(!strcmp(o2pt->rvi, "1") || !strcmp(o2pt->rvi, "2") || !strcmp(o2pt->rvi, "2a") || !strcmp(o2pt->rvi, "3")){
+			if(ptr[0] != 'R' && ptr[0] != 'N' && ptr[0] != 'r') {
+				handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
+				return RSC_BAD_REQUEST;
+			}
+		}
+		else {
 			if(ptr[0] != 'R' && ptr[0] != 'N') {
 				return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
 			}
