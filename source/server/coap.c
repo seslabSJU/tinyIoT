@@ -217,9 +217,12 @@ void opt_to_o2pt(oneM2MPrimitive *o2pt, int opt_num, char *opt_buf) {
 }
 
 void payload_opt_to_o2pt(oneM2MPrimitive *o2pt, cJSON *cjson_payload) {
-    o2pt->fr = strdup(cJSON_GetObjectItem(cjson_payload, "fr")->valuestring);
-    o2pt->rqi = strdup(cJSON_GetObjectItem(cjson_payload, "rqi")->valuestring);
-    o2pt->rvi = strdup(cJSON_GetObjectItem(cjson_payload, "rvi")->valuestring);
+    if(cJSON_GetObjectItem(cjson_payload, "fr"))
+        o2pt->fr = strdup(cJSON_GetObjectItem(cjson_payload, "fr")->valuestring);
+    if(cJSON_GetObjectItem(cjson_payload, "rqi"))
+        o2pt->rqi = strdup(cJSON_GetObjectItem(cjson_payload, "rqi")->valuestring);
+    if(cJSON_GetObjectItem(cjson_payload, "rvi"))
+        o2pt->rvi = strdup(cJSON_GetObjectItem(cjson_payload, "rvi")->valuestring);
 
     if(cJSON_GetObjectItem(cjson_payload, "ty"))
         o2pt->ty = cJSON_GetObjectItem(cjson_payload, "ty")->valueint;
