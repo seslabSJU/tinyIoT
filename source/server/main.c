@@ -16,7 +16,11 @@
 #include "util.h"
 #include "config.h"
 #include "onem2mTypes.h"
+
+#ifdef ENABLE_MQTT
 #include "mqttClient.h"
+#endif
+
 #include "coap.h"
 
 ResourceTree *rt;

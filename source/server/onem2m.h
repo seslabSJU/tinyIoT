@@ -5,14 +5,16 @@
 #include "cJSON.h"
 #include "onem2mTypes.h"
 
-//enum
-typedef enum {
+// enum
+typedef enum
+{
 	PROT_HTTP = 1,
 	PROT_MQTT,
 	PROT_COAP = 3
-}Protocol;
+} Protocol;
 
-typedef enum {
+typedef enum
+{
 	OP_NONE = 0,
 	OP_CREATE = 1,
 	OP_RETRIEVE = 2,
@@ -23,24 +25,27 @@ typedef enum {
 	OP_VIEWER = 1000,
 	OP_OPTIONS,
 	OP_FORWARDING
-}Operation;
+} Operation;
 
-typedef enum {
+typedef enum
+{
 	ACOP_CREATE = 1,
 	ACOP_RETRIEVE = 2,
 	ACOP_UPDATE = 4,
 	ACOP_DELETE = 8,
 	ACOP_NOTIFY = 16,
 	ACOP_DISCOVERY = 32
-}ACOP;
+} ACOP;
 
-typedef enum {
+typedef enum
+{
 	CS_PARTIAL_CONTENT = 1,
 	CS_FULL_CONTENT = 2
 } ContentStatus;
 
-//oneM2M Resource
-typedef struct {
+// oneM2M Resource
+typedef struct
+{
 	char *ct;
 	char *lt;
 	char *rn;
@@ -54,10 +59,9 @@ typedef struct {
 	char *uri;
 } CSE;
 
-
-
-//Resource Tree
-typedef struct RTNode {
+// Resource Tree
+typedef struct RTNode
+{
 	struct RTNode *parent;
 	struct RTNode *child;
 	struct NodeList *subs;
@@ -67,45 +71,50 @@ typedef struct RTNode {
 	char *rn;
 	char *uri;
 	int sub_cnt;
-	
+
 	ResourceType ty;
 	cJSON *obj;
 } RTNode;
 
-typedef struct NodeList {
+typedef struct NodeList
+{
 	struct NodeList *next;
 	RTNode *rtnode;
 	char *uri;
 } NodeList;
 
-//Reachablity Resource
-typedef struct RRNode {
+// Reachablity Resource
+typedef struct RRNode
+{
 	struct RRNode *next;
 	char *uri;
 	struct RTNode *rtnode;
 } RRNode;
-typedef struct {  
+typedef struct
+{
 	RTNode *cb;
 	RTNode *registrar_csr;
 	NodeList *csr_list;
 	RRNode *rr_list;
-}ResourceTree;
+} ResourceTree;
 
-typedef enum {
-    FU_DISCOVERY                    = 1,
-    FU_CONDITIONAL_OPERATION       = 2, // DEFAULT
-    FU_IPE_ON_DEMAND_DISCOVERY     = 3,
-    FU_DISCOVERY_BASED_OPERATION   = 4
+typedef enum
+{
+	FU_DISCOVERY = 1,
+	FU_CONDITIONAL_OPERATION = 2, // DEFAULT
+	FU_IPE_ON_DEMAND_DISCOVERY = 3,
+	FU_DISCOVERY_BASED_OPERATION = 4
 } FilterUsage;
 
-
-typedef enum{
-    FO_AND = 1,    // DEFAULT
-    FO_OR  = 2,
-    FO_XOR = 3
+typedef enum
+{
+	FO_AND = 1, // DEFAULT
+	FO_OR = 2,
+	FO_XOR = 3
 } FilterOperation;
 
-typedef struct _o{
+typedef struct _o
+{
 	char *to;
 	char *fr;
 	char *rqi;
@@ -127,9 +136,10 @@ typedef struct _o{
 	int cnot;
 	cJSON *fc;
 	int drt;
-}oneM2MPrimitive;
+} oneM2MPrimitive;
 
-typedef struct _n{
+typedef struct _n
+{
 	Protocol prot;
 	char host[1024];
 	int port;
@@ -137,8 +147,8 @@ typedef struct _n{
 	char *noti_json;
 } NotiTarget;
 
-//onem2m resource
-int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode* target_rtnode);
+// onem2m resource
+int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int retrieve_object_filtercriteria(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
@@ -166,25 +176,23 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 
-void init_cse(cJSON* cse);
+void init_cse(cJSON *cse);
 void init_csr(cJSON *csr);
 
-//resource tree
-RTNode* create_rtnode(cJSON *resource, ResourceType ty);
+// resource tree
+RTNode *create_rtnode(cJSON *resource, ResourceType ty);
 int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode);
 void free_rtnode(RTNode *rtnode);
 void free_rtnode_list(RTNode *rtnode);
 
-RTNode* restruct_resource_tree(RTNode *node, RTNode *list);
-RTNode* latest_cin_list(RTNode *cinList, int num); // use in viewer API
-RTNode* find_latest_oldest(RTNode* node, int flag);
-bool isResourceAptFC(oneM2MPrimitive* o2pt, RTNode *rtnode, cJSON *fc);
+RTNode *restruct_resource_tree(RTNode *node, RTNode *list);
+RTNode *latest_cin_list(RTNode *cinList, int num); // use in viewer API
+RTNode *find_latest_oldest(RTNode *node, int flag);
+bool isResourceAptFC(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *fc);
 
-
-//etc
+// etc
 int cJSON_getArrayIdx(cJSON *arr, char *value);
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign);
-
 
 // filter criteria
 int validate_filter_criteria(oneM2MPrimitive *o2pt);
@@ -207,15 +215,15 @@ bool FC_isAptSza(int fcSza, RTNode *rtnode);
 bool FC_isAptSzb(int fcSzb, RTNode *rtnode);
 bool FC_isAptOps(ACOP fcAcop, oneM2MPrimitive *o2pt, RTNode *rtnode);
 
-bool do_uri_exist(cJSON* list, char *uri);
-void cjson_merge_objs_by_operation(cJSON* obj1, cJSON* obj2, FilterOperation fo);
+bool do_uri_exist(cJSON *list, char *uri);
+void cjson_merge_objs_by_operation(cJSON *obj1, cJSON *obj2, FilterOperation fo);
 
-bool isValidFcAttr(char* attr);
+bool isValidFcAttr(char *attr);
 void parse_filter_criteria(cJSON *fc);
 void parse_qs(cJSON *qs);
 void route(oneM2MPrimitive *o2pt);
 void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty);
-char* create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isParent);
+char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isParent);
 
 #define ALL_ACOP ACOP_CREATE + ACOP_RETRIEVE + ACOP_UPDATE + ACOP_DELETE + ACOP_NOTIFY + ACOP_DISCOVERY
 
