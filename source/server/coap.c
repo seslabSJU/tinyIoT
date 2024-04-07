@@ -233,6 +233,9 @@ void payload_opt_to_o2pt(oneM2MPrimitive *o2pt, cJSON *cjson_payload) {
             o2pt->op = OP_DISCOVERY;
             o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
         }
+    } else {
+        o2pt->fc = cJSON_CreateObject();
+        parse_filter_criteria(o2pt->fc);
     }
     if(cJSON_GetObjectItem(cjson_payload, "drt")) {
         o2pt->drt = cJSON_GetObjectItem(cjson_payload, "drt")->valueint;
