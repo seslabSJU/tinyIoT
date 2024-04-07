@@ -76,7 +76,7 @@ int logger(const char* tag,  LOGLEVEL level, const char *msg, ...){
         time(&now);
         t = ctime(&now);
         t[24] = '\0';
-        fprintf(stderr, "%s \033[0;%dm%-5s\033[0m [%s]: ", t, fcolor, llChar, tag);
+        fprintf(stderr, "\r%s \033[0;%dm%-5s\033[0m [%s]: ", t, fcolor, llChar, tag);
 
         va_start(ap, msg);
         charsCnt = vsnprintf(log_buffer, LOG_BUFFER_SIZE, msg, ap);
