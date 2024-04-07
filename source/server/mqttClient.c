@@ -140,9 +140,18 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
     /* fill primitives */
     pjson = cJSON_GetObjectItem(json, "op");
     if(!pjson) return invalidRequest();
-
     if(pjson->valueint) o2pt->op = pjson->valueint;
     else o2pt->op = atoi(pjson->valuestring);
+    switch(o2pt->op){
+        case OP_CREATE:
+        case OP_RETRIEVE:
+        case OP_UPDATE:
+            o2pt->rcn = RCN_ATTRIBUTES;
+            break;
+        case OP_DELETE:
+            o2pt->rcn = RCN_NOTHING;
+            break;
+    }
 
     pjson = cJSON_GetObjectItem(json, "to");
     if(!pjson) return invalidRequest();
@@ -164,6 +173,12 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
 
     pjson = cJSON_GetObjectItem(json, "rqi");
     if(pjson) o2pt->rqi = strdup(pjson->valuestring);
+
+    
+    pjson = cJSON_GetObjectItem(json, "rcn");
+    if(pjson){
+        if(pjson->valueint) o2pt->rcn = pjson->valueint;
+    }
     
 
     pjson = cJSON_GetObjectItem(json, "ty");
