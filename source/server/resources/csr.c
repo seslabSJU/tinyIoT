@@ -1,6 +1,8 @@
+#include <stdlib.h>
 #include "../onem2m.h"
 #include "../logger.h"
 #include "../util.h"
+#include "../dbmanager.h"
 #include "../config.h"
 
 extern ResourceTree *rt;

@@ -5,44 +5,6 @@
 #include "cJSON.h"
 #include "onem2mTypes.h"
 
-// enum
-typedef enum
-{
-	PROT_HTTP = 1,
-	PROT_MQTT,
-	PROT_COAP = 3
-} Protocol;
-
-typedef enum
-{
-	OP_NONE = 0,
-	OP_CREATE = 1,
-	OP_RETRIEVE = 2,
-	OP_UPDATE = 4,
-	OP_DELETE = 8,
-	OP_NOTIFY = 16,
-	OP_DISCOVERY = 32,
-	OP_VIEWER = 1000,
-	OP_OPTIONS,
-	OP_FORWARDING
-} Operation;
-
-typedef enum
-{
-	ACOP_CREATE = 1,
-	ACOP_RETRIEVE = 2,
-	ACOP_UPDATE = 4,
-	ACOP_DELETE = 8,
-	ACOP_NOTIFY = 16,
-	ACOP_DISCOVERY = 32
-} ACOP;
-
-typedef enum
-{
-	CS_PARTIAL_CONTENT = 1,
-	CS_FULL_CONTENT = 2
-} ContentStatus;
-
 // oneM2M Resource
 typedef struct
 {
@@ -97,21 +59,6 @@ typedef struct
 	NodeList *csr_list;
 	RRNode *rr_list;
 } ResourceTree;
-
-typedef enum
-{
-	FU_DISCOVERY = 1,
-	FU_CONDITIONAL_OPERATION = 2, // DEFAULT
-	FU_IPE_ON_DEMAND_DISCOVERY = 3,
-	FU_DISCOVERY_BASED_OPERATION = 4
-} FilterUsage;
-
-typedef enum
-{
-	FO_AND = 1, // DEFAULT
-	FO_OR = 2,
-	FO_XOR = 3
-} FilterOperation;
 
 typedef struct _o
 {
@@ -171,10 +118,12 @@ int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 
 int update_cse(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_aea(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 
 void init_cse(cJSON *cse);
 void init_csr(cJSON *csr);

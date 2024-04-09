@@ -1,6 +1,8 @@
+#include <stdlib.h>
 #include "../onem2m.h"
 #include "../logger.h"
 #include "../util.h"
+#include "../dbmanager.h"
 #include "../config.h"
 
 extern ResourceTree *rt;
@@ -10,9 +12,9 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
     int e = check_aei_duplicate(o2pt, parent_rtnode);
     if (e != -1)
-        e = check_rn_invalid(o2pt, RT_AE);
-    if (e != -1)
         e = check_aei_invalid(o2pt);
+    if (e != -1)
+        e = check_rn_invalid(o2pt, RT_AE);
     if (e == -1)
         return o2pt->rsc;
 

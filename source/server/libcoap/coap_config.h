@@ -20,7 +20,7 @@
 #define COAP_DISABLE_TCP 0
 
 /* Define to 1 if the system has epoll support. */
-#define COAP_EPOLL_SUPPORT 1
+// #define COAP_EPOLL_SUPPORT 1
 
 /* Define to build support for IPv4 packets. */
 #define COAP_IPV4_SUPPORT 1
@@ -77,7 +77,7 @@
 #define HAVE_GETADDRINFO 1
 
 /* Define to 1 if you have the `getrandom' function. */
-#define HAVE_GETRANDOM 1
+// #define HAVE_GETRANDOM 1
 
 /* Define to 1 if you have the <ifaddrs.h> header file. */
 #define HAVE_IFADDRS_H 1
@@ -216,17 +216,18 @@
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
 #if defined AC_APPLE_UNIVERSAL_BUILD
-# if defined __BIG_ENDIAN__
-#  define WORDS_BIGENDIAN 1
-# endif
+#if defined __BIG_ENDIAN__
+#define WORDS_BIGENDIAN 1
+#endif
 #else
-# ifndef WORDS_BIGENDIAN
+#ifndef WORDS_BIGENDIAN
 /* #  undef WORDS_BIGENDIAN */
-# endif
+#endif
 #endif
 
 /* Define this to 1 for ancillary data on MacOS */
 /* #undef __APPLE_USE_RFC_3542 */
+#define __APPLE_USE_RFC_3542
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 /* #undef size_t */

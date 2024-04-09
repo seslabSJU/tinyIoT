@@ -30,19 +30,20 @@
 #define LOG_TAG "COAP"
 #define BUF_SIZE 65535
 
-typedef struct {
+typedef struct
+{
     uint8_t ver;
     coap_pdu_type_t type;
     uint8_t code;
-    uint8_t* token;
+    uint8_t *token;
     uint8_t token_len;
-    uint8_t* payload;
+    uint8_t *payload;
     uint8_t payload_len;
     uint16_t message_id;
     uint16_t option_cnt;
 } coapPacket;
 
-void* coap_serve(void);
+void *coap_serve();
 void coap_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt);
 void coap_forwarding(oneM2MPrimitive *o2pt, char *host, int port);
 

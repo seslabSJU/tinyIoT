@@ -485,6 +485,7 @@ int add_child_resource_tree(RTNode *parent, RTNode *child)
 	return 1;
 }
 
+// TODO - move to http.c
 ResourceType http_parse_object_type(header_t *headers)
 {
 	char *content_type = search_header(headers, "Content-Type");
@@ -537,6 +538,7 @@ ResourceType http_parse_object_type(header_t *headers)
 	return ty;
 }
 
+// TODO - move to coap?
 ResourceType coap_parse_object_type(int object_type)
 {
 	ResourceType ty;
@@ -1786,13 +1788,9 @@ int check_aei_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	{
 		return 0;
 	}
-	else if (o2pt->fr[0] != 'C')
-	{
-		aei[0] = 'C';
-	}
 
 	strcat(aei, o2pt->fr);
-
+	logger("UTIL", LOG_LEVEL_DEBUG, "check_aei_duplicate : %s", aei);
 	RTNode *child = rtnode->child;
 
 	while (child)
@@ -2850,30 +2848,6 @@ cJSON *qs_to_json(char *qs)
 	return json;
 }
 
-int is_in_uril(cJSON *uril, char *new)
-{
-	if (!uril)
-		return false;
-	if (!new)
-		return false;
-	int result = -1;
-	cJSON *pjson = NULL;
-
-	int urilSize = cJSON_GetArraySize(uril);
-
-	for (int i = 0; i < urilSize; i++)
-	{
-		pjson = cJSON_GetArrayItem(uril, i);
-		if (!strcmp(pjson->valuestring, new))
-		{
-			result = i;
-			break;
-		}
-	}
-
-	return result;
-}
-
 void filterOptionStr(FilterOperation fo, char *sql)
 {
 	switch (fo)
@@ -2889,6 +2863,7 @@ void filterOptionStr(FilterOperation fo, char *sql)
 	}
 }
 
+// TBD : not used
 bool check_acpi_valid(oneM2MPrimitive *o2pt, cJSON *acpi)
 {
 	bool ret = true;

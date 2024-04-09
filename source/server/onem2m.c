@@ -451,61 +451,6 @@ void free_rtnode_list(RTNode *rtnode)
 	}
 }
 
-int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
-{
-	char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
-	cJSON *m2m_sub = cJSON_GetObjectItem(o2pt->cjson_pc, "m2m:sub");
-	int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
-	for (int i = 0; i < invalid_key_size; i++)
-	{
-		if (cJSON_GetObjectItem(m2m_sub, invalid_key[i]))
-		{
-			handle_error(o2pt, RSC_BAD_REQUEST, "{\"m2m:dbg\": \"unsupported attribute on update\"}");
-			return RSC_BAD_REQUEST;
-		}
-	}
-
-	cJSON *sub = target_rtnode->obj;
-	int result;
-
-	validate_sub(o2pt, m2m_sub, o2pt->op);
-
-	cJSON *old_nu = cJSON_GetObjectItem(sub, "nu");
-	cJSON *new_nu = cJSON_GetObjectItem(m2m_sub, "nu");
-	if (new_nu)
-	{
-		cJSON_DetachItemFromObject(sub, "nu");
-		cJSON_AddItemReferenceToObject(sub, "nu", new_nu);
-		cJSON *noti_cjson, *sgn, *nev, *rep, *nct;
-		noti_cjson = cJSON_CreateObject();
-		cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
-		cJSON_AddItemToObject(sgn, "nev", nev = cJSON_CreateObject());
-		cJSON_AddNumberToObject(nev, "net", NET_CREATE_OF_DIRECT_CHILD_RESOURCE);
-		cJSON_AddItemToObject(nev, "rep", rep = cJSON_CreateObject());
-		cJSON_AddItemToObject(rep, "m2m:sub", cJSON_Duplicate(sub, true));
-		cJSON_AddItemToObject(sgn, "vrq", cJSON_CreateBool(true));
-
-		cJSON_AddStringToObject(sgn, "sur", target_rtnode->uri);
-		if (notify_to_nu(target_rtnode, noti_cjson, NET_CREATE_OF_DIRECT_CHILD_RESOURCE) != RSC_OK)
-		{
-			cJSON_DetachItemFromObject(sub, "nu");
-			cJSON_AddItemToObject(sub, "nu", old_nu);
-			cJSON_Delete(noti_cjson);
-			return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification verification failed");
-		}
-		cJSON_DetachItemFromObject(sub, "nu");
-		cJSON_AddItemToObject(sub, "nu", old_nu);
-	}
-
-	update_resource(sub, m2m_sub);
-
-	db_update_resource(m2m_sub, cJSON_GetObjectItem(sub, "ri")->valuestring, RT_SUB);
-
-	make_response_body(o2pt, target_rtnode, m2m_sub);
-	o2pt->rsc = RSC_UPDATED;
-	return RSC_UPDATED;
-}
-
 int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
 	int rsc = 0;
