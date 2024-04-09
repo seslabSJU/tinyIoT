@@ -4,6 +4,7 @@
 #include "../util.h"
 #include "../dbmanager.h"
 #include "../config.h"
+#include "../jsonparser.h"
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
@@ -318,4 +319,43 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
     }
 
     return RSC_OK;
+}
+
+int check_aei_invalid(oneM2MPrimitive *o2pt)
+{
+    char *aei = o2pt->fr;
+    if (!aei || strlen(aei) == 0)
+        return 0;
+    cJSON *cjson = string_to_cjson_string_list_item(ALLOW_AE_ORIGIN);
+
+    int size = cJSON_GetArraySize(cjson);
+    for (int i = 0; i < size; i++)
+    {
+        cJSON *item = cJSON_GetArrayItem(cjson, i);
+        char *origin = strdup(item->valuestring);
+        if (origin[strlen(origin) - 1] == '*')
+        {
+            if (!strncmp(aei, origin, strlen(origin) - 1))
+            {
+                cJSON_Delete(cjson);
+                free(origin);
+                return 0;
+            }
+        }
+        else if (!strcmp(origin, aei))
+        {
+            cJSON_Delete(cjson);
+            free(origin);
+            return 0;
+        }
+
+        free(origin);
+        origin = NULL;
+    }
+    o2pt->rsc = RSC_BAD_REQUEST;
+    cJSON_Delete(cjson);
+    if (o2pt->pc)
+        free(o2pt->pc);
+    o2pt->pc = strdup("{\"m2m:dbg\":\"originator is invalid\"}");
+    return -1;
 }

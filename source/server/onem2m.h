@@ -45,19 +45,11 @@ typedef struct NodeList
 	char *uri;
 } NodeList;
 
-// Reachablity Resource
-typedef struct RRNode
-{
-	struct RRNode *next;
-	char *uri;
-	struct RTNode *rtnode;
-} RRNode;
 typedef struct
 {
 	RTNode *cb;
 	RTNode *registrar_csr;
 	NodeList *csr_list;
-	RRNode *rr_list;
 } ResourceTree;
 
 typedef struct _o

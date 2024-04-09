@@ -19,8 +19,6 @@ void update_resource(cJSON *old, cJSON *new);
 int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path);
 RTNode *get_rtnode(oneM2MPrimitive *o2pt);
 RTNode *parse_uri(oneM2MPrimitive *o2pt, RTNode *cb);
-int tree_viewer_api(oneM2MPrimitive *o2pt, RTNode *node);
-void tree_viewer_data(RTNode *node, char **viewer_data, int cin_size);
 RTNode *get_remote_resource(char *address, int *rsc);
 
 cJSON *getNonDiscoverableAcp(oneM2MPrimitive *o2pt, RTNode *rtnode);
@@ -35,8 +33,6 @@ int register_remote_cse();
 int create_local_csr();
 int update_remote_csr_dcse(RTNode *created_rtnode);
 int deRegister_csr();
-void add_rrnode(RRNode *rrnode);
-void detach_rrnode(RRNode *rrnode);
 void add_csrlist(RTNode *csr_rtnode);
 void detach_csrlist(RTNode *csr_rtnode);
 

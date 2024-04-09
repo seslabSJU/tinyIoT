@@ -333,24 +333,27 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	NodeList *nl = NULL;
 	int idx = -1;
 	nl = rtnode->memberOf->next;
-	while (nl)
+	if (nl)
 	{
-		logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", rtnode->uri, nl->uri);
-		if (!nl->rtnode)
+		while (nl)
 		{
+			logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", rtnode->uri, nl->uri);
+			if (!nl->rtnode)
+			{
+				nl = nl->next;
+				continue;
+			}
+			pjson = cJSON_GetObjectItem(nl->rtnode->obj, "mid");
+			idx = cJSON_getArrayIdx(pjson, rtnode->uri);
+			if (idx >= 0)
+			{
+				cJSON_DeleteItemFromArray(pjson, idx);
+				cJSON_SetIntValue(cJSON_GetObjectItem(nl->rtnode->obj, "cnm"), cJSON_GetArraySize(pjson));
+			}
+			// logger("O2M", LOG_LEVEL_DEBUG, "new mid =  %s", cJSON_Print(pjson));
 			nl = nl->next;
-			continue;
 		}
-		pjson = cJSON_GetObjectItem(nl->rtnode->obj, "mid");
-		idx = cJSON_getArrayIdx(pjson, rtnode->uri);
-		if (idx >= 0)
-		{
-			cJSON_DeleteItemFromArray(pjson, idx);
-			cJSON_SetIntValue(cJSON_GetObjectItem(nl->rtnode->obj, "cnm"), cJSON_GetArraySize(pjson));
-		}
-		// logger("O2M", LOG_LEVEL_DEBUG, "new mid =  %s", cJSON_Print(pjson));
 		db_update_resource(nl->rtnode->obj, cJSON_GetObjectItem(nl->rtnode->obj, "ri")->valuestring, nl->rtnode->ty);
-		nl = nl->next;
 	}
 
 	notify_onem2m_resource(o2pt, rtnode);
@@ -1220,25 +1223,4 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 
 	return o2pt->rsc;
-}
-
-int check_cse_reachable(RRNode *rrnode)
-{
-	int status_code = 0;
-
-	oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(sizeof(oneM2MPrimitive), 1);
-	o2pt->ty = 0;
-	o2pt->op = OP_RETRIEVE;
-	o2pt->to = strdup(rrnode->uri);
-	o2pt->fr = strdup("/" CSE_BASE_RI);
-	o2pt->rqi = strdup("check-reachability");
-	o2pt->pc = NULL;
-	o2pt->fc = NULL;
-	o2pt->isForwarding = true;
-	forwarding_onem2m_resource(o2pt, rrnode->rtnode);
-
-	logger("UTIL", LOG_LEVEL_DEBUG, "RR rslt: %d", o2pt->rsc);
-	status_code = o2pt->rsc;
-
-	return status_code;
 }
