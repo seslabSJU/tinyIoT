@@ -3,7 +3,7 @@ RELCFLAGS = -g
 
 LIBS = -lpthread -lm -ldl -lssl -lcrypto
 
-SRCS = main.c onem2m.c cJSON.c httpd.c dbmanager.c jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c
+SRCS = main.c onem2m.c cJSON.c httpd.c dbmanager.c jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
 
 RSCSRC = $(wildcard resources/*.c)
 
