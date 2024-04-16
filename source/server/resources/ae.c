@@ -8,6 +8,7 @@
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
+extern RTNode *registrar_csr;
 
 int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
@@ -52,6 +53,13 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(root);
         return rsc;
     }
+    if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
+    {
+        if (!strcmp(o2pt->fr, "/S"))
+        {
+            cJSON_AddItemReferenceToArray(cJSON_GetObjectItem(ae, "at"), cJSON_GetObjectItem(registrar_csr->obj, "csi"));
+        }
+    }
 
     cJSON *final_at = cJSON_CreateArray();
     if (handle_annc_create(parent_rtnode, ae, cJSON_GetObjectItem(ae, "at"), final_at) == -1)
@@ -71,9 +79,6 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(final_at);
         cJSON_DeleteItemFromObject(ae, "at");
     }
-
-    // if(o2pt->pc) free(o2pt->pc);
-    // o2pt->pc = cJSON_PrintUnformatted(root);
 
     // Add uri attribute
     char *ptr = malloc(1024);

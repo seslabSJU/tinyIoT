@@ -43,9 +43,9 @@ void detach_subs(RTNode *parent, RTNode *sub);
 // Announcement
 int handle_annc_create(RTNode *parent_rtnode, cJSON *resource_obj, cJSON *at_obj, cJSON *final_at);
 int handle_annc_update(RTNode *target_rtnode, cJSON *at_obj, cJSON *final_at);
+
 void announce_to_annc(RTNode *target_rtnode);
 int create_remote_cba(char *poa, char **cbA_url);
-int create_remote_aea(RTNode *parent_rtnode, cJSON *ae_obj, cJSON *at_obj);
 int deregister_remote_cba(char *cbA_url);
 int deregister_remote_annc(RTNode *target_rtnode, cJSON *delete_at_list);
 void removeChildAnnc(RTNode *rtnode, char *at);

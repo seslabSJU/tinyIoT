@@ -320,8 +320,11 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(rtnode->obj, "mid"))
 		{
 			ptr_rtnode = find_rtnode(pjson->valuestring);
-			logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", ptr_rtnode->uri, pjson->valuestring);
-			deleteNodeList(ptr_rtnode->memberOf, rtnode);
+			if (ptr_rtnode)
+			{
+				logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", ptr_rtnode->uri, pjson->valuestring);
+				deleteNodeList(ptr_rtnode->memberOf, rtnode);
+			}
 		}
 		break;
 	case RT_AEA:
@@ -351,9 +354,10 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 				cJSON_SetIntValue(cJSON_GetObjectItem(nl->rtnode->obj, "cnm"), cJSON_GetArraySize(pjson));
 			}
 			// logger("O2M", LOG_LEVEL_DEBUG, "new mid =  %s", cJSON_Print(pjson));
+
+			db_update_resource(nl->rtnode->obj, cJSON_GetObjectItem(nl->rtnode->obj, "ri")->valuestring, nl->rtnode->ty);
 			nl = nl->next;
 		}
-		db_update_resource(nl->rtnode->obj, cJSON_GetObjectItem(nl->rtnode->obj, "ri")->valuestring, nl->rtnode->ty);
 	}
 
 	notify_onem2m_resource(o2pt, rtnode);
@@ -870,6 +874,7 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
 	logger("O2M", LOG_LEVEL_DEBUG, "Notify onem2m Resource [%s]", target_rtnode->uri);
 	cJSON *pjson = NULL;
+	bool skip = false;
 	if (!target_rtnode)
 	{
 		logger("O2M", LOG_LEVEL_ERROR, "target_rtnode is NULL");
@@ -910,6 +915,7 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	while (node)
 	{
+		skip = false;
 		cJSON_AddStringToObject(sgn, "sur", node->rtnode->uri);
 		if (node->rtnode->obj && (nct = cJSON_GetObjectItem(node->rtnode->obj, "nct")))
 		{
@@ -930,6 +936,23 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				break;
 			}
 		}
+
+		cJSON *atr = cJSON_GetObjectItem(node->rtnode->obj, "atr");
+		if (atr)
+		{
+			cJSON *pjson = NULL;
+			cJSON_ArrayForEach(pjson, atr)
+			{
+				if (!cJSON_GetObjectItem(cJSON_GetObjectItem(nev, "rep"), pjson->valuestring))
+				{
+					skip = true;
+					break;
+				}
+			}
+		}
+		if (skip)
+			continue;
+
 		cJSON *net_obj = cJSON_GetObjectItem(cJSON_GetObjectItem(node->rtnode->obj, "enc"), "net");
 
 		if (net_obj)
@@ -982,6 +1005,13 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	return 1;
 }
 
+/**
+ * creating remote annc
+ * @param parent_rtnode parent resource node
+ * @param obj resource object
+ * @param at announceTo string
+ * @param isParent true if parent resource is parent resource
+ */
 char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isParent)
 {
 	extern cJSON *ATTRIBUTES;
