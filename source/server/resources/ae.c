@@ -25,7 +25,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
         return o2pt->rsc;
     }
-    cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
+    cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *ae = cJSON_GetObjectItem(root, "m2m:ae");
 
     add_general_attribute(ae, parent_rtnode, RT_AE);
@@ -103,7 +103,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     RTNode *child_rtnode = create_rtnode(ae, RT_AE);
     add_child_resource_tree(parent_rtnode, child_rtnode);
 
-    make_response_body(o2pt, child_rtnode, ae);
+    make_response_body(o2pt, child_rtnode);
 
     cJSON_DetachItemFromObject(root, "m2m:ae");
     cJSON_Delete(root);
@@ -114,7 +114,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 { // TODO deannounce when at removed
     char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
-    cJSON *m2m_ae = cJSON_GetObjectItem(o2pt->cjson_pc, "m2m:ae");
+    cJSON *m2m_ae = cJSON_GetObjectItem(o2pt->request_pc, "m2m:ae");
     cJSON *pjson = NULL;
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
     for (int i = 0; i < invalid_key_size; i++)
@@ -196,9 +196,7 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *root = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "m2m:ae", target_rtnode->obj);
 
-    // if(o2pt->pc) free(o2pt->pc);
-    // o2pt->pc = cJSON_PrintUnformatted(root);
-    make_response_body(o2pt, target_rtnode, m2m_ae);
+    make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
 
     cJSON_DetachItemFromObject(root, "m2m:ae");
@@ -357,10 +355,6 @@ int check_aei_invalid(oneM2MPrimitive *o2pt)
         free(origin);
         origin = NULL;
     }
-    o2pt->rsc = RSC_BAD_REQUEST;
-    cJSON_Delete(cjson);
-    if (o2pt->pc)
-        free(o2pt->pc);
-    o2pt->pc = strdup("{\"m2m:dbg\":\"originator is invalid\"}");
+    handle_error(o2pt, RSC_BAD_REQUEST, "originator is invalid");
     return -1;
 }

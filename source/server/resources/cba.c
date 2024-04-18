@@ -12,7 +12,7 @@ int create_cba(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
     // int e = check_rn_invalid(o2pt, RT_CBA);
     // if(e == -1) return o2pt->rsc;
-    logger("UTIL", LOG_LEVEL_DEBUG, "%s", o2pt->cjson_pc);
+    logger("UTIL", LOG_LEVEL_DEBUG, "%s", o2pt->request_pc);
 
     if (parent_rtnode->ty != RT_CSE)
     {
@@ -26,7 +26,7 @@ int create_cba(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return o2pt->rsc;
     }
 
-    cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
+    cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *cba = cJSON_GetObjectItem(root, "m2m:cba");
 
     add_general_attribute(cba, parent_rtnode, RT_CBA);
@@ -39,9 +39,7 @@ int create_cba(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     // 	return rsc;
     // }
 
-    if (o2pt->pc)
-        free(o2pt->pc);
-    o2pt->pc = cJSON_PrintUnformatted(root);
+    o2pt->response_pc = root;
     o2pt->rsc = RSC_CREATED;
 
     // Add uri attribute

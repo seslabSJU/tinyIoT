@@ -26,7 +26,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return o2pt->rsc;
     }
 
-    cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
+    cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *csr = cJSON_GetObjectItem(root, "m2m:csr");
 
     int rsc = validate_csr(o2pt, parent_rtnode, csr, OP_CREATE);
@@ -41,9 +41,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
     cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));
 
-    if (o2pt->pc)
-        free(o2pt->pc);
-    o2pt->pc = cJSON_PrintUnformatted(root);
+    o2pt->response_pc = root;
     o2pt->rsc = RSC_CREATED;
 
     // Add uri attribute
@@ -84,7 +82,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
     char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
-    cJSON *m2m_csr = cJSON_GetObjectItem(o2pt->cjson_pc, "m2m:csr");
+    cJSON *m2m_csr = cJSON_GetObjectItem(o2pt->request_pc, "m2m:csr");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
     for (int i = 0; i < invalid_key_size; i++)
     {
@@ -109,9 +107,7 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *root = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "m2m:csr", target_rtnode->obj);
 
-    if (o2pt->pc)
-        free(o2pt->pc);
-    o2pt->pc = cJSON_PrintUnformatted(root);
+    o2pt->response_pc = root;
     o2pt->rsc = RSC_UPDATED;
 
     cJSON_DetachItemFromObject(root, "m2m:csr");

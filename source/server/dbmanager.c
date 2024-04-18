@@ -708,14 +708,19 @@ void db_test_and_set_bind_int(sqlite3_stmt *stmt, int index, int value)
 
 int db_delete_onem2m_resource(RTNode *rtnode)
 {
-    logger("DB", LOG_LEVEL_DEBUG, "Delete [RI] %s", get_ri_rtnode(rtnode));
+    char *ri = get_ri_rtnode(rtnode);
+    logger("DB", LOG_LEVEL_DEBUG, "Delete [RI] %s", ri);
     char sql[1024] = {0};
     char *err_msg;
     char *tableName = NULL;
     int rc;
+    if (!ri)
+    {
+        return 0;
+    }
 
     // sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
-    sprintf(sql, "DELETE FROM general WHERE uri LIKE '%s/%%' OR ri='%s';", get_uri_rtnode(rtnode), get_ri_rtnode(rtnode));
+    sprintf(sql, "DELETE FROM general WHERE uri LIKE '%s/%%' OR ri='%s';", get_uri_rtnode(rtnode), ri);
     logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if (rc != SQLITE_OK)
@@ -724,16 +729,6 @@ int db_delete_onem2m_resource(RTNode *rtnode)
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         return 0;
     }
-
-    // sprintf(sql, "DELETE FROM general WHERE ri='%s';", get_ri_rtnode(rtnode));
-    // rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    // if(rc != SQLITE_OK){
-    //     logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from general/ msg : %s", err_msg);
-    //     sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-    //     return 0;
-    // }
-
-    // sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
 
     return 1;
 }

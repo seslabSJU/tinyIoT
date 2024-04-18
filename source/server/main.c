@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 		\"m2m:cnt\": {\"cr\": null, \"mni\":0, \"mbs\":0, \"st\":0, \"cni\":0, \"cbs\":0,\"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
 		\"m2m:cin\": {\"cs\":0, \"cr\":null, \"con\":\"\", \"cnf\":\"\", \"st\":\"\",\"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
 		\"m2m:acp\": {\"pv\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"pvs\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
-		\"m2m:sub\": {\"enc\":{\"net\":[1], \"atr\":[\"\"] }, \"exc\":0, \"nu\":[\"\"], \"gpi\":0, \"nfu\":0, \"bn\":0, \"rl\":0, \"sur\":0, \"nct\":0, \"cr\":\"\", \"su\":\"\"},\
+		\"m2m:sub\": {\"enc\":{\"net\":[1], \"atr\":[\"\"], \"chty\":[0] }, \"exc\":0, \"nu\":[\"\"], \"gpi\":0, \"nfu\":0, \"bn\":0, \"rl\":0, \"sur\":0, \"nct\":0, \"cr\":\"\", \"su\":\"\"},\
 		\"m2m:grp\": {\"cr\":\"\", \"mt\":0, \"cnm\":0, \"mnm\":0, \"mid\":[\"\"], \"macp\":[\"\"], \"mtv\":true, \"csy\":0}, \
 		\"m2m:csr\": {\"cst\":0, \"poa\":[\"\"], \"cb\":\"\", \"dcse\":[\"\"], \"csi\":\"\", \"mei\":\"\", \"tri\":\"\", \"csz\":[\"\"], \"rr\":true, \"nl\":\"\", \"srv\":[\"\"]},\
 		\"m2m:cb\": {\"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[0], \"rr\":true, \"at\":[], \"aa\":[],\"ast\":0}, \
@@ -156,8 +156,6 @@ void route(oneM2MPrimitive *o2pt)
 
 	int e = result_parse_uri(o2pt, target_rtnode);
 	if (e != -1)
-		e = check_payload_size(o2pt);
-	if (e != -1)
 		e = check_mandatory_attributes(o2pt);
 	if (e == -1)
 	{
@@ -189,7 +187,6 @@ void route(oneM2MPrimitive *o2pt)
 			}
 		}
 	}
-
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
 		notify_onem2m_resource(o2pt, target_rtnode);
 	log_runtime(start);
@@ -269,7 +266,6 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	case OP_OPTIONS:
 		rsc = RSC_OK;
-		set_o2pt_pc(o2pt, "{\"m2m:dbg\": \"response about options method\"}");
 		break;
 	case OP_DISCOVERY:
 		// Note : discovery operation rcn validation is reversed with other operations

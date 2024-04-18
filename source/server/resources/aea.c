@@ -21,7 +21,7 @@ int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
         return o2pt->rsc;
     }
-    cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
+    cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *aea = cJSON_GetObjectItem(root, "m2m:aeA");
 
     add_general_attribute(aea, parent_rtnode, RT_AEA);
@@ -34,9 +34,6 @@ int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return rsc;
     }
 
-    if (o2pt->pc)
-        free(o2pt->pc);
-    o2pt->pc = cJSON_PrintUnformatted(root);
     // Add uri attribute
     char *ptr = malloc(1024);
     cJSON *rn = cJSON_GetObjectItem(aea, "rn");
@@ -48,6 +45,7 @@ int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB store fail");
         cJSON_Delete(root);
+
         free(ptr);
         ptr = NULL;
         return RSC_INTERNAL_SERVER_ERROR;
@@ -60,8 +58,7 @@ int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     RTNode *child_rtnode = create_rtnode(aea, RT_AEA);
     add_child_resource_tree(parent_rtnode, child_rtnode);
 
-    cJSON_DetachItemFromObject(root, "m2m:aeA");
-    cJSON_Delete(root);
+    o2pt->response_pc = root;
 
     return o2pt->rsc = RSC_CREATED;
 }
@@ -69,7 +66,7 @@ int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 int update_aea(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
     char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
-    cJSON *m2m_aea = cJSON_GetObjectItem(o2pt->cjson_pc, "m2m:aea");
+    cJSON *m2m_aea = cJSON_GetObjectItem(o2pt->request_pc, "m2m:aea");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
     for (int i = 0; i < invalid_key_size; i++)
     {
@@ -107,9 +104,7 @@ int update_aea(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *root = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "m2m:aea", target_rtnode->obj);
 
-    if (o2pt->pc)
-        free(o2pt->pc);
-    o2pt->pc = cJSON_PrintUnformatted(root);
+    make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
 
     cJSON_DetachItemFromObject(root, "m2m:aea");

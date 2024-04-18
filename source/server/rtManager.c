@@ -220,9 +220,8 @@ RTNode *get_remote_resource(char *address, int *rsc)
         free_o2pt(o2pt);
         return NULL;
     }
-    o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
-    ResourceType ty = parse_object_type_cjson(o2pt->cjson_pc);
-    cJSON *resource = cJSON_GetObjectItem(o2pt->cjson_pc, get_resource_key(ty));
+    ResourceType ty = parse_object_type_cjson(o2pt->response_pc);
+    cJSON *resource = cJSON_GetObjectItem(o2pt->response_pc, get_resource_key(ty));
     RTNode *rtnode = create_rtnode(cJSON_Duplicate(resource, 1), ty);
     rtnode->uri = strdup(target_uri);
 
@@ -606,6 +605,7 @@ void add_subs(RTNode *parent, RTNode *sub)
     {
         parent->subs = calloc(sizeof(NodeList), 1);
         parent->subs->rtnode = sub;
+        parent->subs->uri = strdup(sub->uri);
         parent->subs->next = NULL;
         parent->sub_cnt++;
         return;
@@ -617,10 +617,17 @@ void add_subs(RTNode *parent, RTNode *sub)
     }
     psub->next = calloc(sizeof(NodeList), 1);
     psub->next->rtnode = sub;
+    psub->next->uri = strdup(sub->uri);
     psub->next->next = NULL;
     parent->sub_cnt++;
 }
 
+/**
+ * @brief detach subscription from resource
+ * @param parent parent of subscription
+ * @param sub subscription rtnode
+ * @remark sub should be freed by caller
+ */
 void detach_subs(RTNode *parent, RTNode *sub)
 {
     NodeList *psub = parent->subs;
@@ -631,7 +638,6 @@ void detach_subs(RTNode *parent, RTNode *sub)
     if (psub->rtnode == sub)
     {
         parent->subs = psub->next;
-        free(psub);
         parent->sub_cnt--;
         return;
     }
@@ -639,9 +645,7 @@ void detach_subs(RTNode *parent, RTNode *sub)
     {
         if (psub->next->rtnode == sub)
         {
-            NodeList *temp = psub->next;
             psub->next = psub->next->next;
-            free(temp);
             parent->sub_cnt--;
             return;
         }

@@ -74,10 +74,13 @@ char *get_uri_rtnode(RTNode *rtnode);
 char *ri_to_uri(char *ri);
 cJSON *getResource(cJSON *root, ResourceType ty);
 
+// Notification
+int send_verification_request(char *noti_uri, cJSON *noti_cjson);
+bool isAptEnc(oneM2MPrimitive *o2pt, RTNode *target_rtnode, RTNode *sub_rtnode);
 int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net);
 
 // rcn
-int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode, cJSON *request_obj);
+int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level);
 void build_rcn5(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level);
 void build_rcn6(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level);
@@ -111,7 +114,6 @@ int check_aei_invalid(oneM2MPrimitive *o2pt);
 int check_resource_type_equal(oneM2MPrimitive *o2pt);
 int check_resource_type_invalid(oneM2MPrimitive *o2pt);
 int result_parse_uri(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
-int check_payload_size(oneM2MPrimitive *o2pt);
 int check_payload_format(oneM2MPrimitive *o2pt);
 int check_rn_invalid(oneM2MPrimitive *o2pt, ResourceType ty);
 bool check_acpi_valid(oneM2MPrimitive *o2pt, cJSON *acpi);

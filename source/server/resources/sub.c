@@ -10,12 +10,13 @@ extern cJSON *ATTRIBUTES;
 
 int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
+    int result = 0;
     if (parent_rtnode->ty == RT_CIN || parent_rtnode->ty == RT_SUB)
     {
         return handle_error(o2pt, RSC_TARGET_NOT_SUBSCRIBABLE, "target not subscribable");
     }
 
-    cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
+    cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *sub = cJSON_GetObjectItem(root, "m2m:sub");
 
     add_general_attribute(sub, parent_rtnode, RT_SUB);
@@ -25,6 +26,7 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_AddNumberToObject(sub, "nct", NCT_ALL_ATTRIBUTES);
 
     cJSON *pjson = NULL;
+
     if ((pjson = cJSON_GetObjectItem(sub, "cr")))
     {
         if (pjson->type == cJSON_NULL)
@@ -51,8 +53,54 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON *rn = cJSON_GetObjectItem(sub, "rn");
     sprintf(ptr, "%s/%s", get_uri_rtnode(parent_rtnode), rn->valuestring);
 
+    cJSON *noti_cjson, *sgn, *nev, *rep, *nct;
+    RTNode *nu_rtnode;
+    noti_cjson = cJSON_CreateObject();
+    cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
+    cJSON_AddItemToObject(sgn, "nev", nev = cJSON_CreateObject());
+    cJSON_AddNumberToObject(nev, "net", NET_CREATE_OF_DIRECT_CHILD_RESOURCE);
+    cJSON_AddItemToObject(nev, "rep", rep = cJSON_CreateObject());
+    cJSON_AddStringToObject(sgn, "cr", o2pt->fr);
+    cJSON_AddItemReferenceToObject(rep, "m2m:sub", sub);
+    cJSON_AddStringToObject(sgn, "sur", ptr);
+    cJSON_AddBoolToObject(sgn, "vrq", true);
+    // logger("SUB", LOG_LEVEL_INFO, "vrq \n%s", cJSON_Print(noti_cjson));
+    cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(sub, "nu"))
+    {
+        if (strncmp(pjson->valuestring, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0)
+        {
+            nu_rtnode = find_rtnode(pjson->valuestring);
+            if (nu_rtnode == NULL || nu_rtnode->ty != RT_AE)
+            {
+                handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "nu is invalid");
+                cJSON_Delete(noti_cjson);
+                cJSON_DetachItemFromObject(root, "m2m:sub");
+                cJSON_Delete(root);
+                return RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED;
+            }
+            if (strcmp(cJSON_GetObjectItem(nu_rtnode->obj, "aei")->valuestring, o2pt->fr) == 0)
+            {
+                continue;
+            }
+        }
+        else if (!strcmp(pjson->valuestring, o2pt->fr))
+        {
+            continue;
+        }
+
+        result = send_verification_request(pjson->valuestring, noti_cjson);
+        if (result == RSC_BAD_REQUEST)
+        {
+            cJSON_Delete(noti_cjson);
+            cJSON_DetachItemFromObject(root, "m2m:sub");
+            cJSON_Delete(root);
+            return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification error");
+        }
+        cJSON_DeleteItemFromObject(sgn, "vrq");
+    }
+
     // Store to DB
-    int result = db_store_resource(sub, ptr);
+    result = db_store_resource(sub, ptr);
     if (result != 1)
     {
         handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB store fail");
@@ -63,26 +111,7 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     RTNode *child_rtnode = create_rtnode(sub, RT_SUB);
     add_child_resource_tree(parent_rtnode, child_rtnode);
 
-    cJSON *noti_cjson, *sgn, *nev, *rep, *nct;
-    noti_cjson = cJSON_CreateObject();
-    cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
-    cJSON_AddItemToObject(sgn, "nev", nev = cJSON_CreateObject());
-    cJSON_AddNumberToObject(nev, "net", NET_CREATE_OF_DIRECT_CHILD_RESOURCE);
-    cJSON_AddItemToObject(nev, "rep", rep = cJSON_CreateObject());
-    cJSON_AddItemToObject(rep, "m2m:sub", cJSON_Duplicate(sub, true));
-    cJSON_AddItemToObject(sgn, "vrq", cJSON_CreateBool(true));
-
-    cJSON_AddStringToObject(sgn, "sur", ptr);
-    if (notify_to_nu(child_rtnode, noti_cjson, NET_CREATE_OF_DIRECT_CHILD_RESOURCE) != RSC_OK)
-    {
-        cJSON_Delete(noti_cjson);
-        cJSON_DetachItemFromObject(root, "m2m:sub");
-        cJSON_Delete(root);
-        delete_onem2m_resource(o2pt, child_rtnode);
-        return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification error");
-    }
-
-    make_response_body(o2pt, child_rtnode, sub);
+    make_response_body(o2pt, child_rtnode);
     o2pt->rsc = RSC_CREATED;
 
     cJSON_DetachItemFromObject(root, "m2m:sub");
@@ -94,7 +123,8 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
     char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
-    cJSON *m2m_sub = cJSON_GetObjectItem(o2pt->cjson_pc, "m2m:sub");
+    cJSON *pjson = NULL;
+    cJSON *m2m_sub = cJSON_GetObjectItem(o2pt->request_pc, "m2m:sub");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
     for (int i = 0; i < invalid_key_size; i++)
     {
@@ -108,7 +138,10 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *sub = target_rtnode->obj;
     int result;
 
-    validate_sub(o2pt, m2m_sub, o2pt->op);
+    if (validate_sub(o2pt, m2m_sub, o2pt->op) != RSC_OK)
+    {
+        return o2pt->rsc;
+    }
 
     cJSON *old_nu = cJSON_GetObjectItem(sub, "nu");
     cJSON *new_nu = cJSON_GetObjectItem(m2m_sub, "nu");
@@ -120,28 +153,43 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         noti_cjson = cJSON_CreateObject();
         cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
         cJSON_AddItemToObject(sgn, "nev", nev = cJSON_CreateObject());
+        cJSON_AddStringToObject(sgn, "cr", o2pt->fr);
         cJSON_AddNumberToObject(nev, "net", NET_CREATE_OF_DIRECT_CHILD_RESOURCE);
         cJSON_AddItemToObject(nev, "rep", rep = cJSON_CreateObject());
         cJSON_AddItemToObject(rep, "m2m:sub", cJSON_Duplicate(sub, true));
-        cJSON_AddItemToObject(sgn, "vrq", cJSON_CreateBool(true));
-
         cJSON_AddStringToObject(sgn, "sur", target_rtnode->uri);
-        if (notify_to_nu(target_rtnode, noti_cjson, NET_CREATE_OF_DIRECT_CHILD_RESOURCE) != RSC_OK)
+        cJSON_AddBoolToObject(sgn, "vrq", true);
+        cJSON_ArrayForEach(pjson, new_nu)
         {
-            cJSON_DetachItemFromObject(sub, "nu");
-            cJSON_AddItemToObject(sub, "nu", old_nu);
-            cJSON_Delete(noti_cjson);
-            return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification verification failed");
+            if (!strcmp(pjson->valuestring, o2pt->fr))
+            {
+                continue;
+            }
+            if (send_verification_request(pjson->valuestring, noti_cjson) != RSC_OK)
+            {
+                cJSON_Delete(noti_cjson);
+                return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification error");
+            }
         }
+
         cJSON_DetachItemFromObject(sub, "nu");
         cJSON_AddItemToObject(sub, "nu", old_nu);
+    }
+    pjson = cJSON_GetObjectItem(m2m_sub, "enc");
+    if (pjson && pjson->type == cJSON_NULL)
+    {
+        cJSON *pjson2;
+        pjson = cJSON_CreateObject();
+        cJSON_AddItemToObject(pjson, "net", pjson2 = cJSON_CreateArray());
+        cJSON_AddItemToArray(pjson2, cJSON_CreateNumber(NET_UPDATE_OF_RESOURCE));
+        cJSON_ReplaceItemInObject(m2m_sub, "enc", pjson);
     }
 
     update_resource(sub, m2m_sub);
 
     db_update_resource(m2m_sub, cJSON_GetObjectItem(sub, "ri")->valuestring, RT_SUB);
 
-    make_response_body(o2pt, target_rtnode, m2m_sub);
+    make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
     return RSC_UPDATED;
 }
@@ -149,7 +197,7 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
 {
     cJSON *pjson = NULL;
-    cJSON *net, *nct;
+    cJSON *enc, *net, *nct;
     char *ptr = NULL;
 
     pjson = cJSON_GetObjectItem(sub, "acpi");
@@ -159,8 +207,8 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
         if (result != RSC_OK)
             return result;
     }
-
-    if ((net = cJSON_GetObjectItem(cJSON_GetObjectItem(sub, "enc"), "net")))
+    enc = cJSON_GetObjectItem(sub, "enc");
+    if ((net = cJSON_GetObjectItem(enc, "net")))
     {
         nct = cJSON_GetObjectItem(sub, "nct");
         cJSON_ArrayForEach(pjson, net)
@@ -172,10 +220,6 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
             if (!nct)
                 continue;
             int nct_val = nct->valueint;
-            if (nct_val == NCT_MODIFIED_ATTRIBUTES)
-            {
-                return handle_error(o2pt, RSC_BAD_REQUEST, "Notification Content Type `Modified Attributes` is not supported");
-            }
             switch (pjson->valueint)
             {
             case NET_NONE:
@@ -237,8 +281,21 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
                 }
                 break;
             case NET_REPORT_ON_MISSING_DATA_POINTS:
+                return handle_error(o2pt, RSC_BAD_REQUEST, "`net` NET_REPORT_ON_MISSING_DATA_POINTS is not supported");
                 break;
             }
+        }
+    }
+
+    if (pjson = cJSON_GetObjectItem(sub, "nu"))
+    {
+        if (pjson->type != cJSON_Array)
+        {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `nu` is invalid");
+        }
+        if (cJSON_GetArraySize(pjson) == 0)
+        {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `nu` is invalid");
         }
     }
 

@@ -54,27 +54,27 @@ typedef struct
 
 typedef struct _o
 {
-	char *to;
-	char *fr;
-	char *rqi;
-	char *rvi;
-	char *pc;
-	Operation op;
-	cJSON *cjson_pc;
-	int rcn;
-	int rsc;
-	int coap_rsc;
-	int ty;
-	char *origin;
+	char *to;  // To
+	char *fr;  // From
+	char *rqi; // Request ID
+	char *rvi; // Request Version Indicator
+	// char *pc;
+	Operation op;		// Operation
+	cJSON *request_pc;	// Primitive Content
+	cJSON *response_pc; // Primitive Content
+	int rcn;			// Result Content
+	int rsc;			// Result Code
+	int coap_rsc;		// CoAP Result Code
+	int ty;				// Resource Type
 	bool isFopt;
 	bool isForwarding;
 	char *fopt;
 	bool errFlag;
 	char *ip;
-	ContentStatus cnst;
-	int cnot;
-	cJSON *fc;
-	int drt;
+	ContentStatus cnst; // Content Status
+	int cnot;			// Content Offset
+	cJSON *fc;			// Filter Criteria
+	int drt;			// Discovery Result Type
 } oneM2MPrimitive;
 
 typedef struct _n

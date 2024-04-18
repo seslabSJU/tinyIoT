@@ -16,7 +16,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return o2pt->rsc = RSC_INVALID_CHILD_RESOURCETYPE;
     }
 
-    cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
+    cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *grp = cJSON_GetObjectItem(root, "m2m:grp");
 
     add_general_attribute(grp, parent_rtnode, RT_GRP);
@@ -63,7 +63,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     add_child_resource_tree(parent_rtnode, child_rtnode);
     set_grp_member(child_rtnode);
 
-    make_response_body(o2pt, child_rtnode, NULL);
+    make_response_body(o2pt, child_rtnode);
 
     cJSON_DetachItemFromObject(root, "m2m:grp");
     cJSON_Delete(root);
@@ -78,7 +78,7 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
     int rsc = 0, result = 0;
     char invalid_key[6][4] = {"ty", "pi", "ri", "rn", "ct", "mtv"};
-    cJSON *m2m_grp = cJSON_GetObjectItem(o2pt->cjson_pc, "m2m:grp");
+    cJSON *m2m_grp = cJSON_GetObjectItem(o2pt->request_pc, "m2m:grp");
     cJSON *pjson = NULL;
 
     int invalid_key_size = 6;
@@ -114,9 +114,7 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     cJSON *root = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "m2m:grp", target_rtnode->obj);
-    if (o2pt->pc)
-        free(o2pt->pc);
-    o2pt->pc = cJSON_PrintUnformatted(root);
+    make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
 
     cJSON_DetachItemFromObject(root, "m2m:grp");

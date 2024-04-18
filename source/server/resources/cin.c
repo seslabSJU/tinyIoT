@@ -16,7 +16,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return o2pt->rsc;
     }
 
-    cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
+    cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *cin = cJSON_GetObjectItem(root, "m2m:cin");
     cJSON *rn = NULL;
 #if !ALLOW_CIN_RN
@@ -84,9 +84,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     RTNode *cin_rtnode = create_rtnode(cin, RT_CIN);
     update_cnt_cin(parent_rtnode, cin_rtnode, 1);
 
-    // if(o2pt->pc) free(o2pt->pc);
-    // o2pt->pc = cJSON_PrintUnformatted(root);
-    make_response_body(o2pt, cin_rtnode, cin);
+    make_response_body(o2pt, cin_rtnode);
     o2pt->rsc = RSC_CREATED;
 
     // Add uri attribute

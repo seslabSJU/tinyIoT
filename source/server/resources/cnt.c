@@ -10,7 +10,7 @@ extern cJSON *ATTRIBUTES;
 
 int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
-    cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
+    cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *pjson = NULL;
     if (parent_rtnode->ty != RT_CNT && parent_rtnode->ty != RT_AE && parent_rtnode->ty != RT_CSE)
     {
@@ -72,7 +72,7 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(root);
         return rsc;
     }
-    // o2pt->pc = cJSON_PrintUnformatted(root);
+
     o2pt->rsc = RSC_CREATED;
 
     // Add uri attribute
@@ -95,7 +95,7 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
     RTNode *child_rtnode = create_rtnode(cnt, RT_CNT);
     add_child_resource_tree(parent_rtnode, child_rtnode);
-    make_response_body(o2pt, child_rtnode, cnt);
+    make_response_body(o2pt, child_rtnode);
 
     cJSON_DetachItemFromObject(root, "m2m:cnt");
     cJSON_Delete(root);
@@ -106,7 +106,7 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
     char invalid_key[][9] = {"ty", "pi", "ri", "rn", "ct", "cr"};
-    cJSON *m2m_cnt = cJSON_GetObjectItem(o2pt->cjson_pc, "m2m:cnt");
+    cJSON *m2m_cnt = cJSON_GetObjectItem(o2pt->request_pc, "m2m:cnt");
     int invalid_key_size = sizeof(invalid_key) / (9 * sizeof(char));
     for (int i = 0; i < invalid_key_size; i++)
     {
@@ -180,17 +180,8 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     result = db_update_resource(m2m_cnt, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_CNT);
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "m2m:cnt", target_rtnode->obj);
-
-    // if(o2pt->pc) free(o2pt->pc);
-    // o2pt->pc = cJSON_PrintUnformatted(root);
-
-    make_response_body(o2pt, target_rtnode, m2m_cnt);
+    make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
-
-    cJSON_DetachItemFromObject(root, "m2m:cnt");
-    cJSON_Delete(root);
     return RSC_UPDATED;
 }
 

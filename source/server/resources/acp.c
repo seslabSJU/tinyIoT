@@ -16,7 +16,7 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return o2pt->rsc;
     }
 
-    cJSON *root = cJSON_Duplicate(o2pt->cjson_pc, 1);
+    cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *acp = cJSON_GetObjectItem(root, "m2m:acp");
 
     add_general_attribute(acp, parent_rtnode, RT_ACP);
@@ -54,9 +54,6 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_DeleteItemFromObject(acp, "at");
     }
 
-    // if(o2pt->pc) free(o2pt->pc);
-    // o2pt->pc = cJSON_PrintUnformatted(root);
-
     // Add uri attribute
     char *ptr = malloc(1024);
     cJSON *rn = cJSON_GetObjectItem(acp, "rn");
@@ -78,7 +75,7 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     // Add to resource tree
     RTNode *child_rtnode = create_rtnode(acp, RT_ACP);
     add_child_resource_tree(parent_rtnode, child_rtnode);
-    make_response_body(o2pt, child_rtnode, acp);
+    make_response_body(o2pt, child_rtnode);
 
     cJSON_DetachItemFromObject(root, "m2m:acp");
     cJSON_Delete(root);
@@ -89,7 +86,7 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
     char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
-    cJSON *m2m_acp = cJSON_GetObjectItem(o2pt->cjson_pc, "m2m:acp");
+    cJSON *m2m_acp = cJSON_GetObjectItem(o2pt->request_pc, "m2m:acp");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
     for (int i = 0; i < invalid_key_size; i++)
     {
@@ -120,12 +117,7 @@ int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     result = db_update_resource(m2m_acp, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_ACP);
 
-    // cJSON *root = cJSON_CreateObject();
-    // cJSON_AddItemToObject(root, "m2m:acp", target_rtnode->obj);
-
-    // if(o2pt->pc) free(o2pt->pc);
-    // o2pt->pc = cJSON_PrintUnformatted(root);
-    make_response_body(o2pt, target_rtnode, m2m_acp);
+    make_response_body(o2pt, target_rtnode);
 
     o2pt->rsc = RSC_UPDATED;
 

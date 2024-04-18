@@ -257,8 +257,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
 
     if (req->payload)
     {
-        o2pt->pc = strdup(req->payload);
-        o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
+        o2pt->request_pc = cJSON_Parse(req->payload);
     }
 
     if ((header = search_header(req->headers, "X-M2M-Origin")))
@@ -382,7 +381,6 @@ void handle_http_request(HTTPRequest *req, int slotno)
     pthread_mutex_trylock(&mutex_lock);
     route(o2pt);
     pthread_mutex_unlock(&mutex_lock);
-
     http_respond_to_client(o2pt, slotno);
     free_o2pt(o2pt);
 }
@@ -423,17 +421,20 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
     char rsc[64];
     char cnst[32], ot[32];
     char response_headers[2048] = {'\0'};
-    char buf[BUF_SIZE] = {
-        0,
-    };
+    char buf[BUF_SIZE];
+    char *pc = NULL;
     memset(buf, 0, BUF_SIZE);
+    if (o2pt->response_pc)
+    {
+        pc = cJSON_PrintUnformatted(o2pt->response_pc);
+    }
 
-    if (o2pt->pc && strlen(o2pt->pc) >= BUF_SIZE - 1)
+    if (pc && strlen(pc) >= BUF_SIZE - 1)
     {
         handle_error(o2pt, RSC_NOT_ACCEPTABLE, "result size too big");
     }
 
-    sprintf(content_length, "%ld", o2pt->pc ? strlen(o2pt->pc) : 0);
+    sprintf(content_length, "%ld", pc ? strlen(pc) : 0);
     sprintf(rsc, "%d", o2pt->rsc);
     set_header("Content-Length", content_length, response_headers);
     set_header("X-M2M-RSC", rsc, response_headers);
@@ -453,9 +454,9 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
     }
 
     sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
-    if (o2pt->pc)
+    if (pc)
     {
-        strncat(buf, o2pt->pc, BUF_SIZE - strlen(buf) - 1);
+        strncat(buf, pc, BUF_SIZE - strlen(buf) - 1);
         strncat(buf, "\r\n", BUF_SIZE - strlen(buf) - 1);
     }
 
@@ -470,7 +471,7 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port)
     HTTPRequest *req = (HTTPRequest *)calloc(1, sizeof(HTTPRequest));
     HTTPResponse *res = (HTTPResponse *)calloc(1, sizeof(HTTPResponse));
     req->method = op_to_method(o2pt->op);
-    req->payload = strdup(o2pt->pc);
+    req->payload = o2pt->request_pc ? cJSON_PrintUnformatted(o2pt->request_pc) : NULL;
     req->payload_size = strlen(req->payload);
     req->uri = strdup(o2pt->to);
     req->headers = calloc(1, sizeof(header_t));
@@ -524,10 +525,10 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     {
         add_header("Content-Type", "application/json", req->headers);
     }
-    if (o2pt->pc)
+    if (o2pt->request_pc)
     {
-        req->payload = strdup(o2pt->pc);
-        req->payload_size = strlen(o2pt->pc);
+        req->payload = cJSON_PrintUnformatted(o2pt->request_pc);
+        req->payload_size = strlen(req->payload);
     }
     else
     {
@@ -540,13 +541,9 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
         o2pt->rsc = atoi(rsc);
     else
         o2pt->rsc = RSC_TARGET_NOT_REACHABLE;
-    if (o2pt->pc)
-    {
-        free(o2pt->pc);
-        o2pt->pc = NULL;
-    }
+
     if (res->payload)
-        o2pt->pc = strdup(res->payload);
+        o2pt->response_pc = cJSON_Parse(res->payload);
 
     free_HTTPRequest(req);
     free_HTTPResponse(res);
