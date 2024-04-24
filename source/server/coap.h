@@ -37,8 +37,6 @@ typedef struct
     uint8_t code;
     uint8_t *token;
     uint8_t token_len;
-    uint8_t *payload;
-    uint8_t payload_len;
     uint16_t message_id;
     uint16_t option_cnt;
 } coapPacket;

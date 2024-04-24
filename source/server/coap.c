@@ -10,7 +10,7 @@ coapPacket *req = NULL;
 bool rel5 = false;
 
 /* oneM2M/CoAP options */
-char *coap_opt_name(int opt)
+static char *coap_opt_name(int opt)
 {
     switch (opt)
     {
@@ -116,7 +116,7 @@ char *coap_opt_name(int opt)
     }
 }
 
-int op_to_code(Operation op)
+static int op_to_code(Operation op)
 {
     int method;
     switch (op)
@@ -141,7 +141,7 @@ int op_to_code(Operation op)
     return method;
 }
 
-Operation coap_parse_operation(char *method)
+static Operation coap_parse_operation(char *method)
 {
     Operation op;
 
@@ -157,7 +157,7 @@ Operation coap_parse_operation(char *method)
     return op;
 }
 
-char *coap_parse_type(coap_pdu_type_t type)
+static char *coap_parse_type(coap_pdu_type_t type)
 {
     switch (type)
     {
@@ -172,7 +172,7 @@ char *coap_parse_type(coap_pdu_type_t type)
     }
 }
 
-char *coap_parse_req_code(coap_pdu_code_t code)
+static char *coap_parse_req_code(coap_pdu_code_t code)
 {
     switch (code)
     {
@@ -189,8 +189,11 @@ char *coap_parse_req_code(coap_pdu_code_t code)
     }
 }
 
-void coap_respond_to_client(oneM2MPrimitive *o2pt, coap_resource_t *r, coap_session_t *session,
-                            const coap_pdu_t *req_pdu, coap_pdu_t *res_pdu)
+static void coap_respond_to_client(oneM2MPrimitive *o2pt,
+                                   coap_resource_t *r,
+                                   coap_session_t *session,
+                                   const coap_pdu_t *req_pdu,
+                                   coap_pdu_t *res_pdu)
 {
     char buf[BUF_SIZE] = {'\0'};
     sprintf(buf, "\n%s %d\r\n", coap_parse_type(COAP_MESSAGE_ACK), o2pt->rsc);
@@ -209,13 +212,12 @@ void coap_respond_to_client(oneM2MPrimitive *o2pt, coap_resource_t *r, coap_sess
         cJSON_AddStringToObject(cjson_payload, "rvi", o2pt->rvi);
         cJSON_AddNumberToObject(cjson_payload, "rsc", o2pt->rsc);
 
-        if (o2pt->pc)
+        if (o2pt->response_pc)
         {
-            o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
-            cJSON_AddItemToObject(cjson_payload, "pc", o2pt->cjson_pc);
+            cJSON_AddItemToObject(cjson_payload, "pc", o2pt->response_pc);
         }
 
-        o2pt->pc = cJSON_Print(cjson_payload);
+        o2pt->response_pc = cjson_payload;
     }
     else
     {
@@ -236,25 +238,28 @@ void coap_respond_to_client(oneM2MPrimitive *o2pt, coap_resource_t *r, coap_sess
         // }
     }
 
-    if (o2pt->pc)
+    char *normalized_pc = NULL;
+
+    if (o2pt->response_pc)
     {
-        sprintf(buf + strlen(buf), "\r\n");
-        normalize_payload(o2pt->pc);
-        strcat(buf, o2pt->pc);
-        sprintf(buf + strlen(buf), "\r\n");
+        normalized_pc = cJSON_Print(o2pt->response_pc);
+        normalize_payload(normalized_pc);
+        sprintf(buf + strlen(buf), "\r\n%s\r\n", normalized_pc);
     }
     else
-        o2pt->pc = strdup("");
+        normalized_pc = strdup("");
 
     logger(LOG_TAG, LOG_LEVEL_DEBUG, "\n%s", buf);
 
     // coap_add_data(res_pdu, strlen(buf), (unsigned char *)buf);
     coap_add_data_large_response(r, session, req_pdu, res_pdu,
                                  NULL, COAP_MEDIATYPE_APPLICATION_JSON, -1, 0,
-                                 strlen(o2pt->pc), (unsigned char *)o2pt->pc, NULL, NULL);
+                                 strlen(normalized_pc), normalized_pc, NULL, NULL);
+
+    free(normalized_pc);
 }
 
-void opt_to_o2pt(oneM2MPrimitive *o2pt, int opt_num, char *opt_buf)
+static void opt_to_o2pt(oneM2MPrimitive *o2pt, int opt_num, char *opt_buf)
 {
     cJSON *qs = NULL;
     switch (opt_num)
@@ -320,20 +325,20 @@ void opt_to_o2pt(oneM2MPrimitive *o2pt, int opt_num, char *opt_buf)
     }
 }
 
-void payload_opt_to_o2pt(oneM2MPrimitive *o2pt, cJSON *cjson_payload)
+static void payload_opt_to_o2pt(oneM2MPrimitive *o2pt)
 {
-    if (cJSON_GetObjectItem(cjson_payload, "fr"))
-        o2pt->fr = strdup(cJSON_GetObjectItem(cjson_payload, "fr")->valuestring);
-    if (cJSON_GetObjectItem(cjson_payload, "rqi"))
-        o2pt->rqi = strdup(cJSON_GetObjectItem(cjson_payload, "rqi")->valuestring);
-    if (cJSON_GetObjectItem(cjson_payload, "rvi"))
-        o2pt->rvi = strdup(cJSON_GetObjectItem(cjson_payload, "rvi")->valuestring);
+    if (cJSON_GetObjectItem(o2pt->request_pc, "fr"))
+        o2pt->fr = strdup(cJSON_GetObjectItem(o2pt->request_pc, "fr")->valuestring);
+    if (cJSON_GetObjectItem(o2pt->request_pc, "rqi"))
+        o2pt->rqi = strdup(cJSON_GetObjectItem(o2pt->request_pc, "rqi")->valuestring);
+    if (cJSON_GetObjectItem(o2pt->request_pc, "rvi"))
+        o2pt->rvi = strdup(cJSON_GetObjectItem(o2pt->request_pc, "rvi")->valuestring);
 
-    if (cJSON_GetObjectItem(cjson_payload, "ty"))
-        o2pt->ty = cJSON_GetObjectItem(cjson_payload, "ty")->valueint;
-    if (cJSON_GetObjectItem(cjson_payload, "fc"))
+    if (cJSON_GetObjectItem(o2pt->request_pc, "ty"))
+        o2pt->ty = cJSON_GetObjectItem(o2pt->request_pc, "ty")->valueint;
+    if (cJSON_GetObjectItem(o2pt->request_pc, "fc"))
     {
-        o2pt->fc = cJSON_GetObjectItem(cjson_payload, "fc");
+        o2pt->fc = cJSON_GetObjectItem(o2pt->request_pc, "fc");
         parse_filter_criteria(o2pt->fc);
         if (cJSON_GetNumberValue(cJSON_GetObjectItem(o2pt->fc, "fu")) == FU_DISCOVERY)
         {
@@ -346,23 +351,22 @@ void payload_opt_to_o2pt(oneM2MPrimitive *o2pt, cJSON *cjson_payload)
         o2pt->fc = cJSON_CreateObject();
         parse_filter_criteria(o2pt->fc);
     }
-    if (cJSON_GetObjectItem(cjson_payload, "drt"))
+    if (cJSON_GetObjectItem(o2pt->request_pc, "drt"))
     {
-        o2pt->drt = cJSON_GetObjectItem(cjson_payload, "drt")->valueint;
+        o2pt->drt = cJSON_GetObjectItem(o2pt->request_pc, "drt")->valueint;
     }
     else
     {
         o2pt->drt = DRT_STRUCTURED;
     }
-    if (cJSON_GetObjectItem(cjson_payload, "rcn"))
+    if (cJSON_GetObjectItem(o2pt->request_pc, "rcn"))
     {
-        o2pt->rcn = cJSON_GetObjectItem(cjson_payload, "rcn")->valueint;
+        o2pt->rcn = cJSON_GetObjectItem(o2pt->request_pc, "rcn")->valueint;
     }
 
-    if (cJSON_GetObjectItem(cjson_payload, "pc"))
+    if (cJSON_GetObjectItem(o2pt->request_pc, "pc"))
     {
-        o2pt->pc = cJSON_Print(cJSON_GetObjectItem(cjson_payload, "pc"));
-        o2pt->cjson_pc = cJSON_GetObjectItem(cjson_payload, "pc");
+        o2pt->request_pc = cJSON_GetObjectItem(o2pt->request_pc, "pc");
     }
 }
 
@@ -372,8 +376,11 @@ static void cache_free_app_data(void *data)
     coap_delete_binary(bdata);
 }
 
-void hnd_coap_req(coap_resource_t *r, coap_session_t *session, const coap_pdu_t *req_pdu,
-                  const coap_string_t *token, coap_pdu_t *res_pdu)
+static void hnd_coap_req(coap_resource_t *r,
+                        coap_session_t *session, 
+                        const coap_pdu_t *req_pdu,
+                        const coap_string_t *token, 
+                        coap_pdu_t *res_pdu)
 {
     /* CoAP packet format
     0                   1                   2                   3
@@ -631,42 +638,28 @@ void hnd_coap_req(coap_resource_t *r, coap_session_t *session, const coap_pdu_t 
     if (data_so_far->length)
     {
         sprintf(buf + strlen(buf), "\nPayload:\r\n\n%s\r\n", data_so_far->s);
+        o2pt->request_pc = cJSON_Parse(data_so_far->s);
 
-        char *payload = strdup(data_so_far->s);
-        cJSON *cjson_payload = cJSON_Parse(payload);
-
-        if (cJSON_GetObjectItem(cjson_payload, "rvi"))
+        if (cJSON_GetObjectItem(o2pt->request_pc, "rvi"))
         {
-            if (!strcmp(cJSON_GetObjectItem(cjson_payload, "rvi")->valuestring, "5"))
+            if (!strcmp(cJSON_GetObjectItem(o2pt->request_pc, "rvi")->valuestring, "5"))
                 rel5 = true;
         }
 
         // If Release 5
         if (rel5)
         {
-            payload_opt_to_o2pt(o2pt, cjson_payload);
-            if (req->code == COAP_REQUEST_FETCH)
-            {
-                o2pt->pc = strdup(data_so_far->s);
-                o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
-            }
+            payload_opt_to_o2pt(o2pt);
         }
-        else
+        else if(req->code == COAP_REQUEST_FETCH)
         {
-            if (req->code == COAP_REQUEST_FETCH)
-            {
-                coap_pdu_set_code(res_pdu, COAP_RESPONSE_CODE_BAD_REQUEST);
-                return;
-            }
-            else
-            {
-                o2pt->pc = strdup(data_so_far->s);
-                o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
-            }
+            coap_pdu_set_code(res_pdu, COAP_RESPONSE_CODE_BAD_REQUEST);
+            return;
         }
     }
-    if (!o2pt->pc)
-        o2pt->pc = strdup("");
+
+    if (!o2pt->request_pc)
+        o2pt->request_pc = cJSON_CreateObject();
 
     logger(LOG_TAG, LOG_LEVEL_DEBUG, "\n%s", buf);
 
@@ -686,15 +679,21 @@ void hnd_coap_req(coap_resource_t *r, coap_session_t *session, const coap_pdu_t 
 
     coap_respond_to_client(o2pt, r, session, req_pdu, res_pdu);
 
+    /* Pre-free for free_o2pt in Release 5 of CoAP */
+    if(rel5) {
+        cJSON_DeleteItemFromObject(o2pt->response_pc, "fc");
+        o2pt->fc = NULL;
+    }
+
     rel5 = false;
     free_o2pt(o2pt);
 }
 
-void hnd_unknown(coap_resource_t *resource COAP_UNUSED,
-                 coap_session_t *session,
-                 const coap_pdu_t *req_pdu,
-                 const coap_string_t *query,
-                 coap_pdu_t *res_pdu)
+static void hnd_unknown(coap_resource_t *resource COAP_UNUSED,
+                        coap_session_t *session,
+                        const coap_pdu_t *req_pdu,
+                        const coap_string_t *query,
+                        coap_pdu_t *res_pdu)
 {
     coap_resource_t *r;
     coap_string_t *uri_path;
@@ -724,12 +723,10 @@ void hnd_unknown(coap_resource_t *resource COAP_UNUSED,
     hnd_coap_req(r, session, req_pdu, query, res_pdu);
 }
 
-void free_COAPRequest(coapPacket *req)
+static void free_COAPRequest(coapPacket *req)
 {
     if (req->token)
         free(req->token);
-    if (req->payload)
-        free(req->payload);
     free(req);
 }
 void coap_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt)
@@ -846,7 +843,6 @@ void *coap_serve()
 
 #ifdef ENABLE_COAP_DTLS
     coap_proto_t proto = COAP_PROTO_DTLS;
-
     logger(LOG_TAG, LOG_LEVEL_INFO, "DTLS Enabled");
 #else
     coap_proto_t proto = COAP_PROTO_UDP;
@@ -878,14 +874,17 @@ void *coap_serve()
     /* Clean up */
     coap_free_context(ctx);
     free_COAPRequest(req);
+
     return NULL;
 }
 
 int fwd_rsc = 0;
-char *fwd_payload = NULL;
+char *fwd_response_pc = NULL;
 
-coap_response_t response_handler(coap_session_t *session, const coap_pdu_t *res_pdu,
-                                 const coap_pdu_t *req_pdu, const coap_mid_t id)
+static coap_response_t response_handler(coap_session_t *session,
+                                        const coap_pdu_t *res_pdu,
+                                        const coap_pdu_t *req_pdu, 
+                                        const coap_mid_t id)
 {
     coapPacket *fwd_req = (coapPacket *)malloc(sizeof(coapPacket));
 
@@ -929,7 +928,6 @@ coap_response_t response_handler(coap_session_t *session, const coap_pdu_t *res_
             }
             break;
         case oneM2M_RSC:
-
             for (size_t i = 0; i < 2; i++)
                 sprintf(rsc + strlen(rsc), "%02X", opt_val[i]);
             fwd_rsc = strtol(rsc, NULL, 16);
@@ -1057,10 +1055,10 @@ coap_response_t response_handler(coap_session_t *session, const coap_pdu_t *res_
 
         if (cJSON_GetObjectItem(cJSON_Parse(data_so_far->s), "pc"))
         {
-            fwd_payload = cJSON_Print(cJSON_GetObjectItem(cJSON_Parse(data_so_far->s), "pc"));
+            fwd_response_pc = cJSON_Print(cJSON_GetObjectItem(cJSON_Parse(data_so_far->s), "pc"));
         }
         else
-            fwd_payload = strdup(data_so_far->s);
+            fwd_response_pc = strdup(data_so_far->s);
     }
 
     logger(LOG_TAG, LOG_LEVEL_DEBUG, "Received Forwarding Packet\r\n%s", buf);
@@ -1112,23 +1110,23 @@ void coap_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
 
     if (rel5)
     {
-        o2pt->cjson_pc = cJSON_CreateObject();
+        cJSON *fwd_request_pc = cJSON_CreateObject();
 
         if (method != COAP_REQUEST_FETCH)
-            cJSON_AddItemToObject(o2pt->cjson_pc, "pc", cJSON_Parse(o2pt->pc));
+            cJSON_AddItemToObject(fwd_request_pc, "pc", cJSON_GetObjectItem(o2pt->request_pc, "pc"));
 
-        cJSON_AddStringToObject(o2pt->cjson_pc, "fr", o2pt->fr);
-        cJSON_AddStringToObject(o2pt->cjson_pc, "rqi", o2pt->rqi);
-        cJSON_AddStringToObject(o2pt->cjson_pc, "rvi", o2pt->rvi);
+        cJSON_AddStringToObject(fwd_request_pc, "fr", o2pt->fr);
+        cJSON_AddStringToObject(fwd_request_pc, "rqi", o2pt->rqi);
+        cJSON_AddStringToObject(fwd_request_pc, "rvi", o2pt->rvi);
 
         if (o2pt->ty)
-            cJSON_AddNumberToObject(o2pt->cjson_pc, "ty", o2pt->ty);
+            cJSON_AddNumberToObject(fwd_request_pc, "ty", o2pt->ty);
         if (o2pt->fc)
-            cJSON_AddItemToObject(o2pt->cjson_pc, "fc", o2pt->fc);
+            cJSON_AddItemToObject(fwd_request_pc, "fc", o2pt->fc);
         if (o2pt->drt)
-            cJSON_AddNumberToObject(o2pt->cjson_pc, "drt", o2pt->drt);
+            cJSON_AddNumberToObject(fwd_request_pc, "drt", o2pt->drt);
 
-        o2pt->pc = cJSON_Print(o2pt->cjson_pc);
+        o2pt->request_pc = fwd_request_pc;
     }
     else
     {
@@ -1159,10 +1157,13 @@ void coap_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     }
 
     // Set the request payload
-    if (o2pt->pc)
+    if (o2pt->request_pc)
     {
+        char *normalized_pc = cJSON_Print(o2pt->response_pc);
+        normalize_payload(normalized_pc);
+
         // coap_add_data(pdu, strlen(o2pt->pc), (uint8_t *)o2pt->pc);
-        coap_add_data_large_request(session, pdu, strlen(o2pt->pc), (unsigned char *)o2pt->pc, NULL, NULL);
+        coap_add_data_large_request(session, pdu, strlen(normalized_pc), normalized_pc, NULL, NULL);
     }
 
     coap_register_response_handler(ctx, response_handler);
@@ -1176,10 +1177,8 @@ void coap_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     coap_io_process(ctx, COAP_IO_WAIT);
 
     o2pt->rsc = fwd_rsc;
-    if (fwd_payload)
-        o2pt->pc = strdup(fwd_payload);
-    else
-        o2pt->pc = strdup("");
+    if (fwd_response_pc)
+        o2pt->response_pc = cJSON_Parse(fwd_response_pc);
 
     /* Clean up library usage */
     coap_free_context(ctx);
