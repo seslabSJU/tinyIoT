@@ -17,7 +17,7 @@
 /* #undef COAP_CONSTRAINED_STACK */
 
 /* Define to 1 to build without TCP support. */
-#define COAP_DISABLE_TCP 0
+#define COAP_DISABLE_TCP 1
 
 /* Define to 1 if the system has epoll support. */
 // #define COAP_EPOLL_SUPPORT 1
@@ -32,7 +32,7 @@
 /* #undef COAP_MAX_LOGGING_LEVEL */
 
 /* Define to 1 to build with OSCORE support. */
-#define COAP_OSCORE_SUPPORT 1
+/* #undef COAP_OSCORE_SUPPORT */
 
 /* Define to 1 to build with Q-Block support. */
 #define COAP_Q_BLOCK_SUPPORT 1
@@ -53,10 +53,10 @@
 /* #undef COAP_WITH_LIBTINYDTLS */
 
 /* Define to 1 to build support for persisting observes. */
-#define COAP_WITH_OBSERVE_PERSIST 1
+/* #undef COAP_WITH_OBSERVE_PERSIST */
 
 /* Define to 1 to build with WebSockets support. */
-#define COAP_WS_SUPPORT 1
+/* #undef COAP_WS_SUPPORT */
 
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #define HAVE_ARPA_INET_H 1
