@@ -57,7 +57,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         if (!strcmp(o2pt->fr, "/S"))
         {
-            cJSON_AddItemReferenceToArray(cJSON_GetObjectItem(ae, "at"), cJSON_GetObjectItem(registrar_csr->obj, "csi"));
+            cJSON_AddItemToArray(cJSON_GetObjectItem(ae, "at"), cJSON_CreateString(cJSON_GetObjectItem(registrar_csr->obj, "csi")->valuestring));
         }
     }
 
