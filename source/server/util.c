@@ -2289,6 +2289,7 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 {
 	oneM2MPrimitive *o2pt = calloc(1, sizeof(oneM2MPrimitive));
+	NotiTarget *nt;
 	RTNode *rtnode = NULL;
 	int rsc = 0;
 
@@ -2324,6 +2325,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		Protocol prot;
 		char *host, *path;
 		int port;
+		nt = calloc(1, sizeof(NotiTarget));
 
 		if (parsePoa(noti_uri, &prot, &host, &port, &path) == -1)
 		{
@@ -2331,6 +2333,12 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 			return RSC_BAD_REQUEST;
 		}
 		o2pt->to = strdup(path);
+		strncpy(nt->host, host, 1024);
+		nt->port = port;
+		nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
+		strncpy(nt->target, path, 1024);
+		nt->prot = prot;
+
 		switch (prot)
 		{
 		case PROT_HTTP:
@@ -2340,11 +2348,11 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 			break;
 		case PROT_MQTT:
 #ifdef ENABLE_MQTT
-			mqtt_notify(o2pt, noti_json, nt);
+			mqtt_notify(o2pt, noti_cjson, nt);
 #endif
 #ifdef ENABLE_COAP
 		case PROT_COAP:
-			coap_notify(o2pt, noti_json, nt);
+			coap_notify(o2pt, noti_cjson, nt);
 			break;
 #endif
 			break;
@@ -2416,6 +2424,7 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 			Protocol prot;
 			char *host, *path;
 			int port;
+			nt = calloc(1, sizeof(NotiTarget));
 
 			if (parsePoa(noti_uri, &prot, &host, &port, &path) == -1)
 			{
@@ -2424,6 +2433,11 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 				continue;
 			}
 			o2pt->to = strdup(path);
+			strncpy(nt->host, host, 1024);
+			nt->port = port;
+			nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
+			strncpy(nt->target, path, 1024);
+			nt->prot = prot;
 			switch (prot)
 			{
 			case PROT_HTTP:
