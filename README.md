@@ -20,6 +20,21 @@
 <br><br>
 
 
+# What is the tinyIoT?
+
+<b>tinyIoT</b> is a secure, fast, lightweight and very flexible ```oneM2M service layer platform``` compliant with oneM2M specifications.💪
+
+<b>tinyIoT</b> uses memory  and CPU efficiently and has low resource use.
+
+<b>tinyIoT</b> is implemented in C and uses lightweight open source components for database (SQLite), JSON parser (cJSON), http server (pico) and mqtt client (wolfMQTT)
+
+<b>tinyIoT</b> also comes with a web-based dashboard implemented using Vue.
+<br>
+<p align = "center">
+<img src = "https://github.com/seslabSJU/tinyIoT/blob/main/images/tinyIoT_overview.png?raw=true" >
+</p>
+<br><br>
+
 # Why tinyIoT?
 
 ### For Seamless Installation
@@ -40,20 +55,6 @@ tinyIoT is committed to maintaining high standards in technology implementation
 
  <br><br> 
 
-# What is the tinyIoT?
-
-<b>tinyIoT</b> is a secure, fast, lightweight and very flexible ```oneM2M service layer platform``` compliant with oneM2M specifications.💪
-
-<b>tinyIoT</b> uses memory  and CPU efficiently and has low resource use.
-
-<b>tinyIoT</b> is implemented in C and uses lightweight open source components for database (SQLite), JSON parser (cJSON), http server (pico) and mqtt client (wolfMQTT)
-
-<b>tinyIoT</b> also comes with a web-based dashboard implemented using Vue.
-<br>
-<p align = "center">
-<img src = "https://github.com/seslabSJU/tinyIoT/blob/main/images/tinyIoT_overview.png?raw=true" >
-</p>
-<br>
 
 # tinyIoT supports the following features
 
