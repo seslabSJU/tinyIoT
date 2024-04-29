@@ -31,7 +31,7 @@
 <b>tinyIoT</b> also comes with a web-based dashboard implemented using Vue.
 <br>
 <p align = "center">
-<img src = "https://github.com/seslabSJU/tinyIoT/assets/136944859/91193081-b84c-486e-b5a7-6870d83fa647" >
+<img src = "https://github.com/seslabSJU/tinyIoT/blob/main/images/tinyIoT_overview.png?raw=true" >
 </p>
 <br>
 
