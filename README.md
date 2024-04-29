@@ -38,10 +38,7 @@ tinyIoT utilizes the speed of C programming to offer fast performance which is c
 tinyIoT is committed to maintaining high standards in technology implementation
 - It is developed in compliance with the latest oneM2M standards, ensuring that it meets global criteria for IoT communications and services.
 
-
-
-
-
+ <br><br> 
 
 # What is the tinyIoT?
 
