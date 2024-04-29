@@ -87,10 +87,12 @@
 // CoAP Settings
 #define ENABLE_COAP
 #ifdef ENABLE_COAP
-#define COAP_PORT 5683
 
 // #define ENABLE_COAP_DTLS
 #ifdef ENABLE_COAP_DTLS
     #define COAP_PORT 5684
+#else
+    #define COAP_PORT 5683
 #endif
+
 #endif
