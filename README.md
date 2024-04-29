@@ -20,6 +20,29 @@
 <br><br>
 
 
+# Why tinyIoT?
+
+### For Seamless Installation
+tinyIoT emphasizes simplicity in getting started. Users can easily set up the system by cloning the repository and executing the make command, which streamlines the installation process and reduces initial setup hurdles.
+
+### For Exceptional Portabilit
+tinyIoT is designed with universal compatibility in mind:
+- It is coded in C, ensuring that it does not rely on platform-specific libraries such as those found in apt repositories, allowing it to run on all Linux distributions.
+- Development of a Windows version is also underway, which will extend its usability across more operating systems.
+
+### For Rapid Performance
+tinyIoT utilizes the speed of C programming to offer fast performance which is crucial for systems with intensive data processing needs
+- The architecture is optimized to minimize database access, enhancing performance especially in environments with limited I/O capabilities.
+
+### For Adherence to Standards:
+tinyIoT is committed to maintaining high standards in technology implementation
+- It is developed in compliance with the latest oneM2M standards, ensuring that it meets global criteria for IoT communications and services.
+
+
+
+
+
+
 # What is the tinyIoT?
 
 <b>tinyIoT</b> is a secure, fast, lightweight and very flexible ```oneM2M service layer platform``` compliant with oneM2M specifications.💪
