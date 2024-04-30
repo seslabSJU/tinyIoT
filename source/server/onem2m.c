@@ -119,7 +119,7 @@ void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty)
 
 RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 {
-	RTNode *rtnode = (RTNode *)calloc(1, sizeof(RTNode));
+	RTNode *rtnode = blank_rtnode();
 	cJSON *uri = NULL;
 
 	rtnode->ty = ty;
@@ -133,7 +133,7 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 	rtnode->sub_cnt = 0;
 	if ((uri = cJSON_GetObjectItem(obj, "uri")))
 	{
-		rtnode->uri = strdup(uri->valuestring);
+		strncpy(rtnode->uri, uri->valuestring, MAX_URI_LENGTH);
 		cJSON_DeleteItemFromObject(obj, "uri");
 	}
 
@@ -142,7 +142,7 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 	rtnode->memberOf->rtnode = NULL;
 	rtnode->memberOf->uri = NULL;
 
-	rtnode->rn = strdup(cJSON_GetObjectItem(obj, "rn")->valuestring);
+	strncpy(rtnode->rn, cJSON_GetObjectItem(obj, "rn")->valuestring, MAX_RN_LENGTH);
 
 	return rtnode;
 }
@@ -364,12 +364,12 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 	cJSON_ArrayForEach(at, at_list)
 	{
-		oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+		oneM2MPrimitive *o2pt = blank_o2pt();
 		o2pt->op = OP_DELETE;
-		o2pt->to = strdup(at->valuestring);
-		o2pt->fr = "/" CSE_BASE_RI;
+		strncpy(o2pt->fr, CSE_BASE_RI, O2PT_BUF_SIZE - 1);
+		strncpy(o2pt->fr, "/" CSE_BASE_RI, O2PT_BUF_SIZE - 1);
 		o2pt->ty = RT_AE;
-		o2pt->rqi = strdup("deannounce");
+		strncpy(o2pt->rqi, "deannounce", O2PT_BUF_SIZE - 1);
 		o2pt->isForwarding = true;
 
 		forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
@@ -391,67 +391,6 @@ int cJSON_getArrayIdx(cJSON *arr, char *value)
 		idx++;
 	}
 	return -1;
-}
-
-void free_rtnode(RTNode *rtnode)
-{
-	if (rtnode->uri)
-	{
-		free(rtnode->uri);
-		rtnode->uri = NULL;
-	}
-	if (rtnode->rn)
-	{
-		free(rtnode->rn);
-		rtnode->rn = NULL;
-	}
-	if (rtnode->obj)
-	{
-		cJSON_Delete(rtnode->obj);
-		rtnode->obj = NULL;
-	}
-	if (rtnode->parent && rtnode->parent->child == rtnode)
-	{
-		rtnode->parent->child = rtnode->sibling_right;
-	}
-	if (rtnode->sibling_left)
-	{
-		rtnode->sibling_left->sibling_right = rtnode->sibling_right;
-	}
-	if (rtnode->sibling_right)
-	{
-		rtnode->sibling_right->sibling_left = rtnode->sibling_left;
-	}
-	if (rtnode->child)
-	{
-		free_rtnode_list(rtnode->child);
-		rtnode->child = NULL;
-	}
-
-	if (rtnode->subs)
-	{
-		free_all_nodelist(rtnode->subs);
-		rtnode->subs = NULL;
-	}
-
-	if (rtnode->memberOf)
-	{
-		free_all_nodelist(rtnode->memberOf);
-		rtnode->memberOf = NULL;
-	}
-
-	free(rtnode);
-}
-
-void free_rtnode_list(RTNode *rtnode)
-{
-	RTNode *right = NULL;
-	while (rtnode)
-	{
-		right = rtnode->sibling_right;
-		free_rtnode(rtnode);
-		rtnode = right;
-	}
 }
 
 int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
@@ -689,20 +628,21 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		if (strlen(mid) == 0)
 			continue;
 		if (req_o2pt->to)
-			free(req_o2pt->to);
-		if (o2pt->fopt)
+			memset(req_o2pt->to, 0, O2PT_BUF_SIZE);
+		if (strlen(o2pt->fopt) > 0)
 		{
 			if (strncmp(mid, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) != 0)
 			{
 				mid = ri_to_uri(mid);
 			}
-			req_o2pt->to = malloc(strlen(mid) + strlen(o2pt->fopt) + 2);
-			sprintf(req_o2pt->to, "%s%s", mid, o2pt->fopt);
+			// req_o2pt->to = malloc(strlen(mid) + strlen(o2pt->fopt) + 2);
+
+			snprintf(req_o2pt->to, O2PT_BUF_SIZE - 1, "%s%s", mid, o2pt->fopt);
 		}
 		else
 		{
-			req_o2pt->to = malloc(strlen(mid) + 2);
-			sprintf(req_o2pt->to, "%s", mid);
+			// req_o2pt->to = malloc(strlen(mid) + 2);
+			snprintf(req_o2pt->to, O2PT_BUF_SIZE - 1, "%s", mid);
 		}
 		req_o2pt->isFopt = false;
 		ResourceAddressingType RAT = checkResourceAddressingType(mid);
@@ -1065,13 +1005,13 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 
 	if (RAT == SP_RELATIVE)
 	{
-		oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(sizeof(oneM2MPrimitive), 1);
-		o2pt->fr = strdup("/" CSE_BASE_RI);
-		o2pt->to = strdup(parent_target);
+		oneM2MPrimitive *o2pt = blank_o2pt();
+		strcpy(o2pt->fr, "/" CSE_BASE_RI);
+		strcpy(o2pt->to, parent_target);
 		o2pt->op = OP_CREATE;
 		o2pt->ty = ty + 10000;
-		o2pt->rqi = strdup("create-annc");
-		o2pt->rvi = strdup("3");
+		strcpy(o2pt->rqi, "create-annc");
+		strcpy(o2pt->rvi, "3");
 
 		cJSON *root = cJSON_CreateObject();
 		cJSON *annc = cJSON_CreateObject();
@@ -1208,8 +1148,8 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (checkResourceAddressingType(o2pt->fr) == CSE_RELATIVE)
 	{
 		sprintf(buf, "/%s/%s", CSE_BASE_RI, o2pt->fr);
-		free(o2pt->fr);
-		o2pt->fr = strdup(buf);
+		strncpy(o2pt->fr, buf, O2PT_BUF_SIZE - 1);
+		// o2pt->fr = strdup(buf);
 	}
 
 	cJSON *csr = target_rtnode->obj;

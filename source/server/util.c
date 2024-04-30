@@ -23,6 +23,26 @@
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
+O2ptList *o2pt_list = NULL;
+// int o2pt_cnt = 0;
+
+oneM2MPrimitive *blank_o2pt()
+{
+	O2ptList *del = NULL;
+	oneM2MPrimitive *o2pt = NULL;
+	if (!o2pt_list)
+	{
+		// o2pt_cnt++;
+		logger("UTIL", LOG_LEVEL_DEBUG, "Allocating new o2pt");
+		return calloc(1, sizeof(oneM2MPrimitive));
+	}
+	logger("UTIL", LOG_LEVEL_DEBUG, "Using pre-allocated o2pt");
+	del = o2pt_list;
+	o2pt_list = del->next;
+	o2pt = del->o2pt;
+	free(del);
+	return o2pt;
+}
 
 /**
  * @brief get uri of resource with ri
@@ -775,7 +795,7 @@ int result_parse_uri(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 int check_mandatory_attributes(oneM2MPrimitive *o2pt)
 {
-	if (!o2pt->rvi)
+	if (strlen(o2pt->rvi) == 0)
 	{
 		handle_error(o2pt, RSC_BAD_REQUEST, "rvi is mandatory");
 		return -1;
@@ -805,7 +825,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		parent_rtnode = parent_rtnode->parent;
 	}
 
-	if (!o2pt->fr)
+	if (strlen(o2pt->fr) == 0)
 	{
 		if (!(o2pt->op == OP_CREATE && o2pt->ty == RT_AE))
 		{
@@ -848,7 +868,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 int check_macp_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 {
 	bool deny = false;
-	if (!o2pt->fr)
+	if (strlen(o2pt->fr) == 0)
 	{
 		deny = true;
 	}
@@ -888,7 +908,7 @@ int get_acop(oneM2MPrimitive *o2pt, RTNode *rtnode)
 {
 	int acop = 0;
 	char *origin = NULL;
-	if (!o2pt->fr)
+	if (strlen(o2pt->fr) == 0)
 	{
 		origin = strdup("all");
 	}
@@ -936,7 +956,7 @@ int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	int acop = 0;
 	logger("UTIL", LOG_LEVEL_DEBUG, "get_acop_macp : %s", o2pt->fr);
 	char *origin = NULL;
-	if (!o2pt->fr)
+	if (strlen(o2pt->fr) == 0)
 	{
 		origin = strdup("all");
 	}
@@ -1070,7 +1090,7 @@ int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag)
 	char *origin = NULL;
 	char *asterisk = NULL;
 
-	if (!o2pt->fr)
+	if (strlen(o2pt->fr) == 0)
 	{
 		origin = strdup("all");
 	}
@@ -1213,7 +1233,7 @@ int check_aei_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	char aei[1024] = {
 		'\0',
 	};
-	if (!o2pt->fr)
+	if (strlen(o2pt->fr) == 0)
 	{
 		return 0;
 	}
@@ -1349,7 +1369,7 @@ ACOP op_to_acop(Operation op)
  */
 int handle_error(oneM2MPrimitive *o2pt, int rsc, char *err)
 {
-	logger("UTIL", LOG_LEVEL_INFO, err);
+	logger("UTIL", LOG_LEVEL_INFO, "%s", err);
 	cJSON *root = cJSON_CreateObject();
 	o2pt->rsc = rsc;
 	o2pt->errFlag = true;
@@ -1851,28 +1871,37 @@ cJSON *o2pt_to_json(oneM2MPrimitive *o2pt)
 
 void free_o2pt(oneM2MPrimitive *o2pt)
 {
-	if (o2pt->rqi)
-		free(o2pt->rqi);
-	if (o2pt->fr)
-		free(o2pt->fr);
-	if (o2pt->to)
-		free(o2pt->to);
-	if (o2pt->fc)
-		cJSON_Delete(o2pt->fc);
-	if (o2pt->fopt)
-		free(o2pt->fopt);
-	if (o2pt->rvi)
-		free(o2pt->rvi);
-	if (o2pt->ip)
-		free(o2pt->ip);
+	// if (o2pt->rqi)
+	// 	free(o2pt->rqi);
+	// if (o2pt->fr)
+	// 	free(o2pt->fr);
+	// if (o2pt->to)
+	// 	free(o2pt->to);
+	// if (o2pt->fc)
+	// 	cJSON_Delete(o2pt->fc);
+	// if (o2pt->fopt)
+	// 	free(o2pt->fopt);
+	// if (o2pt->rvi)
+	// 	free(o2pt->rvi);
+	// if (o2pt->ip)
+	// 	free(o2pt->ip);
 	if (o2pt->request_pc)
+	{
 		cJSON_Delete(o2pt->request_pc);
+		o2pt->request_pc = NULL;
+	}
 	if (o2pt->response_pc)
+	{
 		cJSON_Delete(o2pt->response_pc);
+		o2pt->response_pc = NULL;
+	}
 
 	memset(o2pt, 0, sizeof(oneM2MPrimitive));
-	free(o2pt);
-	o2pt = NULL;
+
+	O2ptList *new = calloc(1, sizeof(O2ptList));
+	new->o2pt = o2pt;
+	new->next = o2pt_list;
+	o2pt_list = new;
 }
 
 void o2ptcpy(oneM2MPrimitive **dest, oneM2MPrimitive *src)
@@ -1880,29 +1909,32 @@ void o2ptcpy(oneM2MPrimitive **dest, oneM2MPrimitive *src)
 	if (src == NULL)
 		return;
 
-	(*dest) = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
-
-	(*dest)->fr = strdup(src->fr);
-	(*dest)->to = strdup(src->to);
-	if (src->rqi)
-		(*dest)->rqi = strdup(src->rqi);
+	// (*dest) = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+	(*dest) = blank_o2pt();
+	memcpy(*dest, src, sizeof(oneM2MPrimitive));
+	// (*dest)->fr = strdup(src->fr);
+	// (*dest)->to = strdup(src->to);
+	// if (src->rqi)
+	// 	(*dest)->rqi = strdup(src->rqi);
 	if (src->request_pc)
 		(*dest)->request_pc = cJSON_Duplicate(src->request_pc, true);
-	if (src->rvi)
-		(*dest)->rvi = strdup(src->rvi);
-	if (src->fopt)
-		(*dest)->fopt = strdup(src->fopt);
-	if (src->ip)
-		(*dest)->ip = strdup(src->ip);
-	if (src->fopt)
-		(*dest)->fopt = strdup(src->fopt);
-	(*dest)->rcn = src->rcn;
-	(*dest)->ty = src->ty;
-	(*dest)->op = src->op;
-	(*dest)->isFopt = src->isFopt;
-	(*dest)->rsc = src->rsc;
-	(*dest)->cnot = src->cnot;
-	(*dest)->fc = src->fc;
+	if (src->response_pc)
+		(*dest)->response_pc = cJSON_Duplicate(src->response_pc, true);
+	// if (src->rvi)
+	// 	(*dest)->rvi = strdup(src->rvi);
+	// if (src->fopt)
+	// 	(*dest)->fopt = strdup(src->fopt);
+	// if (src->ip)
+	// 	(*dest)->ip = strdup(src->ip);
+	// if (src->fopt)
+	// 	(*dest)->fopt = strdup(src->fopt);
+	// (*dest)->rcn = src->rcn;
+	// (*dest)->ty = src->ty;
+	// (*dest)->op = src->op;
+	// (*dest)->isFopt = src->isFopt;
+	// (*dest)->rsc = src->rsc;
+	// (*dest)->cnot = src->cnot;
+	// (*dest)->fc = src->fc;
 }
 
 char *get_pi_rtnode(RTNode *rtnode)
@@ -2288,17 +2320,18 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 {
-	oneM2MPrimitive *o2pt = calloc(1, sizeof(oneM2MPrimitive));
+	oneM2MPrimitive *o2pt = blank_o2pt();
 	NotiTarget *nt;
 	RTNode *rtnode = NULL;
+	logger("UTIL", LOG_LEVEL_DEBUG, "send_verification_request [%s]", noti_uri);
 	int rsc = 0;
-
 	o2pt->op = OP_NOTIFY;
-	o2pt->fr = strdup("/" CSE_BASE_RI);
-	o2pt->rqi = strdup("notify");
+	strncpy(o2pt->fr, "/" CSE_BASE_RI, O2PT_BUF_SIZE - 1);
+	strncpy(o2pt->rqi, "notify", O2PT_BUF_SIZE - 1);
+	strncpy(o2pt->rvi, "2a", 5);
 	o2pt->request_pc = cJSON_Duplicate(noti_cjson, true);
-
 	ResourceAddressingType rat = checkResourceAddressingType(noti_uri);
+	logger("UTIL", LOG_LEVEL_DEBUG, "send_verification_request [%s]", noti_uri);
 
 	if (rat == CSE_RELATIVE)
 	{
@@ -2332,13 +2365,12 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 			logger("UTIL", LOG_LEVEL_DEBUG, "poa parse error");
 			return RSC_BAD_REQUEST;
 		}
-		o2pt->to = strdup(path);
+		strncpy(o2pt->to, path, O2PT_BUF_SIZE - 1);
 		strncpy(nt->host, host, 1024);
 		nt->port = port;
 		nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
-		strncpy(nt->target, path, 1024);
+		strncpy(nt->target, path, 512);
 		nt->prot = prot;
-
 		switch (prot)
 		{
 		case PROT_HTTP:
@@ -2357,9 +2389,10 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 #endif
 			break;
 		}
+		free(nt);
 	}
 
-	o2pt->fr = NULL;
+	memset(o2pt->fr, 0, O2PT_BUF_SIZE);
 	free_o2pt(o2pt);
 	if (rsc == RSC_BAD_REQUEST || rsc == RSC_TARGET_NOT_REACHABLE)
 	{
@@ -2386,10 +2419,11 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 	if (!nu)
 		return RSC_OK;
 
-	oneM2MPrimitive *o2pt = calloc(1, sizeof(oneM2MPrimitive));
+	oneM2MPrimitive *o2pt = blank_o2pt();
 	o2pt->op = OP_NOTIFY;
-	o2pt->fr = strdup("/" CSE_BASE_RI);
-	o2pt->rqi = strdup("notify");
+	strncpy(o2pt->fr, "/" CSE_BASE_RI, O2PT_BUF_SIZE - 1);
+	strncpy(o2pt->rqi, "notify", O2PT_BUF_SIZE - 1);
+	strncpy(o2pt->rvi, "2a", 5);
 	o2pt->request_pc = cJSON_Duplicate(noti_cjson, true);
 
 	cJSON_ArrayForEach(pjson, nu)
@@ -2432,11 +2466,12 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 				free(noti_uri);
 				continue;
 			}
-			o2pt->to = strdup(path);
+			strncpy(o2pt->to, path, O2PT_BUF_SIZE - 1);
+
 			strncpy(nt->host, host, 1024);
 			nt->port = port;
 			nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
-			strncpy(nt->target, path, 1024);
+			strncpy(nt->target, path, 512);
 			nt->prot = prot;
 			switch (prot)
 			{
@@ -2458,7 +2493,7 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 		free(noti_uri);
 	}
 
-	o2pt->fr = NULL;
+	memset(o2pt->fr, 0, O2PT_BUF_SIZE);
 	free_o2pt(o2pt);
 	if (rsc == RSC_OK || rsc == 200)
 	{
@@ -2993,13 +3028,13 @@ int deRegister_csr()
 
 			cJSON *poa = cJSON_GetObjectItem(csr, "poa");
 			cJSON *pjson = NULL;
-			oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(sizeof(oneM2MPrimitive), 1);
+			oneM2MPrimitive *o2pt = blank_o2pt();
 			o2pt->op = OP_DELETE;
-			o2pt->fr = strdup("/" CSE_BASE_RI);
 			sprintf(buf, "%s/%s", csi->valuestring, CSE_BASE_RI);
-			o2pt->to = strdup(buf);
-			o2pt->rqi = strdup("delete-csr");
-			o2pt->rvi = strdup("2a");
+			strncpy(o2pt->fr, "/" CSE_BASE_RI, O2PT_BUF_SIZE - 1);
+			strncpy(o2pt->to, buf, O2PT_BUF_SIZE - 1);
+			strncpy(o2pt->rqi, "delete-csr", O2PT_BUF_SIZE - 1);
+			strncpy(o2pt->rvi, "2a", 5);
 
 			forwarding_onem2m_resource(o2pt, rtnode);
 			free_o2pt(o2pt);
@@ -3033,11 +3068,13 @@ int update_remote_csr_dcse(RTNode *skip_rtnode)
 	cJSON_AddItemToObject(csr, "dcse", dcse);
 
 	RTNode *rtnode = NULL;
-	oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+	oneM2MPrimitive *o2pt = blank_o2pt();
 	o2pt->op = OP_UPDATE;
-	o2pt->fr = strdup("/" CSE_BASE_RI);
-	o2pt->rqi = strdup("update-csr");
-	o2pt->rvi = strdup("2a");
+
+	strncpy(o2pt->fr, "/" CSE_BASE_RI, O2PT_BUF_SIZE - 1);
+	strncpy(o2pt->rqi, "update-csr", O2PT_BUF_SIZE - 1);
+	strncpy(o2pt->rvi, "2a", 5);
+
 	o2pt->request_pc = root;
 	logger("UTIL", LOG_LEVEL_DEBUG, "skip_rtnode: %s", skip_rtnode->uri);
 	while (node)
@@ -3050,7 +3087,7 @@ int update_remote_csr_dcse(RTNode *skip_rtnode)
 			continue;
 
 		sprintf(buf, "%s/%s", cJSON_GetObjectItem(rtnode->obj, "csi")->valuestring, CSE_BASE_RI);
-		o2pt->to = strdup(buf);
+		strncpy(o2pt->to, buf, O2PT_BUF_SIZE - 1);
 
 		forwarding_onem2m_resource(o2pt, rtnode);
 	}
@@ -3082,12 +3119,13 @@ int create_remote_cba(char *poa, char **cbA_url)
 			return -1;
 		}
 		oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(sizeof(oneM2MPrimitive), 1);
-		o2pt->fr = strdup("/" CSE_BASE_RI);
-		o2pt->to = strdup(cJSON_GetObjectItem(csr->obj, "cb")->valuestring);
+
+		strncpy(o2pt->fr, "/" CSE_BASE_RI, O2PT_BUF_SIZE - 1);
+		strncpy(o2pt->to, cJSON_GetObjectItem(csr->obj, "cb")->valuestring, O2PT_BUF_SIZE - 1);
 		o2pt->op = OP_CREATE;
 		o2pt->ty = RT_CBA;
-		o2pt->rqi = strdup("create-cba");
-		o2pt->rvi = strdup("2a");
+		strncpy(o2pt->rqi, "create-cba", O2PT_BUF_SIZE - 1);
+		strncpy(o2pt->rvi, "2a", 5);
 
 		cJSON *root = cJSON_CreateObject();
 		cJSON *cba = cJSON_CreateObject();
@@ -3259,13 +3297,13 @@ int deregister_remote_annc(RTNode *target_rtnode, cJSON *delete_at_list)
 		logger("UTIL", LOG_LEVEL_DEBUG, "at: %s", at->valuestring);
 		if (at->valuestring[0] == '/')
 		{
-			oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(sizeof(oneM2MPrimitive), 1);
-			o2pt->fr = strdup("/" CSE_BASE_RI);
-			o2pt->to = strdup(at->valuestring);
+			oneM2MPrimitive *o2pt = blank_o2pt();
 			o2pt->op = OP_DELETE;
 			o2pt->ty = target_rtnode->ty + 10000;
-			o2pt->rqi = strdup("delete-annc");
-			o2pt->rvi = strdup("3");
+			strncpy(o2pt->fr, "/" CSE_BASE_RI, O2PT_BUF_SIZE - 1);
+			strncpy(o2pt->to, at->valuestring, O2PT_BUF_SIZE - 1);
+			strncpy(o2pt->rqi, "delete-annc", O2PT_BUF_SIZE - 1);
+			strncpy(o2pt->rvi, "3", 5);
 			forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
 
 			if (o2pt->rsc != RSC_DELETED)
@@ -3379,12 +3417,13 @@ void announce_to_annc(RTNode *target_rtnode)
 				char buf[128] = {0};
 				oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
 				o2pt->op = OP_UPDATE;
-				o2pt->to = strdup(at->valuestring);
-				o2pt->fr = strdup("/" CSE_BASE_RI);
 				o2pt->ty = target_rtnode->ty + 10000;
-				o2pt->rqi = strdup("ae_update_announce");
 				o2pt->request_pc = root;
 				o2pt->isForwarding = true;
+				strncpy(o2pt->fr, "/" CSE_BASE_RI, O2PT_BUF_SIZE - 1);
+				strncpy(o2pt->to, at->valuestring, O2PT_BUF_SIZE - 1);
+				strncpy(o2pt->rqi, "ae-update-announce", O2PT_BUF_SIZE - 1);
+				strncpy(o2pt->rvi, "2a", 5);
 
 				forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
 				free_o2pt(o2pt);

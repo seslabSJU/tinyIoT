@@ -1,6 +1,6 @@
 #ifndef __ONEM2M_H__
 #define __ONEM2M_H__
-
+#include "config.h"
 #include <stdbool.h>
 #include "cJSON.h"
 #include "onem2mTypes.h"
@@ -30,8 +30,8 @@ typedef struct RTNode
 	struct NodeList *memberOf;
 	struct RTNode *sibling_left;
 	struct RTNode *sibling_right;
-	char *rn;
-	char *uri;
+	char rn[MAX_RN_LENGTH];
+	char uri[MAX_URI_LENGTH];
 	int sub_cnt;
 
 	ResourceType ty;
@@ -54,10 +54,10 @@ typedef struct
 
 typedef struct _o
 {
-	char *to;  // To
-	char *fr;  // From
-	char *rqi; // Request ID
-	char *rvi; // Request Version Indicator
+	char to[O2PT_BUF_SIZE];	 // To
+	char fr[O2PT_BUF_SIZE];	 // From
+	char rqi[O2PT_BUF_SIZE]; // Request ID
+	char rvi[6];			 // Request Version Indicator
 	// char *pc;
 	Operation op;		// Operation
 	cJSON *request_pc;	// Primitive Content
@@ -68,21 +68,26 @@ typedef struct _o
 	int ty;				// Resource Type
 	bool isFopt;
 	bool isForwarding;
-	char *fopt;
+	char fopt[O2PT_BUF_SIZE];
 	bool errFlag;
-	char *ip;
+	char ip[O2PT_BUF_SIZE];
 	ContentStatus cnst; // Content Status
 	int cnot;			// Content Offset
 	cJSON *fc;			// Filter Criteria
 	int drt;			// Discovery Result Type
 } oneM2MPrimitive;
 
+typedef struct
+{
+	oneM2MPrimitive *o2pt;
+	struct O2ptList *next;
+} O2ptList;
 typedef struct _n
 {
 	Protocol prot;
 	char host[1024];
 	int port;
-	char target[256];
+	char target[512];
 	char *noti_json;
 } NotiTarget;
 
@@ -121,6 +126,7 @@ void init_cse(cJSON *cse);
 void init_csr(cJSON *csr);
 
 // resource tree
+RTNode *blank_rtnode();
 RTNode *create_rtnode(cJSON *resource, ResourceType ty);
 int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode);
 void free_rtnode(RTNode *rtnode);

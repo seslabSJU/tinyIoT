@@ -411,7 +411,7 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
         }
         if (hasFopt)
         {
-            sprintf(tStr, "%s/fopt", rt_node->uri);
+            snprintf(tStr, MAX_URI_LENGTH, "%s/fopt", rt_node->uri);
             cJSON_AddItemToArray(final_mid, cJSON_CreateString(tStr));
         }
         else

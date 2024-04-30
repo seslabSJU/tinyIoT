@@ -9,6 +9,28 @@
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
 
+NodeList *nodes = NULL;
+
+/**
+ * @brief retrieve empty node from queue if not exist, create new node
+ */
+RTNode *blank_rtnode()
+{
+    RTNode *rtnode = NULL;
+    NodeList *del = NULL;
+
+    if (!nodes)
+    {
+        return (RTNode *)calloc(1, sizeof(RTNode));
+    }
+    rtnode = nodes->rtnode;
+    del = nodes;
+    nodes = nodes->next;
+
+    free(del);
+    return rtnode;
+}
+
 /**
  * @brief get resource with oneM2MPrimitive
  * @param o2pt oneM2MPrimitive
@@ -106,14 +128,16 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
                 if (strncmp(fopt_start, "/fopt", 5) == 0)
                 {
                     o2pt->isFopt = true;
-                    o2pt->fopt = NULL;
+                    // o2pt->fopt = NULL;
                 }
             }
             else if (strlen(fopt_start) > 5)
             {
                 if (fopt_start[5] == '/')
                 {
-                    o2pt->fopt = strdup(fopt_start + 5);
+                    strncpy(o2pt->fopt, fopt_start + 5, O2PT_BUF_SIZE - 1);
+                    // logger("UTIL", LOG_LEVEL_DEBUG, "fopt : %s", o2pt->fopt);
+                    // o2pt->fopt = strdup(fopt_start + 5);
                     o2pt->isFopt = true;
                 }
             }
@@ -207,11 +231,11 @@ RTNode *get_remote_resource(char *address, int *rsc)
         return NULL;
 
     oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
-    o2pt->fr = strdup("/" CSE_BASE_RI);
-    o2pt->to = strdup(target_uri);
     o2pt->op = OP_RETRIEVE;
-    o2pt->rqi = strdup("retrieve remote resource");
-    o2pt->rvi = strdup("2a");
+    strncpy(o2pt->fr, "/" CSE_BASE_RI, O2PT_BUF_SIZE - 1);
+    strncpy(o2pt->to, target_uri, O2PT_BUF_SIZE - 1);
+    strncpy(o2pt->rqi, "retrieve-remote-resource", O2PT_BUF_SIZE - 1);
+    strncpy(o2pt->rvi, "2a", O2PT_BUF_SIZE - 1);
 
     forwarding_onem2m_resource(o2pt, csr);
     *rsc = o2pt->rsc;
@@ -223,7 +247,7 @@ RTNode *get_remote_resource(char *address, int *rsc)
     ResourceType ty = parse_object_type_cjson(o2pt->response_pc);
     cJSON *resource = cJSON_GetObjectItem(o2pt->response_pc, get_resource_key(ty));
     RTNode *rtnode = create_rtnode(cJSON_Duplicate(resource, 1), ty);
-    rtnode->uri = strdup(target_uri);
+    strncpy(rtnode->uri, target_uri, MAX_URI_LENGTH);
 
     free_o2pt(o2pt);
     return rtnode;
@@ -387,11 +411,9 @@ int add_child_resource_tree(RTNode *parent, RTNode *child)
     RTNode *node = parent->child;
     child->parent = parent;
 
-    char *uri = malloc(strlen(parent->uri) + strlen(child->rn) + 2);
-    strcpy(uri, parent->uri);
-    strcat(uri, "/");
-    strcat(uri, child->rn);
-    child->uri = uri;
+    strcpy(child->uri, parent->uri);
+    strcat(child->uri, "/");
+    strcat(child->uri, child->rn);
 
     logger("O2M", LOG_LEVEL_DEBUG, "Add Resource Tree Node [Parent-ID] : %s, [Child-ID] : %s", get_ri_rtnode(parent), get_ri_rtnode(child));
 
@@ -439,7 +461,7 @@ int add_child_resource_tree(RTNode *parent, RTNode *child)
 void init_resource_tree()
 {
     RTNode *temp = NULL;
-    RTNode *rtnode_list = (RTNode *)calloc(1, sizeof(RTNode));
+    RTNode *rtnode_list = blank_rtnode();
     RTNode *tail = rtnode_list;
 
     logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree");
@@ -458,7 +480,9 @@ void init_resource_tree()
         while (tail->sibling_right)
         {
             tail = tail->sibling_right;
-            tail->rn = strdup("la");
+            tail->rn[0] = 'l';
+            tail->rn[1] = 'a';
+            tail->rn[2] = '\0';
         }
     }
 
@@ -712,5 +736,60 @@ void free_all_resource(RTNode *rtnode)
         rtnode = rtnode->sibling_right;
         free_rtnode(del);
         del = NULL;
+    }
+}
+
+void free_rtnode(RTNode *rtnode)
+{
+    memset(rtnode->uri, 0, MAX_URI_LENGTH);
+    memset(rtnode->rn, 0, MAX_RN_LENGTH);
+    if (rtnode->obj)
+    {
+        cJSON_Delete(rtnode->obj);
+        rtnode->obj = NULL;
+    }
+    if (rtnode->parent && rtnode->parent->child == rtnode)
+    {
+        rtnode->parent->child = rtnode->sibling_right;
+    }
+    if (rtnode->sibling_left)
+    {
+        rtnode->sibling_left->sibling_right = rtnode->sibling_right;
+    }
+    if (rtnode->sibling_right)
+    {
+        rtnode->sibling_right->sibling_left = rtnode->sibling_left;
+    }
+    if (rtnode->child)
+    {
+        free_rtnode_list(rtnode->child);
+        rtnode->child = NULL;
+    }
+
+    if (rtnode->subs)
+    {
+        free_all_nodelist(rtnode->subs);
+        rtnode->subs = NULL;
+    }
+
+    if (rtnode->memberOf)
+    {
+        free_all_nodelist(rtnode->memberOf);
+        rtnode->memberOf = NULL;
+    }
+    NodeList *node = (NodeList *)calloc(1, sizeof(NodeList));
+    node->rtnode = rtnode;
+    node->next = nodes;
+    nodes = node;
+}
+
+void free_rtnode_list(RTNode *rtnode)
+{
+    RTNode *right = NULL;
+    while (rtnode)
+    {
+        right = rtnode->sibling_right;
+        free_rtnode(rtnode);
+        rtnode = right;
     }
 }

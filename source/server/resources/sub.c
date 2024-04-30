@@ -89,6 +89,7 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         }
 
         result = send_verification_request(pjson->valuestring, noti_cjson);
+        
         if (result == RSC_BAD_REQUEST)
         {
             cJSON_Delete(noti_cjson);
@@ -98,7 +99,6 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         }
         cJSON_DeleteItemFromObject(sgn, "vrq");
     }
-
     // Store to DB
     result = db_store_resource(sub, ptr);
     if (result != 1)

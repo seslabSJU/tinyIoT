@@ -251,7 +251,7 @@ Operation http_parse_operation(char *method)
 
 void handle_http_request(HTTPRequest *req, int slotno)
 {
-    oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+    oneM2MPrimitive *o2pt = blank_o2pt();
     cJSON *fcjson = NULL;
     char *header = NULL;
 
@@ -263,17 +263,19 @@ void handle_http_request(HTTPRequest *req, int slotno)
     if ((header = search_header(req->headers, "X-M2M-Origin")))
     {
         logger("HTTP", LOG_LEVEL_DEBUG, "fr: %s", header);
-        o2pt->fr = strdup(header);
+        strncpy(o2pt->fr, header, O2PT_BUF_SIZE - 1);
     }
 
     if ((header = search_header(req->headers, "X-M2M-RI")))
     {
-        o2pt->rqi = strdup(header);
+        strncpy(o2pt->rqi, header, O2PT_BUF_SIZE - 1);
+        // o2pt->rqi = strdup(header);
     }
 
     if ((header = search_header(req->headers, "X-M2M-RVI")))
     {
-        o2pt->rvi = strdup(header);
+        strncpy(o2pt->rvi, header, 6);
+        // o2pt->rvi = strdup(header);
     }
 
     if ((header = search_header(req->headers, "Content-Type")))
@@ -288,20 +290,21 @@ void handle_http_request(HTTPRequest *req, int slotno)
     {
         if (req->uri[1] == '~')
         { // SP relative
-            o2pt->to = (char *)calloc((strlen(req->uri + 1)), sizeof(char));
+            // o2pt->to = (char *)calloc((strlen(req->uri + 1)), sizeof(char));
             o2pt->to[0] = '/';
             strcat(o2pt->to, req->uri + 3);
         }
         else if (req->uri[1] == '_')
         { // absolute
-            o2pt->to = (char *)calloc((strlen(req->uri + 1)), sizeof(char));
+            // o2pt->to = (char *)calloc((strlen(req->uri + 1)), sizeof(char));
             o2pt->to[0] = '/';
             o2pt->to[1] = '/';
             strcat(o2pt->to, req->uri + 3);
         }
         else
         {
-            o2pt->to = strdup(req->uri + 1);
+            // o2pt->to = strdup(req->uri + 1);
+            strncpy(o2pt->to, req->uri + 1, O2PT_BUF_SIZE - 1);
         }
 
         logger("HTTP", LOG_LEVEL_DEBUG, "to: %s", o2pt->to);
@@ -326,7 +329,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     getpeername(clients[slotno], (struct sockaddr *)&client_addr, &client_addr_len);
-    o2pt->ip = (char *)malloc((INET_ADDRSTRLEN + 1) * sizeof(char));
+    // o2pt->ip = (char *)malloc((INET_ADDRSTRLEN + 1) * sizeof(char));
     logger("HTTP", LOG_LEVEL_INFO, "Client connected %d.%d.%d.%d\n",
            (int)(client_addr.sin_addr.s_addr & 0xFF), (int)((client_addr.sin_addr.s_addr & 0xFF00) >> 8), (int)((client_addr.sin_addr.s_addr & 0xFF0000) >> 16), (int)((client_addr.sin_addr.s_addr & 0xFF000000) >> 24));
 
@@ -652,6 +655,7 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
     char *bs = "";
     memset(&serv_addr, 0, sizeof(serv_addr));
     int sock = socket(PF_INET, SOCK_STREAM, 0);
+    int packet_size = 0;
     int rcvd = 0;
     struct timeval tv;
     tv.tv_sec = SOCKET_TIMEOUT;
@@ -703,16 +707,17 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
     }
     if (req->qs == NULL)
         req->qs = bs;
-    sprintf(buffer, "%s %s%s%s %s\r\n%s\r\n", req->method, req->uri, strlen(req->qs) > 0 ? "?" : "", req->qs, HTTP_PROTOCOL_VERSION, header);
+    packet_size = sprintf(buffer, "%s %s%s%s %s\r\n%s\r\n", req->method, req->uri, strlen(req->qs) > 0 ? "?" : "", req->qs, HTTP_PROTOCOL_VERSION, header);
     if (req->payload)
     {
         strcat(buffer, req->payload);
         strcat(buffer, "\r\n");
+        packet_size += strlen(req->payload) + 2;
     }
 
     if (req->qs == bs)
         req->qs = NULL;
-    send(sock, buffer, sizeof(buffer), 0);
+    send(sock, buffer, packet_size, 0);
     if (res == NULL)
     {
         close(sock);

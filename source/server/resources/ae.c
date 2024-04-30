@@ -31,7 +31,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     add_general_attribute(ae, parent_rtnode, RT_AE);
     int rsc = validate_ae(o2pt, ae, OP_CREATE);
 
-    if (o2pt->fr)
+    if (strlen(o2pt->fr) > 0)
     {
         if (o2pt->fr[0] == 'C' && strlen(o2pt->fr) == 1)
         {
@@ -44,7 +44,8 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     }
     else
     {
-        o2pt->fr = strdup(cJSON_GetObjectItem(ae, "ri")->valuestring);
+        strncpy(o2pt->fr, cJSON_GetObjectItem(ae, "ri")->valuestring, O2PT_BUF_SIZE - 1);
+        // o2pt->fr = strdup(cJSON_GetObjectItem(ae, "ri")->valuestring);
     }
     cJSON_AddStringToObject(ae, "aei", cJSON_GetObjectItem(ae, "ri")->valuestring);
 

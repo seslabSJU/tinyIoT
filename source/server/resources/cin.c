@@ -106,8 +106,10 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         add_child_resource_tree(parent_rtnode, cin_rtnode);
         if (cin_rtnode->rn)
-            free(cin_rtnode->rn);
-        cin_rtnode->rn = strdup("la");
+            memset(cin_rtnode->rn, 0, MAX_RN_LENGTH);
+        cin_rtnode->rn[0] = 'l';
+        cin_rtnode->rn[1] = 'a';
+        cin_rtnode->rn[2] = '\0';
     }
     else
     {
@@ -119,8 +121,10 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         {
             add_child_resource_tree(parent_rtnode, cin_rtnode);
             if (cin_rtnode->rn)
-                free(cin_rtnode->rn);
-            cin_rtnode->rn = strdup("la");
+                memset(cin_rtnode->rn, 0, MAX_RN_LENGTH);
+            cin_rtnode->rn[0] = 'l';
+            cin_rtnode->rn[1] = 'a';
+            cin_rtnode->rn[2] = '\0';
         }
         else
         {
