@@ -1408,7 +1408,7 @@ void coap_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     // Set the request payload
     if (o2pt->request_pc)
     {
-        char *normalized_pc = cJSON_Print(o2pt->response_pc);
+        char *normalized_pc = cJSON_Print(o2pt->request_pc);
         normalize_payload(normalized_pc);
 
         // coap_add_data(pdu, strlen(o2pt->pc), (uint8_t *)o2pt->pc);

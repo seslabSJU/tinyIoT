@@ -61,7 +61,7 @@ static ssize_t cmdline_read_key(char *arg, unsigned char **buf, size_t maxlen)
 
 	/* Need at least one byte for the pre-shared key */
 	logger("COAP", LOG_LEVEL_ERROR, "Invalid Pre-Shared Key specified\n");
-	
+
 	return -1;
 }
 #endif
@@ -105,11 +105,12 @@ int main(int argc, char **argv)
 		PORT = argv[2];
 	}
 
-	#ifdef ENABLE_COAP_DTLS
+#ifdef ENABLE_COAP_DTLS
 	int opt;
-	while ((opt = getopt(argc, argv,
-                       "c:C:h:j:k:r")) != -1) {
-    	switch (opt) {
+	while ((opt = getopt(argc, argv, "c:C:h:j:k:r")) != -1)
+	{
+    	switch (opt) 
+		{
 		case 'c' :
 			cert_file = optarg;
 			break;
@@ -130,7 +131,7 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
-	#endif
+#endif
 
 	init_server();
 

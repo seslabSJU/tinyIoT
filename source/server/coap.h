@@ -87,12 +87,4 @@ typedef struct valid_pki_snis_t {
 } valid_pki_snis_t;
 
 static valid_pki_snis_t valid_pki_snis = {0, NULL};
-
-static int verify_cn_callback(const char *cn, const uint8_t *asn1_public_cert COAP_UNUSED, size_t asn1_length COAP_UNUSED, coap_session_t *session COAP_UNUSED, unsigned depth, int validated COAP_UNUSED, void *arg);
-static void update_pki_key(coap_dtls_key_t *dtls_key, const char *key_name, const char *cert_name, const char *ca_name);
-static coap_dtls_key_t *verify_pki_sni_callback(const char *sni, void *arg COAP_UNUSED);
-static const coap_dtls_spsk_info_t *verify_psk_sni_callback(const char *sni, coap_session_t *c_session COAP_UNUSED, void *arg COAP_UNUSED);
-static const coap_bin_const_t *verify_id_callback(coap_bin_const_t *identity, coap_session_t *c_session, void *arg COAP_UNUSED);
-static coap_dtls_pki_t *setup_pki(coap_context_t *ctx, coap_dtls_role_t role, char *client_sni);
-static coap_dtls_spsk_t *setup_spsk(void);
 #endif
