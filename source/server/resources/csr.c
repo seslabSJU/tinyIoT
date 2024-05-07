@@ -41,7 +41,6 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
     cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));
 
-    o2pt->response_pc = root;
     o2pt->rsc = RSC_CREATED;
 
     // Add uri attribute
@@ -64,6 +63,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
     RTNode *rtnode = create_rtnode(csr, RT_CSR);
     add_child_resource_tree(parent_rtnode, rtnode);
+    make_response_body(o2pt, rtnode);
 
     // update descendent cse
     cJSON *dcse = cJSON_GetObjectItem(rt->cb->obj, "dcse");

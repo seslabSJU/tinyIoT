@@ -193,7 +193,7 @@ char *fc_to_qs(cJSON *fc){
     cJSON *fc_copy = fc;
     pjson = fc_copy->child;
 
-    qs = (char *)malloc(256);
+    qs = (char *)calloc(256, sizeof(char));
     while(pjson != NULL){
         key = pjson->string;
         strcat(qs, key);
