@@ -38,6 +38,7 @@ void *respond_thread(void *ps)
     respond(slot);
     close(clients[slot]);
     clients[slot] = -1;
+    pthread_detach(pthread_self());
     return NULL;
 }
 
@@ -260,23 +261,23 @@ void handle_http_request(HTTPRequest *req, int slotno)
         o2pt->request_pc = cJSON_Parse(req->payload);
     }
 
-    if ((header = search_header(req->headers, "X-M2M-Origin")))
+    if ((header = search_header(req->headers, "x-m2m-origin")))
     {
         logger("HTTP", LOG_LEVEL_DEBUG, "fr: %s", header);
         o2pt->fr = strdup(header);
     }
 
-    if ((header = search_header(req->headers, "X-M2M-RI")))
+    if ((header = search_header(req->headers, "x-m2m-ri")))
     {
         o2pt->rqi = strdup(header);
     }
 
-    if ((header = search_header(req->headers, "X-M2M-RVI")))
+    if ((header = search_header(req->headers, "x-m2m-rvi")))
     {
         o2pt->rvi = strdup(header);
     }
 
-    if ((header = search_header(req->headers, "Content-Type")))
+    if ((header = search_header(req->headers, "content-type")))
     {
         if (strstr(header, "ty="))
         {
@@ -335,7 +336,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
 
     if (o2pt->op == OP_CREATE)
     {
-        o2pt->ty = http_parse_object_type(req->headers);
+        // o2pt->ty = http_parse_object_type(req->headers);
         if (o2pt->ty == 0)
         {
             o2pt->op = OP_NOTIFY;
@@ -536,7 +537,7 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
         req->payload_size = 0;
     }
     send_http_request(host, port, req, res);
-    char *rsc = search_header(res->headers, "X-M2M-RSC");
+    char *rsc = search_header(res->headers, "x-m2m-rsc");
     if (rsc)
         o2pt->rsc = atoi(rsc);
     else
@@ -591,6 +592,8 @@ void parse_http_request(HTTPRequest *req, char *packet)
         h->name = strdup(key);
         h->value = strdup(val);
 
+        headerToLowercase(h->name);
+
         t = val + 1 + strlen(val);
         if (t[1] == '\r' && t[2] == '\n')
             break;
@@ -601,7 +604,7 @@ void parse_http_request(HTTPRequest *req, char *packet)
     t = strtok(NULL, "\n");
     if (t && t[0] == '\r')
         t += 2;                                         // now the *t shall be the beginning of user payload
-    t2 = search_header(req->headers, "Content-Length"); // and the related header if there is
+    t2 = search_header(req->headers, "content-length"); // and the related header if there is
     if (t)
         req->payload = strdup(t);
     req->payload_size = t2 ? atol(t2) : 0;
@@ -640,7 +643,7 @@ void parse_http_response(HTTPResponse *res, char *packet)
     t = strtok(NULL, "\n");
     if (t && t[0] == '\r')
         t += 2;                                         // now the *t shall be the beginning of user payload
-    t2 = search_header(res->headers, "Content-Length"); // and the related header if there is
+    t2 = search_header(res->headers, "content-length"); // and the related header if there is
     if (t)
         res->payload = strdup(t);
     res->payload_size = t2 ? atol(t2) : 0;
@@ -830,4 +833,12 @@ void free_HTTPResponse(HTTPResponse *res)
         free(tmp);
     }
     free(res);
+}
+
+void headerToLowercase(char *header)
+{
+    for (int i = 0; header[i]; i++)
+    {
+        header[i] = tolower(header[i]);
+    }
 }

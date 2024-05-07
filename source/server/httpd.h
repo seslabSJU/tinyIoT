@@ -14,22 +14,25 @@
 
 // extern int payload_size;
 
-typedef struct _header{
-  char *name; 
-  char *value;
-  struct _header *next;
+typedef struct _header
+{
+    char *name;
+    char *value;
+    struct _header *next;
 } header_t;
-typedef struct _request {
-    char *method;   // METHOD : GET, POST, PUT, DELETE, OPTIONS (use static string)
-    char *uri;      // 
-    char *qs;       // query string
-    char *prot;     // protocol (HTTP/1.1)
-    char *payload;  // body for POST
-    int payload_size; //  content-size
+typedef struct _request
+{
+    char *method;      // METHOD : GET, POST, PUT, DELETE, OPTIONS (use static string)
+    char *uri;         //
+    char *qs;          // query string
+    char *prot;        // protocol (HTTP/1.1)
+    char *payload;     // body for POST
+    int payload_size;  //  content-size
     header_t *headers; // header list
 } HTTPRequest;
 
-typedef struct _response {
+typedef struct _response
+{
     int status_code;
     char *protocol;
     char *status_msg;
@@ -38,11 +41,11 @@ typedef struct _response {
     int payload_size;
 } HTTPResponse;
 
-typedef struct _host {
+typedef struct _host
+{
     char *host;
     int port;
 } Host;
-
 
 // Server control functions
 void serve_forever(const char *PORT);
@@ -54,19 +57,17 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno);
 int http_notify(oneM2MPrimitive *o2pt, char *host, int port);
 void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port);
 
-
-
 // user shall implement this function
 void handle_http_request(HTTPRequest *req, int slotno);
 char *op_to_method(Operation op);
-int send_http_request(char *host, int port,  HTTPRequest *req, HTTPResponse *res);
+int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res);
 void add_header(char *key, char *value, header_t *header);
 
 void parse_http_request(HTTPRequest *req, char *packet);
 
 void free_HTTPRequest(HTTPRequest *req);
 void free_HTTPResponse(HTTPResponse *res);
-
+void headerToLowercase(char *header);
 
 // Response
 #define HTTP_PROTOCOL_VERSION "HTTP/1.1"

@@ -60,7 +60,7 @@ int net_to_bit(cJSON *net)
 // TODO - move to http.c
 ResourceType http_parse_object_type(header_t *headers)
 {
-	char *content_type = search_header(headers, "Content-Type");
+	char *content_type = search_header(headers, "content-type");
 	if (!content_type)
 		return RT_MIXED;
 	char *str_ty = strstr(content_type, "ty=");
