@@ -1235,9 +1235,9 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 #endif
 
 #ifdef ENABLE_COAP
-		else if (protocol == PROT_COAP)
+		else if (protocol == PROT_COAP || protocol == PROT_COAPS)
 		{
-			coap_forwarding(o2pt, host, port);
+			coap_forwarding(o2pt, protocol, host, port);
 		}
 #endif
 		free(host);

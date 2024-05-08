@@ -751,7 +751,11 @@ void init_server()
 #endif
 
 #ifdef ENABLE_COAP
+#ifdef ENABLE_COAP_DTLS
+	sprintf(poa, "coaps://%s:%d", SERVER_IP, COAP_PORT);
+#else
 	sprintf(poa, "coap://%s:%d", SERVER_IP, COAP_PORT);
+#endif
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 #endif
 
@@ -3421,21 +3425,40 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 	{
 		*prot = PROT_COAP;
 	}
-	else
+	else if (!strncmp(poa_str, "coaps://", 8))
+	{
+		*prot = PROT_COAPS;
+	}	else
 	{
 		free(p);
 		return -1;
 	}
-	ptr = strchr(p + 7, ':');
-	if (ptr)
+	if(*prot == PROT_COAPS)
 	{
-		*ptr = '\0';
-		*port = atoi(ptr + 1);
+		ptr = strchr(p + 8, ':');
+		if (ptr)
+		{
+			*ptr = '\0';
+			*port = atoi(ptr + 1);
+		}
+		*host = strdup(p + 8);
+		if (ptr)
+			*ptr = ':';
+		ptr = strchr(p + 8, '/');
 	}
-	*host = strdup(p + 7);
-	if (ptr)
-		*ptr = ':';
-	ptr = strchr(p + 7, '/');
+	else
+	{
+		ptr = strchr(p + 7, ':');
+		if (ptr)
+		{
+			*ptr = '\0';
+			*port = atoi(ptr + 1);
+		}
+		*host = strdup(p + 7);
+		if (ptr)
+			*ptr = ':';
+		ptr = strchr(p + 7, '/');
+	}
 	if (ptr)
 	{
 		*path = strdup(ptr);
@@ -3458,6 +3481,10 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 	{
 		*port = 5683;
 	}
+	else if (*prot == PROT_COAPS && port == 0)
+	{
+		*port = 5684;
+	}
 	return 0;
 }
 
@@ -3471,7 +3498,7 @@ ResourceAddressingType checkResourceAddressingType(char *uri)
 	{
 		return SP_RELATIVE;
 	}
-	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strcmp(uri, "coap://") == 0)
+	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strcmp(uri, "coap://") == 0 || strcmp(uri, "coaps://") == 0)
 	{
 		return PROTOCOL_BINDING;
 	}
