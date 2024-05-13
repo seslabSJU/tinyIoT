@@ -43,7 +43,7 @@ typedef struct
 
 void *coap_serve();
 void coap_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt);
-void coap_forwarding(oneM2MPrimitive *o2pt, char *host, int port);
+void coap_forwarding(oneM2MPrimitive *o2pt, Protocol protocol, char *host, int port);
 
 extern void route(oneM2MPrimitive *o2pt);
 
