@@ -728,6 +728,7 @@ static void free_COAPRequest(coapPacket *req)
         free(req->token);
     free(req);
 }
+
 void coap_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt)
 {
     coap_session_t *session = NULL;
@@ -1319,9 +1320,14 @@ static coap_response_t response_handler(coap_session_t *session,
     return COAP_RESPONSE_OK;
 }
 
-void coap_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
+void coap_forwarding(oneM2MPrimitive *o2pt, Protocol protocol, char *host, int port)
 {
-    logger(LOG_TAG, LOG_LEVEL_INFO, "coap_forwarding");
+    if(protocol == PROT_COAP)
+        logger(LOG_TAG, LOG_LEVEL_INFO, "coap_forwarding %scoap://%s:%d%s", "\033[92m", host, port, "\033[0m");
+    else if(protocol == PROT_COAPS)
+        logger(LOG_TAG, LOG_LEVEL_INFO, "coap_forwarding %scoaps://%s:%d%s", "\033[92m", host, port, "\033[0m");
+    else
+        logger(LOG_TAG, LOG_LEVEL_ERROR, "Invalid Protocol");
 
     /* Initialize */
     coap_startup();
