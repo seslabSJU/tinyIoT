@@ -2830,7 +2830,7 @@ int register_remote_cse()
 		send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
 
 		char *rsc = 0;
-		if ((rsc = search_header(res->headers, "X-M2M-RSC")))
+		if ((rsc = search_header(res->headers, "x-m2m-rsc")))
 		{
 			if (atoi(rsc) != RSC_CREATED)
 			{
@@ -3428,12 +3428,13 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 	else if (!strncmp(poa_str, "coaps://", 8))
 	{
 		*prot = PROT_COAPS;
-	}	else
+	}
+	else
 	{
 		free(p);
 		return -1;
 	}
-	if(*prot == PROT_COAPS)
+	if (*prot == PROT_COAPS)
 	{
 		ptr = strchr(p + 8, ':');
 		if (ptr)
