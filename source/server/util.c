@@ -1570,7 +1570,7 @@ bool isSpRelativeLocal(char *address)
 	char *ptr = strchr(address + 1, '/');
 	if (ptr)
 		*ptr = '\0';
-	if (strncmp(address + 1, CSE_BASE_RI, strlen(CSE_BASE_RI)) == 0)
+	if (strcmp(address + 1, CSE_BASE_RI) == 0)
 	{
 		if (ptr)
 			*ptr = '/';

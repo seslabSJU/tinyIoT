@@ -633,6 +633,8 @@ void parse_http_response(HTTPResponse *res, char *packet)
         h->name = strdup(key);
         h->value = strdup(val);
 
+        headerToLowercase(h->name);
+
         t = val + 1 + strlen(val);
         if (t[1] == '\r' && t[2] == '\n')
             break;

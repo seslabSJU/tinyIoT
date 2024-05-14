@@ -377,10 +377,10 @@ static void cache_free_app_data(void *data)
 }
 
 static void hnd_coap_req(coap_resource_t *r,
-                        coap_session_t *session, 
-                        const coap_pdu_t *req_pdu,
-                        const coap_string_t *token, 
-                        coap_pdu_t *res_pdu)
+                         coap_session_t *session,
+                         const coap_pdu_t *req_pdu,
+                         const coap_string_t *token,
+                         coap_pdu_t *res_pdu)
 {
     /* CoAP packet format
     0                   1                   2                   3
@@ -651,7 +651,7 @@ static void hnd_coap_req(coap_resource_t *r,
         {
             payload_opt_to_o2pt(o2pt);
         }
-        else if(req->code == COAP_REQUEST_FETCH)
+        else if (req->code == COAP_REQUEST_FETCH)
         {
             coap_pdu_set_code(res_pdu, COAP_RESPONSE_CODE_BAD_REQUEST);
             return;
@@ -680,7 +680,7 @@ static void hnd_coap_req(coap_resource_t *r,
     coap_respond_to_client(o2pt, r, session, req_pdu, res_pdu);
 
     /* Pre-free for free_o2pt in Release 5 of CoAP */
-    if(rel5)
+    if (rel5)
     {
         cJSON_DeleteItemFromObject(o2pt->response_pc, "fc");
         o2pt->fc = NULL;
@@ -777,14 +777,14 @@ void coap_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt)
 }
 
 #ifdef ENABLE_COAP_DTLS
-char *cert_file     = NULL;     /* Certificate and optional private key in PEM */
-char *key_file      = NULL;     /* Private key in PEM */
-char *ca_file       = NULL;     /* CA for cert_file - for cert checking in PEM */
-char *root_ca_file  = NULL;     /* List of trusted Root CAs in PEM */
+char *cert_file = NULL;    /* Certificate and optional private key in PEM */
+char *key_file = NULL;     /* Private key in PEM */
+char *ca_file = NULL;      /* CA for cert_file - for cert checking in PEM */
+char *root_ca_file = NULL; /* List of trusted Root CAs in PEM */
 
-uint8_t *key         = NULL;
-ssize_t key_length   = 0;
-int key_defined      = 0;
+uint8_t *key = NULL;
+ssize_t key_length = 0;
+int key_defined = 0;
 
 static const char *hint = "CoAP";
 
@@ -810,10 +810,10 @@ static void update_pki_key(coap_dtls_key_t *dtls_key,
 {
     memset(dtls_key, 0, sizeof(*dtls_key));
 
-    dtls_key->key_type              = COAP_PKI_KEY_PEM;
-    dtls_key->key.pem.public_cert   = cert_name;
-    dtls_key->key.pem.private_key   = key_name ? key_name : cert_name;
-    dtls_key->key.pem.ca_file       = ca_name;
+    dtls_key->key_type = COAP_PKI_KEY_PEM;
+    dtls_key->key.pem.public_cert = cert_name;
+    dtls_key->key.pem.private_key = key_name ? key_name : cert_name;
+    dtls_key->key.pem.ca_file = ca_name;
 }
 
 static coap_dtls_key_t *verify_pki_sni_callback(const char *sni, void *arg COAP_UNUSED)
@@ -828,15 +828,16 @@ static coap_dtls_key_t *verify_pki_sni_callback(const char *sni, void *arg COAP_
         logger(LOG_TAG, LOG_LEVEL_DEBUG, "SNI '%s' requested", sni);
 
         /* Change Certificate + CA */
-        for (i = 0; i < valid_pki_snis.count; i++) {
+        for (i = 0; i < valid_pki_snis.count; i++)
+        {
             if (strcasecmp(sni, valid_pki_snis.pki_sni_list[i].sni_match) == 0)
             {
                 logger(LOG_TAG, LOG_LEVEL_DEBUG, "Switching to using cert '%s' + ca '%s'",
-                            valid_pki_snis.pki_sni_list[i].new_cert,
-                            valid_pki_snis.pki_sni_list[i].new_ca);
+                       valid_pki_snis.pki_sni_list[i].new_cert,
+                       valid_pki_snis.pki_sni_list[i].new_ca);
                 update_pki_key(&dtls_key, valid_pki_snis.pki_sni_list[i].new_cert,
-                            valid_pki_snis.pki_sni_list[i].new_cert,
-                            valid_pki_snis.pki_sni_list[i].new_ca);
+                               valid_pki_snis.pki_sni_list[i].new_cert,
+                               valid_pki_snis.pki_sni_list[i].new_ca);
                 break;
             }
         }
@@ -880,20 +881,22 @@ static coap_dtls_pki_t *setup_pki(coap_context_t *ctx, coap_dtls_role_t role, ch
         // dtls_pki.cert_chain_verify_depth = 3;
         // dtls_pki.check_cert_revocation   = 1;
 
-        dtls_pki.verify_peer_cert        = 1;
-        dtls_pki.check_common_ca         = !root_ca_file;
-        dtls_pki.allow_self_signed       = 1;
-        dtls_pki.allow_expired_certs     = 1;
-        dtls_pki.cert_chain_validation   = 1;
+        dtls_pki.verify_peer_cert = 1;
+        dtls_pki.check_common_ca = !root_ca_file;
+        dtls_pki.allow_self_signed = 1;
+        dtls_pki.allow_expired_certs = 1;
+        dtls_pki.cert_chain_validation = 1;
         dtls_pki.cert_chain_verify_depth = 2;
-        dtls_pki.check_cert_revocation   = 1;
-        dtls_pki.allow_no_crl            = 1;
-        dtls_pki.allow_expired_crl       = 1;
+        dtls_pki.check_cert_revocation = 1;
+        dtls_pki.allow_no_crl = 1;
+        dtls_pki.allow_expired_crl = 1;
     }
-    
-    dtls_pki.validate_cn_call_back  = verify_cn_callback;      dtls_pki.cn_call_back_arg  = NULL;
-    dtls_pki.validate_sni_call_back = verify_pki_sni_callback; dtls_pki.sni_call_back_arg = NULL;
-        
+
+    dtls_pki.validate_cn_call_back = verify_cn_callback;
+    dtls_pki.cn_call_back_arg = NULL;
+    dtls_pki.validate_sni_call_back = verify_pki_sni_callback;
+    dtls_pki.sni_call_back_arg = NULL;
+
     update_pki_key(&dtls_pki.pki_key, key_file, cert_file, ca_file);
 
     return &dtls_pki;
@@ -909,9 +912,9 @@ static const coap_bin_const_t *verify_id_callback(coap_bin_const_t *identity,
     size_t i;
 
     logger(LOG_TAG, LOG_LEVEL_INFO, "Identity '%.*s' requested, current hint '%.*s'\n",
-                                    (int)identity->length, identity->s,
-                                    s_psk_hint ? (int)s_psk_hint->length : 0,
-                                    s_psk_hint ? (const char *)s_psk_hint->s : "");
+           (int)identity->length, identity->s,
+           s_psk_hint ? (int)s_psk_hint->length : 0,
+           s_psk_hint ? (const char *)s_psk_hint->s : "");
 
     for (i = 0; i < valid_ids.count; i++)
     {
@@ -923,8 +926,8 @@ static const coap_bin_const_t *verify_id_callback(coap_bin_const_t *identity,
         if (coap_binary_equal(identity, valid_ids.id_list[i].identity_match))
         {
             logger(LOG_TAG, LOG_LEVEL_INFO, "Switching to using '%.*s' key\n",
-                                            (int)valid_ids.id_list[i].new_key->length,
-                                            valid_ids.id_list[i].new_key->s);
+                   (int)valid_ids.id_list[i].new_key->length,
+                   valid_ids.id_list[i].new_key->s);
             return valid_ids.id_list[i].new_key;
         }
     }
@@ -952,10 +955,10 @@ static const coap_dtls_spsk_info_t *verify_psk_sni_callback(const char *sni,
 
     memset(&psk_info, 0, sizeof(psk_info));
 
-    psk_info.hint.s         = (const uint8_t *)hint;
-    psk_info.hint.length    = hint ? strlen(hint) : 0;
-    psk_info.key.s          = key;
-    psk_info.key.length     = key_length;
+    psk_info.hint.s = (const uint8_t *)hint;
+    psk_info.hint.length = hint ? strlen(hint) : 0;
+    psk_info.key.s = key;
+    psk_info.key.length = key_length;
 
     if (sni)
     {
@@ -967,12 +970,12 @@ static const coap_dtls_spsk_info_t *verify_psk_sni_callback(const char *sni,
             if (strcasecmp(sni, valid_psk_snis.psk_sni_list[i].sni_match) == 0)
             {
                 logger(LOG_TAG, LOG_LEVEL_INFO, "Switching to using '%.*s' hint + '%.*s' key\n",
-                                                (int)valid_psk_snis.psk_sni_list[i].new_hint->length,
-                                                valid_psk_snis.psk_sni_list[i].new_hint->s,
-                                                (int)valid_psk_snis.psk_sni_list[i].new_key->length,
-                                                valid_psk_snis.psk_sni_list[i].new_key->s);
-                psk_info.hint   = *valid_psk_snis.psk_sni_list[i].new_hint;
-                psk_info.key    = *valid_psk_snis.psk_sni_list[i].new_key;
+                       (int)valid_psk_snis.psk_sni_list[i].new_hint->length,
+                       valid_psk_snis.psk_sni_list[i].new_hint->s,
+                       (int)valid_psk_snis.psk_sni_list[i].new_key->length,
+                       valid_psk_snis.psk_sni_list[i].new_key->s);
+                psk_info.hint = *valid_psk_snis.psk_sni_list[i].new_hint;
+                psk_info.key = *valid_psk_snis.psk_sni_list[i].new_key;
                 break;
             }
         }
@@ -992,12 +995,12 @@ static coap_dtls_spsk_t *setup_spsk(void)
     memset(&dtls_spsk, 0, sizeof(dtls_spsk));
 
     dtls_spsk.version = COAP_DTLS_SPSK_SETUP_VERSION;
-    dtls_spsk.validate_id_call_back     = valid_ids.count ? verify_id_callback : NULL;
-    dtls_spsk.validate_sni_call_back    = valid_psk_snis.count ? verify_psk_sni_callback : NULL;
-    dtls_spsk.psk_info.hint.s           = (const uint8_t *)hint;
-    dtls_spsk.psk_info.hint.length      = hint ? strlen(hint) : 0;
-    dtls_spsk.psk_info.key.s            = key;
-    dtls_spsk.psk_info.key.length       = key_length;
+    dtls_spsk.validate_id_call_back = valid_ids.count ? verify_id_callback : NULL;
+    dtls_spsk.validate_sni_call_back = valid_psk_snis.count ? verify_psk_sni_callback : NULL;
+    dtls_spsk.psk_info.hint.s = (const uint8_t *)hint;
+    dtls_spsk.psk_info.hint.length = hint ? strlen(hint) : 0;
+    dtls_spsk.psk_info.key.s = key;
+    dtls_spsk.psk_info.key.length = key_length;
 
     return &dtls_spsk;
 }
@@ -1072,7 +1075,8 @@ void *coap_serve()
             return NULL;
         }
     }
-    if (key_defined) {
+    if (key_defined)
+    {
         coap_dtls_spsk_t *dtls_spsk = setup_spsk();
         if (!coap_context_set_psk2(ctx, dtls_spsk))
         {
@@ -1132,7 +1136,7 @@ char *fwd_response_pc = NULL;
 
 static coap_response_t response_handler(coap_session_t *session,
                                         const coap_pdu_t *res_pdu,
-                                        const coap_pdu_t *req_pdu, 
+                                        const coap_pdu_t *req_pdu,
                                         const coap_mid_t id)
 {
     coapPacket *fwd_req = (coapPacket *)malloc(sizeof(coapPacket));
@@ -1337,6 +1341,7 @@ void coap_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     if (!session)
     {
         logger(LOG_TAG, LOG_LEVEL_ERROR, "Not Created Session (Forwarding)");
+        o2pt->rsc = RSC_TARGET_NOT_REACHABLE;
         return;
     }
 
@@ -1347,6 +1352,7 @@ void coap_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     if (!pdu)
     {
         logger(LOG_TAG, LOG_LEVEL_ERROR, "Not Created PDU (Forwarding)");
+        o2pt->rsc = RSC_TARGET_NOT_REACHABLE;
         return;
     }
 

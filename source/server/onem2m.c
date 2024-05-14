@@ -1243,8 +1243,9 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		free(host);
 		free(path);
 
-		if (o2pt->rsc == RSC_OK)
+		if (o2pt->rsc != RSC_TARGET_NOT_REACHABLE)
 		{
+			logger("O2M", LOG_LEVEL_DEBUG, "forwarding success");
 			break;
 		}
 	}
