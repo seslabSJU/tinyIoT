@@ -396,26 +396,21 @@ static void hnd_coap_req(coap_resource_t *r,
     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
     /* Parse CoAP packet */
-    /* Version, Type, Token Length, Code, Message ID */
-    req->ver = COAP_VERSION;
-    req->type = coap_pdu_get_type(req_pdu);
-    char *msg_type = coap_parse_type(req->type);
-    req->code = coap_pdu_get_code(req_pdu);
-    char *method = coap_parse_req_code(req->code);
+    /* Type, Token Length, Code, Message ID */
+    req->type = coap_pdu_get_type(req_pdu); char *msg_type = coap_parse_type(req->type);
+    req->code = coap_pdu_get_code(req_pdu); char *method = coap_parse_req_code(req->code);
     req->message_id = coap_pdu_get_mid(req_pdu);
 
     /* Token */
-    coap_bin_const_t token_data = coap_pdu_get_token(req_pdu);
-    req->token = token_data.s;
-    req->token_len = token_data.length;
+    req->token = coap_pdu_get_token(req_pdu);
 
     char buf[BUF_SIZE] = {'\0'};
-    sprintf(buf, "\n%s %s %d(TKL) %d(MID)\r\n\n", msg_type, method, req->token_len, req->message_id);
-    if (req->token_len > 0)
+    sprintf(buf, "\n%s %s %ld(TKL) %d(MID)\r\n\n", msg_type, method, req->token.length, req->message_id);
+    if (req->token.length > 0)
     {
         sprintf(buf + strlen(buf), "Token: ");
-        for (size_t i = 0; i < req->token_len; i++)
-            sprintf(buf + strlen(buf), "%02X", req->token[i]);
+        for (size_t i = 0; i < req->token.length; i++)
+            sprintf(buf + strlen(buf), "%02X", req->token.s[i]);
         sprintf(buf + strlen(buf), "\r\n\n");
     }
 
@@ -724,8 +719,6 @@ static void hnd_unknown(coap_resource_t *resource COAP_UNUSED,
 
 static void free_COAPRequest(coapPacket *req)
 {
-    if (req->token)
-        free(req->token);
     free(req);
 }
 
@@ -1309,9 +1302,7 @@ static coap_response_t response_handler(coap_session_t *session,
 {
     coapPacket *fwd_req = (coapPacket *)malloc(sizeof(coapPacket));
 
-    fwd_req->ver = COAP_VERSION;
-    fwd_req->type = coap_pdu_get_type(req_pdu);
-    char *msg_type = coap_parse_type(fwd_req->type);
+    fwd_req->type = coap_pdu_get_type(req_pdu); char *msg_type = coap_parse_type(fwd_req->type);
     fwd_req->code = coap_pdu_get_code(req_pdu);
     fwd_req->token = coap_pdu_get_token(req_pdu);
 

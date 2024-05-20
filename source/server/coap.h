@@ -32,13 +32,11 @@
 
 typedef struct
 {
-    uint8_t ver;
     coap_pdu_type_t type;
-    uint8_t code;
-    uint8_t *token;
-    uint8_t token_len;
-    uint16_t message_id;
-    uint16_t option_cnt;
+    coap_pdu_code_t code;
+    coap_bin_const_t token;
+    coap_mid_t message_id;
+    int option_cnt;
 } coapPacket;
 
 typedef struct {
