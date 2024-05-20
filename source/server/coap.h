@@ -41,6 +41,10 @@ typedef struct
     uint16_t option_cnt;
 } coapPacket;
 
+typedef struct {
+    coap_binary_t *token;
+} track_token;
+
 void *coap_serve();
 void coap_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt);
 void coap_forwarding(oneM2MPrimitive *o2pt, Protocol protocol, char *host, int port);
@@ -87,4 +91,17 @@ typedef struct valid_pki_snis_t {
 } valid_pki_snis_t;
 
 static valid_pki_snis_t valid_pki_snis = {0, NULL};
+
+typedef struct ih_def_t {
+  char *hint_match;
+  coap_bin_const_t *new_identity;
+  coap_bin_const_t *new_key;
+} ih_def_t;
+
+typedef struct valid_ihs_t {
+  size_t count;
+  ih_def_t *ih_list;
+} valid_ihs_t;
+
+static valid_ihs_t valid_ihs = {0, NULL};
 #endif

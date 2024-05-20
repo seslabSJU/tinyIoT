@@ -851,7 +851,7 @@ static coap_dtls_key_t *verify_pki_sni_callback(const char *sni, void *arg COAP_
     return &dtls_key;
 }
 
-static coap_dtls_pki_t *setup_pki(coap_context_t *ctx, coap_dtls_role_t role, char *client_sni)
+static coap_dtls_pki_t *setup_pki(coap_context_t *ctx, coap_dtls_role_t role)
 {
     static coap_dtls_pki_t dtls_pki;
 
@@ -892,13 +892,28 @@ static coap_dtls_pki_t *setup_pki(coap_context_t *ctx, coap_dtls_role_t role, ch
         dtls_pki.allow_no_crl = 1;
         dtls_pki.allow_expired_crl = 1;
     }
+    
+    dtls_pki.validate_cn_call_back  = verify_cn_callback;      dtls_pki.cn_call_back_arg  = NULL;
+    dtls_pki.validate_sni_call_back = verify_pki_sni_callback; dtls_pki.sni_call_back_arg = NULL;
 
-    dtls_pki.validate_cn_call_back = verify_cn_callback;
-    dtls_pki.cn_call_back_arg = NULL;
-    dtls_pki.validate_sni_call_back = verify_pki_sni_callback;
-    dtls_pki.sni_call_back_arg = NULL;
+    if(role == COAP_DTLS_ROLE_CLIENT)
+    {
+        static char client_sni[256];
+        memset(client_sni, 0, sizeof(client_sni));
 
-    update_pki_key(&dtls_pki.pki_key, key_file, cert_file, ca_file);
+        // if ((uri.host.length == 3 && memcmp(uri.host.s, "::1", 3) != 0) ||
+        //     (uri.host.length == 9 && memcmp(uri.host.s, "127.0.0.1", 9) != 0))
+        //     memcpy(client_sni, uri.host.s, min(uri.host.length, sizeof(client_sni)-1));
+        // else
+        //     memcpy(client_sni, "localhost", 9);
+
+        memcpy(client_sni, "localhost", 9);
+        dtls_pki.client_sni = client_sni;
+    }
+    else if(role == COAP_DTLS_ROLE_SERVER)
+    {
+        update_pki_key(&dtls_pki.pki_key, key_file, cert_file, ca_file);
+    }
 
     return &dtls_pki;
 }
@@ -1005,7 +1020,101 @@ static coap_dtls_spsk_t *setup_spsk(void)
 
     return &dtls_spsk;
 }
+
+static const coap_dtls_cpsk_info_t *verify_ih_callback(coap_str_const_t *hint,
+                                                       coap_session_t *c_session COAP_UNUSED,
+                                                       void *arg)
+{
+    coap_dtls_cpsk_info_t *psk_info = (coap_dtls_cpsk_info_t *)arg;
+    char lhint[COAP_DTLS_HINT_LENGTH];
+    static coap_dtls_cpsk_info_t psk_identity_info;
+    size_t i;
+
+    snprintf(lhint, sizeof(lhint), "%.*s", (int)hint->length, hint->s);
+    logger(LOG_TAG, LOG_LEVEL_INFO, "Identity Hint '%s' provided\n", lhint);
+
+    /* Test for hint to possibly change identity + key */
+    for (i = 0; i < valid_ihs.count; i++) {
+        if (strcmp(lhint, valid_ihs.ih_list[i].hint_match) == 0) {
+            /* Preset */
+            psk_identity_info = *psk_info;
+            if (valid_ihs.ih_list[i].new_key) {
+                psk_identity_info.key = *valid_ihs.ih_list[i].new_key;
+            }
+            if (valid_ihs.ih_list[i].new_identity) {
+                psk_identity_info.identity = *valid_ihs.ih_list[i].new_identity;
+            }
+            logger(LOG_TAG, LOG_LEVEL_INFO, "Switching to using '%s' identity + '%s' key\n",
+                            psk_identity_info.identity.s, psk_identity_info.key.s);
+            return &psk_identity_info;
+        }
+    }
+    
+    /* Just use the defined key for now as passed in by arg */
+    return psk_info;
+}
+
+static coap_dtls_cpsk_t *setup_cpsk()
+{
+    static coap_dtls_cpsk_t dtls_cpsk;
+    static char client_sni[256];
+
+    memset(&dtls_cpsk, 0, sizeof(dtls_cpsk));
+    memset(client_sni, 0, sizeof(client_sni));
+
+    dtls_cpsk.version                   = COAP_DTLS_CPSK_SETUP_VERSION;
+    dtls_cpsk.validate_ih_call_back     = verify_ih_callback;
+    dtls_cpsk.ih_call_back_arg          = &dtls_cpsk.psk_info;
+
+    // if (uri.host.length)
+    //     memcpy(client_sni, uri.host.s,
+    //         min(uri.host.length, sizeof(client_sni) - 1));
+    // else
+    //     memcpy(client_sni, "localhost", 9);
+
+    memcpy(client_sni, "localhost", 9);
+
+    dtls_cpsk.client_sni                = client_sni;
+    dtls_cpsk.psk_info.identity.s       = "tinyiot";
+    dtls_cpsk.psk_info.identity.length  = strlen("tinyiot");
+    dtls_cpsk.psk_info.key.s            = key;
+    dtls_cpsk.psk_info.key.length       = key_length;
+
+    return &dtls_cpsk;
+}
 #endif
+
+static int event_handler(coap_session_t *session COAP_UNUSED,
+                        const coap_event_t event)
+{
+    switch (event)
+    {
+    case COAP_EVENT_DTLS_CLOSED:
+        logger(LOG_TAG, LOG_LEVEL_INFO, "DTLS CLOSED");
+        break;
+    case COAP_EVENT_DTLS_ERROR:
+        logger(LOG_TAG, LOG_LEVEL_ERROR, "DTLS ERROR");
+        break;
+    case COAP_EVENT_DTLS_CONNECTED:
+        logger(LOG_TAG, LOG_LEVEL_INFO, "DTLS CONNECTED");
+        break;
+    case COAP_EVENT_SESSION_CLOSED:
+        logger(LOG_TAG, LOG_LEVEL_INFO, "SESSION CLOSED");
+        break;
+    case COAP_EVENT_SESSION_FAILED:
+        logger(LOG_TAG, LOG_LEVEL_ERROR, "SESSION FAILED");
+        break;
+    case COAP_EVENT_SESSION_CONNECTED:
+        logger(LOG_TAG, LOG_LEVEL_INFO, "SESSION CONNECTED");
+        break;
+    case COAP_EVENT_BAD_PACKET:
+        logger(LOG_TAG, LOG_LEVEL_ERROR, "BAD PACKET");
+        break;
+    default:
+        break;
+    }
+    return 0;
+}
 
 static coap_context_t *get_context(void)
 {
@@ -1053,6 +1162,8 @@ static coap_context_t *get_context(void)
     // coap_register_option(ctx, oneM2M_PRPI);
     // coap_register_option(ctx, oneM2M_MSU);
 
+    coap_register_event_handler(ctx, event_handler);
+
     return ctx;
 }
 
@@ -1068,7 +1179,7 @@ void *coap_serve()
 #ifdef ENABLE_COAP_DTLS
     if (cert_file)
     {
-        coap_dtls_pki_t *dtls_pki = setup_pki(ctx, COAP_DTLS_ROLE_SERVER, NULL);
+        coap_dtls_pki_t *dtls_pki = setup_pki(ctx, COAP_DTLS_ROLE_SERVER);
         if (!coap_context_set_pki(ctx, dtls_pki))
         {
             logger(LOG_TAG, LOG_LEVEL_ERROR, "Unable to set up PKI keys");
@@ -1132,13 +1243,69 @@ void *coap_serve()
     return NULL;
 }
 
+track_token *tracked_tokens = NULL;
+size_t tracked_tokens_count = 0;
+
+static unsigned char _token_data[24]; /* With support for RFC8974 */
+coap_binary_t the_token = { 0, _token_data };
+
+static void track_new_token(size_t tokenlen, uint8_t *token)
+{
+    track_token *new_list = realloc(tracked_tokens,
+                                    (tracked_tokens_count + 1) * sizeof(tracked_tokens[0]));
+    if (!new_list)
+        return;
+
+    tracked_tokens = new_list;
+    tracked_tokens[tracked_tokens_count].token = coap_new_binary(tokenlen);
+    if (!tracked_tokens[tracked_tokens_count].token)
+        return;
+    memcpy(tracked_tokens[tracked_tokens_count].token->s, token, tokenlen);
+    tracked_tokens_count++;
+}
+
+static int track_check_token(coap_bin_const_t *token)
+{
+    size_t i;
+
+    for (i = 0; i < tracked_tokens_count; i++)
+    {
+        if (coap_binary_equal(token, tracked_tokens[i].token))
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void track_flush_token(coap_bin_const_t *token)
+{
+    size_t i;
+
+    for (i = 0; i < tracked_tokens_count; i++)
+    {
+        if (coap_binary_equal(token, tracked_tokens[i].token))
+        {
+            coap_delete_binary(tracked_tokens[i].token);
+            if (tracked_tokens_count-i > 1)
+            {
+                memmove(&tracked_tokens[i],
+                        &tracked_tokens[i+1],
+                        (tracked_tokens_count-i-1) * sizeof(tracked_tokens[0]));
+            }
+            tracked_tokens_count--;
+            break;
+        }
+    }
+}
+
 int fwd_rsc = 0;
 char *fwd_response_pc = NULL;
 
 static coap_response_t response_handler(coap_session_t *session,
                                         const coap_pdu_t *res_pdu,
-                                        const coap_pdu_t *req_pdu,
-                                        const coap_mid_t id)
+                                        const coap_pdu_t *req_pdu, 
+                                        const coap_mid_t id COAP_UNUSED)
 {
     coapPacket *fwd_req = (coapPacket *)malloc(sizeof(coapPacket));
 
@@ -1146,14 +1313,29 @@ static coap_response_t response_handler(coap_session_t *session,
     fwd_req->type = coap_pdu_get_type(req_pdu);
     char *msg_type = coap_parse_type(fwd_req->type);
     fwd_req->code = coap_pdu_get_code(req_pdu);
+    fwd_req->token = coap_pdu_get_token(req_pdu);
 
     char buf[BUF_SIZE] = {'\0'};
-    sprintf(buf, "\n%s %d\r\n\n", msg_type, fwd_req->code);
+    sprintf(buf, "\n%s %d.%02d\r\n\n", msg_type, COAP_RESPONSE_CLASS(fwd_req->code), fwd_req->code & 0x1F);
+
+    /* check if this is a response to our original request */
+    if (!track_check_token(&fwd_req->token)) {
+        /* drop if this was just some message, or send RST in case of notification */
+        if (!res_pdu && (fwd_req->type == COAP_MESSAGE_CON || fwd_req->type == COAP_MESSAGE_NON)) {
+            /* Cause a CoAP RST to be sent */
+            return COAP_RESPONSE_FAIL;
+        }
+        return COAP_RESPONSE_OK;
+    }
+
+    if (fwd_req->type == COAP_MESSAGE_RST) {
+        return COAP_RESPONSE_OK;
+    }
 
     /* Options */
     coap_opt_iterator_t opt_iter;
     coap_opt_t *option;
-
+    
     fwd_req->option_cnt = 0;
     coap_option_iterator_init(req_pdu, &opt_iter, COAP_OPT_ALL);
     while ((option = coap_option_next(&opt_iter)))
@@ -1178,7 +1360,8 @@ static coap_response_t response_handler(coap_session_t *session,
             else
             {
                 logger(LOG_TAG, LOG_LEVEL_ERROR, "Unsupported Content-Format");
-                return COAP_RESPONSE_FAIL;
+                // coap_pdu_set_code(res_pdu, COAP_RESPONSE_CODE_UNSUPPORTED_CONTENT_FORMAT);
+                // return;
             }
             break;
         case oneM2M_RSC:
@@ -1315,6 +1498,9 @@ static coap_response_t response_handler(coap_session_t *session,
             fwd_response_pc = strdup(data_so_far->s);
     }
 
+    track_flush_token(&fwd_req->token);
+    free_COAPRequest(fwd_req);
+
     logger(LOG_TAG, LOG_LEVEL_DEBUG, "Received Forwarding Packet\r\n%s", buf);
 
     return COAP_RESPONSE_OK;
@@ -1343,7 +1529,21 @@ void coap_forwarding(oneM2MPrimitive *o2pt, Protocol protocol, char *host, int p
 
     coap_context_t *ctx = get_context();
 
+#ifdef ENABLE_COAP_DTLS
+    if (cert_file)
+    {
+        coap_dtls_pki_t *dtls_pki = setup_pki(ctx, COAP_DTLS_ROLE_CLIENT);
+        session = coap_new_client_session_pki(ctx, NULL, &bind_addr, COAP_PROTO_DTLS, dtls_pki);
+    }
+    else 
+    {
+        coap_dtls_cpsk_t *dtls_cpsk = setup_cpsk();
+        session = coap_new_client_session_psk2(ctx, NULL, &bind_addr, COAP_PROTO_DTLS, dtls_cpsk);
+    }
+#else
     session = coap_new_client_session(ctx, NULL, &bind_addr, COAP_PROTO_UDP);
+#endif
+
     if (!session)
     {
         logger(LOG_TAG, LOG_LEVEL_ERROR, "Not Created Session (Forwarding)");
@@ -1353,8 +1553,7 @@ void coap_forwarding(oneM2MPrimitive *o2pt, Protocol protocol, char *host, int p
 
     unsigned int method = op_to_code(o2pt->op);
 
-    // Protocol Data Unit
-    pdu = coap_pdu_init(COAP_MESSAGE_CON, method, 0, coap_session_max_pdu_size(session));
+    pdu = coap_pdu_init(COAP_MESSAGE_CON, method, coap_new_message_id(session), coap_session_max_pdu_size(session));
     if (!pdu)
     {
         logger(LOG_TAG, LOG_LEVEL_ERROR, "Not Created PDU (Forwarding)");
@@ -1362,7 +1561,25 @@ void coap_forwarding(oneM2MPrimitive *o2pt, Protocol protocol, char *host, int p
         return;
     }
 
-    // Set the request options
+    /* Token */
+    uint8_t token[8];
+    size_t tokenlen;
+
+    coap_session_init_token(session, the_token.length, the_token.s);
+
+    if (the_token.length > COAP_TOKEN_DEFAULT_MAX) {
+        coap_session_new_token(session, &tokenlen, token);
+        /* Update the last part 8 bytes of the large token */
+        memcpy(&the_token.s[the_token.length - tokenlen], token, tokenlen);
+    } else {
+        coap_session_new_token(session, &the_token.length, the_token.s);
+    }
+    track_new_token(the_token.length, the_token.s);
+    if (!coap_add_token(pdu, the_token.length, the_token.s)) {
+        logger(LOG_TAG, LOG_LEVEL_DEBUG, "Can't add token to request\n");
+    }
+
+    /* Option */
     coap_add_option(pdu, COAP_OPTION_URI_PATH, strlen(o2pt->to), (uint8_t *)o2pt->to);
 
     unsigned char buf[2];
@@ -1417,7 +1634,7 @@ void coap_forwarding(oneM2MPrimitive *o2pt, Protocol protocol, char *host, int p
             coap_add_option(pdu, COAP_OPTION_URI_QUERY, strlen(qs), (uint8_t *)qs);
     }
 
-    // Set the request payload
+    /* Payload */
     if (o2pt->request_pc)
     {
         char *normalized_pc = cJSON_Print(o2pt->request_pc);
@@ -1434,8 +1651,11 @@ void coap_forwarding(oneM2MPrimitive *o2pt, Protocol protocol, char *host, int p
         logger(LOG_TAG, LOG_LEVEL_ERROR, "Failed to send (Forwarding)");
         return;
     }
-
-    coap_io_process(ctx, COAP_IO_WAIT);
+    
+    while (coap_io_pending(ctx))
+    {
+        coap_io_process(ctx, COAP_IO_WAIT);
+    }
 
     o2pt->rsc = fwd_rsc;
     if (fwd_response_pc)
