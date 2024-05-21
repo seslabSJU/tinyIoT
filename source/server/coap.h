@@ -32,14 +32,16 @@
 
 typedef struct
 {
-    uint8_t ver;
     coap_pdu_type_t type;
-    uint8_t code;
-    uint8_t *token;
-    uint8_t token_len;
-    uint16_t message_id;
-    uint16_t option_cnt;
+    coap_pdu_code_t code;
+    coap_bin_const_t token;
+    coap_mid_t message_id;
+    int option_cnt;
 } coapPacket;
+
+typedef struct {
+    coap_binary_t *token;
+} track_token;
 
 void *coap_serve();
 void coap_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt);
@@ -87,4 +89,17 @@ typedef struct valid_pki_snis_t {
 } valid_pki_snis_t;
 
 static valid_pki_snis_t valid_pki_snis = {0, NULL};
+
+typedef struct ih_def_t {
+  char *hint_match;
+  coap_bin_const_t *new_identity;
+  coap_bin_const_t *new_key;
+} ih_def_t;
+
+typedef struct valid_ihs_t {
+  size_t count;
+  ih_def_t *ih_list;
+} valid_ihs_t;
+
+static valid_ihs_t valid_ihs = {0, NULL};
 #endif
