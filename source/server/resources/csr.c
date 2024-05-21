@@ -41,10 +41,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
     cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));
 
-    o2pt->response_pc = root;
-    o2pt->rsc = RSC_CREATED;
-
-    // Add uri attribute
+        // Add uri attribute
     char *ptr = malloc(1024);
     cJSON *rn = cJSON_GetObjectItem(csr, "rn");
     sprintf(ptr, "%s/%s", get_uri_rtnode(parent_rtnode), rn->valuestring);
@@ -64,6 +61,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
     RTNode *rtnode = create_rtnode(csr, RT_CSR);
     add_child_resource_tree(parent_rtnode, rtnode);
+    make_response_body(o2pt, rtnode);
 
     // update descendent cse
     cJSON *dcse = cJSON_GetObjectItem(rt->cb->obj, "dcse");
@@ -75,7 +73,8 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     logger("UTIL", LOG_LEVEL_INFO, "add dcse %s", cJSON_GetObjectItem(csr, "csi")->valuestring);
     cJSON_AddItemToArray(dcse, cJSON_CreateString(cJSON_GetObjectItem(csr, "csi")->valuestring));
     update_remote_csr_dcse(rtnode);
-
+    logger("UTIL", LOG_LEVEL_INFO, "%s", cJSON_Print(root));
+    o2pt->rsc = RSC_CREATED;
     return RSC_CREATED;
 }
 

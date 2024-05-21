@@ -10,6 +10,7 @@ extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
 
 NodeList *nodes = NULL;
+int node_cnt = 0;
 
 /**
  * @brief retrieve empty node from queue if not exist, create new node
@@ -21,8 +22,11 @@ RTNode *blank_rtnode()
 
     if (!nodes)
     {
+        node_cnt++;
+        logger("UTIL", LOG_LEVEL_DEBUG, "Create New Node : %d", node_cnt);
         return (RTNode *)calloc(1, sizeof(RTNode));
     }
+    logger("UTIL", LOG_LEVEL_DEBUG, "Retrieve Node from Queue %d", node_cnt);
     rtnode = nodes->rtnode;
     del = nodes;
     nodes = nodes->next;
@@ -388,18 +392,21 @@ RTNode *find_rtnode_by_ri(char *ri)
  */
 RTNode *rt_search_ri(RTNode *rtnode, char *ri)
 {
+    logger("UTIL", LOG_LEVEL_DEBUG, "rt_search_ri %s", ri);
     RTNode *ret = NULL;
     if (!rtnode)
         return NULL;
     while (rtnode)
     {
-        if (rtnode->child)
-            ret = rt_search_ri(rtnode->child, ri);
+        logger("UTIL", LOG_LEVEL_DEBUG, "\trtnode : %s, %s", rtnode->uri, get_ri_rtnode(rtnode));
         if (!strcmp(get_ri_rtnode(rtnode), ri))
         {
+            logger("UTIL", LOG_LEVEL_DEBUG, "Found Resource Node : %s", get_ri_rtnode(rtnode));
             ret = rtnode;
             break;
         }
+        if (rtnode->child)
+            ret = rt_search_ri(rtnode->child, ri);
         rtnode = rtnode->sibling_right;
     }
 

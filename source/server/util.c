@@ -24,7 +24,7 @@
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
 O2ptList *o2pt_list = NULL;
-// int o2pt_cnt = 0;
+int o2pt_cnt = 0;
 
 oneM2MPrimitive *blank_o2pt()
 {
@@ -32,11 +32,11 @@ oneM2MPrimitive *blank_o2pt()
 	oneM2MPrimitive *o2pt = NULL;
 	if (!o2pt_list)
 	{
-		// o2pt_cnt++;
-		logger("UTIL", LOG_LEVEL_DEBUG, "Allocating new o2pt");
+		o2pt_cnt++;
+		logger("UTIL", LOG_LEVEL_DEBUG, "Allocating new o2pt : %d", o2pt_cnt);
 		return calloc(1, sizeof(oneM2MPrimitive));
 	}
-	logger("UTIL", LOG_LEVEL_DEBUG, "Using pre-allocated o2pt");
+	logger("UTIL", LOG_LEVEL_DEBUG, "Using pre-allocated o2pt %d", o2pt_cnt);
 	del = o2pt_list;
 	o2pt_list = del->next;
 	o2pt = del->o2pt;
@@ -2821,7 +2821,7 @@ int register_remote_cse()
 	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
 	logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration check: %d", res->status_code);
 	status_code = res->status_code;
-	if (status_code == 999 || status_code == 500)
+	if (status_code == 999 || status_code == 500 || status_code == 504)
 	{
 		logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE is not running");
 		free_HTTPRequest(req);
@@ -3510,16 +3510,13 @@ ResourceAddressingType checkResourceAddressingType(char *uri)
 	{
 		return SP_RELATIVE;
 	}
-	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strcmp(uri, "coap://") == 0)
+	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strncmp(uri, "coap://", 7) == 0 ||
+			 strncmp(uri, "HTTP://", 7) == 0 || strncmp(uri, "MQTT://", 7) == 0 || strncmp(uri, "COAP://", 7) == 0)
 	{
 		return PROTOCOL_BINDING;
 	}
-	else
-	{
-		return CSE_RELATIVE;
-	}
 
-	return -1;
+	return CSE_RELATIVE;
 }
 
 /**

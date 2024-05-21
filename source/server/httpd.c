@@ -38,6 +38,7 @@ void *respond_thread(void *ps)
     respond(slot);
     close(clients[slot]);
     clients[slot] = -1;
+    pthread_detach(pthread_self());
     return NULL;
 }
 
