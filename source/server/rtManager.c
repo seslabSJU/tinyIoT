@@ -631,22 +631,27 @@ void add_subs(RTNode *parent, RTNode *sub)
 void detach_subs(RTNode *parent, RTNode *sub)
 {
     NodeList *psub = parent->subs;
+    NodeList *del = NULL;
     if (!psub)
     {
         return;
     }
     if (psub->rtnode == sub)
     {
+        del = psub;
         parent->subs = psub->next;
         parent->sub_cnt--;
+        // free_nodelist(del);
         return;
     }
     while (psub->next)
     {
         if (psub->next->rtnode == sub)
         {
+            del = psub->next;
             psub->next = psub->next->next;
             parent->sub_cnt--;
+            // free_nodelist(del);
             return;
         }
         psub = psub->next;

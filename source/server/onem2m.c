@@ -215,41 +215,27 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	lim = cJSON_GetObjectItem(o2pt->fc, "lim");
 	ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
 	lvl = cJSON_GetObjectItem(o2pt->fc, "lvl");
-	switch (o2pt->rcn)
-	{
-	case RCN_ATTRIBUTES:
-		break;
-	case RCN_CHILD_RESOURCES:
-		root = cJSON_CreateObject();
 
-		build_rcn8(o2pt, target_rtnode, root, ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
-		break;
-	case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
-		root = cJSON_CreateObject();
-		lim = cJSON_GetObjectItem(o2pt->fc, "lim");
-		ofst = cJSON_GetObjectItem(o2pt->fc, "ofst");
-		build_rcn4(o2pt, target_rtnode, cJSON_AddObjectToObject(root, get_resource_key(target_rtnode->ty)),
-				   ofst ? ofst->valueint : 0, lim ? lim->valueint : DEFAULT_DISCOVERY_LIMIT, lvl ? lvl->valueint : 10000);
-		break;
-	case RCN_CHILD_RESOURCE_REFERENCES:
-		break;
-	}
-	if (root)
-	{
-		o2pt->response_pc = root;
-	}
+	make_response_body(o2pt, target_rtnode);
 
 	delete_process(o2pt, target_rtnode);
-
 	db_delete_onem2m_resource(target_rtnode);
 
 	if (target_rtnode->ty == RT_CIN)
 	{
-		cJSON *pjson = cJSON_GetObjectItem(target_rtnode->parent->obj, "cni");
-		if (pjson && pjson->valueint > 0)
+		// logger("O2M", LOG_LEVEL_DEBUG, "delete cin rtnode %s", target_rtnode->rn);
+		if (!strcmp(target_rtnode->rn, "la"))
 		{
 			cJSON_Delete(target_rtnode->obj);
 			target_rtnode->obj = db_get_cin_laol(target_rtnode->parent, 0);
+			if (!target_rtnode->obj)
+			{
+				free_rtnode(target_rtnode);
+			}
+		}
+		else
+		{
+			free_rtnode(target_rtnode);
 		}
 	}
 	else
@@ -424,13 +410,16 @@ void free_rtnode(RTNode *rtnode)
 	}
 	if (rtnode->child)
 	{
-		free_rtnode_list(rtnode->child);
-		rtnode->child = NULL;
+		while (rtnode->child)
+		{
+			free_rtnode(rtnode->child);
+		}
 	}
 
 	if (rtnode->subs)
 	{
 		free_all_nodelist(rtnode->subs);
+
 		rtnode->subs = NULL;
 	}
 
@@ -738,8 +727,12 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 			}
 			if (req_o2pt->op != OP_DELETE && target_rtnode->ty == RT_CIN)
 			{
-				free_rtnode(target_rtnode);
-				target_rtnode = NULL;
+				if (strcmp(target_rtnode->rn, "la"))
+				{
+					logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
+					free_rtnode(target_rtnode);
+					target_rtnode = NULL;
+				}
 			}
 			if (RAT == SP_RELATIVE && !isSpRelativeLocal(mid))
 			{
@@ -959,13 +952,13 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			{
 				del = node;
 				node = node->next;
-				logger("O2M", LOG_LEVEL_DEBUG, "delete_process %s", del->uri);
+				logger("O2M", LOG_LEVEL_DEBUG, "deleting [%s]", del->uri);
 				delete_process(o2pt, del->rtnode);
-				logger("O2M", LOG_LEVEL_DEBUG, "delete_process done");
-				logger("O2M", LOG_LEVEL_DEBUG, "%s", del->uri);
+				logger("O2M", LOG_LEVEL_DEBUG, "delete_process done [%s]", del->uri);
 				db_delete_onem2m_resource(del->rtnode);
 				logger("O2M", LOG_LEVEL_DEBUG, "db_delete_onem2m_resource done");
 				free_rtnode(del->rtnode);
+				free_nodelist(del);
 				del = NULL;
 				continue;
 			}
@@ -978,32 +971,33 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 	node = NULL;
 
-	if (target_rtnode->ty == RT_SUB && net == NET_DELETE_OF_RESOURCE)
-	{
-		logger("O2M", LOG_LEVEL_DEBUG, "notify delete sub");
-		cJSON_AddItemToObject(nev, "sur", cJSON_CreateString(target_rtnode->uri));
-		cJSON_AddItemToObject(sgn, "sud", cJSON_CreateBool(true));
-		notify_to_nu(target_rtnode, noti_cjson, net);
-		cJSON_DeleteItemFromObject(sgn, "sud");
-	}
-
 	if (net == NET_DELETE_OF_RESOURCE)
 	{
-		logger("O2M", LOG_LEVEL_DEBUG, "notify delete child resource");
-		net = NET_DELETE_OF_DIRECT_CHILD_RESOURCE;
-		cJSON_SetNumberValue(cJSON_GetObjectItem(nev, "net"), net);
-		if (target_rtnode->parent->sub_cnt > 0)
-			node = target_rtnode->parent->subs;
-
-		while (node)
+		if (target_rtnode->ty == RT_SUB)
 		{
-			cJSON_AddStringToObject(sgn, "sur", node->rtnode->uri);
-			notify_to_nu(node->rtnode, noti_cjson, net);
-			cJSON_DeleteItemFromObject(sgn, "sur");
-			node = node->next;
+			logger("O2M", LOG_LEVEL_DEBUG, "notify delete sub");
+			cJSON_AddItemToObject(nev, "sur", cJSON_CreateString(target_rtnode->uri));
+			cJSON_AddItemToObject(sgn, "sud", cJSON_CreateBool(true));
+			notify_to_nu(target_rtnode, noti_cjson, net);
+			cJSON_DeleteItemFromObject(sgn, "sud");
+		}
+		else
+		{
+			logger("O2M", LOG_LEVEL_DEBUG, "notify delete child resource");
+			net = NET_DELETE_OF_DIRECT_CHILD_RESOURCE;
+			cJSON_SetNumberValue(cJSON_GetObjectItem(nev, "net"), net);
+			if (target_rtnode->parent->sub_cnt > 0)
+				node = target_rtnode->parent->subs;
+
+			while (node)
+			{
+				cJSON_AddStringToObject(sgn, "sur", node->rtnode->uri);
+				notify_to_nu(node->rtnode, noti_cjson, net);
+				cJSON_DeleteItemFromObject(sgn, "sur");
+				node = node->next;
+			}
 		}
 	}
-
 	cJSON_Delete(noti_cjson);
 
 	return 1;

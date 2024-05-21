@@ -43,7 +43,7 @@ pthread_t coap;
 int coap_thread_id;
 #ifdef ENABLE_COAP_DTLS
 extern char *cert_file;
-extern char *key_file;	
+extern char *key_file;
 extern char *ca_file;
 extern char *root_ca_file;
 extern uint8_t *key;
@@ -109,24 +109,24 @@ int main(int argc, char **argv)
 	int opt;
 	while ((opt = getopt(argc, argv, "c:C:h:j:k:r")) != -1)
 	{
-    	switch (opt) 
+		switch (opt)
 		{
-		case 'c' :
+		case 'c':
 			cert_file = optarg;
 			break;
-		case 'C' :
+		case 'C':
 			ca_file = optarg;
 			break;
-		case 'j' :
+		case 'j':
 			key_file = optarg;
 			break;
-		case 'k' :
+		case 'k':
 			key_length = cmdline_read_key(optarg, &key, MAX_KEY);
 			if (key_length < 0)
 				break;
 			key_defined = 1;
 			break;
-		case 'r' :
+		case 'r':
 			root_ca_file = optarg;
 			break;
 		}
@@ -310,6 +310,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			o2pt->rcn == RCN_SEMANTIC_CONTENT ||
 			o2pt->rcn == RCN_PERMISSIONS)
 		{
+
 			handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for delete operation");
 			break;
 		}

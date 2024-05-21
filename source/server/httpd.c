@@ -463,16 +463,22 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
 
     write(clients[slotno], buf, strlen(buf));
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buf);
+
+    if (pc)
+    {
+        free(pc);
+        pc = NULL;
+    }
 }
 
-int http_notify(oneM2MPrimitive *o2pt, char *host, int port)
+int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
 {
     int rsc = 0;
     logger("HTTP", LOG_LEVEL_DEBUG, "http_notify %s:%d", host, port);
     HTTPRequest *req = (HTTPRequest *)calloc(1, sizeof(HTTPRequest));
     HTTPResponse *res = (HTTPResponse *)calloc(1, sizeof(HTTPResponse));
     req->method = op_to_method(o2pt->op);
-    req->payload = o2pt->request_pc ? cJSON_PrintUnformatted(o2pt->request_pc) : NULL;
+    req->payload = strdup(nt->noti_json);
     req->payload_size = strlen(req->payload);
     req->uri = strdup(o2pt->to);
     req->headers = calloc(1, sizeof(header_t));
@@ -821,6 +827,8 @@ void free_HTTPResponse(HTTPResponse *res)
 {
     header_t *h = res->headers;
     header_t *tmp;
+    if (res->protocol)
+        free(res->protocol);
     if (res->status_msg)
         free(res->status_msg);
     if (res->payload)

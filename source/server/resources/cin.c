@@ -98,6 +98,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB store fail");
         free_rtnode(cin_rtnode);
+        cJSON_Delete(root);
         return o2pt->rsc;
     }
 
@@ -126,8 +127,8 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         {
             cJSON_Delete(rtnode->obj);
             rtnode->obj = cJSON_Duplicate(cin, 1);
+            cJSON_DetachItemFromObject(root, "m2m:cin");
             free_rtnode(cin_rtnode);
-            root = NULL;
         }
     }
     cJSON_DetachItemFromObject(root, "m2m:cin");

@@ -1358,6 +1358,9 @@ int handle_error(oneM2MPrimitive *o2pt, int rsc, char *err)
 	o2pt->rsc = rsc;
 	o2pt->errFlag = true;
 	cJSON_AddItemToObject(root, "m2m:dbg", cJSON_CreateString(err));
+	if (o2pt->response_pc)
+		cJSON_Delete(o2pt->response_pc);
+	o2pt->response_pc = root;
 	return rsc;
 }
 
@@ -1423,13 +1426,13 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), cJSON_Duplicate(target_rtnode->obj, true));
 		break;
 	case RCN_HIERARCHICAL_ADDRESS:
-		cJSON_AddItemReferenceToObject(root, "m2m:uri", cJSON_CreateString(target_rtnode->uri));
+		cJSON_AddItemToObject(root, "m2m:uri", cJSON_CreateString(target_rtnode->uri));
 		break;
 	case RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES:
 		pjson = cJSON_CreateObject();
-		cJSON_AddItemToObject(pjson, get_resource_key(target_rtnode->ty), target_rtnode->obj);
+		cJSON_AddItemReferenceToObject(pjson, get_resource_key(target_rtnode->ty), target_rtnode->obj);
 		cJSON_AddItemToObject(pjson, "uri", cJSON_CreateString(target_rtnode->uri));
-		cJSON_AddItemReferenceToObject(root, "m2m:rce", pjson);
+		cJSON_AddItemToObject(root, "m2m:rce", pjson);
 		break;
 	case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
 		build_rcn4(o2pt, target_rtnode, root, ofst, lim, lvl);
@@ -1449,8 +1452,10 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	case RCN_MODIFIED_ATTRIBUTES:
 		if (!o2pt->request_pc)
 		{
+			cJSON_Delete(root);
 			return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "Internal Server Error");
 		}
+		cJSON_Delete(root);
 		root = cJSON_Duplicate(o2pt->request_pc, true);
 		break;
 	case RCN_SEMANTIC_CONTENT:
@@ -1461,8 +1466,14 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		break;
 	}
 
+	if (o2pt->response_pc)
+	{
+		cJSON_Delete(o2pt->response_pc);
+	}
+
 	if (root)
 	{
+
 		o2pt->response_pc = root;
 	}
 
@@ -1898,8 +1909,6 @@ void o2ptcpy(oneM2MPrimitive **dest, oneM2MPrimitive *src)
 		(*dest)->fopt = strdup(src->fopt);
 	if (src->ip)
 		(*dest)->ip = strdup(src->ip);
-	if (src->fopt)
-		(*dest)->fopt = strdup(src->fopt);
 	(*dest)->rcn = src->rcn;
 	(*dest)->ty = src->ty;
 	(*dest)->op = src->op;
@@ -2284,6 +2293,10 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 #endif
 				break;
 			}
+			if (host)
+				free(host);
+			if (path)
+				free(path);
 		}
 	}
 
@@ -2334,19 +2347,20 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		if (parsePoa(noti_uri, &prot, &host, &port, &path) == -1)
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "poa parse error");
+			free(nt);
 			return RSC_BAD_REQUEST;
 		}
 		o2pt->to = strdup(path);
 		strncpy(nt->host, host, 1024);
 		nt->port = port;
 		nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
-		strncpy(nt->target, path, 1024);
+		strncpy(nt->target, path, 256);
 		nt->prot = prot;
 
 		switch (prot)
 		{
 		case PROT_HTTP:
-			rsc = http_notify(o2pt, host, port);
+			rsc = http_notify(o2pt, host, port, nt);
 			if (rsc >= 400)
 				rsc = RSC_BAD_REQUEST;
 			break;
@@ -2354,16 +2368,23 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 #ifdef ENABLE_MQTT
 			mqtt_notify(o2pt, noti_cjson, nt);
 #endif
+			break;
 #ifdef ENABLE_COAP
 		case PROT_COAP:
 			coap_notify(o2pt, noti_cjson, nt);
-			break;
 #endif
 			break;
 		}
+
+		free(nt->noti_json);
+		free(nt);
+		if (host)
+			free(host);
+		if (path)
+			free(path);
 	}
 
-	o2pt->fr = NULL;
+	// o2pt->fr = NULL;
 	free_o2pt(o2pt);
 	if (rsc == RSC_BAD_REQUEST || rsc == RSC_TARGET_NOT_REACHABLE)
 	{
@@ -2440,12 +2461,12 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 			strncpy(nt->host, host, 1024);
 			nt->port = port;
 			nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
-			strncpy(nt->target, path, 1024);
+			strncpy(nt->target, path, 256);
 			nt->prot = prot;
 			switch (prot)
 			{
 			case PROT_HTTP:
-				rsc = http_notify(o2pt, host, port);
+				rsc = http_notify(o2pt, host, port, nt);
 				break;
 			case PROT_MQTT:
 #ifdef ENABLE_MQTT
@@ -2458,11 +2479,16 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 #endif
 				break;
 			}
+			free(nt->noti_json);
+			free(nt);
+			if (host)
+				free(host);
+			if (path)
+				free(path);
 		}
 		free(noti_uri);
 	}
 
-	o2pt->fr = NULL;
 	free_o2pt(o2pt);
 	if (rsc == RSC_OK || rsc == 200)
 	{

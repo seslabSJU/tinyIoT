@@ -54,7 +54,7 @@ void set_header(char *key, char *value, char *response_headers);
 void normalize_payload(char *body);
 Operation http_parse_operation(char *method);
 void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno);
-int http_notify(oneM2MPrimitive *o2pt, char *host, int port);
+int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt);
 void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port);
 
 // user shall implement this function
