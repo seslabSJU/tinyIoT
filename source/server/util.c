@@ -80,7 +80,7 @@ int net_to_bit(cJSON *net)
 // TODO - move to http.c
 ResourceType http_parse_object_type(header_t *headers)
 {
-	char *content_type = search_header(headers, "Content-Type");
+	char *content_type = search_header(headers, "content-type");
 	if (!content_type)
 		return RT_MIXED;
 	char *str_ty = strstr(content_type, "ty=");
@@ -771,7 +771,11 @@ void init_server()
 #endif
 
 #ifdef ENABLE_COAP
+#ifdef ENABLE_COAP_DTLS
+	sprintf(poa, "coaps://%s:%d", SERVER_IP, COAP_PORT);
+#else
 	sprintf(poa, "coap://%s:%d", SERVER_IP, COAP_PORT);
+#endif
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 #endif
 
@@ -1374,6 +1378,9 @@ int handle_error(oneM2MPrimitive *o2pt, int rsc, char *err)
 	o2pt->rsc = rsc;
 	o2pt->errFlag = true;
 	cJSON_AddItemToObject(root, "m2m:dbg", cJSON_CreateString(err));
+	if (o2pt->response_pc)
+		cJSON_Delete(o2pt->response_pc);
+	o2pt->response_pc = root;
 	return rsc;
 }
 
@@ -1439,13 +1446,13 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), cJSON_Duplicate(target_rtnode->obj, true));
 		break;
 	case RCN_HIERARCHICAL_ADDRESS:
-		cJSON_AddItemReferenceToObject(root, "m2m:uri", cJSON_CreateString(target_rtnode->uri));
+		cJSON_AddItemToObject(root, "m2m:uri", cJSON_CreateString(target_rtnode->uri));
 		break;
 	case RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES:
 		pjson = cJSON_CreateObject();
-		cJSON_AddItemToObject(pjson, get_resource_key(target_rtnode->ty), target_rtnode->obj);
+		cJSON_AddItemReferenceToObject(pjson, get_resource_key(target_rtnode->ty), target_rtnode->obj);
 		cJSON_AddItemToObject(pjson, "uri", cJSON_CreateString(target_rtnode->uri));
-		cJSON_AddItemReferenceToObject(root, "m2m:rce", pjson);
+		cJSON_AddItemToObject(root, "m2m:rce", pjson);
 		break;
 	case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
 		build_rcn4(o2pt, target_rtnode, root, ofst, lim, lvl);
@@ -1465,8 +1472,10 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	case RCN_MODIFIED_ATTRIBUTES:
 		if (!o2pt->request_pc)
 		{
+			cJSON_Delete(root);
 			return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "Internal Server Error");
 		}
+		cJSON_Delete(root);
 		root = cJSON_Duplicate(o2pt->request_pc, true);
 		break;
 	case RCN_SEMANTIC_CONTENT:
@@ -1477,8 +1486,14 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		break;
 	}
 
+	if (o2pt->response_pc)
+	{
+		cJSON_Delete(o2pt->response_pc);
+	}
+
 	if (root)
 	{
+
 		o2pt->response_pc = root;
 	}
 
@@ -1590,7 +1605,7 @@ bool isSpRelativeLocal(char *address)
 	char *ptr = strchr(address + 1, '/');
 	if (ptr)
 		*ptr = '\0';
-	if (strncmp(address + 1, CSE_BASE_RI, strlen(CSE_BASE_RI)) == 0)
+	if (strcmp(address + 1, CSE_BASE_RI) == 0)
 	{
 		if (ptr)
 			*ptr = '/';
@@ -2312,6 +2327,10 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 #endif
 				break;
 			}
+			if (host)
+				free(host);
+			if (path)
+				free(path);
 		}
 	}
 
@@ -2363,18 +2382,19 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		if (parsePoa(noti_uri, &prot, &host, &port, &path) == -1)
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "poa parse error");
+			free(nt);
 			return RSC_BAD_REQUEST;
 		}
 		strncpy(o2pt->to, path, O2PT_BUF_SIZE - 1);
 		strncpy(nt->host, host, 1024);
 		nt->port = port;
 		nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
-		strncpy(nt->target, path, 512);
+		strncpy(nt->target, path, 256);
 		nt->prot = prot;
 		switch (prot)
 		{
 		case PROT_HTTP:
-			rsc = http_notify(o2pt, host, port);
+			rsc = http_notify(o2pt, host, port, nt);
 			if (rsc >= 400)
 				rsc = RSC_BAD_REQUEST;
 			break;
@@ -2382,14 +2402,20 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 #ifdef ENABLE_MQTT
 			mqtt_notify(o2pt, noti_cjson, nt);
 #endif
+			break;
 #ifdef ENABLE_COAP
 		case PROT_COAP:
 			coap_notify(o2pt, noti_cjson, nt);
-			break;
 #endif
 			break;
 		}
+
+		free(nt->noti_json);
 		free(nt);
+		if (host)
+			free(host);
+		if (path)
+			free(path);
 	}
 
 	memset(o2pt->fr, 0, O2PT_BUF_SIZE);
@@ -2471,12 +2497,12 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 			strncpy(nt->host, host, 1024);
 			nt->port = port;
 			nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
-			strncpy(nt->target, path, 512);
+			strncpy(nt->target, path, 256);
 			nt->prot = prot;
 			switch (prot)
 			{
 			case PROT_HTTP:
-				rsc = http_notify(o2pt, host, port);
+				rsc = http_notify(o2pt, host, port, nt);
 				break;
 			case PROT_MQTT:
 #ifdef ENABLE_MQTT
@@ -2489,6 +2515,12 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 #endif
 				break;
 			}
+			free(nt->noti_json);
+			free(nt);
+			if (host)
+				free(host);
+			if (path)
+				free(path);
 		}
 		free(noti_uri);
 	}
@@ -2861,7 +2893,7 @@ int register_remote_cse()
 		send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
 
 		char *rsc = 0;
-		if ((rsc = search_header(res->headers, "X-M2M-RSC")))
+		if ((rsc = search_header(res->headers, "x-m2m-rsc")))
 		{
 			if (atoi(rsc) != RSC_CREATED)
 			{
@@ -3460,21 +3492,41 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 	{
 		*prot = PROT_COAP;
 	}
+	else if (!strncmp(poa_str, "coaps://", 8))
+	{
+		*prot = PROT_COAPS;
+	}
 	else
 	{
 		free(p);
 		return -1;
 	}
-	ptr = strchr(p + 7, ':');
-	if (ptr)
+	if (*prot == PROT_COAPS)
 	{
-		*ptr = '\0';
-		*port = atoi(ptr + 1);
+		ptr = strchr(p + 8, ':');
+		if (ptr)
+		{
+			*ptr = '\0';
+			*port = atoi(ptr + 1);
+		}
+		*host = strdup(p + 8);
+		if (ptr)
+			*ptr = ':';
+		ptr = strchr(p + 8, '/');
 	}
-	*host = strdup(p + 7);
-	if (ptr)
-		*ptr = ':';
-	ptr = strchr(p + 7, '/');
+	else
+	{
+		ptr = strchr(p + 7, ':');
+		if (ptr)
+		{
+			*ptr = '\0';
+			*port = atoi(ptr + 1);
+		}
+		*host = strdup(p + 7);
+		if (ptr)
+			*ptr = ':';
+		ptr = strchr(p + 7, '/');
+	}
 	if (ptr)
 	{
 		*path = strdup(ptr);
@@ -3496,6 +3548,10 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 	else if (*prot == PROT_COAP && port == 0)
 	{
 		*port = 5683;
+	}
+	else if (*prot == PROT_COAPS && port == 0)
+	{
+		*port = 5684;
 	}
 	return 0;
 }

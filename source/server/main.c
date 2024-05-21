@@ -41,6 +41,30 @@ int mqtt_thread_id;
 #ifdef ENABLE_COAP
 pthread_t coap;
 int coap_thread_id;
+#ifdef ENABLE_COAP_DTLS
+extern char *cert_file;
+extern char *key_file;
+extern char *ca_file;
+extern char *root_ca_file;
+extern uint8_t *key;
+extern ssize_t key_length;
+extern int key_defined;
+
+static ssize_t cmdline_read_key(char *arg, unsigned char **buf, size_t maxlen)
+{
+	size_t len = strnlen(arg, maxlen);
+	if (len)
+	{
+		*buf = (unsigned char *)arg;
+		return len;
+	}
+
+	/* Need at least one byte for the pre-shared key */
+	logger("COAP", LOG_LEVEL_ERROR, "Invalid Pre-Shared Key specified\n");
+
+	return -1;
+}
+#endif
 #endif
 
 int main(int argc, char **argv)
@@ -80,6 +104,34 @@ int main(int argc, char **argv)
 	{
 		PORT = argv[2];
 	}
+
+#ifdef ENABLE_COAP_DTLS
+	int opt;
+	while ((opt = getopt(argc, argv, "c:C:h:j:k:r")) != -1)
+	{
+		switch (opt)
+		{
+		case 'c':
+			cert_file = optarg;
+			break;
+		case 'C':
+			ca_file = optarg;
+			break;
+		case 'j':
+			key_file = optarg;
+			break;
+		case 'k':
+			key_length = cmdline_read_key(optarg, &key, MAX_KEY);
+			if (key_length < 0)
+				break;
+			key_defined = 1;
+			break;
+		case 'r':
+			root_ca_file = optarg;
+			break;
+		}
+	}
+#endif
 
 	init_server();
 
@@ -258,6 +310,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			o2pt->rcn == RCN_SEMANTIC_CONTENT ||
 			o2pt->rcn == RCN_PERMISSIONS)
 		{
+
 			handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for delete operation");
 			break;
 		}

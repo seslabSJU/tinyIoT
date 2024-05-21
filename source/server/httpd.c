@@ -261,25 +261,25 @@ void handle_http_request(HTTPRequest *req, int slotno)
         o2pt->request_pc = cJSON_Parse(req->payload);
     }
 
-    if ((header = search_header(req->headers, "X-M2M-Origin")))
+    if ((header = search_header(req->headers, "x-m2m-origin")))
     {
         logger("HTTP", LOG_LEVEL_DEBUG, "fr: %s", header);
         strncpy(o2pt->fr, header, O2PT_BUF_SIZE - 1);
     }
 
-    if ((header = search_header(req->headers, "X-M2M-RI")))
+    if ((header = search_header(req->headers, "x-m2m-ri")))
     {
         strncpy(o2pt->rqi, header, O2PT_BUF_SIZE - 1);
         // o2pt->rqi = strdup(header);
     }
 
-    if ((header = search_header(req->headers, "X-M2M-RVI")))
+    if ((header = search_header(req->headers, "x-m2m-rvi")))
     {
         strncpy(o2pt->rvi, header, 6);
         // o2pt->rvi = strdup(header);
     }
 
-    if ((header = search_header(req->headers, "Content-Type")))
+    if ((header = search_header(req->headers, "content-type")))
     {
         if (strstr(header, "ty="))
         {
@@ -339,7 +339,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
 
     if (o2pt->op == OP_CREATE)
     {
-        o2pt->ty = http_parse_object_type(req->headers);
+        // o2pt->ty = http_parse_object_type(req->headers);
         if (o2pt->ty == 0)
         {
             o2pt->op = OP_NOTIFY;
@@ -466,16 +466,22 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
 
     write(clients[slotno], buf, strlen(buf));
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buf);
+
+    if (pc)
+    {
+        free(pc);
+        pc = NULL;
+    }
 }
 
-int http_notify(oneM2MPrimitive *o2pt, char *host, int port)
+int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
 {
     int rsc = 0;
     logger("HTTP", LOG_LEVEL_DEBUG, "http_notify %s:%d", host, port);
     HTTPRequest *req = (HTTPRequest *)calloc(1, sizeof(HTTPRequest));
     HTTPResponse *res = (HTTPResponse *)calloc(1, sizeof(HTTPResponse));
     req->method = op_to_method(o2pt->op);
-    req->payload = o2pt->request_pc ? cJSON_PrintUnformatted(o2pt->request_pc) : NULL;
+    req->payload = strdup(nt->noti_json);
     req->payload_size = strlen(req->payload);
     req->uri = strdup(o2pt->to);
     req->headers = calloc(1, sizeof(header_t));
@@ -540,7 +546,7 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
         req->payload_size = 0;
     }
     send_http_request(host, port, req, res);
-    char *rsc = search_header(res->headers, "X-M2M-RSC");
+    char *rsc = search_header(res->headers, "x-m2m-rsc");
     if (rsc)
         o2pt->rsc = atoi(rsc);
     else
@@ -595,6 +601,8 @@ void parse_http_request(HTTPRequest *req, char *packet)
         h->name = strdup(key);
         h->value = strdup(val);
 
+        headerToLowercase(h->name);
+
         t = val + 1 + strlen(val);
         if (t[1] == '\r' && t[2] == '\n')
             break;
@@ -605,7 +613,7 @@ void parse_http_request(HTTPRequest *req, char *packet)
     t = strtok(NULL, "\n");
     if (t && t[0] == '\r')
         t += 2;                                         // now the *t shall be the beginning of user payload
-    t2 = search_header(req->headers, "Content-Length"); // and the related header if there is
+    t2 = search_header(req->headers, "content-length"); // and the related header if there is
     if (t)
         req->payload = strdup(t);
     req->payload_size = t2 ? atol(t2) : 0;
@@ -634,6 +642,8 @@ void parse_http_response(HTTPResponse *res, char *packet)
         h->name = strdup(key);
         h->value = strdup(val);
 
+        headerToLowercase(h->name);
+
         t = val + 1 + strlen(val);
         if (t[1] == '\r' && t[2] == '\n')
             break;
@@ -644,7 +654,7 @@ void parse_http_response(HTTPResponse *res, char *packet)
     t = strtok(NULL, "\n");
     if (t && t[0] == '\r')
         t += 2;                                         // now the *t shall be the beginning of user payload
-    t2 = search_header(res->headers, "Content-Length"); // and the related header if there is
+    t2 = search_header(res->headers, "content-length"); // and the related header if there is
     if (t)
         res->payload = strdup(t);
     res->payload_size = t2 ? atol(t2) : 0;
@@ -822,6 +832,8 @@ void free_HTTPResponse(HTTPResponse *res)
 {
     header_t *h = res->headers;
     header_t *tmp;
+    if (res->protocol)
+        free(res->protocol);
     if (res->status_msg)
         free(res->status_msg);
     if (res->payload)
@@ -836,4 +848,12 @@ void free_HTTPResponse(HTTPResponse *res)
         free(tmp);
     }
     free(res);
+}
+
+void headerToLowercase(char *header)
+{
+    for (int i = 0; header[i]; i++)
+    {
+        header[i] = tolower(header[i]);
+    }
 }

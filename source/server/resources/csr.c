@@ -41,7 +41,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
     cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));
 
-        // Add uri attribute
+    // Add uri attribute
     char *ptr = malloc(1024);
     cJSON *rn = cJSON_GetObjectItem(csr, "rn");
     sprintf(ptr, "%s/%s", get_uri_rtnode(parent_rtnode), rn->valuestring);
