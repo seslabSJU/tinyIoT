@@ -12,6 +12,42 @@ AC_ARG_WITH([server-type],
              esac],
             [server_type=IN_CSE])  # Default to IN-CSE if not specified
 
+# IN-CSE
+AC_ARG_WITH([server-ip],
+            AS_HELP_STRING([--with-server-ip=IP],
+                           [Set the server IP]),
+            [server_ip="${withval}"])
+AC_ARG_WITH([server-port],
+            AS_HELP_STRING([--with-server-port=PORT],
+                           [Set the server port]),
+            [server_port="${withval}"])
+AC_ARG_WITH([cse-base-name],
+            AS_HELP_STRING([--with-cse-base-name=NAME],
+                           [Set the CSE base name]),
+            [cse_base_name="${withval}"])
+AC_ARG_WITH([cse-base-ri],
+            AS_HELP_STRING([--with-cse-base-ri=RI],
+                           [Set the CSE base RI]),
+            [cse_base_ri="${withval}"])
+
+# REMOTE_CSE (MN-CSE)
+AC_ARG_WITH([remote-cse-id],
+            AS_HELP_STRING([--with-remote-cse-id=ID],
+                           [Set the remote CSE ID]),
+            [remote_cse_id="${withval}"])
+AC_ARG_WITH([remote-cse-name],
+            AS_HELP_STRING([--with-remote-cse-name=NAME],
+                           [Set the remote CSE name]),
+            [remote_cse_name="${withval}"])
+AC_ARG_WITH([remote-cse-host],
+            AS_HELP_STRING([--with-remote-cse-host=HOST],
+                           [Set the remote CSE host]),
+            [remote_cse_host="${withval}"])
+AC_ARG_WITH([remote-cse-port],
+            AS_HELP_STRING([--with-remote-cse-port=PORT],
+                           [Set the remote CSE port]),
+            [remote_cse_port="${withval}"])
+
 # ENABLE_MQTT      
 AC_ARG_ENABLE([mqtt], 
               AS_HELP_STRING([--enable-mqtt],       
@@ -50,6 +86,17 @@ fi
 
 # Define config.h settings
 AC_DEFINE_UNQUOTED([SERVER_TYPE], [$server_type])
+
+AC_DEFINE_UNQUOTED([SERVER_IP], ["$server_ip"])
+AC_DEFINE_UNQUOTED([SERVER_PORT], ["$server_port"])
+AC_DEFINE_UNQUOTED([CSE_BASE_NAME], ["$cse_base_name"])
+AC_DEFINE_UNQUOTED([CSE_BASE_RI], ["$cse_base_ri"])
+
+AC_DEFINE_UNQUOTED([REMOTE_CSE_ID], ["$remote_cse_id"])
+AC_DEFINE_UNQUOTED([REMOTE_CSE_NAME], ["$remote_cse_name"])
+AC_DEFINE_UNQUOTED([REMOTE_CSE_HOST], ["$remote_cse_host"])
+AC_DEFINE_UNQUOTED([REMOTE_CSE_PORT], [$remote_cse_port])
+
 if test "x$enable_mqtt" = "xyes"; then
     AC_DEFINE([ENABLE_MQTT])
 fi
