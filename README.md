@@ -79,7 +79,7 @@ Default IP address and port number are 127.0.0.1 and 3000.
 	git clone --recursive https://github.com/seslabSJU/tinyIoT.git
 	```
     
-2. Move to the source directory      
+2. Move to the server directory      
 	```
 	cd tinyIoT/source/server
 	```   
