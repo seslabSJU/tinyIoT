@@ -79,9 +79,9 @@ Default IP address and port number are 127.0.0.1 and 3000.
 	git clone --recursive https://github.com/seslabSJU/tinyIoT.git
 	```
     
-2. Please enter the pico path of the file       
+2. Move to the source directory      
 	```
-	cd pico
+	cd tinyIoT/source/server
 	```   
         
 3. To make an excutable tinyIoT server, simply execute the make file.       
