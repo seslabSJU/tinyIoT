@@ -8,11 +8,9 @@ AC_ARG_WITH([server-type],
                            [Set the server type to MN-CSE or IN-CSE]),
             [case "${withval}" in
                 mn) server_type=MN_CSE ;;
-                *) server_type=IN_CSE ;;
-             esac],
-            [server_type=IN_CSE])  # Default to IN-CSE if not specified
+                *) server_type=IN_CSE ;; # Default to IN-CSE if not specified
+             esac])
 
-# IN-CSE
 AC_ARG_WITH([server-ip],
             AS_HELP_STRING([--with-server-ip=IP],
                            [Set the server IP]),
@@ -46,7 +44,11 @@ AC_ARG_WITH([remote-cse-host],
 AC_ARG_WITH([remote-cse-port],
             AS_HELP_STRING([--with-remote-cse-port=PORT],
                            [Set the remote CSE port]),
-            [remote_cse_port="${withval}"])
+            [if test -z "${withval}"; then
+                remote_cse_port=0
+             else
+                remote_cse_port="${withval}"
+             fi])
 
 # ENABLE_MQTT      
 AC_ARG_ENABLE([mqtt], 
@@ -80,8 +82,7 @@ AC_ARG_ENABLE([coaps],
 
 # Check for openssl and crypto libraries if CoAP or CoAPS is enabled
 if test "x$enable_coap" = "xyes" || test "x$enable_coaps" = "xyes"; then
-    AC_CHECK_LIB([ssl], [SSL_library_init])
-    AC_CHECK_LIB([crypto], [CRYPTO_new])
+    PKG_CHECK_MODULES([OPENSSL], [openssl])
 fi
 
 # Define config.h settings

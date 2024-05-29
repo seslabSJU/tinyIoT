@@ -10,14 +10,16 @@ RSCSRC = $(wildcard resources/*.c)
 OBJS = $(SRCS:.c=.o) $(RSCSRC:.c=.o) 
 
 ifeq (@ENABLE_MQTT@,yes)
-MQTT = mqttClient.c wolfmqtt/mqtt_client.c wolfmqtt/mqtt_packet.c wolfmqtt/mqtt_socket.c
-OBJS += $(MQTT:.c=.o)
+MQTT = mqttClient.c
+WOLFMQTT = $(wildcard wolfmqtt/*.c)
+OBJS += $(MQTT:.c=.o) $(WOLFMQTT:.c=.o)
 endif
 
 ifeq (@ENABLE_COAP@,yes)
 LIBS += -lssl -lcrypto
-COAP = coap.c libcoap/coap_address.c libcoap/coap_asn1.c libcoap/coap_async.c libcoap/coap_block.c libcoap/coap_cache.c libcoap/coap_debug.c libcoap/coap_dtls.c libcoap/coap_encode.c libcoap/coap_event.c libcoap/coap_hashkey.c libcoap/coap_io.c libcoap/coap_layers.c libcoap/coap_mem.c libcoap/coap_net.c libcoap/coap_netif.c libcoap/coap_notls.c libcoap/coap_openssl.c libcoap/coap_option.c libcoap/coap_oscore.c libcoap/coap_pdu.c libcoap/coap_prng.c libcoap/coap_resource.c libcoap/coap_session.c libcoap/coap_str.c libcoap/coap_subscribe.c libcoap/coap_tcp.c libcoap/coap_time.c libcoap/coap_uri.c libcoap/coap_ws.c 
-OBJS += $(COAP:.c=.o)
+COAP = coap.c 
+LIBCOAP = $(wildcard libcoap/*.c)
+OBJS += $(COAP:.c=.o) $(LIBCOAP:.c=.o)
 endif
 
 RELEXE = server
