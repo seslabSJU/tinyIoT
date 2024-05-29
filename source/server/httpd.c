@@ -723,7 +723,8 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
 
     if (req->qs == bs)
         req->qs = NULL;
-    send(sock, buffer, sizeof(buffer), 0);
+
+    send(sock, buffer, strlen(buffer), 0);
     if (res == NULL)
     {
         close(sock);
@@ -745,6 +746,7 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
     }
     else
     { // message received
+        // logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buffer);
         parse_http_response(res, buffer);
         if (res->payload_size > 0 && ((res->payload == NULL) || strlen(res->payload) == 0))
         { // if there is payload but it is not in the buffer
