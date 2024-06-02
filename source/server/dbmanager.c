@@ -1487,6 +1487,7 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
         strcat(sql, buf);
     }
     strcat(sql, ";");
+    logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if (rc != SQLITE_OK)
     {

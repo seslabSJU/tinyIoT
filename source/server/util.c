@@ -1421,6 +1421,8 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	switch (o2pt->rcn)
 	{
 	case RCN_NOTHING:
+		cJSON_Delete(root);
+		root = NULL;
 		break;
 	case RCN_ATTRIBUTES:
 		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), cJSON_Duplicate(target_rtnode->obj, true));
@@ -2435,13 +2437,25 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 		else if (rat == SP_RELATIVE)
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "SP_RELATIVE");
-			rtnode = get_remote_resource(noti_uri, &rsc);
-			if (rtnode)
-			{
-				rsc = requestToResource(o2pt, rtnode);
-				free_rtnode(rtnode);
-				rtnode = NULL;
-			}
+			oneM2MPrimitive noti_o2pt;
+			noti_o2pt.op = OP_NOTIFY;
+			noti_o2pt.fr = strdup("/" CSE_BASE_RI);
+			noti_o2pt.to = strdup(noti_uri);
+			noti_o2pt.rqi = strdup("notify");
+			noti_o2pt.request_pc = cJSON_Duplicate(noti_cjson, true);
+
+			forwarding_onem2m_resource(&noti_o2pt, find_csr_rtnode_by_uri(noti_uri));
+			// rtnode = get_remote_resource(noti_uri, &rsc);
+			// if (rtnode)
+			// {
+			// 	rsc = requestToResource(o2pt, rtnode);
+			// 	free_rtnode(rtnode);
+			// 	rtnode = NULL;
+			// }
+			// else
+			// {
+			// 	logger("UTIL", LOG_LEVEL_DEBUG, "SP_RELATIVE resource not found");
+			// }
 		}
 		else if (rat == PROTOCOL_BINDING)
 		{
@@ -2810,12 +2824,15 @@ int register_remote_cse()
 	add_header("X-M2M-Origin", "/" CSE_BASE_RI, req->headers);
 	add_header("X-M2M-RI", "check-cse-registered", req->headers);
 	add_header("Accept", "application/json", req->headers);
-	add_header("Content-Type", "application/json", req->headers);
+	// add_header("Content-Type", "application/json", req->headers);
 	add_header("X-M2M-RVI", "2a", req->headers);
 
 	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
 	logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration check: %d", res->status_code);
 	status_code = res->status_code;
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration check: %s", search_header(res->headers, "x-m2m-rsc"));
+
 	if (status_code == 999 || status_code == 500)
 	{
 		logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE is not running");
@@ -2854,10 +2871,12 @@ int register_remote_cse()
 
 		req->payload_size = strlen(req->payload);
 		send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
-
+		logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration: %d", res->status_code);
+		logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration: %s", res->payload);
 		char *rsc = 0;
 		if ((rsc = search_header(res->headers, "x-m2m-rsc")))
 		{
+			logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration: %s", rsc);
 			if (atoi(rsc) != RSC_CREATED)
 			{
 				logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE registration failed");
@@ -2898,7 +2917,7 @@ int create_local_csr()
 	add_header("X-M2M-Origin", "/" CSE_BASE_RI, req->headers);
 	add_header("X-M2M-RI", "retrieve-cb", req->headers);
 	add_header("Accept", "application/json", req->headers);
-	add_header("Content-Type", "application/json", req->headers);
+	// add_header("Content-Type", "application/json", req->headers);
 	add_header("X-M2M-RVI", "2a", req->headers);
 
 	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);

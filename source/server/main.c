@@ -153,7 +153,7 @@ int main(int argc, char **argv)
 	}
 
 #ifdef ENABLE_MQTT
-	mqtt_thread_id = pthread_create(&mqtt, NULL, mqtt_serve, "mqtt Client");
+	mqtt_thread_id = pthread_create(&mqtt, NULL, (void *)mqtt_serve, "mqtt Client");
 	if (mqtt_thread_id < 0)
 	{
 		fprintf(stderr, "MQTT thread create error\n");

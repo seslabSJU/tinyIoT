@@ -101,20 +101,23 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
         if (strlen(target_uri) > strlen(get_uri_rtnode(rtnode)))
         {
             char *fopt_start = strstr(target_uri, "/fopt");
-            if (strlen(fopt_start) == 5)
+            if (fopt_start)
             {
-                if (strncmp(fopt_start, "/fopt", 5) == 0)
+                if (strlen(fopt_start) == 5)
                 {
-                    o2pt->isFopt = true;
-                    o2pt->fopt = NULL;
+                    if (strncmp(fopt_start, "/fopt", 5) == 0)
+                    {
+                        o2pt->isFopt = true;
+                        o2pt->fopt = NULL;
+                    }
                 }
-            }
-            else if (strlen(fopt_start) > 5)
-            {
-                if (fopt_start[5] == '/')
+                else if (strlen(fopt_start) > 5)
                 {
-                    o2pt->fopt = strdup(fopt_start + 5);
-                    o2pt->isFopt = true;
+                    if (fopt_start[5] == '/')
+                    {
+                        o2pt->fopt = strdup(fopt_start + 5);
+                        o2pt->isFopt = true;
+                    }
                 }
             }
         }

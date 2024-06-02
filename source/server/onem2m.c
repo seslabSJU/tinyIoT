@@ -782,7 +782,8 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
  */
 int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-	logger("MAIN", LOG_LEVEL_DEBUG, "Discover Resource");
+	char *orig_to = NULL;
+	logger("MAIN", LOG_LEVEL_DEBUG, "Discover Resource %s", o2pt->to);
 	cJSON *fc = o2pt->fc;
 	cJSON *pjson = NULL, *pjson2 = NULL;
 	cJSON *acpi_obj = NULL;
@@ -804,6 +805,8 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_WARN, "Empty Filter Criteria");
 		return RSC_BAD_REQUEST;
 	}
+	orig_to = o2pt->to;
+	o2pt->to = strdup(target_rtnode->uri);
 
 	list = db_get_filter_criteria(o2pt);
 	lSize = cJSON_GetArraySize(list);
@@ -838,6 +841,8 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		cJSON_AddItemToObject(root, "m2m:rrl", list);
 
 	o2pt->response_pc = root;
+	free(o2pt->to);
+	o2pt->to = orig_to;
 
 	return o2pt->rsc = RSC_OK;
 }

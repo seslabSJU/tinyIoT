@@ -437,7 +437,9 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
 
     sprintf(content_length, "%ld", pc ? strlen(pc) : 0);
     sprintf(rsc, "%d", o2pt->rsc);
-    set_header("Content-Length", content_length, response_headers);
+    if (o2pt->response_pc)
+        set_header("Content-Length", content_length, response_headers);
+
     set_header("X-M2M-RSC", rsc, response_headers);
     set_header("X-M2M-RVI", o2pt->rvi, response_headers);
     set_header("X-M2M-RI", o2pt->rqi, response_headers);
@@ -746,7 +748,7 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
     }
     else
     { // message received
-        // logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buffer);
+        logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buffer);
         parse_http_response(res, buffer);
         if (res->payload_size > 0 && ((res->payload == NULL) || strlen(res->payload) == 0))
         { // if there is payload but it is not in the buffer
