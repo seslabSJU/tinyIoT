@@ -14,24 +14,71 @@ tinyIoT supports the following features:
 - Bindings: HTTP and MQTT (CoAP will be added in 2024 first quarter)
 - Group management 
 
-
-Tested Operating System: 
-  - Linux Ubuntu 22.04
-
+# Installation & Development Environment
 Configure your running environment with the config.h file. You can configure IP address, Port number, supported binding protocols, etc. 
 Default IP address and port number are 127.0.0.1 and 3000. 
 
-To make an excutable tinyIoT server, simply execute the make file. 
+### Tested Operating System
+  - Linux Ubuntu 22.04
 
-  $ make
+### Install with script
+1. Clone our repository!
+	```
+	git clone --recursive https://github.com/seslabSJU/tinyIoT.git
+	```
+    
+2. Move to the server directory      
+	```
+	cd tinyIoT/source/server
+	```   
 
-Use the following command to run tinyIoT server: 
+3. Configuration
+	
+ 	You can set up configuration through `./autogen.sh` that makes `config.h` and `Makefile`.
+	This will ask you the following and it will be automatically forwarded as an option through `./configure`.
 
-  $ ./server 
+	```
+ 	./autogen.sh 
+	Enter server type [mn/in]: in
+	Enter server IP (default: lo)): 127.0.0.1
+	Enter server port (default: 3000): 3000
+	Enter CSE base name (default: TinyIoT): TinyIoT
+	Enter CSE base RI (default: tinyiot): tinyiot
+	Do you want to enable MQTT support? [yes/no] (default: no): no
+	Do you want to enable COAP support? [yes/no] (default: no): no
+ 	```
  
-You can configure port number and ip address as parameters, for example, 
+	- You can input CSE information:
+		- `--with-server-type select` selects the server type.
+		- `--with-server-ip` sets the IP address of the server.
+		- `--with-server-port` sets the port of the server
+		- `--with-cse-base-name` sets the base name of the CSE.
+		- `--with-cse-base-ri` sets the base resource identifier of the CSE.
+	- If tinyIoT is MN-CSE, you can input RemoteCSE information:
+		- `--with-remote-cse-id` sets the ID of the remote CSE.
+		- `--with-remote-cse-name` sets the name of the remote CSE.
+		- `--with-remote-cse-host` sets the host of the remote CSE.
+		- `--with-remote-cse-port` sets the port of the remote CSE.
+	- For binding protocols, tinyIoT supports HTTP basically. You can choose more protocols:
+		- `--enable-mqtt` enables the MQTT protocol.
+		- `--enable-coap` enables the CoAP protocol.
+		- `--enable-coaps` enables the secure CoAP protocol.
 
-  $ ./server -p [port] (port = 3000 by default)
+
+ 5. To make an excutable tinyIoT server, simply execute the make file.       
+	```
+	$ make
+	```   
+        
+ 6. Use the following command to run tinyIoT server:
+	```	
+	./server
+	```
+ 
+ 7. You can configure port number and ip address as parameters, for example, 
+	```
+	$ ./server -p [port] (port = 3000 by default)
+	```
    
 
 For binding protocols, tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later. 
@@ -40,5 +87,3 @@ In order to run MQTT, Mosquitto MQTT broker should be installed on your machine.
   - HTTP: foxweb/pico
   - MQTT: Mosquitto
   - CoAP: To be added
-
-

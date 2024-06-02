@@ -1,0 +1,45 @@
+CC=gcc
+RELCFLAGS = -g
+
+LIBS = -lpthread -lm -ldl
+
+SRCS = main.c onem2m.c cJSON.c httpd.c dbmanager.c jsonparser.c logger.c util.c filterCriteria.c rtManager.c sqlite/sqlite3.c
+
+RSCSRC = $(wildcard resources/*.c)
+
+OBJS = $(SRCS:.c=.o) $(RSCSRC:.c=.o) 
+
+ifeq (@ENABLE_MQTT@,yes)
+MQTT = mqttClient.c
+WOLFMQTT = $(wildcard wolfmqtt/*.c)
+OBJS += $(MQTT:.c=.o) $(WOLFMQTT:.c=.o)
+endif
+
+ifeq (@ENABLE_COAP@,yes)
+LIBS += -lssl -lcrypto
+COAP = coap.c 
+LIBCOAP = $(wildcard libcoap/*.c)
+OBJS += $(COAP:.c=.o) $(LIBCOAP:.c=.o)
+endif
+
+RELEXE = server
+
+all: $(RELEXE)
+
+$(RELEXE) : $(OBJS)
+	$(CC) $(RELCFLAGS) -o $(RELEXE) $(OBJS) $(LIBS)
+
+%.o: %.c
+	$(CC) $(RELCFLAGS) -c $< -o $@
+
+conf: semi-clean all
+
+remake: clean all
+
+clean:
+	@rm -rf $(OBJS)
+	@rm -rf $(RELEXE)
+
+semi-clean:
+	@rm -rf *.o
+	@rm -rf $(RELEXE)
