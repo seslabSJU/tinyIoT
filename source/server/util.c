@@ -746,7 +746,7 @@ void init_server()
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 
 #ifdef ENABLE_MQTT
-	sprintf(poa, "mqtt://%s:%s", SERVER_IP, MQTT_PORT);
+	sprintf(poa, "mqtt://%s:%d", SERVER_IP, MQTT_PORT);
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 #endif
 
@@ -800,6 +800,7 @@ int check_mandatory_attributes(oneM2MPrimitive *o2pt)
  */
 int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 {
+	logger("UTIL", LOG_LEVEL_DEBUG, "check_privilege : %s", o2pt->fr);
 	bool deny = false;
 
 	RTNode *parent_rtnode = rtnode;
@@ -1886,6 +1887,8 @@ void free_o2pt(oneM2MPrimitive *o2pt)
 		cJSON_Delete(o2pt->request_pc);
 	if (o2pt->response_pc)
 		cJSON_Delete(o2pt->response_pc);
+	if (o2pt->mqtt_origin)
+		free(o2pt->mqtt_origin);
 
 	memset(o2pt, 0, sizeof(oneM2MPrimitive));
 	free(o2pt);
@@ -2152,6 +2155,7 @@ void filterOptionStr(FilterOperation fo, char *sql)
 // TBD : not used
 bool check_acpi_valid(oneM2MPrimitive *o2pt, cJSON *acpi)
 {
+	logger("UTIL", LOG_LEVEL_DEBUG, "check_acpi_valid");
 	bool ret = true;
 
 	int acpi_size = cJSON_GetArraySize(acpi);
@@ -2695,6 +2699,7 @@ bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg)
  */
 int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op)
 {
+	logger("UTIL", LOG_LEVEL_DEBUG, "validate_acpi %d", op);
 	if (!acpiAttr)
 	{
 		return RSC_OK;
@@ -2718,11 +2723,12 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op)
 		{
 			return handle_error(o2pt, RSC_BAD_REQUEST, "resource `acp` is not found");
 		}
-		else if (op == OP_UPDATE)
+
+		if (op == OP_UPDATE)
 		{
 			acop = (acop | get_acop_origin(o2pt, acp, 1));
 			logger("UTIL", LOG_LEVEL_DEBUG, "acop-pvs : %d, op : %d", acop, op);
-			if ((acop & op) == op)
+			if ((acop & op_to_acop(op)) == op_to_acop(op))
 			{
 				break;
 			}
@@ -2741,7 +2747,7 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op)
 	if (o2pt->fr && !strcmp(o2pt->fr, "CAdmin"))
 	{
 	}
-	else if ((acop & op) != op)
+	else if ((acop & op_to_acop(op)) != op_to_acop(op))
 	{
 		return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "originator has no privilege");
 	}

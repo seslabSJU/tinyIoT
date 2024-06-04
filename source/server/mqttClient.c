@@ -139,15 +139,17 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
     }
 
     /* type mqtt */
-    o2pt->origin = strdup(originator);
-    MqttClientIdToId(o2pt->origin);
+    o2pt->mqtt_origin = strdup(originator);
+    MqttClientIdToId(o2pt->mqtt_origin);
 
     /* fill primitives */
     pjson = cJSON_GetObjectItem(json, "op");
     if (!pjson)
         return invalidRequest();
     if (pjson->valueint)
+    {
         o2pt->op = pjson->valueint;
+    }
     else
         o2pt->op = atoi(pjson->valuestring);
     switch (o2pt->op)
@@ -176,13 +178,21 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
     pjson = cJSON_GetObjectItem(json, "pc");
     if (pjson)
     {
-        o2pt->pc = cJSON_PrintUnformatted(pjson);
-        o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
+        o2pt->request_pc = cJSON_Duplicate(pjson, 1);
+        // o2pt->cjson_pc = cJSON_Parse(o2pt->pc);
     }
 
     pjson = cJSON_GetObjectItem(json, "rvi");
     if (pjson)
+    {
         o2pt->rvi = strdup(pjson->valuestring);
+    }
+    else
+    {
+        handle_error(o2pt, RSC_BAD_REQUEST, "rvi is mandatory");
+        mqtt_respond_to_client(o2pt, req_type);
+        goto exit;
+    }
 
     pjson = cJSON_GetObjectItem(json, "rqi");
     if (pjson)
@@ -207,8 +217,8 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
     pjson = cJSON_GetObjectItem(json, "fc");
     if (pjson)
     {
-        o2pt->fc = pjson;
-        if (rsc = validate_filter_criteria(o2pt) > 4000)
+        o2pt->fc = cJSON_Duplicate(pjson, true);
+        if ((rsc = validate_filter_criteria(o2pt)) > 4000)
         {
             handle_error(o2pt, rsc, "Invalid FilterCriteria");
             mqtt_respond_to_client(o2pt, req_type);
@@ -234,10 +244,7 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
     if (strcmp(contentType, "json"))
     {
         logger(LOG_TAG, LOG_LEVEL_DEBUG, "only json supported\n");
-
-        o2pt->rsc = RSC_UNSUPPORTED_MEDIATYPE;
-
-        o2pt->pc = "{\"m2m:dbg\": \"Unsupported media type for content-type: 5\"}";
+        handle_error(o2pt, RSC_UNSUPPORTED_MEDIATYPE, "Unsupported media type for content-type: 5");
         mqtt_respond_to_client(o2pt, req_type);
     }
     else
@@ -273,18 +280,19 @@ int mqtt_respond_to_client(oneM2MPrimitive *o2pt, char *req_type)
     int rc = 0;
 
     respTopic = (char *)malloc(512);
+    memset(respTopic, 0, 512);
 
     logger(LOG_TAG, LOG_LEVEL_DEBUG, "publish mqtt response");
 
-    idToMqttClientId(o2pt->origin);
+    idToMqttClientId(o2pt->mqtt_origin);
 
     if (!strcmp(req_type, "req"))
     {
-        sprintf(respTopic, "%s/oneM2M/resp/%s/%s/json", topicPrefix, o2pt->origin, CSE_BASE_RI);
+        sprintf(respTopic, "%s/oneM2M/resp/%s/%s/json", topicPrefix, o2pt->mqtt_origin, CSE_BASE_RI);
     }
     else
     {
-        sprintf(respTopic, "%s/oneM2M/reg_resp/%s/%s/json", topicPrefix, o2pt->origin, CSE_BASE_RI);
+        sprintf(respTopic, "%s/oneM2M/reg_resp/%s/%s/json", topicPrefix, o2pt->mqtt_origin, CSE_BASE_RI);
     }
 
     logger(LOG_TAG, LOG_LEVEL_DEBUG, "Topic : %s", respTopic);
@@ -582,7 +590,7 @@ static word16 mqtt_get_packetid(void)
     return ++mPacketIdLast;
 }
 
-int mqtt_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt)
+int mqtt_notify(oneM2MPrimitive *o2pt, cJSON *noti_json, NotiTarget *nt)
 {
     int rc = 0;
     int sfd = 0;
@@ -614,7 +622,7 @@ int mqtt_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt)
         mNet.context = &sfd;
 
         rc = MqttClient_Init(&notiClient, &mNet, mqtt_message_cb,
-                             notiSbuf, sizeof(notiSbuf), notiRbuf, sizeof(notiRbuf),
+                             (byte *)notiSbuf, sizeof(notiSbuf), notiRbuf, sizeof(notiRbuf),
                              MQTT_CON_TIMEOUT_MS);
         if (rc != MQTT_CODE_SUCCESS)
         {
@@ -654,7 +662,7 @@ int mqtt_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt)
     mqttPub.qos = MQTT_QOS;
     mqttPub.topic_name = topic;
     mqttPub.packet_id = mqtt_get_packetid();
-    mqttPub.buffer = strdup(noti_json);
+    mqttPub.buffer = cJSON_PrintUnformatted(noti_json);
     mqttPub.total_len = XSTRLEN(noti_json);
 
     logger(LOG_TAG, LOG_LEVEL_DEBUG, "MQTT Publish: Topic %s, Qos %d\n%s\n",
@@ -680,7 +688,7 @@ exit:
         MqttClient_Disconnect(&notiClient);
         MqttClient_DeInit(&notiClient);
     }
-    return NULL;
+    return rc;
 }
 
 int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, int port, cJSON *csr)
@@ -820,7 +828,7 @@ exit:
         MqttClient_Disconnect(&notiClient);
         MqttClient_DeInit(&notiClient);
     }
-    return;
+    return rc;
 }
 
 /* Public Function */
@@ -912,7 +920,7 @@ void *mqtt_serve(void)
     /* Wait for messages */
     while (!terminate)
     {
-        rc = MqttClient_WaitMessage_ex(&mClient, &mqttObj, 3000);
+        rc = MqttClient_WaitMessage_ex(&mClient, &mqttObj, 1000);
         pingc += 3000;
         if (rc == MQTT_CODE_ERROR_TIMEOUT)
         {

@@ -71,6 +71,7 @@ typedef struct _o
 	char *fopt;
 	bool errFlag;
 	char *ip;
+	char *mqtt_origin;
 	ContentStatus cnst; // Content Status
 	int cnot;			// Content Offset
 	cJSON *fc;			// Filter Criteria
