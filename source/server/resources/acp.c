@@ -112,6 +112,7 @@ int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         cJSON_DeleteItemFromObject(m2m_acp, "at");
         cJSON_AddItemToObject(m2m_acp, "at", final_at);
     }
+    cJSON_AddItemToObject(m2m_acp, "lt", cJSON_CreateString(get_local_time(0)));
 
     update_resource(target_rtnode->obj, m2m_acp);
 
@@ -193,7 +194,7 @@ int validate_acp(oneM2MPrimitive *o2pt, cJSON *acp, Operation op)
         pjson = cJSON_GetObjectItem(acp, "pv");
         if (pjson)
         {
-            if (cJSON_IsNull(pjson) || !cJSON_GetObjectItem(pjson, "acr"))
+            if (cJSON_IsNull(pjson))
             {
                 return handle_error(o2pt, RSC_BAD_REQUEST, "empty `pv` is not allowed");
             }

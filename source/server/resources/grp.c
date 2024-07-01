@@ -101,6 +101,9 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     {
         cJSON_SetIntValue(cJSON_GetObjectItem(target_rtnode->obj, "cnm"), cJSON_GetArraySize(pjson));
     }
+
+    cJSON_AddItemToObject(m2m_grp, "lt", cJSON_CreateString(get_local_time(0)));
+
     update_resource(target_rtnode->obj, m2m_grp);
     result = db_update_resource(m2m_grp, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_GRP);
 

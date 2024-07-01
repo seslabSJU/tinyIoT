@@ -89,13 +89,20 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         }
 
         result = send_verification_request(pjson->valuestring, noti_cjson);
-        if (result == RSC_BAD_REQUEST)
+
+        if (result == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE)
         {
             cJSON_Delete(noti_cjson);
-            // cJSON_DetachItemFromObject(root, "m2m:sub");
+            cJSON_Delete(root);
+            return handle_error(o2pt, RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE, "notification error");
+        }
+        else if (result == RSC_BAD_REQUEST)
+        {
+            cJSON_Delete(noti_cjson);
             cJSON_Delete(root);
             return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification error");
         }
+
         cJSON_DeleteItemFromObject(sgn, "vrq");
     }
     cJSON_Delete(noti_cjson);
@@ -185,6 +192,7 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         cJSON_AddItemToArray(pjson2, cJSON_CreateNumber(NET_UPDATE_OF_RESOURCE));
         cJSON_ReplaceItemInObject(m2m_sub, "enc", pjson);
     }
+    cJSON_AddItemToObject(m2m_sub, "lt", cJSON_CreateString(get_local_time(0)));
 
     update_resource(sub, m2m_sub);
 

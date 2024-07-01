@@ -72,6 +72,11 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(root);
         return rsc;
     }
+    // add default mni if not set
+    if (!cJSON_GetObjectItem(cnt, "mni"))
+    {
+        cJSON_AddNumberToObject(cnt, "mni", DEFAULT_MAX_NR_INSTANCES);
+    }
 
     o2pt->rsc = RSC_CREATED;
 
@@ -174,6 +179,9 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         cJSON_DeleteItemFromObject(m2m_cnt, "at");
         cJSON_AddItemToObject(m2m_cnt, "at", final_at);
     }
+
+    cJSON_AddItemToObject(m2m_cnt, "lt", cJSON_CreateString(get_local_time(0)));
+
     update_resource(target_rtnode->obj, m2m_cnt);
 
     delete_cin_under_cnt_mni_mbs(target_rtnode);

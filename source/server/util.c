@@ -2241,6 +2241,7 @@ cJSON *getNoPermAcopDiscovery(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 
 int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 {
+
 	cJSON *pjson = NULL;
 	int rsc = 0;
 	if (!rtnode)
@@ -2392,6 +2393,10 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 
 	// o2pt->fr = NULL;
 	free_o2pt(o2pt);
+	if (rsc == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE)
+	{
+		return RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE;
+	}
 	if (rsc == RSC_BAD_REQUEST || rsc == RSC_TARGET_NOT_REACHABLE)
 	{
 		return RSC_BAD_REQUEST;

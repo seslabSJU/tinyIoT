@@ -191,7 +191,7 @@ RTNode *find_rtnode(char *addr)
 }
 
 /**
- * @brief get resource from remote cse wiht sp-relative uri
+ * @brief get resource from remote cse with sp-relative uri
  * @param address sp-relative address
  * @return RTNode or NULL
  * @remark rtnode should be freed after use

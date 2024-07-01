@@ -65,6 +65,7 @@ int invalidRequest();
 static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
                            byte msg_new, byte msg_done)
 {
+    int rsc = 0;
     byte buf[PRINT_BUFFER_SIZE + 1];
     word32 len;
 
@@ -198,6 +199,24 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
     if (pjson)
         o2pt->rqi = strdup(pjson->valuestring);
 
+    pjson = cJSON_GetObjectItem(json, "fc");
+    if (pjson)
+    {
+        o2pt->fc = cJSON_Duplicate(pjson, true);
+        if ((rsc = validate_filter_criteria(o2pt)) > 4000)
+        {
+            handle_error(o2pt, rsc, "Invalid FilterCriteria");
+            mqtt_respond_to_client(o2pt, req_type);
+            goto exit;
+        }
+        if (cJSON_GetObjectItem(pjson, "fu") && cJSON_GetObjectItem(pjson, "fu")->valueint == 1)
+        {
+            o2pt->op = OP_DISCOVERY;
+            o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
+            o2pt->drt = DRT_STRUCTURED;
+        }
+    }
+
     pjson = cJSON_GetObjectItem(json, "rcn");
     if (pjson)
     {
@@ -213,17 +232,12 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
         else
             o2pt->ty = atoi(pjson->valuestring);
     }
-    int rsc = 0;
-    pjson = cJSON_GetObjectItem(json, "fc");
+
+    pjson = cJSON_GetObjectItem(json, "drt");
     if (pjson)
     {
-        o2pt->fc = cJSON_Duplicate(pjson, true);
-        if ((rsc = validate_filter_criteria(o2pt)) > 4000)
-        {
-            handle_error(o2pt, rsc, "Invalid FilterCriteria");
-            mqtt_respond_to_client(o2pt, req_type);
-            goto exit;
-        }
+        if (pjson->valueint)
+            o2pt->drt = pjson->valueint;
     }
 
     /* initialize */

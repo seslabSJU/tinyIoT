@@ -31,12 +31,9 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     add_general_attribute(ae, parent_rtnode, RT_AE);
     int rsc = validate_ae(o2pt, ae, OP_CREATE);
 
-    if (o2pt->fr)
+    if (o2pt->fr && o2pt->fr[0] == 'C')
     {
-        if (o2pt->fr[0] == 'C' && strlen(o2pt->fr) == 1)
-        {
-        }
-        else
+        if (strlen(o2pt->fr) > 1)
         {
             cJSON *ri = cJSON_GetObjectItem(ae, "ri");
             cJSON_SetValuestring(ri, o2pt->fr);
@@ -177,6 +174,7 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         cJSON_DeleteItemFromObject(m2m_ae, "at");
         cJSON_AddItemToObject(m2m_ae, "at", final_at);
     }
+    cJSON_AddItemToObject(m2m_ae, "lt", cJSON_CreateString(get_local_time(0)));
 
     // merge update resource
     update_resource(target_rtnode->obj, m2m_ae);

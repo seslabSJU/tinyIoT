@@ -332,6 +332,16 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		rsc = discover_onem2m_resource(o2pt, target_rtnode);
 		break;
 
+	case OP_NOTIFY:
+		if (check_privilege(o2pt, target_rtnode, ACOP_NOTIFY) != 0)
+		{
+			handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "permission denied");
+			break;
+		}
+		requestToResource(o2pt, target_rtnode);
+		o2pt->rsc = RSC_OK;
+		break;
+
 	default:
 		handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "internal server error");
 		return RSC_INTERNAL_SERVER_ERROR;

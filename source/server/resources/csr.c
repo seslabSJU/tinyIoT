@@ -98,6 +98,8 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     // result = validate_csr(o2pt, target_rtnode->p)
     // if(result != 1) return result;
 
+    cJSON_AddItemToObject(m2m_csr, "lt", cJSON_CreateString(get_local_time(0)));
+
     update_resource(target_rtnode->obj, m2m_csr);
 
     result = db_update_resource(m2m_csr, cJSON_GetStringValue(cJSON_GetObjectItem(csr, "ri")), RT_CSR);
