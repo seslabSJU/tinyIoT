@@ -802,6 +802,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "check_privilege : %s", o2pt->fr);
 	bool deny = false;
+	char *origin = NULL;
 
 	RTNode *parent_rtnode = rtnode;
 
@@ -817,11 +818,18 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 			deny = true;
 		}
 	}
-	else if (!strcmp(o2pt->fr, "CAdmin"))
+	if (parent_rtnode && parent_rtnode->ty == RT_AE)
+		origin = cJSON_GetObjectItem(parent_rtnode->obj, "aei")->valuestring;
+	else
+		origin = o2pt->fr;
+
+#ifdef ADMIN_AE_ID
+	if (!strcmp(origin, ADMIN_AE_ID))
 	{
 		return false;
 	}
-	else if ((parent_rtnode && strcmp(o2pt->fr, get_ri_rtnode(parent_rtnode))))
+#endif
+	else if ((parent_rtnode && strcmp(origin, get_ri_rtnode(parent_rtnode))))
 	{
 		deny = true;
 	}
@@ -834,7 +842,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if ((get_acpi_rtnode(rtnode) && cJSON_GetArraySize(get_acpi_rtnode(rtnode)) > 0) || rtnode->ty == RT_ACP)
 		{
 			deny = true;
-			if ((get_acop(o2pt, rtnode) & acop) == acop)
+			if ((get_acop(o2pt, origin, rtnode) & acop) == acop)
 			{
 				deny = false;
 			}
@@ -857,10 +865,12 @@ int check_macp_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	{
 		deny = true;
 	}
-	else if (!strcmp(o2pt->fr, "CAdmin"))
+#ifdef ADMIN_AE_ID
+	else if (!strcmp(o2pt->fr, ADMIN_AE_ID))
 	{
 		return false;
 	}
+#endif
 	else if (strcmp(o2pt->fr, get_ri_rtnode(rtnode)))
 	{
 		deny = true;
@@ -889,24 +899,29 @@ int check_macp_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	return 0;
 }
 
-int get_acop(oneM2MPrimitive *o2pt, RTNode *rtnode)
+int get_acop(oneM2MPrimitive *o2pt, char *origin, RTNode *rtnode)
 {
 	int acop = 0;
-	char *origin = NULL;
-	if (!o2pt->fr)
+	// if (!o2pt->fr)
+	// {
+	// 	origin = strdup("all");
+	// }
+	// else
+	// {
+	// 	origin = strdup(o2pt->fr);
+	// }
+	if (!origin)
 	{
 		origin = strdup("all");
 	}
-	else
-	{
-		origin = strdup(o2pt->fr);
-	}
 
-	if (!strcmp(origin, "CAdmin"))
+#ifdef ADMIN_AE_ID
+	if (!strcmp(origin, ADMIN_AE_ID))
 	{
 		free(origin);
 		return ALL_ACOP;
 	}
+#endif
 
 	if (rtnode->ty == RT_ACP)
 	{
@@ -949,12 +964,13 @@ int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	{
 		origin = strdup(o2pt->fr);
 	}
-
-	if (!strcmp(origin, "CAdmin"))
+#ifdef ADMIN_AE_ID
+	if (!strcmp(origin, ADMIN_AE_ID))
 	{
 		free(origin);
 		return ALL_ACOP;
 	}
+#endif
 
 	cJSON *macp = cJSON_GetObjectItem(rtnode->obj, "macp");
 	if (!macp)
@@ -1495,7 +1511,8 @@ int set_grp_member(RTNode *grp_rtnode)
 {
 	cJSON *mid_Arr = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
 	cJSON *mid_obj = NULL;
-	NodeList *nl = NULL;
+	cJSON *update_obj;
+
 	bool duplicated = false;
 
 	cJSON_ArrayForEach(mid_obj, mid_Arr)
@@ -1504,22 +1521,16 @@ int set_grp_member(RTNode *grp_rtnode)
 		RTNode *mid_rtnode = find_rtnode(mid);
 		if (mid_rtnode)
 		{
-			duplicated = false;
-			nl = mid_rtnode->memberOf;
-			while (nl)
-			{
-				if (nl->rtnode == grp_rtnode)
-				{
-					duplicated = true;
-					break;
-				}
-				nl = nl->next;
-			}
-
-			if (!duplicated)
+			if (cJSON_getArrayIdx(mid_rtnode->memberOf, grp_rtnode->uri) == -1)
 			{
 				logger("UTIL", LOG_LEVEL_DEBUG, "set_grp_member : %s is now member of %s", mid, grp_rtnode->uri);
-				addNodeList(mid_rtnode->memberOf, grp_rtnode);
+				cJSON_AddItemToArray(mid_rtnode->memberOf, cJSON_CreateString(grp_rtnode->uri));
+				// update_db
+				update_obj = cJSON_CreateObject();
+				cJSON_AddItemToObject(update_obj, "memberOf", mid_rtnode->memberOf);
+				db_update_resource(update_obj, cJSON_GetObjectItem(mid_rtnode->obj, "ri")->valuestring, mid_rtnode->ty);
+				cJSON_DetachItemFromObject(update_obj, "memberOf");
+				cJSON_Delete(update_obj);
 			}
 			else
 			{
@@ -1577,6 +1588,26 @@ void remove_mid(char **mid, int idx, int cnm)
 	if (idx != cnm - 1)
 		free(del);
 	del = NULL;
+}
+
+bool isSPIDLocal(char *address)
+{
+	if (!address)
+		return false;
+	if (address[0] != '/' && address[1] != '/')
+		return false;
+	char *ptr = strchr(address + 2, '/');
+	if (ptr)
+		*ptr = '\0';
+	if (strcmp(address + 2, CSE_BASE_SP_ID) == 0)
+	{
+		if (ptr)
+			*ptr = '/';
+		return true;
+	}
+	if (ptr)
+		*ptr = '/';
+	return false;
 }
 
 bool isSpRelativeLocal(char *address)
@@ -2749,10 +2780,13 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op)
 			// }
 		}
 	}
-	if (o2pt->fr && !strcmp(o2pt->fr, "CAdmin"))
+#ifdef ADMIN_AE_ID
+	if (o2pt->fr && !strcmp(o2pt->fr, ADMIN_AE_ID))
 	{
+		return RSC_OK;
 	}
-	else if ((acop & op_to_acop(op)) != op_to_acop(op))
+#endif
+	if ((acop & op_to_acop(op)) != op_to_acop(op))
 	{
 		return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "originator has no privilege");
 	}

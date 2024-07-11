@@ -121,6 +121,7 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 {
 	RTNode *rtnode = (RTNode *)calloc(1, sizeof(RTNode));
 	cJSON *uri = NULL;
+	cJSON *memberOf = NULL;
 
 	rtnode->ty = ty;
 	rtnode->obj = obj;
@@ -136,11 +137,11 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 		rtnode->uri = strdup(uri->valuestring);
 		cJSON_DeleteItemFromObject(obj, "uri");
 	}
-
-	rtnode->memberOf = (NodeList *)calloc(1, sizeof(NodeList));
-	rtnode->memberOf->next = NULL;
-	rtnode->memberOf->rtnode = NULL;
-	rtnode->memberOf->uri = NULL;
+	rtnode->memberOf = cJSON_DetachItemFromObject(obj, "memberOf");
+	if (!rtnode->memberOf)
+	{
+		rtnode->memberOf = cJSON_CreateArray();
+	}
 
 	rtnode->rn = strdup(cJSON_GetObjectItem(obj, "rn")->valuestring);
 
@@ -253,6 +254,7 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	cJSON *csr, *dcse, *dcse_item;
 	cJSON *pjson = NULL;
 	RTNode *ptr_rtnode = NULL;
+	int idx = 0;
 	if (rtnode->child)
 	{
 		ptr_rtnode = rtnode->child;
@@ -302,8 +304,11 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 			ptr_rtnode = find_rtnode(pjson->valuestring);
 			if (ptr_rtnode)
 			{
-				logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", ptr_rtnode->uri, pjson->valuestring);
-				deleteNodeList(ptr_rtnode->memberOf, rtnode);
+				logger("O2M", LOG_LEVEL_DEBUG, "delete %s from memberOf[%s] ", rtnode->uri, ptr_rtnode->uri);
+				idx = cJSON_getArrayIdx(ptr_rtnode->memberOf, rtnode->uri);
+				logger("O2M", LOG_LEVEL_DEBUG, "%d", idx);
+				if (idx >= 0)
+					cJSON_DeleteItemFromArray(ptr_rtnode->memberOf, idx);
 			}
 		}
 		break;
@@ -312,32 +317,27 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	case RT_CBA:
 		break;
 	}
+	cJSON *member;
+	RTNode *grp_rtnode = NULL;
 
-	NodeList *nl = NULL;
-	int idx = -1;
-	nl = rtnode->memberOf->next;
-	if (nl)
+	cJSON_ArrayForEach(member, rtnode->memberOf)
 	{
-		while (nl)
+		grp_rtnode = find_rtnode(member->valuestring);
+		logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", grp_rtnode->uri, member->valuestring);
+		if (!grp_rtnode)
 		{
-			logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", rtnode->uri, nl->uri);
-			if (!nl->rtnode)
-			{
-				nl = nl->next;
-				continue;
-			}
-			pjson = cJSON_GetObjectItem(nl->rtnode->obj, "mid");
-			idx = cJSON_getArrayIdx(pjson, rtnode->uri);
-			if (idx >= 0)
-			{
-				cJSON_DeleteItemFromArray(pjson, idx);
-				cJSON_SetIntValue(cJSON_GetObjectItem(nl->rtnode->obj, "cnm"), cJSON_GetArraySize(pjson));
-			}
-			// logger("O2M", LOG_LEVEL_DEBUG, "new mid =  %s", cJSON_Print(pjson));
-
-			db_update_resource(nl->rtnode->obj, cJSON_GetObjectItem(nl->rtnode->obj, "ri")->valuestring, nl->rtnode->ty);
-			nl = nl->next;
+			logger("O2M", LOG_LEVEL_ERROR, "Node of MemberOf missing - INTERNAL SERVER ERROR");
+			continue;
 		}
+		pjson = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
+		idx = cJSON_getArrayIdx(pjson, rtnode->uri);
+		if (idx >= 0)
+		{
+			cJSON_DeleteItemFromArray(pjson, idx);
+			cJSON_SetIntValue(cJSON_GetObjectItem(grp_rtnode->obj, "cnm"), cJSON_GetArraySize(pjson));
+		}
+
+		db_update_resource(grp_rtnode->obj, cJSON_GetObjectItem(grp_rtnode->obj, "ri")->valuestring, grp_rtnode->ty);
 	}
 
 	Operation op = o2pt->op;
@@ -366,6 +366,8 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 int cJSON_getArrayIdx(cJSON *arr, char *value)
 {
+	if (!arr)
+		return -1;
 	cJSON *item = NULL;
 	int idx = 0;
 	cJSON_ArrayForEach(item, arr)
@@ -425,7 +427,7 @@ void free_rtnode(RTNode *rtnode)
 
 	if (rtnode->memberOf)
 	{
-		free_all_nodelist(rtnode->memberOf);
+		cJSON_Delete(rtnode->memberOf);
 		rtnode->memberOf = NULL;
 	}
 

@@ -26,6 +26,7 @@ cJSON *getNoPermAcopDiscovery(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop);
 
 // Addressing
 ResourceAddressingType checkResourceAddressingType(char *uri);
+bool isSPIDLocal(char *address);
 bool isSpRelativeLocal(char *address);
 
 // Remote-CSE
@@ -54,6 +55,8 @@ void removeChildAnnc(RTNode *rtnode, char *at);
 void init_resource_tree();
 int add_child_resource_tree(RTNode *parent, RTNode *child);
 RTNode *find_rtnode(char *addr);
+RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri);
+RTNode *parse_abs_uri(oneM2MPrimitive *o2pt, char *target_uri);
 RTNode *find_rtnode_by_uri(char *node_uri);
 RTNode *find_rtnode_by_ri(char *ri);
 RTNode *rt_search_ri(RTNode *rtnode, char *ri);
@@ -139,7 +142,7 @@ void free_all_nodelist(NodeList *nl);
 void free_nodelist(NodeList *nl);
 
 // privilege
-int get_acop(oneM2MPrimitive *o2pt, RTNode *node);
+int get_acop(oneM2MPrimitive *o2pt, char *origin, RTNode *node);
 int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode);
 int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag);
 int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop);

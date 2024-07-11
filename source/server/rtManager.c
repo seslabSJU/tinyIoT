@@ -33,67 +33,12 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
     else if (RAT == SP_RELATIVE)
     {
         logger("UTIL", LOG_LEVEL_DEBUG, "SP_RELATIVE");
-        char *ptr = NULL;
-        if (isSpRelativeLocal(target_uri))
-        {
-            if (strcmp(target_uri + 1, CSE_BASE_RI) == 0)
-            {
-                handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
-                free(target_uri);
-                return NULL;
-            }
-            ptr = target_uri + strlen(CSE_BASE_RI) + 2; // for first / and end /
-            if (strlen(ptr) == 0)
-            {
-                logger("UTIL", LOG_LEVEL_DEBUG, "addr is empty");
-                handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
-                free(target_uri);
-                return NULL;
-            }
-            rtnode = find_rtnode(ptr);
-        }
-        else
-        {
-            int rsc = 0;
-            char buffer[256];
-            char *tmp = NULL;
-            o2pt->isForwarding = true;
-            RTNode *csr = find_csr_rtnode_by_uri(target_uri);
-
-            // remote CSE not registered
-            // forwarding TS 0004 7.3.2.6
-            if (!csr)
-            {
-                if (SERVER_TYPE == IN_CSE)
-                {
-                    handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
-                    free(target_uri);
-                    return NULL;
-                }
-                else
-                {
-                    cJSON *registrar_csr = rt->registrar_csr->obj;
-                    if (strcmp(cJSON_GetStringValue(cJSON_GetObjectItem(registrar_csr, "csi")), target_uri) != 0)
-                    {
-                        handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
-                        free(target_uri);
-                        return NULL;
-                    }
-                }
-            }
-
-            rsc = forwarding_onem2m_resource(o2pt, csr);
-            free(target_uri);
-            return NULL;
-            if (rsc >= 4000)
-            {
-                handle_error(o2pt, rsc, "Forwarding Failed");
-            }
-        }
+        rtnode = parse_spr_uri(o2pt, target_uri);
     }
     else if (RAT == ABSOLUTE)
     {
-        // None
+        logger("UTIL", LOG_LEVEL_DEBUG, "ABSOLUTE");
+        rtnode = parse_abs_uri(o2pt, target_uri);
     }
 
     if (rtnode && rtnode->ty == RT_GRP)
@@ -124,6 +69,115 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
     }
 
     free(target_uri);
+    return rtnode;
+}
+
+/**
+ *
+ */
+
+RTNode *parse_abs_uri(oneM2MPrimitive *o2pt, char *target_uri)
+{
+    RTNode *rtnode = NULL;
+    char *ptr = NULL;
+    if (isSPIDLocal(target_uri))
+    {
+        if (strcmp(target_uri + 2, CSE_BASE_SP_ID) == 0)
+        {
+            handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
+            free(target_uri);
+            return NULL;
+        }
+        ptr = target_uri + strlen(CSE_BASE_SP_ID) + 2; // for first two /
+        if (strlen(ptr) == 0)
+        {
+            logger("UTIL", LOG_LEVEL_DEBUG, "addr is empty");
+            handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
+            free(target_uri);
+            return NULL;
+        }
+        rtnode = parse_spr_uri(o2pt, ptr);
+    }
+    else
+    {
+        int rsc = 0;
+        char buffer[256];
+        char *tmp = NULL;
+        o2pt->isForwarding = true;
+        RTNode *csr = find_csr_rtnode_by_uri(target_uri);
+
+        // remote CSE not registered
+        // forwarding TS 0004
+    }
+    return rtnode;
+}
+
+/**
+ * @brief parse uri with SP RELATIVE addressing
+ * @param o2pt oneM2MPrimitive
+ * @param target_uri target uri
+ * @return resource node or NULL
+ */
+RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
+{
+    RTNode *rtnode = NULL;
+    char *ptr = NULL;
+    if (isSpRelativeLocal(target_uri))
+    {
+        if (strcmp(target_uri + 1, CSE_BASE_RI) == 0)
+        {
+            handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
+            free(target_uri);
+            return NULL;
+        }
+        ptr = target_uri + strlen(CSE_BASE_RI) + 2; // for first / and end /
+        if (strlen(ptr) == 0)
+        {
+            logger("UTIL", LOG_LEVEL_DEBUG, "addr is empty");
+            handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
+            free(target_uri);
+            return NULL;
+        }
+        rtnode = find_rtnode(ptr);
+    }
+    else
+    {
+        int rsc = 0;
+        char buffer[256];
+        char *tmp = NULL;
+        o2pt->isForwarding = true;
+        RTNode *csr = find_csr_rtnode_by_uri(target_uri);
+
+        // remote CSE not registered
+        // forwarding TS 0004 7.3.2.6
+        if (!csr)
+        {
+            if (SERVER_TYPE == IN_CSE)
+            {
+                handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
+                free(target_uri);
+                return NULL;
+            }
+            else
+            {
+                cJSON *registrar_csr = rt->registrar_csr->obj;
+                if (strcmp(cJSON_GetStringValue(cJSON_GetObjectItem(registrar_csr, "csi")), target_uri) != 0)
+                {
+                    handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
+                    free(target_uri);
+                    return NULL;
+                }
+            }
+        }
+
+        rsc = forwarding_onem2m_resource(o2pt, csr);
+        free(target_uri);
+        return NULL;
+        if (rsc >= 4000)
+        {
+            handle_error(o2pt, rsc, "Forwarding Failed");
+        }
+    }
     return rtnode;
 }
 

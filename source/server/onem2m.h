@@ -27,7 +27,7 @@ typedef struct RTNode
 	struct RTNode *parent;
 	struct RTNode *child;
 	struct NodeList *subs;
-	struct NodeList *memberOf;
+	cJSON *memberOf;
 	struct RTNode *sibling_left;
 	struct RTNode *sibling_right;
 	char *rn;

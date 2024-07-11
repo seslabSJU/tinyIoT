@@ -8,22 +8,29 @@
 #include "config.h"
 
 char *log_buffer;
+FILE *log_file;
 
 /**
  * @brief Initialize logger
  * @return void
-*/
-void logger_init(){
+ */
+void logger_init()
+{
     log_buffer = malloc(sizeof(char) * LOG_BUFFER_SIZE);
 }
 
 /**
  * @brief Free logger
  * @return void
-*/
-void logger_free(){
+ */
+void logger_free()
+{
     free(log_buffer);
 }
+
+#if MULTI_THREAD == 1
+
+#endif
 
 /**
  * @brief Print log message to stderr
@@ -32,8 +39,9 @@ void logger_free(){
  * @param msg Message to print includes format strings
  * @param ... Arguments for format strings
  * @return Number of characters printed
-*/
-int logger(const char* tag,  LOGLEVEL level, const char *msg, ...){
+ */
+int logger(const char *tag, LOGLEVEL level, const char *msg, ...)
+{
 
     va_list ap;
     char *t = NULL;
@@ -41,37 +49,38 @@ int logger(const char* tag,  LOGLEVEL level, const char *msg, ...){
     int charsCnt = 0, fcolor = 0;
 
     switch (level)
-        {
-        case LOG_LEVEL_DEBUG:
-            llChar = "DEBUG";
-            fcolor = BLUE;
-            break;
+    {
+    case LOG_LEVEL_DEBUG:
+        llChar = "DEBUG";
+        fcolor = BLUE;
+        break;
 
-        case LOG_LEVEL_INFO:
-            llChar = "INFO";
-            fcolor = GREEN;
-            break;
+    case LOG_LEVEL_INFO:
+        llChar = "INFO";
+        fcolor = GREEN;
+        break;
 
-        case LOG_LEVEL_WARN:
-            llChar = "WARN";
-            fcolor = YELLOW;
-            break;
+    case LOG_LEVEL_WARN:
+        llChar = "WARN";
+        fcolor = YELLOW;
+        break;
 
-        case LOG_LEVEL_ERROR:
-            llChar = "ERROR";
-            fcolor = BR_RED;
-            break;
-        
-        case LOG_LEVEL_FATAL:
-            llChar = "FATAL";
-            fcolor = RED;
-            break;
+    case LOG_LEVEL_ERROR:
+        llChar = "ERROR";
+        fcolor = BR_RED;
+        break;
 
-        default:
-            return 0;
+    case LOG_LEVEL_FATAL:
+        llChar = "FATAL";
+        fcolor = RED;
+        break;
+
+    default:
+        return 0;
     }
 
-    if(level >= LOG_LEVEL){
+    if (level >= LOG_LEVEL)
+    {
         time_t now;
         time(&now);
         t = ctime(&now);
@@ -82,6 +91,10 @@ int logger(const char* tag,  LOGLEVEL level, const char *msg, ...){
         charsCnt = vsnprintf(log_buffer, LOG_BUFFER_SIZE, msg, ap);
         va_end(ap);
         fprintf(stderr, "%s\n", log_buffer);
+
+#ifdef SAVE_LOG
+        fprintf(log_file, "\r%s %-5s [%s]: %s\n", t, llChar, tag, log_buffer);
+#endif
     }
 
     return charsCnt;

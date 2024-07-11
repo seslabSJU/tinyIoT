@@ -24,7 +24,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     rn = cJSON_GetObjectItem(cin, "rn");
     if (rn != NULL)
     {
-        handle_error(o2pt, RSC_NOT_IMPLEMENTED, "rn attribute for cin is assigned by CSE");
+        handle_error(o2pt, RSC_BAD_REQUEST, "rn attribute for cin is assigned by CSE");
         cJSON_Delete(root);
         return o2pt->rsc;
     }
