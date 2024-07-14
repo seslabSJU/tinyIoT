@@ -22,6 +22,7 @@
 #endif
 
 #include "coap.h"
+#include "websocket_server.h" // WebSocket 서버 헤더 파일 추가
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
@@ -169,6 +170,12 @@ int main(int argc, char **argv)
 		return 0;
 	}
 #endif
+
+	// WebSocket 서버 초기화
+	if (initialize_websocket_server() != 0) {
+		fprintf(stderr, "Failed to initialize websocket server\n");
+		return 0;
+	}
 
 	serve_forever(PORT); // main oneM2M operation logic in void route()
 
@@ -330,16 +337,6 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			break;
 		}
 		rsc = discover_onem2m_resource(o2pt, target_rtnode);
-		break;
-
-	case OP_NOTIFY:
-		if (check_privilege(o2pt, target_rtnode, ACOP_NOTIFY) != 0)
-		{
-			handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "permission denied");
-			break;
-		}
-		requestToResource(o2pt, target_rtnode);
-		o2pt->rsc = RSC_OK;
 		break;
 
 	default:
