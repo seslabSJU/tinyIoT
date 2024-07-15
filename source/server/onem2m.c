@@ -34,8 +34,11 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_GRP));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CSR));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_SUB));
-	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CBA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_ACPA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_AEA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CNTA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CINA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CBA));
 
 	cJSON_AddStringToObject(cse, "ct", ct);
 	cJSON_AddStringToObject(cse, "ri", CSE_BASE_RI);
@@ -48,7 +51,7 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srv, cJSON_CreateString("2a"));
 
 	cJSON_AddItemToObject(cse, "srv", srv);
-	cJSON_AddItemToObject(cse, "pi", cJSON_CreateNull());
+	cJSON_AddItemToObject(cse, "pi", cJSON_CreateString(""));
 	cJSON_AddNumberToObject(cse, "ty", RT_CSE);
 	cJSON_AddStringToObject(cse, "uri", CSE_BASE_NAME);
 	cJSON_AddStringToObject(cse, "csi", csi);
@@ -1072,7 +1075,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 		o2pt->op = OP_CREATE;
 		o2pt->ty = ty + 10000;
 		o2pt->rqi = strdup("create-annc");
-		o2pt->rvi = strdup("3");
+		o2pt->rvi = CSE_RVI;
 
 		cJSON *root = cJSON_CreateObject();
 		cJSON *annc = cJSON_CreateObject();

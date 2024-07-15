@@ -17,6 +17,13 @@ FILE *log_file;
 void logger_init()
 {
     log_buffer = malloc(sizeof(char) * LOG_BUFFER_SIZE);
+#ifdef SAVE_LOG
+    time_t now;
+    time(&now);
+    char *t = ctime(&now);
+    t[24] = '\0';
+    log_file = fopen(t, "w");
+#endif
 }
 
 /**
@@ -26,6 +33,9 @@ void logger_init()
 void logger_free()
 {
     free(log_buffer);
+#ifdef SAVE_LOG
+    fclose(log_file);
+#endif
 }
 
 #if MULTI_THREAD == 1

@@ -186,7 +186,7 @@ static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
     pjson = cJSON_GetObjectItem(json, "rvi");
     if (pjson)
     {
-        o2pt->rvi = strdup(pjson->valuestring);
+        o2pt->rvi = to_rvi(pjson->valuestring);
     }
     else
     {

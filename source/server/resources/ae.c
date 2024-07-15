@@ -210,7 +210,10 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
     char *ptr = NULL;
     if (!ae)
     {
-        return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
+        if (o2pt->rvi >= RVI_3)
+            return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
+        else
+            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
     }
     if (cJSON_GetObjectItem(ae, "aei"))
     {
@@ -219,13 +222,14 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
 
     if (op == OP_CREATE)
     {
+
         pjson = cJSON_GetObjectItem(ae, "api");
         if (!pjson)
         {
-            return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
+            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
         }
         ptr = pjson->valuestring;
-        if (!strcmp(o2pt->rvi, "1") || !strcmp(o2pt->rvi, "2") || !strcmp(o2pt->rvi, "2a") || !strcmp(o2pt->rvi, "3"))
+        if (o2pt->rvi > RVI_3)
         {
             if (ptr[0] != 'R' && ptr[0] != 'N' && ptr[0] != 'r')
             {
@@ -239,6 +243,11 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
             {
                 return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
             }
+        }
+        pjson = cJSON_GetObjectItem(ae, "rr");
+        if (!pjson)
+        {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
         }
     }
 

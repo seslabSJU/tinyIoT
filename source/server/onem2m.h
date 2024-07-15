@@ -57,7 +57,7 @@ typedef struct _o
 	char *to;  // To
 	char *fr;  // From
 	char *rqi; // Request ID
-	char *rvi; // Request Version Indicator
+	RVI rvi;   // Request Version Indicator
 	// char *pc;
 	Operation op;		// Operation
 	cJSON *request_pc;	// Primitive Content

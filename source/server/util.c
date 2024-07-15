@@ -779,7 +779,7 @@ int result_parse_uri(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 int check_mandatory_attributes(oneM2MPrimitive *o2pt)
 {
-	if (!o2pt->rvi)
+	if (o2pt->rvi == RVI_NONE)
 	{
 		handle_error(o2pt, RSC_BAD_REQUEST, "rvi is mandatory");
 		return -1;
@@ -789,6 +789,7 @@ int check_mandatory_attributes(oneM2MPrimitive *o2pt)
 		handle_error(o2pt, RSC_BAD_REQUEST, "originator is mandatory");
 		return -1;
 	}
+	return 0;
 }
 
 /**
@@ -1337,6 +1338,11 @@ int check_resource_type_invalid(oneM2MPrimitive *o2pt)
 		handle_error(o2pt, RSC_BAD_REQUEST, "resource type can't be 0(Mixed)");
 		return -1;
 	}
+	else if (o2pt->ty == RT_CSE)
+	{
+		handle_error(o2pt, RSC_BAD_REQUEST, "resource type can't be 5(CSEBase)");
+		return -1;
+	}
 	return 0;
 }
 
@@ -1358,6 +1364,59 @@ ACOP op_to_acop(Operation op)
 		return ACOP_NOTIFY;
 	default:
 		return 0;
+	}
+}
+
+RVI to_rvi(char *str)
+{
+	if (!str)
+		return RVI_NONE;
+	if (!strcmp(str, "2a"))
+	{
+		return RVI_2;
+	}
+	if (!strcmp(str, "3"))
+	{
+		return RVI_3;
+	}
+	if (!strcmp(str, "1"))
+	{
+		return RVI_1;
+	}
+	if (!strcmp(str, "2"))
+	{
+		return RVI_2;
+	}
+	if (!strcmp(str, "4"))
+	{
+		return RVI_4;
+	}
+	if (!strcmp(str, "5"))
+	{
+		return RVI_5;
+	}
+
+	return RVI_NONE;
+}
+
+char *from_rvi(RVI rvi)
+{
+	switch (rvi)
+	{
+	case RVI_1:
+		return "1";
+	case RVI_2:
+		return "2";
+	case RVI_2a:
+		return "2a";
+	case RVI_3:
+		return "3";
+	case RVI_4:
+		return "4";
+	case RVI_5:
+		return "5";
+	default:
+		return NULL;
 	}
 }
 
@@ -1538,6 +1597,7 @@ int set_grp_member(RTNode *grp_rtnode)
 			}
 		}
 	}
+	return 0;
 }
 
 int handle_csy(cJSON *grp, cJSON *mid, int csy, int i)
@@ -1886,7 +1946,7 @@ cJSON *o2pt_to_json(oneM2MPrimitive *o2pt)
 	cJSON_AddStringToObject(json, "rqi", o2pt->rqi);
 	cJSON_AddStringToObject(json, "to", o2pt->to);
 	cJSON_AddStringToObject(json, "fr", o2pt->fr);
-	cJSON_AddStringToObject(json, "rvi", o2pt->rvi);
+	cJSON_AddStringToObject(json, "rvi", from_rvi(o2pt->rvi));
 	if (o2pt->response_pc)
 		cJSON_AddItemToObject(json, "pc", cJSON_Duplicate(o2pt->response_pc, true));
 	if (o2pt->cnst)
@@ -1910,8 +1970,6 @@ void free_o2pt(oneM2MPrimitive *o2pt)
 		cJSON_Delete(o2pt->fc);
 	if (o2pt->fopt)
 		free(o2pt->fopt);
-	if (o2pt->rvi)
-		free(o2pt->rvi);
 	if (o2pt->ip)
 		free(o2pt->ip);
 	if (o2pt->request_pc)
@@ -1939,12 +1997,11 @@ void o2ptcpy(oneM2MPrimitive **dest, oneM2MPrimitive *src)
 		(*dest)->rqi = strdup(src->rqi);
 	if (src->request_pc)
 		(*dest)->request_pc = cJSON_Duplicate(src->request_pc, true);
-	if (src->rvi)
-		(*dest)->rvi = strdup(src->rvi);
 	if (src->fopt)
 		(*dest)->fopt = strdup(src->fopt);
 	if (src->ip)
 		(*dest)->ip = strdup(src->ip);
+	(*dest)->rvi = src->rvi;
 	(*dest)->rcn = src->rcn;
 	(*dest)->ty = src->ty;
 	(*dest)->op = src->op;
@@ -3093,7 +3150,7 @@ int deRegister_csr()
 			sprintf(buf, "%s/%s", csi->valuestring, CSE_BASE_RI);
 			o2pt->to = strdup(buf);
 			o2pt->rqi = strdup("delete-csr");
-			o2pt->rvi = strdup("2a");
+			o2pt->rvi = CSE_RVI;
 
 			forwarding_onem2m_resource(o2pt, rtnode);
 			free_o2pt(o2pt);
@@ -3131,7 +3188,7 @@ int update_remote_csr_dcse(RTNode *skip_rtnode)
 	o2pt->op = OP_UPDATE;
 	o2pt->fr = strdup("/" CSE_BASE_RI);
 	o2pt->rqi = strdup("update-csr");
-	o2pt->rvi = strdup("2a");
+	o2pt->rvi = CSE_RVI;
 	o2pt->request_pc = root;
 	logger("UTIL", LOG_LEVEL_DEBUG, "skip_rtnode: %s", skip_rtnode->uri);
 	while (node)
@@ -3181,7 +3238,7 @@ int create_remote_cba(char *poa, char **cbA_url)
 		o2pt->op = OP_CREATE;
 		o2pt->ty = RT_CBA;
 		o2pt->rqi = strdup("create-cba");
-		o2pt->rvi = strdup("2a");
+		o2pt->rvi = CSE_RVI;
 
 		cJSON *root = cJSON_CreateObject();
 		cJSON *cba = cJSON_CreateObject();
@@ -3359,7 +3416,7 @@ int deregister_remote_annc(RTNode *target_rtnode, cJSON *delete_at_list)
 			o2pt->op = OP_DELETE;
 			o2pt->ty = target_rtnode->ty + 10000;
 			o2pt->rqi = strdup("delete-annc");
-			o2pt->rvi = strdup("3");
+			o2pt->rvi = CSE_RVI;
 			forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
 
 			if (o2pt->rsc != RSC_DELETED)

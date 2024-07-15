@@ -11,6 +11,7 @@
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
 #define CSE_BASE_SP_ID "tinyiot.example.com"
+#define CSE_RVI RVI_2a
 
 #if SERVER_TYPE == MN_CSE
 #define REMOTE_CSE_ID ""
@@ -83,7 +84,7 @@
 
 #define LOG_LEVEL LOG_LEVEL_DEBUG
 #define LOG_BUFFER_SIZE MAX_PAYLOAD_SIZE
-// #define SAVE_LOG
+#define SAVE_LOG
 
 #endif
 

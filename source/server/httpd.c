@@ -229,6 +229,7 @@ void respond(int slot)
     // call router
     handle_http_request(req, slot);
     free(buf[slot]);
+    buf[slot] = NULL;
     free_HTTPRequest(req);
 }
 
@@ -274,7 +275,11 @@ void handle_http_request(HTTPRequest *req, int slotno)
 
     if ((header = search_header(req->headers, "x-m2m-rvi")))
     {
-        o2pt->rvi = strdup(header);
+        o2pt->rvi = to_rvi(header);
+    }
+    else
+    {
+        o2pt->rvi = RVI_NONE;
     }
 
     if ((header = search_header(req->headers, "content-type")))
@@ -282,6 +287,10 @@ void handle_http_request(HTTPRequest *req, int slotno)
         if (strstr(header, "ty="))
         {
             o2pt->ty = atoi(strstr(header, "ty=") + 3);
+        }
+        else
+        {
+            o2pt->ty = 0;
         }
     }
 
@@ -309,7 +318,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
     }
 
     o2pt->op = http_parse_operation(req->method);
-    logger("HTTP", LOG_LEVEL_INFO, "Request : %s", req->method);
+    logger("HTTP", LOG_LEVEL_INFO, "Request : %s (%d)", req->method, o2pt->op);
     // Setting default rcn
     switch (o2pt->op)
     {
@@ -441,7 +450,7 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         set_header("Content-Length", content_length, response_headers);
 
     set_header("X-M2M-RSC", rsc, response_headers);
-    set_header("X-M2M-RVI", o2pt->rvi, response_headers);
+    set_header("X-M2M-RVI", from_rvi(o2pt->rvi), response_headers);
     set_header("X-M2M-RI", o2pt->rqi, response_headers);
 
     if (o2pt->cnst > 0)

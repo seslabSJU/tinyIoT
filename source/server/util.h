@@ -140,6 +140,8 @@ int addNodeList(NodeList *target, RTNode *rtnode);
 int deleteNodeList(NodeList *target, RTNode *rtnode);
 void free_all_nodelist(NodeList *nl);
 void free_nodelist(NodeList *nl);
+RVI to_rvi(char *str);
+char *from_rvi(RVI rvi);
 
 // privilege
 int get_acop(oneM2MPrimitive *o2pt, char *origin, RTNode *node);

@@ -268,7 +268,7 @@ RTNode *get_remote_resource(char *address, int *rsc)
     o2pt->to = strdup(target_uri);
     o2pt->op = OP_RETRIEVE;
     o2pt->rqi = strdup("retrieve remote resource");
-    o2pt->rvi = strdup("2a");
+    o2pt->rvi = CSE_RVI;
 
     forwarding_onem2m_resource(o2pt, csr);
     *rsc = o2pt->rsc;

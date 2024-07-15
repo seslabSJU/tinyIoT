@@ -44,6 +44,17 @@ typedef enum
 
 typedef enum
 {
+	RVI_NONE,
+	RVI_1,
+	RVI_2,
+	RVI_2a,
+	RVI_3,
+	RVI_4,
+	RVI_5,
+} RVI;
+
+typedef enum
+{
 	CS_PARTIAL_CONTENT = 1,
 	CS_FULL_CONTENT = 2
 } ContentStatus;
