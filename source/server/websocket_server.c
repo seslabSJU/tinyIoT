@@ -35,6 +35,18 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             // 여기에 요청 처리를 추가하세요
             logger("WEBSOCKET", LOG_LEVEL_INFO, "Processed request successfully");
 
+            // 응답 메시지 생성
+            cJSON *response = cJSON_CreateObject();
+            cJSON_AddNumberToObject(response, "rsc", o2pt.rsc);
+            cJSON_AddStringToObject(response, "rqi", o2pt.rqi);
+            cJSON_AddItemToObject(response, "pc", cJSON_Duplicate(o2pt.response_pc, 1));
+
+            char *response_message = cJSON_PrintUnformatted(response);
+            send_websocket_message(wsi, response_message);
+
+            cJSON_Delete(response);
+            free(response_message);
+
             cJSON_Delete(json);
             break;
         }
@@ -80,4 +92,17 @@ void initialize_websocket_server() {
     }
 
     lws_context_destroy(context);
+}
+
+// WebSocket 메시지를 보내는 함수
+void send_websocket_message(struct lws *wsi, const char *message) {
+    size_t message_length = strlen(message);
+    unsigned char *buf = (unsigned char *)malloc(LWS_SEND_BUFFER_PRE_PADDING + message_length + LWS_SEND_BUFFER_POST_PADDING);
+    if (buf == NULL) {
+        logger("WEBSOCKET", LOG_LEVEL_ERROR, "Memory allocation failed");
+        return;
+    }
+    memcpy(&buf[LWS_SEND_BUFFER_PRE_PADDING], message, message_length);
+    lws_write(wsi, &buf[LWS_SEND_BUFFER_PRE_PADDING], message_length, LWS_WRITE_TEXT);
+    free(buf);
 }

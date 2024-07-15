@@ -1294,7 +1294,7 @@ int process_onem2m_request(cJSON *json, oneM2MPrimitive *o2pt) {
         case OP_CREATE:
             logger("WEBSOCKET", LOG_LEVEL_INFO, "Create operation requested");
             o2pt->response_pc = cJSON_CreateObject(); // Create a dummy response for now
-            cJSON_AddStringToObject(o2pt->response_pc, "rsc", "2000");
+            cJSON_AddNumberToObject(o2pt->response_pc, "rsc", 2001);
             cJSON_AddStringToObject(o2pt->response_pc, "rqi", o2pt->rqi);
             cJSON_AddItemToObject(o2pt->response_pc, "pc", cJSON_Duplicate(o2pt->pc, 1));
             break;
@@ -1306,4 +1306,3 @@ int process_onem2m_request(cJSON *json, oneM2MPrimitive *o2pt) {
 
     return 0;
 }
-
