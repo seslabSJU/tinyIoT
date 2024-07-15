@@ -1340,7 +1340,7 @@ int check_resource_type_invalid(oneM2MPrimitive *o2pt)
 	}
 	else if (o2pt->ty == RT_CSE)
 	{
-		handle_error(o2pt, RSC_BAD_REQUEST, "resource type can't be 5(CSEBase)");
+		handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "resource type can't be 5(CSEBase)");
 		return -1;
 	}
 	return 0;
