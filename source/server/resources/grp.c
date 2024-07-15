@@ -359,7 +359,15 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
             }
             else if (csy == CSY_SET_MIXED)
             {
-                cJSON_SetIntValue(cJSON_GetObjectItem(grp, "mt"), RT_MIXED);
+                pjson = cJSON_GetObjectItem(grp, "mt");
+                if (pjson == NULL)
+                {
+                    cJSON_AddItemToObject(grp, "mt", cJSON_CreateNumber(RT_MIXED));
+                }
+                else
+                {
+                    cJSON_SetIntValue(pjson, RT_MIXED);
+                }
                 mt = RT_MIXED;
             }
             else
@@ -481,13 +489,13 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
         if (pjson->valueint < cJSON_GetArraySize(midArr))
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "`mnm` is less than `mid` size");
-            return RSC_BAD_REQUEST;
+            return RSC_MAX_NUMBER_OF_MEMBER_EXCEEDED;
         }
 
         if (pjson->valueint < cJSON_GetObjectItem(grp_old, "cnm")->valueint)
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "`mnm` can't be smaller than `cnm` size");
-            return RSC_BAD_REQUEST;
+            return RSC_MAX_NUMBER_OF_MEMBER_EXCEEDED;
         }
     }
     else if ((pjson = cJSON_GetObjectItem(grp_old, "mnm")))
@@ -523,13 +531,17 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
         cJSON *final_mid = cJSON_CreateArray();
         bool mtv = validate_grp_member(grp_new, final_mid, csy, mt);
         cJSON_SetBoolValue(cJSON_GetObjectItem(grp_new, "mtv"), mtv);
-
+        RTNode *mid_rtnode;
         cJSON_ArrayForEach(mid_obj, midArr)
         {
             char *mid = cJSON_GetStringValue(mid_obj);
             if (cJSON_getArrayIdx(final_mid, mid) == -1)
             {
-                deleteNodeList(find_rtnode(mid)->memberOf, find_rtnode(mid));
+                mid_rtnode = find_rtnode(mid);
+                if (mid_rtnode)
+                    cJSON_DeleteItemFromArray(mid_rtnode->memberOf, cJSON_getArrayIdx(mid_rtnode->memberOf, o2pt->to));
+                else
+                    logger("UTIL", LOG_LEVEL_DEBUG, "GRP member %s not found", mid);
             }
         }
 
