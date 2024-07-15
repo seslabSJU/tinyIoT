@@ -39,6 +39,11 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
             cJSON_SetValuestring(ri, o2pt->fr);
         }
     }
+    else if (o2pt->fr && o2pt->fr[0] == 'S')
+    {
+        cJSON *ri = cJSON_GetObjectItem(ae, "ri");
+        ri->valuestring[0] = 'S';
+    }
     else
     {
         o2pt->fr = strdup(cJSON_GetObjectItem(ae, "ri")->valuestring);
@@ -362,6 +367,6 @@ int check_aei_invalid(oneM2MPrimitive *o2pt)
         free(origin);
         origin = NULL;
     }
-    handle_error(o2pt, RSC_BAD_REQUEST, "originator is invalid");
+    handle_error(o2pt, RSC_APP_RULE_VALIDATION_FAILED, "originator is invalid");
     return -1;
 }
