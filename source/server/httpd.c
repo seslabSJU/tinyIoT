@@ -207,7 +207,7 @@ void respond(int slot)
     }
     else if (rcvd == 0)
     { // receive socket closed
-        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
+        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected unexpectedly");
         return;
     }
     // message received
@@ -414,6 +414,8 @@ void normalize_payload(char *body)
     body[index] = '\0';
 }
 
+
+// 추가: HTTP 응답을 기록하는 로직을 수정
 void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
 {
     char *status_msg = NULL;
@@ -471,7 +473,8 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         free(pc);
         pc = NULL;
     }
-}
+}   
+
 
 int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
 {

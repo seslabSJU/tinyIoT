@@ -76,6 +76,7 @@ typedef struct _o
 	int cnot;			// Content Offset
 	cJSON *fc;			// Filter Criteria
 	int drt;			// Discovery Result Type
+	cJSON *pc;
 } oneM2MPrimitive;
 
 typedef struct _n

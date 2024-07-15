@@ -1,10 +1,10 @@
 CC = gcc
 RELCFLAGS = -g
 
-LIBS = -lpthread -lm -ldl -lssl -lcrypto -lwebsockets
-INCLUDES = -I/path/to/your/includes
+LIBS = -lpthread -lm -ldl -lssl -lcrypto -lwebsockets -ljansson
+INCLUDES = -I/path/to/your/includes -I/usr/include
 
-SRCS = main.c onem2m.c cJSON.c httpd.c dbmanager.c jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket_server.c
+SRCS = main.c onem2m.c cJSON.c httpd.c dbmanager.c jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket_server.c resource_manager.c
 
 RSCSRC = $(wildcard resources/*.c)
 

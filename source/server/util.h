@@ -6,6 +6,7 @@
 #include "cJSON.h"
 #include "httpd.h"
 
+
 void init_server();
 
 void set_o2pt_pc(oneM2MPrimitive *o2pt, char *pc, ...);
@@ -167,4 +168,6 @@ cJSON *qs_to_json(char *qs);
 cJSON *handle_uril(cJSON *uril, char *new_uri, FilterOperation fo);
 void filterOptionStr(FilterOperation fo, char *sql);
 ACOP op_to_acop(Operation op);
+
+
 #endif

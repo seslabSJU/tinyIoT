@@ -1257,3 +1257,53 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	return o2pt->rsc;
 }
+
+int process_onem2m_request(cJSON *json, oneM2MPrimitive *o2pt) {
+    if (!cJSON_IsObject(json)) {
+        logger("WEBSOCKET", LOG_LEVEL_ERROR, "JSON is not an object");
+        return -1;
+    }
+
+    // Initialize oneM2MPrimitive structure
+    memset(o2pt, 0, sizeof(oneM2MPrimitive));
+
+    // Parse JSON data
+    cJSON *op = cJSON_GetObjectItem(json, "op");
+    cJSON *to = cJSON_GetObjectItem(json, "to");
+    cJSON *rqi = cJSON_GetObjectItem(json, "rqi");
+    cJSON *ty = cJSON_GetObjectItem(json, "ty");
+    cJSON *pc = cJSON_GetObjectItem(json, "pc");
+
+    // Check mandatory fields
+    if (!op || !to || !rqi || !ty || !pc) {
+        logger("WEBSOCKET", LOG_LEVEL_ERROR, "Mandatory fields missing");
+        return -1;
+    }
+
+    o2pt->op = op->valueint;
+    o2pt->to = strdup(to->valuestring);
+    o2pt->rqi = strdup(rqi->valuestring);
+    o2pt->ty = ty->valueint;
+    o2pt->pc = cJSON_Duplicate(pc, 1); // Deep copy of 'pc' field
+
+    // Logging the parsed values
+    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed request: op=%d, to=%s, rqi=%s, ty=%d", o2pt->op, o2pt->to, o2pt->rqi, o2pt->ty);
+
+    // Process the request
+    switch (o2pt->op) {
+        case OP_CREATE:
+            logger("WEBSOCKET", LOG_LEVEL_INFO, "Create operation requested");
+            o2pt->response_pc = cJSON_CreateObject(); // Create a dummy response for now
+            cJSON_AddStringToObject(o2pt->response_pc, "rsc", "2000");
+            cJSON_AddStringToObject(o2pt->response_pc, "rqi", o2pt->rqi);
+            cJSON_AddItemToObject(o2pt->response_pc, "pc", cJSON_Duplicate(o2pt->pc, 1));
+            break;
+
+        default:
+            logger("WEBSOCKET", LOG_LEVEL_ERROR, "Unsupported operation");
+            return -1;
+    }
+
+    return 0;
+}
+
