@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdarg.h>
 
+#include "util.h"
 #include "logger.h"
 #include "config.h"
 
@@ -16,13 +17,14 @@ FILE *log_file;
  */
 void logger_init()
 {
+    char logFileName[100];
     log_buffer = malloc(sizeof(char) * LOG_BUFFER_SIZE);
 #ifdef SAVE_LOG
     time_t now;
     time(&now);
-    char *t = ctime(&now);
-    t[24] = '\0';
-    log_file = fopen(t, "w");
+    char *t = get_local_time(0);
+    sprintf(logFileName, "%s.log", t);
+    log_file = fopen(logFileName, "w");
 #endif
 }
 

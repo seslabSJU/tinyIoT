@@ -260,6 +260,12 @@ void handle_http_request(HTTPRequest *req, int slotno)
     if (req->payload)
     {
         o2pt->request_pc = cJSON_Parse(req->payload);
+        if (!o2pt->request_pc)
+        {
+            handle_error(o2pt, RSC_BAD_REQUEST, "Invalid JSON format");
+            http_respond_to_client(o2pt, slotno);
+            return;
+        }
     }
 
     if ((header = search_header(req->headers, "x-m2m-origin")))
