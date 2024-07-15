@@ -1173,12 +1173,12 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 
     if (o2pt->drt == DRT_STRUCTURED)
     {
-        sprintf(buf, "SELECT uri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
+        sprintf(buf, "SELECT rn, ty, uri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
         strcat(sql, buf);
     }
     else
     {
-        sprintf(buf, "SELECT ri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
+        sprintf(buf, "SELECT rn, ty, ri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
         strcat(sql, buf);
     }
 
@@ -1498,6 +1498,7 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 
     json = cJSON_CreateArray();
     rc = sqlite3_step(res);
+    pjson = NULL;
     while (rc == SQLITE_ROW)
     {
         bytes = sqlite3_column_bytes(res, 0);
@@ -1506,7 +1507,11 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
             logger("DB", LOG_LEVEL_ERROR, "empty URI");
             break;
         }
-        cJSON_AddItemToArray(json, cJSON_CreateString(sqlite3_column_text(res, 0)));
+        pjson = cJSON_CreateObject();
+        cJSON_AddItemToObject(pjson, "name", cJSON_CreateString(sqlite3_column_text(res, 0)));
+        cJSON_AddItemToObject(pjson, "type", cJSON_CreateNumber(sqlite3_column_int(res, 1)));
+        cJSON_AddItemToObject(pjson, "val", cJSON_CreateString(sqlite3_column_text(res, 2)));
+        cJSON_AddItemToArray(json, pjson);
         rc = sqlite3_step(res);
     }
     sqlite3_finalize(res);

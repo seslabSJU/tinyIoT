@@ -2927,13 +2927,11 @@ int register_remote_cse()
 	add_header("X-M2M-RI", "check-cse-registered", req->headers);
 	add_header("Accept", "application/json", req->headers);
 	// add_header("Content-Type", "application/json", req->headers);
-	add_header("X-M2M-RVI", "2a", req->headers);
+	add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
 
 	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
 	logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration check: %d", res->status_code);
 	status_code = res->status_code;
-
-	logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration check: %s", search_header(res->headers, "x-m2m-rsc"));
 
 	if (status_code == 999 || status_code == 500)
 	{
@@ -2962,7 +2960,7 @@ int register_remote_cse()
 		add_header("X-M2M-RI", "register-cse", req->headers);
 		add_header("Accept", "application/json", req->headers);
 		add_header("Content-Type", "application/json;ty=16", req->headers);
-		add_header("X-M2M-RVI", "2a", req->headers);
+		add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
 
 		cJSON *root = cJSON_CreateObject();
 		cJSON *csr = cJSON_Duplicate(rt->cb->obj, 1);

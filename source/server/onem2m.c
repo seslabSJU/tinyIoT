@@ -843,10 +843,20 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		o2pt->cnot = ofst + lim;
 	}
 
-	if (o2pt->drt == DRT_STRUCTURED)
-		cJSON_AddItemToObject(root, "m2m:uril", list);
+	if (o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES)
+	{
+		cJSON *rrl = cJSON_AddObjectToObject(root, "m2m:rrl");
+		cJSON_AddItemToObject(rrl, "rrf", list);
+	}
 	else
-		cJSON_AddItemToObject(root, "m2m:rrl", list);
+	{
+		cJSON *uril = cJSON_CreateArray();
+		cJSON_ArrayForEach(pjson, list)
+		{
+			cJSON_AddItemToArray(uril, cJSON_GetObjectItem(pjson, "val"));
+		}
+		cJSON_AddItemToObject(root, "m2m:uril", uril);
+	}
 
 	o2pt->response_pc = root;
 	free(o2pt->to);
