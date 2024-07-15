@@ -125,6 +125,7 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 	RTNode *rtnode = (RTNode *)calloc(1, sizeof(RTNode));
 	cJSON *uri = NULL;
 	cJSON *memberOf = NULL;
+	cJSON *pjson = NULL;
 
 	rtnode->ty = ty;
 	rtnode->obj = obj;
@@ -144,6 +145,34 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 	if (!rtnode->memberOf)
 	{
 		rtnode->memberOf = cJSON_CreateArray();
+	}
+	if ((pjson = cJSON_GetObjectItem(obj, "rr")))
+	{
+		if (pjson->type != cJSON_True || pjson->type != cJSON_False)
+		{
+			if (pjson->valueint == 1)
+			{
+				cJSON_ReplaceItemInObject(obj, "rr", cJSON_CreateTrue());
+			}
+			else
+			{
+				cJSON_ReplaceItemInObject(obj, "rr", cJSON_CreateFalse());
+			}
+		}
+	}
+	if ((pjson = cJSON_GetObjectItem(obj, "mtv")))
+	{
+		if (pjson->type != cJSON_True || pjson->type != cJSON_False)
+		{
+			if (pjson->valueint == 1)
+			{
+				cJSON_ReplaceItemInObject(obj, "mtv", cJSON_CreateTrue());
+			}
+			else
+			{
+				cJSON_ReplaceItemInObject(obj, "mtv", cJSON_CreateFalse());
+			}
+		}
 	}
 
 	rtnode->rn = strdup(cJSON_GetObjectItem(obj, "rn")->valuestring);

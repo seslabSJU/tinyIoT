@@ -199,8 +199,10 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op)
     char *ptr = NULL;
     if (!cnt)
     {
-        handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
-        return RSC_CONTENTS_UNACCEPTABLE;
+        if (o2pt->rvi >= 3)
+            return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
+        else
+            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
     }
 
     pjson = cJSON_GetObjectItem(cnt, "rn");

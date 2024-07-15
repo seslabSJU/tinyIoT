@@ -343,7 +343,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
     socklen_t client_addr_len = sizeof(client_addr);
     getpeername(clients[slotno], (struct sockaddr *)&client_addr, &client_addr_len);
     o2pt->ip = (char *)malloc((INET_ADDRSTRLEN + 1) * sizeof(char));
-    logger("HTTP", LOG_LEVEL_INFO, "Client connected %d.%d.%d.%d\n",
+    logger("HTTP", LOG_LEVEL_INFO, "Client connected %d.%d.%d.%d",
            (int)(client_addr.sin_addr.s_addr & 0xFF), (int)((client_addr.sin_addr.s_addr & 0xFF00) >> 8), (int)((client_addr.sin_addr.s_addr & 0xFF0000) >> 16), (int)((client_addr.sin_addr.s_addr & 0xFF000000) >> 24));
 
     inet_ntop(AF_INET, &(client_addr.sin_addr.s_addr), o2pt->ip, INET_ADDRSTRLEN);
