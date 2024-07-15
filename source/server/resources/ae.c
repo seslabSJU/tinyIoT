@@ -41,8 +41,15 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     }
     else if (o2pt->fr && o2pt->fr[0] == 'S')
     {
-        cJSON *ri = cJSON_GetObjectItem(ae, "ri");
-        ri->valuestring[0] = 'S';
+        if (strlen(o2pt->fr) > 1)
+        {
+            cJSON_ReplaceItemInObject(ae, "ri", cJSON_CreateString(o2pt->fr));
+        }
+        else
+        {
+            cJSON *ri = cJSON_GetObjectItem(ae, "ri");
+            ri->valuestring[0] = 'S';
+        }
     }
     else
     {
