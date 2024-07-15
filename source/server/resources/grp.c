@@ -330,7 +330,7 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
             logger("UTIL", LOG_LEVEL_DEBUG, "GRP member %s not present", tStr);
             if (csy == CSY_ABANDON_GROUP)
                 return RSC_BAD_REQUEST;
-            else if (csy == CSY_ABANDON_MEMBER)
+            else if (csy == CSY_ABANDON_MEMBER || csy == CSY_SET_MIXED)
             {
                 // CSY_ABANDON_MEMBER - member unsaved
                 continue;
@@ -341,7 +341,7 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
             logger("UTIL", LOG_LEVEL_DEBUG, "GRP member %s not present", tStr);
             if (csy == CSY_ABANDON_GROUP)
                 return RSC_BAD_REQUEST;
-            else if (csy == CSY_ABANDON_MEMBER)
+            else if (csy == CSY_ABANDON_MEMBER || csy == CSY_SET_MIXED)
             {
                 // CSY_ABANDON_MEMBER - member unsaved
                 continue;
@@ -433,7 +433,7 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
         if (resourceLocation == 2)
             free_rtnode(rt_node);
     }
-    return 1;
+    return 0;
 }
 
 int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
@@ -529,8 +529,12 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
             csy = pjson->valueint;
         }
         cJSON *final_mid = cJSON_CreateArray();
-        bool mtv = validate_grp_member(grp_new, final_mid, csy, mt);
-        cJSON_SetBoolValue(cJSON_GetObjectItem(grp_new, "mtv"), mtv);
+        int result = validate_grp_member(grp_new, final_mid, csy, mt);
+        if (result != 0)
+        {
+            return handle_error(o2pt, result, "GRP member is invalid");
+        }
+        cJSON_SetBoolValue(cJSON_GetObjectItem(grp_new, "mtv"), true);
         RTNode *mid_rtnode;
         cJSON_ArrayForEach(mid_obj, midArr)
         {
