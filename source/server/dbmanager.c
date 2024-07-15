@@ -277,8 +277,6 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
         bytes = sqlite3_column_bytes(stmt, col);
         coltype = sqlite3_column_type(stmt, col);
 
-        if (bytes == 0)
-            continue;
         if (strcmp(colname, "id") == 0)
             continue;
         switch (coltype)
@@ -356,8 +354,6 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
         bytes = sqlite3_column_bytes(stmt, col);
         coltype = sqlite3_column_type(stmt, col);
 
-        if (bytes == 0)
-            continue;
         if (strcmp(colname, "id") == 0)
             continue;
         switch (coltype)
@@ -819,8 +815,6 @@ RTNode *db_get_all_resource_as_rtnode()
             coltype = sqlite3_column_type(res, col);
 
             // logger("DB", LOG_LEVEL_DEBUG, "rc : %s", colname);
-            if (bytes == 0)
-                continue;
             // if(strcmp(colname, "id") == 0) continue;
             switch (coltype)
             {
