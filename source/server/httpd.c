@@ -260,7 +260,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
     if (req->payload)
     {
         o2pt->request_pc = cJSON_Parse(req->payload);
-        if (!o2pt->request_pc)
+        if (!o2pt->request_pc && strlen(req->payload) > 0)
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid JSON format");
             http_respond_to_client(o2pt, slotno);
@@ -479,7 +479,6 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
     }
 
     write(clients[slotno], buf, strlen(buf));
-    logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buf);
 
     if (pc)
     {
@@ -763,7 +762,7 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
     }
     else
     { // message received
-        logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buffer);
+        // logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buffer);
         parse_http_response(res, buffer);
         if (res->payload_size > 0 && ((res->payload == NULL) || strlen(res->payload) == 0))
         { // if there is payload but it is not in the buffer

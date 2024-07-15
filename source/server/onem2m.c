@@ -178,7 +178,7 @@ int update_cb(cJSON *csr, cJSON *cb)
  * @param cnt_rtnode rtnode of cnt
  * @param cin_rtnode rtnode of cin
  * @param sign 1 for create, -1 for delete
- * @return int 1 for success, -1 for fail
+ * @return 0 for success, -1 for fail
  */
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 {
@@ -196,11 +196,13 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 	cJSON_SetIntValue(cbs, cbs->valueint + (sign * cJSON_GetObjectItem(cin, "cs")->valueint));
 	cJSON_SetIntValue(st, st->valueint + 1);
 	logger("O2", LOG_LEVEL_DEBUG, "cni: %d, cbs: %d, st: %d", cni->valueint, cbs->valueint, st->valueint);
-	delete_cin_under_cnt_mni_mbs(cnt_rtnode);
+
+	if (sign == 1)
+		delete_cin_under_cnt_mni_mbs(cnt_rtnode);
 
 	db_update_resource(cnt, get_ri_rtnode(cnt_rtnode), RT_CNT);
 
-	return 1;
+	return 0;
 }
 
 int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
@@ -227,6 +229,7 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	if (target_rtnode->ty == RT_CIN)
 	{
+
 		// logger("O2M", LOG_LEVEL_DEBUG, "delete cin rtnode %s", target_rtnode->rn);
 		if (!strcmp(target_rtnode->rn, "la"))
 		{

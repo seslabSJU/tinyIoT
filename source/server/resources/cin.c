@@ -166,14 +166,13 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
 
     if ((mbs = cJSON_GetObjectItem(parent_cnt, "mbs")))
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "mbs %d", mbs->valueint);
+        logger("CIN", LOG_LEVEL_DEBUG, "mbs %d", mbs->valueint);
         if ((cs = cJSON_GetObjectItem(cin, "cs")))
         {
-            logger("UTIL", LOG_LEVEL_DEBUG, "cs %d", cs->valueint);
+            logger("CIN", LOG_LEVEL_DEBUG, "cs %d", cs->valueint);
             if (mbs->valueint >= 0 && cs->valueint > mbs->valueint)
             {
-                handle_error(o2pt, RSC_NOT_ACCEPTABLE, "contentInstance size exceed `mbs`");
-                return RSC_NOT_ACCEPTABLE;
+                return handle_error(o2pt, RSC_NOT_ACCEPTABLE, "contentInstance size exceed `mbs`");
             }
         }
     }

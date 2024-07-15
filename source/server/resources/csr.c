@@ -95,8 +95,11 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *csr = target_rtnode->obj;
     int result;
 
-    // result = validate_csr(o2pt, target_rtnode->p)
-    // if(result != 1) return result;
+    result = validate_csr(o2pt, target_rtnode->parent, m2m_csr, OP_UPDATE);
+    if (result != 0)
+    {
+        return result;
+    }
 
     cJSON_AddItemToObject(m2m_csr, "lt", cJSON_CreateString(get_local_time(0)));
 
@@ -106,13 +109,7 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     update_remote_csr_dcse(target_rtnode);
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "m2m:csr", target_rtnode->obj);
-
-    o2pt->response_pc = root;
-    o2pt->rsc = RSC_UPDATED;
-
-    cJSON_DetachItemFromObject(root, "m2m:csr");
+    make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
     return RSC_UPDATED;
 }
@@ -178,5 +175,5 @@ int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Opera
         }
     }
 
-    return RSC_OK;
+    return 0;
 }
