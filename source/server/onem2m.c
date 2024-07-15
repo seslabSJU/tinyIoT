@@ -259,6 +259,7 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 {
 	cJSON *csr, *dcse, *dcse_item;
 	cJSON *pjson = NULL;
+	cJSON *update_obj = NULL;
 	RTNode *ptr_rtnode = NULL;
 	int idx = 0;
 	if (rtnode->child)
@@ -315,6 +316,12 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 				logger("O2M", LOG_LEVEL_DEBUG, "%d", idx);
 				if (idx >= 0)
 					cJSON_DeleteItemFromArray(ptr_rtnode->memberOf, idx);
+
+				update_obj = cJSON_CreateObject();
+				cJSON_AddItemToObject(update_obj, "memberOf", ptr_rtnode->memberOf);
+				db_update_resource(update_obj, cJSON_GetObjectItem(ptr_rtnode->obj, "ri")->valuestring, ptr_rtnode->ty);
+				cJSON_DetachItemFromObject(update_obj, "memberOf");
+				cJSON_Delete(update_obj);
 			}
 		}
 		break;

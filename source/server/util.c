@@ -1566,40 +1566,6 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	return 0;
 }
 
-int set_grp_member(RTNode *grp_rtnode)
-{
-	cJSON *mid_Arr = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
-	cJSON *mid_obj = NULL;
-	cJSON *update_obj;
-
-	bool duplicated = false;
-
-	cJSON_ArrayForEach(mid_obj, mid_Arr)
-	{
-		char *mid = cJSON_GetStringValue(mid_obj);
-		RTNode *mid_rtnode = find_rtnode(mid);
-		if (mid_rtnode)
-		{
-			if (cJSON_getArrayIdx(mid_rtnode->memberOf, grp_rtnode->uri) == -1)
-			{
-				logger("UTIL", LOG_LEVEL_DEBUG, "set_grp_member : %s is now member of %s", mid, grp_rtnode->uri);
-				cJSON_AddItemToArray(mid_rtnode->memberOf, cJSON_CreateString(grp_rtnode->uri));
-				// update_db
-				update_obj = cJSON_CreateObject();
-				cJSON_AddItemToObject(update_obj, "memberOf", mid_rtnode->memberOf);
-				db_update_resource(update_obj, cJSON_GetObjectItem(mid_rtnode->obj, "ri")->valuestring, mid_rtnode->ty);
-				cJSON_DetachItemFromObject(update_obj, "memberOf");
-				cJSON_Delete(update_obj);
-			}
-			else
-			{
-				logger("UTIL", LOG_LEVEL_DEBUG, "set_grp_member : %s is already member of %s", mid, grp_rtnode->uri);
-			}
-		}
-	}
-	return 0;
-}
-
 int handle_csy(cJSON *grp, cJSON *mid, int csy, int i)
 {
 	cJSON *mt = cJSON_GetObjectItem(grp, "mt");
