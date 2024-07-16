@@ -270,19 +270,19 @@ void route(oneM2MPrimitive *o2pt)
     log_runtime(start);
 }
 
+
 int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-    logger("MAIN", LOG_LEVEL_DEBUG, "handle_onem2m_request");
+    logger("MAIN", LOG_LEVEL_DEBUG, "handle_onem2m_request 시작: op=%d, to=%s, rqi=%s, ty=%d", o2pt->op, o2pt->to, o2pt->rqi, o2pt->ty);
     int rsc = 0;
     if (!o2pt || !target_rtnode)
     {
-        logger("MAIN", LOG_LEVEL_ERROR, "INTERNAL SERVER ERROR");
+        logger("MAIN", LOG_LEVEL_ERROR, "handle_onem2m_request: o2pt 또는 target_rtnode가 NULL임");
         return o2pt->rsc = RSC_INTERNAL_SERVER_ERROR;
     }
 
     switch (o2pt->op)
     {
-
     case OP_CREATE:
         if (o2pt->rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCES ||
             o2pt->rcn == RCN_CHILD_RESOURCES ||
@@ -294,7 +294,9 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for create operation");
             break;
         }
+        logger("MAIN", LOG_LEVEL_DEBUG, "create_onem2m_resource 호출 전");
         rsc = create_onem2m_resource(o2pt, target_rtnode);
+        logger("MAIN", LOG_LEVEL_DEBUG, "create_onem2m_resource 호출 후: rsc=%d", rsc);
         break;
 
     case OP_RETRIEVE:
@@ -363,8 +365,13 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         return RSC_INTERNAL_SERVER_ERROR;
     }
 
+    logger("MAIN", LOG_LEVEL_DEBUG, "handle_onem2m_request 완료: rsc=%d", rsc);
     return rsc;
 }
+
+
+
+
 
 void stop_server(int sig)
 {

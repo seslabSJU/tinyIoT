@@ -12,7 +12,15 @@ extern RTNode *registrar_csr;
 
 int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
+    logger("O2M", LOG_LEVEL_DEBUG, "create_ae 시작");
+
+    if (!o2pt || !parent_rtnode) {
+        logger("O2M", LOG_LEVEL_ERROR, "o2pt 또는 parent_rtnode가 NULL입니다.");
+        return RSC_INTERNAL_SERVER_ERROR;
+    }
+
     int e = check_aei_duplicate(o2pt, parent_rtnode);
+    logger("O2M", LOG_LEVEL_DEBUG, "eeee%d", e);
     if (e != -1)
         e = check_aei_invalid(o2pt);
     if (e != -1)
@@ -20,13 +28,27 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     if (e == -1)
         return o2pt->rsc;
 
+    logger("O2M", LOG_LEVEL_DEBUG, "%d", parent_rtnode->ty);
     if (parent_rtnode->ty != RT_CSE)
     {
         handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
         return o2pt->rsc;
     }
+
+    logger("O2M", LOG_LEVEL_DEBUG, "parent_rtnode: %s", o2pt->request_pc);
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
+    logger("O2M", LOG_LEVEL_DEBUG, "root: %s", cJSON_Print(root));
+    if (!root) {
+        logger("O2M", LOG_LEVEL_ERROR, "cJSON_Duplicate 실패");
+        return RSC_INTERNAL_SERVER_ERROR;
+    }
+
     cJSON *ae = cJSON_GetObjectItem(root, "m2m:ae");
+    if (!ae) {
+        logger("O2M", LOG_LEVEL_ERROR, "cJSON_GetObjectItem 실패: m2m:ae");
+        cJSON_Delete(root);
+        return RSC_BAD_REQUEST;
+    }
 
     add_general_attribute(ae, parent_rtnode, RT_AE);
     int rsc = validate_ae(o2pt, ae, OP_CREATE);
@@ -36,13 +58,27 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         if (strlen(o2pt->fr) > 1)
         {
             cJSON *ri = cJSON_GetObjectItem(ae, "ri");
-            cJSON_SetValuestring(ri, o2pt->fr);
+            if (ri) {
+                cJSON_SetValuestring(ri, o2pt->fr);
+            } else {
+                logger("O2M", LOG_LEVEL_ERROR, "cJSON_GetObjectItem 실패: ri");
+                cJSON_Delete(root);
+                return RSC_BAD_REQUEST;
+            }
         }
     }
     else
     {
-        o2pt->fr = strdup(cJSON_GetObjectItem(ae, "ri")->valuestring);
+        cJSON *ri = cJSON_GetObjectItem(ae, "ri");
+        if (ri) {
+            o2pt->fr = strdup(ri->valuestring);
+        } else {
+            logger("O2M", LOG_LEVEL_ERROR, "cJSON_GetObjectItem 실패: ri");
+            cJSON_Delete(root);
+            return RSC_BAD_REQUEST;
+        }
     }
+
     cJSON_AddStringToObject(ae, "aei", cJSON_GetObjectItem(ae, "ri")->valuestring);
 
     if (rsc != RSC_OK)
@@ -50,11 +86,19 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(root);
         return rsc;
     }
+
     if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
     {
         if (!strcmp(o2pt->fr, "/S"))
         {
-            cJSON_AddItemToArray(cJSON_GetObjectItem(ae, "at"), cJSON_CreateString(cJSON_GetObjectItem(registrar_csr->obj, "csi")->valuestring));
+            cJSON *csi = cJSON_GetObjectItem(registrar_csr->obj, "csi");
+            if (csi) {
+                cJSON_AddItemToArray(cJSON_GetObjectItem(ae, "at"), cJSON_CreateString(csi->valuestring));
+            } else {
+                logger("O2M", LOG_LEVEL_ERROR, "cJSON_GetObjectItem 실패: csi");
+                cJSON_Delete(root);
+                return RSC_BAD_REQUEST;
+            }
         }
     }
 
@@ -79,9 +123,23 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
     // Add uri attribute
     char *ptr = malloc(1024);
+    if (!ptr) {
+        logger("O2M", LOG_LEVEL_ERROR, "메모리 할당 실패");
+        cJSON_Delete(root);
+        return RSC_INTERNAL_SERVER_ERROR;
+    }
+
     cJSON *rn = cJSON_GetObjectItem(ae, "rn");
+    if (!rn) {
+        logger("O2M", LOG_LEVEL_ERROR, "Resource Name (rn) not found in AE");
+        free(ptr);
+        cJSON_Delete(root);
+        return RSC_BAD_REQUEST;
+    }
+
     sprintf(ptr, "%s/%s", get_uri_rtnode(parent_rtnode), rn->valuestring);
     // Save to DB
+    //여기로 들어가야함
     int result = db_store_resource(ae, ptr);
 
     if (result != 1)
@@ -98,6 +156,11 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
     // Add to resource tree
     RTNode *child_rtnode = create_rtnode(ae, RT_AE);
+    if (!child_rtnode) {
+        logger("O2M", LOG_LEVEL_ERROR, "Failed to create RTNode for AE");
+        cJSON_Delete(root);
+        return RSC_INTERNAL_SERVER_ERROR;
+    }
     add_child_resource_tree(parent_rtnode, child_rtnode);
 
     make_response_body(o2pt, child_rtnode);
@@ -105,8 +168,10 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_DetachItemFromObject(root, "m2m:ae");
     cJSON_Delete(root);
 
+    logger("O2M", LOG_LEVEL_DEBUG, "create_ae 완료");
     return o2pt->rsc = RSC_CREATED;
 }
+
 
 int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 { // TODO deannounce when at removed
@@ -204,31 +269,46 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
 {
+    logger("O2M", LOG_LEVEL_DEBUG, "validate_ae 시작");
+
     extern cJSON *ATTRIBUTES;
     cJSON *pjson = NULL;
+
+    logger("O2M", LOG_LEVEL_DEBUG, "중간췤");
 
     char *ptr = NULL;
     if (!ae)
     {
+        logger("O2M", LOG_LEVEL_ERROR, "ae is NULL");
         return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
     }
+
+    logger("O2M", LOG_LEVEL_DEBUG, "중간췤2");
+
     if (cJSON_GetObjectItem(ae, "aei"))
     {
+        logger("O2M", LOG_LEVEL_ERROR, "attribute `aei` is not allowed");
         return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `aei` is not allowed");
     }
 
-    if (op == OP_CREATE)
+    logger("O2M", LOG_LEVEL_DEBUG, "중간췤4");
+
+    if (op == OP_CREATE) // 문제 발견!!
     {
         pjson = cJSON_GetObjectItem(ae, "api");
         if (!pjson)
         {
+            logger("O2M", LOG_LEVEL_ERROR, "insufficient mandatory attribute(s): api is missing");
             return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
         }
         ptr = pjson->valuestring;
+        logger("O2M", LOG_LEVEL_DEBUG, "api 값: %s", ptr);
+        // o2pt->rvi = "3";
         if (!strcmp(o2pt->rvi, "1") || !strcmp(o2pt->rvi, "2") || !strcmp(o2pt->rvi, "2a") || !strcmp(o2pt->rvi, "3"))
         {
             if (ptr[0] != 'R' && ptr[0] != 'N' && ptr[0] != 'r')
             {
+                logger("O2M", LOG_LEVEL_ERROR, "attribute `api` prefix is invalid");
                 handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
                 return RSC_BAD_REQUEST;
             }
@@ -237,20 +317,31 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
         {
             if (ptr[0] != 'R' && ptr[0] != 'N')
             {
+                logger("O2M", LOG_LEVEL_ERROR, "attribute `api` prefix is invalid");
                 return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
             }
         }
     }
 
+    logger("O2M", LOG_LEVEL_DEBUG, "중간췤3");
+
     if ((pjson = cJSON_GetObjectItem(ae, "rn")))
     {
         if (strstr(pjson->valuestring, "/"))
         {
+            logger("O2M", LOG_LEVEL_ERROR, "attribute `rn` is invalid");
             return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `rn` is invalid");
         }
     }
+
     cJSON *attrs = cJSON_GetObjectItem(ATTRIBUTES, "m2m:ae");
+    if (!attrs) {
+        logger("O2M", LOG_LEVEL_ERROR, "attrs is NULL");
+    }
     cJSON *general = cJSON_GetObjectItem(ATTRIBUTES, "general");
+    if (!general) {
+        logger("O2M", LOG_LEVEL_ERROR, "general is NULL");
+    }
 
     if (cJSON_GetObjectItem(ae, "aa"))
     {
@@ -278,6 +369,7 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
             }
             else
             {
+                logger("O2M", LOG_LEVEL_ERROR, "attribute `aa` is invalid: %s", pjson->valuestring);
                 return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `aa` is invalid");
             }
         }
@@ -300,14 +392,17 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
             if (pjson)
             {
                 int result = validate_acpi(o2pt, pjson, op);
-                if (result != RSC_OK)
+                if (result != RSC_OK) {
+                    logger("O2M", LOG_LEVEL_ERROR, "validate_acpi 실패: %d", result);
                     return result;
+                }
             }
         }
         else if (op == OP_UPDATE)
         {
             if (pjson && cJSON_GetArraySize(pjson) > 1)
             {
+                logger("O2M", LOG_LEVEL_ERROR, "only attribute `acpi` is allowed when updating `acpi`");
                 handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
                 return RSC_BAD_REQUEST;
             }
@@ -315,12 +410,16 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
 
         if (!cJSON_IsNull(pjson) && cJSON_GetArraySize(pjson) == 0)
         {
+            logger("O2M", LOG_LEVEL_ERROR, "empty `acpi` is not allowed");
             return handle_error(o2pt, RSC_BAD_REQUEST, "empty `acpi` is not allowed");
         }
     }
 
+    logger("O2M", LOG_LEVEL_DEBUG, "validate_ae 완료");
     return RSC_OK;
 }
+
+
 
 int check_aei_invalid(oneM2MPrimitive *o2pt)
 {
