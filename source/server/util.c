@@ -816,7 +816,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	{
 		if (!(o2pt->op == OP_CREATE && o2pt->ty == RT_AE))
 		{
-			deny = true;
+			return true;
 		}
 	}
 	if (parent_rtnode && parent_rtnode->ty == RT_AE)
@@ -830,7 +830,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		return false;
 	}
 #endif
-	else if ((parent_rtnode && strcmp(origin, get_ri_rtnode(parent_rtnode))))
+	if ((parent_rtnode && strcmp(origin, get_ri_rtnode(parent_rtnode))))
 	{
 		deny = true;
 	}
@@ -2724,6 +2724,10 @@ bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg)
 	pjson = pjson->child;
 	while (pjson)
 	{
+		// if (!strcmp(pjson->string, "memberOf"))
+		// {
+		// 	return false;
+		// }
 		if (validate_sub_attr(attrs, pjson, err_msg))
 		{
 			flag = true;

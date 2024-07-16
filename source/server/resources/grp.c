@@ -227,11 +227,11 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
 
     if (result == 0)
     {
-        cJSON_AddBoolToObject(grp, "mtv", false);
-    }
-    else if (result == 1)
-    {
         cJSON_AddBoolToObject(grp, "mtv", true);
+    }
+    else
+    {
+        cJSON_AddBoolToObject(grp, "mtv", false);
     }
 
     cJSON_DeleteItemFromObject(grp, "mid");

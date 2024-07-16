@@ -257,10 +257,10 @@ void handle_http_request(HTTPRequest *req, int slotno)
     cJSON *fcjson = NULL;
     char *header = NULL;
 
-    if (req->payload)
+    if (req->payload && strlen(req->payload) > 0)
     {
         o2pt->request_pc = cJSON_Parse(req->payload);
-        if (!o2pt->request_pc && strlen(req->payload) > 0)
+        if (!o2pt->request_pc)
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid JSON format");
             http_respond_to_client(o2pt, slotno);
@@ -477,6 +477,7 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         strncat(buf, pc, BUF_SIZE - strlen(buf) - 1);
         strncat(buf, "\r\n", BUF_SIZE - strlen(buf) - 1);
     }
+    logger("HTTP", LOG_LEVEL_DEBUG, "Response: \n%s", buf);
 
     write(clients[slotno], buf, strlen(buf));
 
