@@ -812,7 +812,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		parent_rtnode = parent_rtnode->parent;
 	}
 
-	if (!o2pt->fr)
+	if (strlen(o2pt->fr) == 0)
 	{
 		if (!(o2pt->op == OP_CREATE && o2pt->ty == RT_AE))
 		{
@@ -900,20 +900,17 @@ int check_macp_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	return 0;
 }
 
-int get_acop(oneM2MPrimitive *o2pt, char *origin, RTNode *rtnode)
+int get_acop(oneM2MPrimitive *o2pt, char *corigin, RTNode *rtnode)
 {
 	int acop = 0;
-	// if (!o2pt->fr)
-	// {
-	// 	origin = strdup("all");
-	// }
-	// else
-	// {
-	// 	origin = strdup(o2pt->fr);
-	// }
-	if (!origin)
+	char *origin;
+	if (!corigin || strlen(corigin) == 0)
 	{
 		origin = strdup("all");
+	}
+	else
+	{
+		origin = strdup(o2pt->fr);
 	}
 
 #ifdef ADMIN_AE_ID
