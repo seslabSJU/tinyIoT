@@ -812,7 +812,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		parent_rtnode = parent_rtnode->parent;
 	}
 
-	if (strlen(o2pt->fr) == 0)
+	if (o2pt->fr == NULL || strlen(o2pt->fr) == 0)
 	{
 		if (!(o2pt->op == OP_CREATE && o2pt->ty == RT_AE))
 		{
@@ -825,7 +825,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		origin = o2pt->fr;
 
 #ifdef ADMIN_AE_ID
-	if (!strcmp(origin, ADMIN_AE_ID))
+	if (origin && !strcmp(origin, ADMIN_AE_ID))
 	{
 		return false;
 	}
