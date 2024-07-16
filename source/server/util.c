@@ -910,7 +910,7 @@ int get_acop(oneM2MPrimitive *o2pt, char *corigin, RTNode *rtnode)
 	}
 	else
 	{
-		origin = strdup(o2pt->fr);
+		origin = strdup(corigin);
 	}
 
 #ifdef ADMIN_AE_ID
