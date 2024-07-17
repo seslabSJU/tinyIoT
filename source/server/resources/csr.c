@@ -16,21 +16,20 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
     if (parent_rtnode->ty != RT_CSE)
     {
-        handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
-        return o2pt->rsc;
+
+        return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
     }
 
     if (SERVER_TYPE == ASN_CSE)
     {
-        handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation not allowed");
-        return o2pt->rsc;
+        return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation not allowed");
     }
 
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *csr = cJSON_GetObjectItem(root, "m2m:csr");
 
     int rsc = validate_csr(o2pt, parent_rtnode, csr, OP_CREATE);
-    if (rsc != RSC_OK)
+    if (rsc != 0)
     {
         cJSON_Delete(root);
         return rsc;
