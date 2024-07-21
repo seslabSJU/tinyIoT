@@ -409,3 +409,52 @@ void stop_server(int sig)
     logger_free();
     exit(0);
 }
+
+void create_response(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key) {
+    // 응답 객체 생성
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddNumberToObject(response, "rsc", o2pt->rsc);  // 응답 상태 코드
+    cJSON_AddStringToObject(response, "rqi", o2pt->rqi);  // 요청 ID
+    cJSON_AddStringToObject(response, "rvi", o2pt->rvi);  // 버전
+
+    // 생성된 리소스의 정보를 가져옴
+    if (resource_obj != NULL) {
+        cJSON *resource = cJSON_Duplicate(resource_obj, 1);
+        cJSON *pc = cJSON_CreateObject();
+
+        cJSON_AddItemToObject(pc, resource_key, resource);
+        cJSON_AddItemToObject(response, "pc", pc);
+    } else {
+        logger("RESPONSE", LOG_LEVEL_ERROR, "Resource object is NULL");
+    }
+
+    o2pt->response_pc = response;
+}
+
+
+RTNode* find_created_rtnode(const char *parent_ri, const char *child_rn) {
+    char parent_ri_mutable[256];
+    strncpy(parent_ri_mutable, parent_ri, sizeof(parent_ri_mutable));
+
+    RTNode *parent_node = find_rtnode(parent_ri_mutable);
+    if (parent_node == NULL) {
+        return NULL;
+    }
+
+    RTNode *child_node = parent_node->child;
+    while (child_node) {
+        if (strcmp(child_node->rn, child_rn) == 0) {
+            return child_node;
+        }
+        child_node = child_node->sibling_right;
+    }
+
+    return NULL;
+}
+
+
+
+
+
+
+

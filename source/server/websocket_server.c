@@ -8,6 +8,8 @@
 #include "rtManager.h"
 
 void send_websocket_message(struct lws *wsi, const char *message);
+void create_response(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key);
+RTNode* find_created_rtnode(const char *parent_ri, const char *child_ri);
 
 static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                               void *user, void *in, size_t len) {
@@ -75,9 +77,9 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 
             // 'rvi' 필드 처리: 존재하지 않을 경우 기본값 설정
             if (rvi) {
-            o2pt.rvi = strdup(rvi->valuestring);
+                o2pt.rvi = strdup(rvi->valuestring);
             } else {
-            o2pt.rvi = strdup("3"); // 기본값을 "3"으로 설정
+                o2pt.rvi = strdup("3"); // 기본값을 "3"으로 설정
             }
 
             // 'fr' 필드 처리
@@ -101,17 +103,34 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 
             int flag = handle_onem2m_request(&o2pt, target_rtnode);
             logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Flag: %d", flag);
-           //if (handle_onem2m_request(&o2pt, target_rtnode) != "20001") {
-                //logger("WEBSOCKET", LOG_LEVEL_ERROR, "Failed to handle request");
-                //cJSON_Delete(json);
-                //return -1;
-            //}
+
+            // rsc가 2001인 경우 응답 필드를 조합
+            if (o2pt.rsc == 2001) {
+                const char *resource_key = NULL;
+                switch (o2pt.ty) {
+                    case 2:
+                        resource_key = "m2m:ae";
+                        break;
+                    case 3:
+                        resource_key = "m2m:cnt";
+                        break;
+                    
+                }
+
+                if (resource_key) {
+                    cJSON *resource = cJSON_GetObjectItem(o2pt.request_pc, resource_key);
+                    const char *rn = cJSON_GetObjectItem(resource, "rn")->valuestring;
+
+                    RTNode *created_node = find_created_rtnode(target_rtnode->rn, rn);
+                    if (created_node && created_node->obj) {
+                        create_response(&o2pt, created_node->obj, resource_key);
+                    } else {
+                        logger("WEBSOCKET", LOG_LEVEL_ERROR, "Created node or resource key not found");
+                    }
+                }
+            }
 
             // 응답 메시지 생성 및 전송
-            //char *response_message = cJSON_Print(o2pt.response_pc);
-            //send_websocket_message(wsi, response_message);
-            //free(response_message);
-
             if (o2pt.response_pc != NULL) {
                 char *response_message = cJSON_Print(o2pt.response_pc);
                 send_websocket_message(wsi, response_message);
@@ -166,7 +185,6 @@ void initialize_websocket_server() {
 
     lws_context_destroy(context);
 }
-
 void send_websocket_message(struct lws *wsi, const char *message) {
     size_t message_length = strlen(message);
     unsigned char *buffer = (unsigned char *)malloc(LWS_PRE + message_length);
