@@ -73,7 +73,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 
             o2pt.rqi = strdup(rqi->valuestring);
             o2pt.ty = ty->valueint;
-            o2pt.request_pc = cJSON_Duplicate(pc, 1); // 'pc' 필드의 깊은 복사
+            o2pt.request_pc = cJSON_Duplicate(pc, 1); // 'pc' 필드 복사
 
             // 'rvi' 필드 처리: 존재하지 않을 경우 기본값 설정
             if (rvi) {
@@ -121,7 +121,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                     cJSON *resource = cJSON_GetObjectItem(o2pt.request_pc, resource_key);
                     const char *rn = cJSON_GetObjectItem(resource, "rn")->valuestring;
 
-                    RTNode *created_node = find_created_rtnode(target_rtnode->rn, rn);
+                    RTNode *created_node = find_rtnode(o2pt.to);
                     if (created_node && created_node->obj) {
                         create_response(&o2pt, created_node->obj, resource_key);
                     } else {
@@ -132,7 +132,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 
             // 응답 메시지 생성 및 전송
             if (o2pt.response_pc != NULL) {
-                char *response_message = cJSON_Print(o2pt.response_pc);
+                char *response_message = cJSON_PrintUnformatted(o2pt.response_pc);
                 send_websocket_message(wsi, response_message);
                 free(response_message);
             } else {
@@ -192,4 +192,26 @@ void send_websocket_message(struct lws *wsi, const char *message) {
 
     lws_write(wsi, &buffer[LWS_PRE], message_length, LWS_WRITE_TEXT);
     free(buffer);
+}
+
+void create_response(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key) {
+    // 응답 객체 생성
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddNumberToObject(response, "rsc", o2pt->rsc);  // 응답 상태 코드
+    cJSON_AddStringToObject(response, "rqi", o2pt->rqi);  // 요청 ID
+    cJSON_AddStringToObject(response, "rvi", o2pt->rvi);  // 버전
+
+    // 생성된 리소스의 정보를 가져옴
+    if (resource_obj != NULL) {
+        cJSON *resource = cJSON_Duplicate(resource_obj, 1);
+        cJSON *pc = cJSON_CreateObject();
+
+        cJSON_AddItemToObject(pc, resource_key, resource);
+        cJSON_AddItemToObject(response, "pc", pc);
+    } else {
+        logger("RESPONSE", LOG_LEVEL_ERROR, "Resource object is NULL");
+    }
+
+    o2pt->response_pc = response;
+    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "\n\n%s", cJSON_PrintUnformatted(response));
 }

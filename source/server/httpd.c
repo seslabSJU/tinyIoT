@@ -242,7 +242,7 @@ Operation http_parse_operation(char *method)
         op = OP_RETRIEVE;
     else if (strcmp(method, "PUT") == 0)
         op = OP_UPDATE;
-    else if (strcmp(method, "DELETE") == 0)
+    else if (strcmp(method, "DELETE") == 0) 
         op = OP_DELETE;
     else if (strcmp(method, "OPTIONS") == 0)
         op = OP_OPTIONS;

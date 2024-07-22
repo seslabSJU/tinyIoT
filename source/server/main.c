@@ -410,9 +410,10 @@ void stop_server(int sig)
     exit(0);
 }
 
+/*
 void create_response(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key) {
     // 응답 객체 생성
-    cJSON *response = cJSON_CreateObject();
+   cJSON *response = cJSON_CreateObject();
     cJSON_AddNumberToObject(response, "rsc", o2pt->rsc);  // 응답 상태 코드
     cJSON_AddStringToObject(response, "rqi", o2pt->rqi);  // 요청 ID
     cJSON_AddStringToObject(response, "rvi", o2pt->rvi);  // 버전
@@ -430,6 +431,8 @@ void create_response(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *res
 
     o2pt->response_pc = response;
 }
+
+*/
 
 
 RTNode* find_created_rtnode(const char *parent_ri, const char *child_rn) {

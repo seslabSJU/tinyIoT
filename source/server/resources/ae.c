@@ -274,8 +274,6 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
     extern cJSON *ATTRIBUTES;
     cJSON *pjson = NULL;
 
-    logger("O2M", LOG_LEVEL_DEBUG, "중간췤");
-
     char *ptr = NULL;
     if (!ae)
     {
@@ -283,7 +281,6 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
         return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
     }
 
-    logger("O2M", LOG_LEVEL_DEBUG, "중간췤2");
 
     if (cJSON_GetObjectItem(ae, "aei"))
     {
@@ -291,7 +288,6 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
         return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `aei` is not allowed");
     }
 
-    logger("O2M", LOG_LEVEL_DEBUG, "중간췤4");
 
     if (op == OP_CREATE) // 문제 발견!!
     {
@@ -323,7 +319,6 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
         }
     }
 
-    logger("O2M", LOG_LEVEL_DEBUG, "중간췤3");
 
     if ((pjson = cJSON_GetObjectItem(ae, "rn")))
     {

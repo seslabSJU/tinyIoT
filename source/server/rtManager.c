@@ -171,13 +171,19 @@ RTNode *find_rtnode(char *addr)
 {
     if (!addr)
         return NULL;
+    
     RTNode *rtnode = NULL;
+    
+    // Check if the address is the CSE base name or root identifier
     if (strcmp(addr, CSE_BASE_NAME) == 0 || strcmp(addr, "-") == 0)
     {
         return rt->cb;
     }
+    
     logger("UTIL", LOG_LEVEL_DEBUG, "addr : %s", addr);
-    if ((strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 && addr[strlen(CSE_BASE_NAME)] == '/') || (addr[0] == '-' && addr[1] == '/'))
+    
+    // Check for hierarchical addressing
+    if ((strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 && addr[strlen(CSE_BASE_NAME)] == '/') || (addr[0] == '/' && addr[1] != '\0'))
     {
         logger("UTIL", LOG_LEVEL_DEBUG, "Hierarchical Addressing");
         rtnode = find_rtnode_by_uri(addr);
@@ -187,8 +193,10 @@ RTNode *find_rtnode(char *addr)
         logger("UTIL", LOG_LEVEL_DEBUG, "Non-Hierarchical Addressing");
         rtnode = find_rtnode_by_ri(addr);
     }
+    
     return rtnode;
 }
+
 
 /**
  * @brief get resource from remote cse with sp-relative uri
@@ -329,25 +337,21 @@ RTNode *find_rtnode_by_uri(char *uri)
  * @param ri resource identifier
  * @return resource node or NULL
  */
-RTNode *find_rtnode_by_ri(char *ri)
-{
+RTNode *find_rtnode_by_ri(char *ri) {
     cJSON *resource = NULL;
     RTNode *rtnode = NULL;
     char *fopt = strstr(ri, "/fopt");
     logger("UTIL", LOG_LEVEL_DEBUG, "RI : %s", ri);
-    if (strncmp(ri, "4-", 2) == 0)
-    {
+
+    if (strncmp(ri, "4-", 2) == 0) {
         logger("UTIL", LOG_LEVEL_DEBUG, "CIN");
         resource = db_get_resource(ri, RT_CIN);
         rtnode = create_rtnode(resource, RT_CIN);
         rtnode->parent = find_rtnode_by_ri(get_pi_rtnode(rtnode));
         return rtnode;
-    }
-    else if (strncmp(ri, "9-", 2) == 0)
-    {
+    } else if (strncmp(ri, "9-", 2) == 0) {
         logger("UTIL", LOG_LEVEL_DEBUG, "GRP");
-        if (fopt)
-        {
+        if (fopt) {
             *fopt = '\0';
         }
     }
@@ -355,14 +359,19 @@ RTNode *find_rtnode_by_ri(char *ri)
     logger("UTIL22", LOG_LEVEL_DEBUG, "RI : %s", ri);
     rtnode = rt_search_ri(rt->cb, ri);
 
-    if (fopt)
-    {
+    if (fopt) {
         *fopt = '/';
     }
 
-    logger("UTIL22", LOG_LEVEL_DEBUG, "RI : %s", rtnode);
+    if (rtnode == NULL) {
+        logger("UTIL", LOG_LEVEL_ERROR, "RTNode not found for RI: %s", ri);
+    } else {
+        logger("UTIL224", LOG_LEVEL_DEBUG, "RTNode found: %s", rtnode->rn);
+    }
+
     return rtnode;
 }
+
 
 /**
  * @brief recursive search of resource tree
@@ -370,25 +379,36 @@ RTNode *find_rtnode_by_ri(char *ri)
  * @param ri resource identifier
  * @return resource node or NULL
  */
-RTNode *rt_search_ri(RTNode *rtnode, char *ri)
-{
+RTNode *rt_search_ri(RTNode *rtnode, char *ri) {
     RTNode *ret = NULL;
     if (!rtnode)
         return NULL;
-    while (rtnode)
-    {
-        if (rtnode->child)
-            ret = rt_search_ri(rtnode->child, ri);
-        if (!strcmp(get_ri_rtnode(rtnode), ri))
-        {
-            ret = rtnode;
-            break;
+
+    while (rtnode) {
+        logger("RT_SEARCH", LOG_LEVEL_DEBUG, "Comparing node: %s with RI: %s", rtnode->rn, ri);
+        
+        if (!strcmp(get_ri_rtnode(rtnode), ri)) {
+            logger("RT_SEARCH", LOG_LEVEL_DEBUG, "Found node: %s", rtnode->rn);
+            return rtnode;  // 찾은 노드를 반환
         }
+
+        if (rtnode->child) {
+            ret = rt_search_ri(rtnode->child, ri);
+            if (ret) {
+                return ret;  // 재귀 호출에서 찾은 노드를 반환
+            }
+        }
+        
         rtnode = rtnode->sibling_right;
     }
 
-    return ret;
+    return NULL;
 }
+
+
+
+
+
 
 int add_child_resource_tree(RTNode *parent, RTNode *child)
 {
