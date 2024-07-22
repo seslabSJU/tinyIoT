@@ -120,8 +120,14 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                 if (resource_key) {
                     cJSON *resource = cJSON_GetObjectItem(o2pt.request_pc, resource_key);
                     const char *rn = cJSON_GetObjectItem(resource, "rn")->valuestring;
+                    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Resource name: %s", rn);
+                    
+                    char created_ri[256];
+                    snprintf(created_ri, sizeof(created_ri), "%s/%s", o2pt.to, rn);
+                    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Created resource path: %s", created_ri);
 
-                    RTNode *created_node = find_rtnode(o2pt.to);
+
+                    RTNode *created_node = find_rtnode(created_ri);
                     if (created_node && created_node->obj) {
                         create_response(&o2pt, created_node->obj, resource_key);
                     } else {

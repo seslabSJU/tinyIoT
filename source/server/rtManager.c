@@ -470,12 +470,13 @@ void init_resource_tree()
     RTNode *rtnode_list = (RTNode *)calloc(1, sizeof(RTNode));
     RTNode *tail = rtnode_list;
 
-    logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree 시작");
+    //logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree 시작");
+    logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree");
     RTNode *resource_list = db_get_all_resource_as_rtnode();
     if (resource_list == NULL) {
-        logger("UTIL", LOG_LEVEL_ERROR, "DB에서 리소스 목록을 가져올 수 없습니다.");
+        //logger("UTIL", LOG_LEVEL_DEBUG, "Unable to get resource list from DB");
     } else {
-        logger("UTIL", LOG_LEVEL_DEBUG, "DB에서 리소스 목록을 가져왔습니다.");
+        //logger("UTIL", LOG_LEVEL_DEBUG, "Importing a list of resources from DB");
     }
 
     tail->sibling_right = resource_list;
@@ -508,7 +509,7 @@ void init_resource_tree()
     if (rtnode_list)
         restruct_resource_tree(rt->cb, rtnode_list);
 
-    logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree 완료");
+    //logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree 완료");
 }
 
 
