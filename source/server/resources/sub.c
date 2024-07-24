@@ -11,10 +11,6 @@ extern cJSON *ATTRIBUTES;
 int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
     int result = 0;
-    if (parent_rtnode->ty == RT_CIN || parent_rtnode->ty == RT_SUB)
-    {
-        return handle_error(o2pt, RSC_TARGET_NOT_SUBSCRIBABLE, "target not subscribable");
-    }
 
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *sub = cJSON_GetObjectItem(root, "m2m:sub");

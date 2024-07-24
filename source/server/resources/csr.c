@@ -14,12 +14,6 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     if (e == -1)
         return o2pt->rsc;
 
-    if (parent_rtnode->ty != RT_CSE)
-    {
-
-        return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
-    }
-
     if (SERVER_TYPE == ASN_CSE)
     {
         return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation not allowed");

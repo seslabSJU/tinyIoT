@@ -3683,3 +3683,43 @@ bool isAptEnc(oneM2MPrimitive *o2pt, RTNode *target_rtnode, RTNode *sub_rtnode)
 
 	return true;
 }
+
+bool isValidChildType(ResourceType parent, ResourceType child)
+{
+	switch (parent)
+	{
+	case RT_ACP:
+		if (child == RT_SUB)
+			return true;
+		break;
+	case RT_AE:
+		if (child == RT_CNT || child == RT_SUB || child == RT_ACP || child == RT_GRP || child == RT_TS)
+			return true;
+		break;
+	case RT_CNT:
+		if (child == RT_CIN || child == RT_SUB || child == RT_CNT || child == RT_SMD || child == RT_FCNT || child == RT_TS)
+			return true;
+		break;
+	case RT_CIN:
+		if (child == RT_SMD)
+			return true;
+		break;
+	case RT_CSE:
+		if (child == RT_ACP || child == RT_AE || child == RT_CNT || child == RT_GRP || child == RT_SUB ||
+			child == RT_CSR || child == RT_NOD || child == RT_MGMTOBJ)
+			return true;
+		break;
+	case RT_GRP:
+		if (child == RT_SUB || child == RT_SMD)
+			return true;
+		break;
+	case RT_CSR:
+		if (child == RT_CNT || child == RT_CNTA || child == RT_FCNT || child == RT_GRP || child == RT_GRPA || child == RT_ACP ||
+			child == RT_ACPA || child == RT_AE || child == RT_SUB || child == RT_AEA)
+			return true;
+		break;
+	case RT_SUB:
+		break;
+	}
+	return false;
+}

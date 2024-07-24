@@ -11,10 +11,6 @@ extern cJSON *ATTRIBUTES;
 int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
     int rsc = 0;
-    if (parent_rtnode->ty != RT_AE && parent_rtnode->ty != RT_CSE)
-    {
-        return o2pt->rsc = RSC_INVALID_CHILD_RESOURCETYPE;
-    }
 
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *grp = cJSON_GetObjectItem(root, "m2m:grp");

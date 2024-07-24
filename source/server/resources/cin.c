@@ -10,12 +10,6 @@ extern cJSON *ATTRIBUTES;
 
 int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
-    if (parent_rtnode->ty != RT_CNT)
-    {
-        handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
-        return o2pt->rsc;
-    }
-
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *cin = cJSON_GetObjectItem(root, "m2m:cin");
     cJSON *rn = NULL;

@@ -107,6 +107,7 @@ int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Opera
 int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op);
 int validate_acr(oneM2MPrimitive *o2pt, cJSON *acr_attr);
 bool checkResourceCseID(char *resourceUri, char *cseID);
+bool isValidChildType(ResourceType parent, ResourceType child);
 
 // error
 int check_mandatory_attributes(oneM2MPrimitive *o2pt);

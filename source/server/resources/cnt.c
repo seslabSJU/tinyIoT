@@ -12,11 +12,6 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *pjson = NULL;
-    if (parent_rtnode->ty != RT_CNT && parent_rtnode->ty != RT_AE && parent_rtnode->ty != RT_CSE)
-    {
-        handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
-        return RSC_INVALID_CHILD_RESOURCETYPE;
-    }
 
     cJSON *cnt = cJSON_GetObjectItem(root, "m2m:cnt");
 

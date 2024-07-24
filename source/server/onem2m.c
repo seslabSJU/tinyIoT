@@ -508,6 +508,11 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
 	}
 
+	if (!isValidChildType(parent_rtnode->ty, o2pt->ty))
+	{
+		return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type error");
+	}
+
 	switch (o2pt->ty)
 	{
 	case RT_AE:

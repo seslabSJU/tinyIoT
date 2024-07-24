@@ -20,11 +20,6 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     if (e == -1)
         return o2pt->rsc;
 
-    if (parent_rtnode->ty != RT_CSE)
-    {
-        handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
-        return o2pt->rsc;
-    }
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *ae = cJSON_GetObjectItem(root, "m2m:ae");
 
