@@ -304,13 +304,13 @@ void handle_http_request(HTTPRequest *req, int slotno)
     {
         if (req->uri[1] == '~')
         { // SP relative
-            o2pt->to = (char *)calloc((strlen(req->uri + 1)), sizeof(char));
+            o2pt->to = (char *)calloc(sizeof(char), (strlen(req->uri + 1) + 2));
             o2pt->to[0] = '/';
             strcat(o2pt->to, req->uri + 3);
         }
         else if (req->uri[1] == '_')
         { // absolute
-            o2pt->to = (char *)calloc((strlen(req->uri + 1)), sizeof(char));
+            o2pt->to = (char *)calloc(sizeof(char), (strlen(req->uri + 1) + 2));
             o2pt->to[0] = '/';
             o2pt->to[1] = '/';
             strcat(o2pt->to, req->uri + 3);
@@ -342,7 +342,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     getpeername(clients[slotno], (struct sockaddr *)&client_addr, &client_addr_len);
-    o2pt->ip = (char *)malloc((INET_ADDRSTRLEN + 1) * sizeof(char));
+    o2pt->ip = (char *)calloc(sizeof(char), (INET_ADDRSTRLEN + 1));
     logger("HTTP", LOG_LEVEL_INFO, "Client connected %d.%d.%d.%d",
            (int)(client_addr.sin_addr.s_addr & 0xFF), (int)((client_addr.sin_addr.s_addr & 0xFF00) >> 8), (int)((client_addr.sin_addr.s_addr & 0xFF0000) >> 16), (int)((client_addr.sin_addr.s_addr & 0xFF000000) >> 24));
 
@@ -500,7 +500,6 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
     req->uri = strdup(o2pt->to);
     req->headers = calloc(1, sizeof(header_t));
     add_header("X-M2M-Origin", "/" CSE_BASE_RI, req->headers);
-    add_header("X-M2M-RVI", "2a", req->headers);
     add_header("Content-Type", "application/json", req->headers);
     send_http_request(host, port, req, res);
     logger("HTTP", LOG_LEVEL_DEBUG, "http_notify response: %d", res->status_code);

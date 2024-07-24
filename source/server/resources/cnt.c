@@ -159,7 +159,7 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         // validate new acpi
         if (cJSON_GetArraySize(cJSON_GetObjectItem(m2m_cnt, "acpi")) > 0)
         {
-            if (validate_acpi(o2pt, cJSON_GetObjectItem(m2m_cnt, "acpi"), OP_UPDATE) != RSC_OK)
+            if (validate_acpi(o2pt, cJSON_GetObjectItem(m2m_cnt, "acpi"), ACOP_UPDATE) != RSC_OK)
             {
                 return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
             }
@@ -226,7 +226,7 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op)
         pjson = cJSON_GetObjectItem(cnt, "acpi");
         if (pjson && cJSON_GetArraySize(pjson) > 0)
         {
-            int result = validate_acpi(o2pt, pjson, op);
+            int result = validate_acpi(o2pt, pjson, ACOP_CREATE);
             if (result != RSC_OK)
                 return result;
         }

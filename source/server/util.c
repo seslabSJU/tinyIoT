@@ -801,7 +801,7 @@ int check_mandatory_attributes(oneM2MPrimitive *o2pt)
  */
 int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 {
-	logger("UTIL", LOG_LEVEL_DEBUG, "check_privilege : %s", o2pt->fr);
+	logger("UTIL", LOG_LEVEL_DEBUG, "check_privilege : %s : %d", o2pt->fr, acop);
 	bool deny = false;
 	char *origin = NULL;
 
@@ -932,9 +932,6 @@ int get_acop(oneM2MPrimitive *o2pt, char *corigin, RTNode *rtnode)
 	if (!acpiArr)
 		return 0;
 
-	RTNode *cb = rtnode;
-	while (cb->parent)
-		cb = cb->parent;
 	cJSON *acpi = NULL;
 	cJSON_ArrayForEach(acpi, acpiArr)
 	{
@@ -1101,19 +1098,28 @@ int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag)
 	if (flag)
 	{
 		privilege = cJSON_GetObjectItem(acp, "pvs");
+		logger("UTIL", LOG_LEVEL_DEBUG, "pvs");
 	}
 	else
 	{
 		privilege = cJSON_GetObjectItem(acp, "pv");
+		logger("UTIL", LOG_LEVEL_DEBUG, "pv");
 	}
+
+	char *acor_ptr = NULL;
 
 	cJSON_ArrayForEach(acr, cJSON_GetObjectItem(privilege, "acr"))
 	{
 		cJSON_ArrayForEach(acor, cJSON_GetObjectItem(acr, "acor"))
 		{
-			if ((asterisk = strchr(acor->valuestring, '*')))
+			acor_ptr = acor->valuestring;
+			if (strncmp(acor_ptr, "/" CSE_BASE_RI "/", strlen(CSE_BASE_RI) + 2) == 0)
 			{
-				if (!strncmp(acor->valuestring, origin, asterisk - acor->valuestring) && !strcmp(asterisk + 1, origin + strlen(origin) - strlen(asterisk + 1)))
+				acor_ptr += strlen(CSE_BASE_RI) + 2;
+			}
+			if ((asterisk = strchr(acor_ptr, '*')))
+			{
+				if (!strncmp(acor_ptr, origin, asterisk - acor_ptr) && !strcmp(asterisk + 1, origin + strlen(origin) - strlen(asterisk + 1)))
 				{
 					if (check_acco(cJSON_GetObjectItem(acr, "acco"), o2pt->ip))
 					{
@@ -1122,7 +1128,7 @@ int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag)
 					break;
 				}
 			}
-			else if (!strcmp(acor->valuestring, origin))
+			else if (!strcmp(acor_ptr, origin))
 			{
 				if (check_acco(cJSON_GetObjectItem(acr, "acco"), o2pt->ip))
 				{
@@ -1130,7 +1136,7 @@ int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag)
 				}
 				break;
 			}
-			else if (!strcmp(acor->valuestring, "all"))
+			else if (!strcmp(acor_ptr, "all"))
 			{
 				if (check_acco(cJSON_GetObjectItem(acr, "acco"), o2pt->ip))
 				{
@@ -1531,7 +1537,14 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "Internal Server Error");
 		}
 		cJSON_Delete(root);
-		root = cJSON_Duplicate(o2pt->request_pc, true);
+		if (o2pt->op == OP_CREATE)
+		{
+			root = cJSON_Duplicate(target_rtnode->obj, true);
+		}
+		else
+		{
+			root = cJSON_Duplicate(o2pt->request_pc, true);
+		}
 		break;
 	case RCN_SEMANTIC_CONTENT:
 		break;
@@ -1971,7 +1984,7 @@ void o2ptcpy(oneM2MPrimitive **dest, oneM2MPrimitive *src)
 	(*dest)->isFopt = src->isFopt;
 	(*dest)->rsc = src->rsc;
 	(*dest)->cnot = src->cnot;
-	(*dest)->fc = src->fc;
+	(*dest)->fc = cJSON_Duplicate(src->fc, true);
 }
 
 char *get_pi_rtnode(RTNode *rtnode)
@@ -2764,7 +2777,7 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op)
 	{
 		return RSC_OK;
 	}
-	if (!cJSON_IsArray(acpiAttr) && !cJSON_IsNull(acpiAttr))
+	if (!cJSON_IsArray(acpiAttr) || cJSON_IsNull(acpiAttr))
 	{
 		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` is in invalid form");
 	}

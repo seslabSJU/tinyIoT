@@ -15,8 +15,8 @@ int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         e = check_rn_invalid(o2pt, RT_AE);
     if (e == -1)
         return o2pt->rsc;
-    // logger("UTIL", LOG_LEVEL_DEBUG, "%s", cJSON_PrintUnformatted(parent_rtnode->obj));
-    if (parent_rtnode->ty != RT_CBA)
+
+    if (!(parent_rtnode->ty == RT_CBA || parent_rtnode->ty == RT_CSR))
     {
         handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
         return o2pt->rsc;

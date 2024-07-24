@@ -263,7 +263,8 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			o2pt->rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES ||
 			o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES ||
 			o2pt->rcn == RCN_ORIGINAL_RESOURCE ||
-			o2pt->rcn == RCN_SEMANTIC_CONTENT)
+			o2pt->rcn == RCN_SEMANTIC_CONTENT ||
+			o2pt->rcn == RCN_PERMISSIONS)
 		{
 			handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for create operation");
 			break;
@@ -285,8 +286,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		break;
 
 	case OP_UPDATE:
-		if (o2pt->rcn == RCN_MODIFIED_ATTRIBUTES ||
-			o2pt->rcn == RCN_HIERARCHICAL_ADDRESS ||
+		if (o2pt->rcn == RCN_HIERARCHICAL_ADDRESS ||
 			o2pt->rcn == RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES ||
 			o2pt->rcn == RCN_CHILD_RESOURCES ||
 			o2pt->rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES ||

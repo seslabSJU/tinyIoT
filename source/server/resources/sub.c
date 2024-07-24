@@ -212,7 +212,7 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
     pjson = cJSON_GetObjectItem(sub, "acpi");
     if (pjson)
     {
-        int result = validate_acpi(o2pt, pjson, op);
+        int result = validate_acpi(o2pt, pjson, op_to_acop(op));
         if (result != RSC_OK)
             return result;
     }

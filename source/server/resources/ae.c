@@ -172,7 +172,7 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             }
         }
 
-        if (validate_acpi(o2pt, pjson, OP_UPDATE) != RSC_OK)
+        if (validate_acpi(o2pt, pjson, ACOP_UPDATE) != RSC_OK)
         {
             return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
         }
@@ -320,7 +320,7 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
         {
             if (pjson)
             {
-                int result = validate_acpi(o2pt, pjson, op);
+                int result = validate_acpi(o2pt, pjson, op_to_acop(op));
                 if (result != RSC_OK)
                     return result;
             }
@@ -332,6 +332,8 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
                 handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
                 return RSC_BAD_REQUEST;
             }
+
+            validate_acpi(o2pt, pjson, op_to_acop(op));
         }
 
         if (!cJSON_IsNull(pjson) && cJSON_GetArraySize(pjson) == 0)

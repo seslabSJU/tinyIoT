@@ -204,7 +204,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
         }
         else
         {
-            if (validate_acpi(o2pt, pjson, OP_CREATE) != RSC_OK)
+            if (validate_acpi(o2pt, pjson, ACOP_CREATE) != RSC_OK)
                 return o2pt->rsc;
         }
     }
@@ -212,7 +212,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
     pjson = cJSON_GetObjectItem(grp, "acpi");
     if (pjson)
     {
-        int result = validate_acpi(o2pt, pjson, OP_CREATE);
+        int result = validate_acpi(o2pt, pjson, ACOP_CREATE);
         if (result != RSC_OK)
             return result;
     }
@@ -456,7 +456,7 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
         {
             return handle_error(o2pt, RSC_BAD_REQUEST, "`acpi` should be only attribute when updating");
         }
-        int result = validate_acpi(o2pt, pjson, OP_UPDATE);
+        int result = validate_acpi(o2pt, pjson, ACOP_UPDATE);
         if (result != RSC_OK)
             return result;
     }
@@ -509,7 +509,7 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
 
     if ((pjson = cJSON_GetObjectItem(grp_new, "macp")))
     {
-        if (validate_acpi(o2pt, pjson, OP_UPDATE) != RSC_OK)
+        if (validate_acpi(o2pt, pjson, ACOP_UPDATE) != RSC_OK)
             return RSC_BAD_REQUEST;
 
         if (cJSON_GetArraySize(pjson) == 0)

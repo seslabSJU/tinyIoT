@@ -24,7 +24,6 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
     ResourceAddressingType RAT = checkResourceAddressingType(o2pt->to);
     RTNode *rtnode = NULL;
     char *target_uri = strdup(o2pt->to);
-
     if (RAT == CSE_RELATIVE)
     {
         logger("UTIL", LOG_LEVEL_DEBUG, "CSE_RELATIVE");
@@ -230,7 +229,6 @@ RTNode *find_rtnode(char *addr)
     {
         return rt->cb;
     }
-    logger("UTIL", LOG_LEVEL_DEBUG, "addr : %s", addr);
     if ((strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 && addr[strlen(CSE_BASE_NAME)] == '/') || (addr[0] == '-' && addr[1] == '/'))
     {
         logger("UTIL", LOG_LEVEL_DEBUG, "Hierarchical Addressing");
