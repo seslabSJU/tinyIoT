@@ -147,34 +147,20 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         logger("O2", LOG_LEVEL_ERROR, "validation failed");
         return result;
     }
-    cJSON *acpi_obj = NULL;
+    cJSON *orig_acpi_obj = NULL;
     bool acpi_flag = false;
     if (cJSON_GetObjectItem(m2m_ae, "acpi"))
     {
-        cJSON_ArrayForEach(acpi_obj, cJSON_GetObjectItem(target_rtnode->obj, "acpi"))
+        cJSON_ArrayForEach(orig_acpi_obj, cJSON_GetObjectItem(target_rtnode->obj, "acpi"))
         {
-            acpi_flag = false;
-            cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(m2m_ae, "acpi"))
+            if (cJSON_getArrayIdx(cJSON_GetObjectItem(m2m_ae, "acpi"), orig_acpi_obj->valuestring) == -1)
             {
-                if (strcmp(acpi_obj->valuestring, pjson->valuestring) != 0)
-                {
-                    acpi_flag = true;
-                    break;
-                }
-            }
-            if (!acpi_flag)
-            {
-                logger("UTIL", LOG_LEVEL_INFO, "acpi %s", acpi_obj->valuestring);
-                if (!has_acpi_update_privilege(o2pt, acpi_obj->valuestring))
+                logger("UTIL", LOG_LEVEL_INFO, "acpi deleted : %s", orig_acpi_obj->valuestring);
+                if (!has_acpi_update_privilege(o2pt, orig_acpi_obj->valuestring))
                 {
                     return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
                 }
             }
-        }
-
-        if (validate_acpi(o2pt, pjson, ACOP_UPDATE) != RSC_OK)
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
         }
     }
 

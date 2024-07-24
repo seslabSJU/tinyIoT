@@ -806,6 +806,13 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	char *origin = NULL;
 
 	RTNode *parent_rtnode = rtnode;
+#ifdef ADMIN_AE_ID
+	if (o2pt->fr && !strcmp(o2pt->fr, ADMIN_AE_ID))
+	{
+		logger("UTIL", LOG_LEVEL_DEBUG, "ADMIN_AE_ID : %s", o2pt->fr);
+		return false;
+	}
+#endif
 
 	while (parent_rtnode && parent_rtnode->ty != RT_AE)
 	{
@@ -824,12 +831,6 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	else
 		origin = o2pt->fr;
 
-#ifdef ADMIN_AE_ID
-	if (origin && !strcmp(origin, ADMIN_AE_ID))
-	{
-		return false;
-	}
-#endif
 	if ((parent_rtnode && strcmp(origin, get_ri_rtnode(parent_rtnode))))
 	{
 		deny = true;
@@ -1170,6 +1171,7 @@ int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop)
 
 int has_acpi_update_privilege(oneM2MPrimitive *o2pt, char *acpi)
 {
+	logger("UTIL", LOG_LEVEL_DEBUG, "has_acpi_update_privilege : %s", acpi);
 	char *origin = o2pt->fr;
 	if (!origin)
 		return 0;
