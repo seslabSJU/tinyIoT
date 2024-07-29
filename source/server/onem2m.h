@@ -94,6 +94,7 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int retrieve_object_filtercriteria(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);

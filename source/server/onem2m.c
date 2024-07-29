@@ -384,7 +384,7 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 	Operation op = o2pt->op;
 	o2pt->op = OP_DELETE;
-	notify_onem2m_resource(o2pt, rtnode);
+	notify_via_sub(o2pt, rtnode);
 	o2pt->op = op;
 
 	cJSON *at_list = cJSON_GetObjectItem(rtnode->obj, "at");
@@ -908,7 +908,27 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-	logger("O2M", LOG_LEVEL_DEBUG, "Notify onem2m Resource [%s]", target_rtnode->uri);
+	cJSON *sgn = cJSON_GetObjectItem(o2pt->request_pc, "m2m:sgn");
+	cJSON *vrq = cJSON_GetObjectItem(sgn, "vrq");
+	if (vrq && vrq->type == cJSON_True)
+	{
+		logger("O2M", LOG_LEVEL_DEBUG, "verification request");
+		if (!check_privilege(o2pt, target_rtnode, ACOP_NOTIFY))
+		{
+			return o2pt->rsc = RSC_OK;
+		}
+	}
+	if (check_privilege(o2pt, target_rtnode, ACOP_NOTIFY) != 0)
+	{
+		return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "permission denied");
+	}
+	requestToResource(o2pt, target_rtnode);
+	o2pt->rsc = RSC_OK;
+}
+
+int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
+{
+	logger("O2M", LOG_LEVEL_DEBUG, "Notify via SUB [%s]", target_rtnode->uri);
 	cJSON *pjson = NULL;
 	NodeList *del = NULL;
 	NodeList *node = NULL;
@@ -927,6 +947,7 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	{
 		return 1;
 	}
+
 	int net = NET_NONE;
 
 	switch (o2pt->op)

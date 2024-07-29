@@ -240,7 +240,7 @@ void route(oneM2MPrimitive *o2pt)
 		}
 	}
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
-		notify_onem2m_resource(o2pt, target_rtnode);
+		notify_via_sub(o2pt, target_rtnode);
 	log_runtime(start);
 }
 
@@ -333,13 +333,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		break;
 
 	case OP_NOTIFY:
-		if (check_privilege(o2pt, target_rtnode, ACOP_NOTIFY) != 0)
-		{
-			handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "permission denied");
-			break;
-		}
-		requestToResource(o2pt, target_rtnode);
-		o2pt->rsc = RSC_OK;
+		notify_onem2m_resource(o2pt, target_rtnode);
 		break;
 
 	default:
