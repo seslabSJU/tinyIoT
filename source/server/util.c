@@ -2459,15 +2459,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 
 	// o2pt->fr = NULL;
 	free_o2pt(o2pt);
-	if (rsc == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE)
-	{
-		return RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE;
-	}
-	if (rsc == RSC_BAD_REQUEST || rsc == RSC_TARGET_NOT_REACHABLE)
-	{
-		return RSC_BAD_REQUEST;
-	}
-	return RSC_OK;
+	return rsc;
 }
 
 int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)

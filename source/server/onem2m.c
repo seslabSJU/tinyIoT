@@ -940,6 +940,7 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 	if (o2pt->ty == RT_SUB && (o2pt->op == OP_CREATE || o2pt->op == OP_UPDATE))
 	{
+		logger("O2M", LOG_LEVEL_DEBUG, "skip sub notification");
 		return 1;
 	}
 
