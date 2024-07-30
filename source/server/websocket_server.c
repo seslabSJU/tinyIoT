@@ -6,11 +6,14 @@
 #include "logger.h"
 #include "websocket_server.h"
 #include "rtManager.h"
+#include "util.h"
 
 void send_websocket_message(struct lws *wsi, const char *message);
 void response_create(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key);
 RTNode* find_created_rtnode(const char *parent_ri, const char *child_ri);
 int response_delete(oneM2MPrimitive *o2pt);
+void response_update(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key);
+
 
 static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                               void *user, void *in, size_t len) {
@@ -125,33 +128,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 
             // rsc가 2001인 경우 응답 필드를 조합
             if (o2pt.rsc == 2001) {
-                const char *resource_key = NULL;
-                switch (o2pt.ty) {
-                    case 1:
-                        resource_key = "m2m:acp";
-                        break;
-                    case 2:
-                        resource_key = "m2m:ae";
-                        break;
-                    case 3:
-                        resource_key = "m2m:cnt";
-                        break;
-                    case 4:
-                        resource_key = "m2m:cin";
-                        break;
-                    case 5:
-                        resource_key = "m2m:cse";
-                        break;
-                    case 9:
-                        resource_key = "m2m:grp";
-                        break;
-                    case 16:
-                        resource_key = "m2m:csr";
-                        break;
-                    case 23:
-                        resource_key = "m2m:sub";
-                        break;
-                }
+                const char *resource_key = get_resource_key(o2pt.ty);
 
                 if (resource_key) {
                     cJSON *resource = cJSON_GetObjectItem(o2pt.request_pc, resource_key);
@@ -172,59 +149,15 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                 }
             }
 
-
             // rsc가 2002인 경우 응답 필드를 조합
             if (o2pt.rsc == 2002) {
                 response_delete(&o2pt);
             }
 
             if (o2pt.rsc == 2004){
-                const char *resource_key = NULL;
-                switch (o2pt.ty) {
-                    case 0:
-                        resource_key = "m2m:ae";
-                        break;
-                    case 1:
-                        resource_key = "m2m:acp";
-                        break;
-                    case 2:
-                        resource_key = "m2m:ae";
-                        break;
-                    case 3:
-                        resource_key = "m2m:cnt";
-                        break;
-                    case 4:
-                        resource_key = "m2m:cin";
-                        break;
-                    case 5:
-                        resource_key = "m2m:cse";
-                        break;
-                    case 9:
-                        resource_key = "m2m:grp";
-                        break;
-                    case 16:
-                        resource_key = "m2m:csr";
-                        break;
-                    case 23:
-                        resource_key = "m2m:sub";
-                        break;
-                }
-
-
-                logger("WEBSOCKET", LOG_LEVEL_DEBUG, "resource_key: %s", resource_key);
-                logger("WEBSOCKET", LOG_LEVEL_DEBUG, "to: %s",  o2pt.to);
+                const char *resource_key = get_resource_key(o2pt.ty);
 
                 if (resource_key) {
-                    //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "체크");
-                    //cJSON *resource = cJSON_GetObjectItem(o2pt.request_pc, resource_key);
-                    //const char *rn = cJSON_GetObjectItem(resource, "rn")->valuestring;
-                    //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Resource name: %s", rn);
-                    
-                    //char created_ri[256];
-                    //snprintf(created_ri, sizeof(created_ri), "%s/%s", o2pt.to, rn);
-                    //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Created resource path: %s", created_ri);
-
-
                     RTNode *created_node = find_rtnode(o2pt.to);
                     if (created_node && created_node->obj) {
                         response_update(&o2pt, created_node->obj, resource_key);
@@ -233,8 +166,6 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                     }
                 }
             }
-
-
 
             // 응답 메시지 생성 및 전송
             if (o2pt.response_pc != NULL) {

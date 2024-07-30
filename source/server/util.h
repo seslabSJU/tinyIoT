@@ -55,7 +55,7 @@ void removeChildAnnc(RTNode *rtnode, char *at);
 void init_resource_tree();
 int add_child_resource_tree(RTNode *parent, RTNode *child);
 RTNode *find_rtnode(char *addr);
-RTNode *find_rtnode_by_uri(char *node_uri);
+RTNode *find_rtnode_by_uri(const char *node_uri);
 RTNode *find_rtnode_by_ri(char *ri);
 RTNode *rt_search_ri(RTNode *rtnode, char *ri);
 RTNode *find_csr_rtnode_by_uri(char *target_uri);
