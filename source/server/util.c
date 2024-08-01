@@ -1474,6 +1474,7 @@ bool endswith(char *str, char *match)
 
 int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
+	bool limited = false;
 	if (o2pt->rcn == RCN_NOTHING)
 	{
 		return 0;
@@ -1488,6 +1489,7 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if ((pjson = cJSON_GetObjectItem(o2pt->fc, "lim")))
 	{
 		lim = pjson->valueint;
+		limited = true;
 	}
 	if ((pjson = cJSON_GetObjectItem(o2pt->fc, "ofst")))
 	{
@@ -1573,7 +1575,8 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 	else
 	{
-		o2pt->cnst = CS_FULL_CONTENT;
+		if (limited)
+			o2pt->cnst = CS_FULL_CONTENT;
 	}
 	return 0;
 }
