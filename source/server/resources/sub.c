@@ -92,7 +92,7 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
             cJSON_Delete(root);
             return handle_error(o2pt, RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE, "subscription verification error");
         }
-        else if (result % 1000 == 4)
+        else if (result / 1000 == 4)
         {
             cJSON_Delete(noti_cjson);
             cJSON_Delete(root);
