@@ -2378,6 +2378,7 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 {
+	logger("UTIL", LOG_LEVEL_DEBUG, "send_verification_request");
 	oneM2MPrimitive *o2pt = calloc(1, sizeof(oneM2MPrimitive));
 	NotiTarget *nt;
 	RTNode *rtnode = NULL;
@@ -2401,13 +2402,16 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 	else if (rat == SP_RELATIVE)
 	{
 		logger("UTIL", LOG_LEVEL_DEBUG, "SP_RELATIVE");
-		rtnode = get_remote_resource(noti_uri, &rsc);
-		if (rtnode)
-		{
-			rsc = requestToResource(o2pt, rtnode);
-			free_rtnode(rtnode);
-			rtnode = NULL;
-		}
+		// rtnode = get_remote_resource(noti_uri, &rsc);
+		// if (rtnode)
+		// {
+		// 	rsc = requestToResource(o2pt, rtnode);
+		// 	free_rtnode(rtnode);
+		// 	rtnode = NULL;
+		// }
+		o2pt->to = strdup(noti_uri);
+
+		forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(noti_uri));
 	}
 	else if (rat == PROTOCOL_BINDING)
 	{
@@ -3610,6 +3614,10 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 
 ResourceAddressingType checkResourceAddressingType(char *uri)
 {
+	if (uri == NULL)
+	{
+		return -1;
+	}
 	if (uri[0] == '/' && uri[1] == '/')
 	{
 		return ABSOLUTE;

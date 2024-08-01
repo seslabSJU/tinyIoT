@@ -456,7 +456,10 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         set_header("Content-Length", content_length, response_headers);
 
     set_header("X-M2M-RSC", rsc, response_headers);
-    set_header("X-M2M-RVI", from_rvi(o2pt->rvi), response_headers);
+    if (o2pt->rvi != RVI_NONE)
+    {
+        set_header("X-M2M-RVI", from_rvi(o2pt->rvi), response_headers);
+    }
     set_header("X-M2M-RI", o2pt->rqi, response_headers);
 
     if (o2pt->cnst > 0)
@@ -511,7 +514,7 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
 
 void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
 {
-    logger("HTTP", LOG_LEVEL_DEBUG, "http_forwarding");
+    logger("HTTP", LOG_LEVEL_DEBUG, "http_forwarding %s:%d", host, port);
     struct sockaddr_in serv_addr;
 
     int rcvd = 0;
@@ -522,7 +525,7 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     ResourceAddressingType rat = checkResourceAddressingType(o2pt->to);
 
     req->method = op_to_method(o2pt->op);
-    req->uri = calloc(1, sizeof(char) * (strlen(o2pt->to) + 4));
+    req->uri = calloc(1, sizeof(char) * (strlen(o2pt->to) + 5));
     req->uri[0] = '/';
     if (rat == SP_RELATIVE)
         req->uri[1] = '~';
@@ -531,7 +534,10 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     strcat(req->uri, o2pt->to);
     req->headers = (header_t *)calloc(sizeof(header_t), 1);
     add_header("X-M2M-Origin", o2pt->fr, req->headers);
-    add_header("X-M2M-RVI", "2a", req->headers);
+    if (o2pt->rvi != RVI_NONE)
+    {
+        add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
+    }
     add_header("X-M2M-RI", o2pt->rqi, req->headers);
 
     if (o2pt->fc)
