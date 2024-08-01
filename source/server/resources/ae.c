@@ -64,7 +64,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
             cJSON_AddItemToArray(cJSON_GetObjectItem(ae, "at"), cJSON_CreateString(cJSON_GetObjectItem(registrar_csr->obj, "csi")->valuestring));
         }
     }
-
+#if CSE_RVI >= RVI_3
     cJSON *final_at = cJSON_CreateArray();
     if (handle_annc_create(parent_rtnode, ae, cJSON_GetObjectItem(ae, "at"), final_at) == -1)
     {
@@ -83,6 +83,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(final_at);
         cJSON_DeleteItemFromObject(ae, "at");
     }
+#endif
 
     // Add uri attribute
     char *ptr = malloc(1024);
@@ -180,8 +181,6 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         pjson = NULL;
     }
 
-    // announce_to_annc(target_rtnode);
-
     result = db_update_resource(m2m_ae, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_AE);
 
     cJSON *root = cJSON_CreateObject();
@@ -256,6 +255,8 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
 
     if (cJSON_GetObjectItem(ae, "aa"))
     {
+        if (CSE_RVI < RVI_3)
+            return handle_error(o2pt, RSC_BAD_REQUEST, "`aa` attribute is not supported");
         cJSON *aa_final = cJSON_CreateArray();
         cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(ae, "aa"))
         {
@@ -292,6 +293,12 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
             cJSON_DeleteItemFromObject(ae, "aa");
             cJSON_AddItemToObject(ae, "aa", cJSON_CreateNull());
         }
+    }
+
+    if ((pjson = cJSON_GetObjectItem(ae, "at")))
+    {
+        if (CSE_RVI < RVI_3)
+            return handle_error(o2pt, RSC_BAD_REQUEST, "`at` attribute is not supported");
     }
 
     pjson = cJSON_GetObjectItem(ae, "acpi");

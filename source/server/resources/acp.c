@@ -29,6 +29,7 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return rsc;
     }
 
+#if CSE_RVI >= RVI_3
     cJSON *final_at = cJSON_CreateArray();
     cJSON *at = NULL;
     char *at_str = NULL;
@@ -53,7 +54,7 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(final_at);
         cJSON_DeleteItemFromObject(acp, "at");
     }
-
+#endif
     // Add uri attribute
     char *ptr = malloc(1024);
     cJSON *rn = cJSON_GetObjectItem(acp, "rn");

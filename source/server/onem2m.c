@@ -633,7 +633,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Update GRP");
 		rsc = update_grp(o2pt, target_rtnode);
 		break;
-
+#if CSE_RVI >= RVI_3
 	case RT_AEA:
 		logger("O2M", LOG_LEVEL_INFO, "Update AEA");
 		rsc = update_aea(o2pt, target_rtnode);
@@ -643,7 +643,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Update CSR");
 		rsc = update_csr(o2pt, target_rtnode);
 		break;
-
+#endif
 		// case RT_CBA:
 		// 	logger("O2M", LOG_LEVEL_INFO, "Update CBA");
 		// 	rsc = update_cba(o2pt, target_rtnode);
@@ -653,7 +653,9 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` is unsupported");
 		rsc = o2pt->rsc;
 	}
+#if CSE_RVI >= RVI_3
 	announce_to_annc(target_rtnode);
+#endif
 	return rsc;
 }
 

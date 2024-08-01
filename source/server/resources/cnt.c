@@ -43,7 +43,7 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_AddNumberToObject(cnt, "st", 0);
     cJSON_AddNumberToObject(cnt, "cni", 0);
     cJSON_AddNumberToObject(cnt, "cbs", 0);
-
+#if CSE_RVI >= RVI_3
     cJSON *final_at = cJSON_CreateArray();
     if (handle_annc_create(parent_rtnode, cnt, cJSON_GetObjectItem(cnt, "at"), final_at) == -1)
     {
@@ -61,7 +61,7 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         cJSON_Delete(final_at);
     }
-
+#endif
     if (rsc != RSC_OK)
     {
         cJSON_Delete(root);

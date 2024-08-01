@@ -56,7 +56,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
             return o2pt->rsc;
         }
     }
-
+#if CSE_RVI >= RVI_3
     cJSON *final_at = cJSON_CreateArray();
     if (handle_annc_create(parent_rtnode, cin, cJSON_GetObjectItem(cin, "at"), final_at) == -1)
     {
@@ -74,6 +74,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         cJSON_Delete(final_at);
     }
+#endif
 
     RTNode *cin_rtnode = create_rtnode(cin, RT_CIN);
     update_cnt_cin(parent_rtnode, cin_rtnode, 1);
@@ -175,8 +176,11 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
     {
         // check cnf
     }
-
     cJSON *aa = cJSON_GetObjectItem(cin, "aa");
+    if (aa && CSE_RVI < RVI_3)
+    {
+        return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `aa` is not supported");
+    }
     cJSON *attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(RT_CIN));
     cJSON_ArrayForEach(pjson, aa)
     {

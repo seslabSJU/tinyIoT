@@ -2412,6 +2412,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		o2pt->to = strdup(noti_uri);
 
 		forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(noti_uri));
+		rsc = o2pt->rsc;
 	}
 	else if (rat == PROTOCOL_BINDING)
 	{
