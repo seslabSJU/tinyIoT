@@ -994,11 +994,14 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		cJSON *enc = cJSON_GetObjectItem(node->rtnode->obj, "enc");
 		exc = cJSON_GetObjectItem(node->rtnode->obj, "exc");
 		cJSON_AddStringToObject(sgn, "sur", node->rtnode->uri);
-		cJSON_DeleteItemFromObject(nev, "rep");
+
 		if (node->rtnode->obj && (nct = cJSON_GetObjectItem(node->rtnode->obj, "nct")))
 		{
+			cJSON_DeleteItemFromObject(nev, "rep");
+			logger("O2M", LOG_LEVEL_DEBUG, "nct : %d", nct->valueint);
 			switch (nct->valueint)
 			{
+			case 0:
 			case NCT_ALL_ATTRIBUTES:
 				cJSON_AddItemReferenceToObject(nev, "rep", o2pt->response_pc);
 				break;
