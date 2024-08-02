@@ -2492,6 +2492,7 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 	oneM2MPrimitive *o2pt = calloc(1, sizeof(oneM2MPrimitive));
 	o2pt->op = OP_NOTIFY;
 	o2pt->fr = strdup("/" CSE_BASE_RI);
+	o2pt->rvi = CSE_RVI;
 	o2pt->rqi = strdup("notify");
 	o2pt->request_pc = cJSON_Duplicate(noti_cjson, true);
 
