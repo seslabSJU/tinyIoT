@@ -2519,10 +2519,12 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "SP_RELATIVE");
 			oneM2MPrimitive noti_o2pt;
+			memset(&noti_o2pt, 0, sizeof(oneM2MPrimitive));
 			noti_o2pt.op = OP_NOTIFY;
 			noti_o2pt.fr = strdup("/" CSE_BASE_RI);
 			noti_o2pt.to = strdup(noti_uri);
 			noti_o2pt.rqi = strdup("notify");
+			noti_o2pt.rvi = CSE_RVI;
 			noti_o2pt.request_pc = cJSON_Duplicate(noti_cjson, true);
 
 			forwarding_onem2m_resource(&noti_o2pt, find_csr_rtnode_by_uri(noti_uri));

@@ -915,11 +915,16 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (vrq && vrq->type == cJSON_True)
 	{
 		logger("O2M", LOG_LEVEL_DEBUG, "verification request");
-		if (!check_privilege(o2pt, target_rtnode, ACOP_NOTIFY))
+		if (check_privilege(o2pt, target_rtnode, ACOP_NOTIFY) == -1)
+		{
+			return o2pt->rsc = RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE;
+		}
+		else
 		{
 			return o2pt->rsc = RSC_OK;
 		}
 	}
+
 	if (check_privilege(o2pt, target_rtnode, ACOP_NOTIFY) != 0)
 	{
 		return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "permission denied");
@@ -989,6 +994,7 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		cJSON *enc = cJSON_GetObjectItem(node->rtnode->obj, "enc");
 		exc = cJSON_GetObjectItem(node->rtnode->obj, "exc");
 		cJSON_AddStringToObject(sgn, "sur", node->rtnode->uri);
+		cJSON_DeleteItemFromObject(nev, "rep");
 		if (node->rtnode->obj && (nct = cJSON_GetObjectItem(node->rtnode->obj, "nct")))
 		{
 			switch (nct->valueint)
