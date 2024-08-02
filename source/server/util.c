@@ -2359,6 +2359,10 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 				add_header("X-M2M-Origin", o2pt->fr, req->headers);
 				add_header("X-M2M-RI", o2pt->rqi, req->headers);
 				add_header("Content-Type", "application/json", req->headers);
+				if (o2pt->rvi)
+				{
+					add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
+				}
 
 				rsc = send_http_request(host, port, req, NULL);
 				free_HTTPRequest(req);
