@@ -24,6 +24,7 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
     ResourceAddressingType RAT = checkResourceAddressingType(o2pt->to);
     RTNode *rtnode = NULL;
     char *target_uri = strdup(o2pt->to);
+    logger("RT", LOG_LEVEL_DEBUG, "ddd: %s", target_uri);
 
     if (RAT == CSE_RELATIVE)
     {
@@ -245,7 +246,7 @@ RTNode *get_remote_resource(char *address, int *rsc)
  * @param uri hierarchical uri
  * @return resource node or NULL
  */
-RTNode *find_rtnode_by_uri(char *uri)
+RTNode *find_rtnode_by_uri(const char *uri)
 {
     RTNode *rtnode = rt->cb, *parent_rtnode = NULL;
     char *target_uri = strdup(uri);

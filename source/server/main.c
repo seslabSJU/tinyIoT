@@ -266,6 +266,7 @@ void route(oneM2MPrimitive *o2pt)
         }
     }
     if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
+        logger("MAIN", LOG_LEVEL_DEBUG, "notify 시작 전");
         notify_onem2m_resource(o2pt, target_rtnode);
     log_runtime(start);
 }
@@ -309,7 +310,9 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for retrieve operation");
             break;
         }
+        logger("MAIN",LOG_LEVEL_DEBUG,"retrieve_onem2m_resource 호출 전");
         rsc = retrieve_onem2m_resource(o2pt, target_rtnode);
+        logger("MAIN", LOG_LEVEL_DEBUG,"retrieve_onem2m_resource 호출 후 : rsc = %d", rsc);
         break;
 
     case OP_UPDATE:
@@ -326,7 +329,9 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for update operation");
             break;
         }
+        logger("MAIN",LOG_LEVEL_DEBUG,"update_onem2m_resource 호출 전");
         rsc = update_onem2m_resource(o2pt, target_rtnode);
+        logger("MAIN", LOG_LEVEL_DEBUG,"update_onem2m_resource 호출 후 : rsc = %d", rsc);
         break;
 
     case OP_DELETE:
@@ -342,7 +347,9 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for delete operation");
             break;
         }
+        logger("MAIN",LOG_LEVEL_DEBUG,"delete_onem2m_resource 호출 전");
         rsc = delete_onem2m_resource(o2pt, target_rtnode);
+        logger("MAIN", LOG_LEVEL_DEBUG,"delete_onem2m_resource 호출 후 : rsc = %d", rsc);
         break;
 
     case OP_OPTIONS:
@@ -357,7 +364,9 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for discovery operation");
             break;
         }
+        logger("MAIN",LOG_LEVEL_DEBUG,"discover_onem2m_resource 호출 전");
         rsc = discover_onem2m_resource(o2pt, target_rtnode);
+        logger("MAIN", LOG_LEVEL_DEBUG,"discover_onem2m_resource 호출 후 : rsc = %d, rsc");
         break;
 
     default:
@@ -365,11 +374,9 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         return RSC_INTERNAL_SERVER_ERROR;
     }
 
-    logger("MAIN", LOG_LEVEL_DEBUG, "handle_onem2m_request 완료: rsc=%d", rsc);
+    logger("MAIN", LOG_LEVEL_DEBUG, "handle_onem2m_request 완료 : rsc = %d", rsc);
     return rsc;
 }
-
-
 
 
 
