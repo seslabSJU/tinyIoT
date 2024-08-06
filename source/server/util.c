@@ -990,80 +990,84 @@ int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	return acop;
 }
 
-int check_acco(cJSON *acco, char *ip)
+int check_acco(cJSON *accos, char *ip)
 {
-	if (!acco)
+	cJSON *acco;
+	if (!accos)
 		return 1;
 	if (!ip)
 		return 1;
-
-	cJSON *acip = cJSON_GetObjectItem(acco, "acip");
-	cJSON *ipv4 = cJSON_GetObjectItem(acip, "ipv4");
-	cJSON *pjson = NULL;
-	char *ip_str = NULL;
-	int res = 0;
-	struct in_addr addr, addr2;
-	char *subnet_ptr;
-	int mask = 0xFFFFFFFF;
-
-	cJSON_ArrayForEach(pjson, ipv4)
+	cJSON_ArrayForEach(acco, accos)
 	{
-		ip_str = strdup(pjson->valuestring);
-		mask = 1;
 
-		subnet_ptr = strchr(ip_str, '/');
+		cJSON *acip = cJSON_GetObjectItem(acco, "acip");
+		cJSON *ipv4 = cJSON_GetObjectItem(acip, "ipv4");
+		cJSON *pjson = NULL;
+		char *ip_str = NULL;
+		int res = 0;
+		struct in_addr addr, addr2;
+		char *subnet_ptr;
+		int mask = 0xFFFFFFFF;
 
-		if (subnet_ptr)
+		cJSON_ArrayForEach(pjson, ipv4)
 		{
-			subnet_ptr[0] = '\0';
-			subnet_ptr++;
-			for (int i = 0; i < atoi(subnet_ptr) - 1; i++)
+			ip_str = strdup(pjson->valuestring);
+			mask = 1;
+
+			subnet_ptr = strchr(ip_str, '/');
+
+			if (subnet_ptr)
 			{
-				mask = mask << 1;
-				mask = mask | 1;
+				subnet_ptr[0] = '\0';
+				subnet_ptr++;
+				for (int i = 0; i < atoi(subnet_ptr) - 1; i++)
+				{
+					mask = mask << 1;
+					mask = mask | 1;
+				}
+
+				res = inet_pton(AF_INET, ip_str, &addr);
+				if (res == 0)
+				{
+					logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : %s is not valid ipv4 address", ip_str);
+					continue;
+				}
+				else if (res == -1)
+				{
+					logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : inet_pton error");
+					continue;
+				}
+
+				res = inet_pton(AF_INET, ip, &addr2);
+				if (res == 0)
+				{
+					logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : %s is not valid ipv4 address", ip);
+					continue;
+				}
+				else if (res == -1)
+				{
+					logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : inet_pton error");
+					continue;
+				}
+				logger("UTIL", LOG_LEVEL_DEBUG, "addr & mask : %X, addr2 & mask : %X", (addr.s_addr & mask), (addr2.s_addr & mask));
+
+				if ((addr.s_addr & mask) == (addr2.s_addr & mask))
+				{
+					free(ip_str);
+					return 1;
+				}
+			}
+			else
+			{
+				if (!strcmp(ip_str, ip))
+				{
+					free(ip_str);
+					return 1;
+				}
 			}
 
-			res = inet_pton(AF_INET, ip_str, &addr);
-			if (res == 0)
-			{
-				logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : %s is not valid ipv4 address", ip_str);
-				continue;
-			}
-			else if (res == -1)
-			{
-				logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : inet_pton error");
-				continue;
-			}
-
-			res = inet_pton(AF_INET, ip, &addr2);
-			if (res == 0)
-			{
-				logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : %s is not valid ipv4 address", ip);
-				continue;
-			}
-			else if (res == -1)
-			{
-				logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : inet_pton error");
-				continue;
-			}
-			logger("UTIL", LOG_LEVEL_DEBUG, "addr & mask : %X, addr2 & mask : %X", (addr.s_addr & mask), (addr2.s_addr & mask));
-
-			if ((addr.s_addr & mask) == (addr2.s_addr & mask))
-			{
-				free(ip_str);
-				return 1;
-			}
+			free(ip_str);
 		}
-		else
-		{
-			if (!strcmp(ip_str, ip))
-			{
-				free(ip_str);
-				return 1;
-			}
-		}
-
-		free(ip_str);
 	}
 	return 0;
 }
@@ -2423,13 +2427,6 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 	else if (rat == SP_RELATIVE)
 	{
 		logger("UTIL", LOG_LEVEL_DEBUG, "SP_RELATIVE");
-		// rtnode = get_remote_resource(noti_uri, &rsc);
-		// if (rtnode)
-		// {
-		// 	rsc = requestToResource(o2pt, rtnode);
-		// 	free_rtnode(rtnode);
-		// 	rtnode = NULL;
-		// }
 		o2pt->to = strdup(noti_uri);
 
 		forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(noti_uri));
@@ -2598,11 +2595,7 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 	}
 
 	free_o2pt(o2pt);
-	if (rsc == RSC_OK || rsc == 200)
-	{
-		return RSC_OK;
-	}
-	return RSC_BAD_REQUEST;
+	return RSC_OK;
 }
 
 void update_resource(cJSON *old_obj, cJSON *new_obj)
