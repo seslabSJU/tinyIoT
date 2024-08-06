@@ -507,6 +507,15 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
     send_http_request(host, port, req, res);
     logger("HTTP", LOG_LEVEL_DEBUG, "http_notify response: %d", res->status_code);
     rsc = res->status_code;
+    char *ptr = search_header(res->headers, "X-M2M-RSC");
+    if (ptr)
+    {
+        rsc = atoi(ptr);
+    }
+    else
+    {
+        rsc = RSC_BAD_REQUEST;
+    }
     free_HTTPRequest(req);
     free_HTTPResponse(res);
     return rsc;
