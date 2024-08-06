@@ -15,8 +15,8 @@ int response_delete(oneM2MPrimitive *o2pt);
 void response_update(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key);
 void route(oneM2MPrimitive *o2pt);
 
-char *extract_x_m2m_origin(const char *data) {
-    // 데이터에서 X-M2M-Origin 헤더 추출
+
+char *find_x_m2m_origin(const char *data) { // 요청헤더에서 X-M2M-Origin 추출
     const char *origin_start = strstr(data, "X-M2M-Origin:");
     if (origin_start) {
         origin_start += strlen("X-M2M-Origin:");
@@ -31,7 +31,7 @@ char *extract_x_m2m_origin(const char *data) {
             return origin; // 오리진 반환
         }
     }
-    return NULL;  // 못 찾았을 경우
+    return strdup(""); // 못 찾았을 경우 빈값을 반환하도록 설정
 }
 
 static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
@@ -49,11 +49,11 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Received raw data: \n--%s--\n", received_data); // 여기서 헤더의 정보가 함께 들어옴
 
             // X-M2M-Origin 헤더 추출
-            char *origin = extract_x_m2m_origin(received_data);
+            char *origin = find_x_m2m_origin(received_data);
             if (origin) {
                 logger("WEBSOCKET", LOG_LEVEL_INFO, "X-M2M-Origin: %s", origin);
             } else {
-                logger("WEBSOCKET", LOG_LEVEL_WARN, "X-M2M-Origin header not found");
+                logger("WEBSOCKET", LOG_LEVEL_WARN, "X-M2M-Origin 헤더 없음");
             }
 
             cJSON *json = cJSON_Parse(received_data);
@@ -83,6 +83,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             cJSON *pc = cJSON_GetObjectItem(json, "pc");
             cJSON *rvi = cJSON_GetObjectItem(json, "rvi");
 
+
             // Payload 먼저 처리    
             if (cJSON_IsObject(pc)) {
                 o2pt->request_pc = cJSON_Duplicate(pc, 1);
@@ -92,15 +93,28 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             // fr 필드가 없으면 WebSocket 헤더에서 가져온 X-M2M-Origin 값을 사용
             if (fr) {
                 o2pt->fr = strdup(fr->valuestring);
-                logger("WEBSOCKET", LOG_LEVEL_DEBUG, "fr 필드가 있을때 : %s", o2pt->fr);
+                //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "fr 필드가 있을때 : %s", o2pt->fr);
             } else {
                 o2pt->fr = strdup(origin);
-                logger("WEBSOCKET", LOG_LEVEL_DEBUG, "fr 필드가 없을때 : %s ", o2pt->fr);
+                //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "fr 필드가 없을때 : %s ", o2pt->fr);
             }
 
             // 나머지 필드들 처리
             o2pt->op = op->valueint;
-            logger("WEBSOCKET", LOG_LEVEL_INFO, "--op: %d---", o2pt->op);
+            logger("WEBSOCKET", LOG_LEVEL_INFO, "op: %d", o2pt->op);
+
+        
+            // 요청 유형에 따라 rcn 필드 설정
+            switch (o2pt->op) {
+                case 1: // create
+                case 2: // retrieve
+                case 3: // update
+                    o2pt->rcn = RCN_ATTRIBUTES;
+                    break;
+                case 4: // delete
+                    o2pt->rcn = RCN_NOTHING;
+                    break;
+            }
 
             // to 필드 처리
             if (to) {
@@ -150,11 +164,11 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                         logger("WEBSOCKET", LOG_LEVEL_ERROR, "Created node or resource key not found");
                     }
                 }
-
-
-            } else if (o2pt->rsc == 2002) {  // 삭제 요청
+            } 
+            else if (o2pt->rsc == 2002) {  // 삭제 요청
                 response_delete(o2pt);
-            } else if (o2pt->rsc == 2004) {  // 업데이트 요청
+            } 
+            else if (o2pt->rsc == 2004) {  // 업데이트 요청
                 const char *resource_key = get_resource_key(o2pt->ty);
                 if (resource_key) {
                     RTNode *created_node = find_rtnode(o2pt->to);
@@ -164,7 +178,8 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                         logger("WEBSOCKET", LOG_LEVEL_ERROR, "Created node or resource key not found");
                     }
                 }
-            } else if (o2pt->rsc == 4105) {  // 충돌 상태
+            } 
+            else if (o2pt->rsc == 4105) {  // 충돌 상태
                 char *error_message = cJSON_PrintUnformatted(o2pt->request_pc);
                 send_websocket_message(wsi, error_message);
                 free(error_message);
@@ -299,3 +314,4 @@ int response_delete(oneM2MPrimitive *o2pt) {
     //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "delete 응답 메세지 : %s", cJSON_PrintUnformatted(response));
     return 0;
 }
+

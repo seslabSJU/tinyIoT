@@ -309,6 +309,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
     }
 
     o2pt->op = http_parse_operation(req->method);
+   
     logger("HTTP", LOG_LEVEL_INFO, "Request : %s", req->method);
     // Setting default rcn
     switch (o2pt->op)
