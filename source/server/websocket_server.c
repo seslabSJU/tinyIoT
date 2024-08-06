@@ -63,13 +63,13 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             }
 
             // JSON 구조체를 문자열로 변환하여 출력 -> 여기서 헤더 사라짐
-            //char *json_string = cJSON_Print(json); 
-            //if (json_string != NULL) {
-                //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed JSON data: %s", json_string);
-                //free(json_string); // 메모리 해제 필요
-            //} else {
-                //logger("WEBSOCKET", LOG_LEVEL_ERROR, "Failed to print JSON");
-            //}
+            char *json_string = cJSON_Print(json); 
+            if (json_string != NULL) {
+                logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed JSON data: %s", json_string);
+                free(json_string); // 메모리 해제 필요
+            } else {
+                logger("WEBSOCKET", LOG_LEVEL_ERROR, "Failed to print JSON");
+            }
 
             // 프리미티브 초기화
             oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
@@ -93,10 +93,10 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             // fr 필드가 없으면 WebSocket 헤더에서 가져온 X-M2M-Origin 값을 사용
             if (fr) {
                 o2pt->fr = strdup(fr->valuestring);
-                //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "fr 필드가 있을때 : %s", o2pt->fr);
+                logger("WEBSOCKET", LOG_LEVEL_DEBUG, "fr 필드가 있을때 : %s", o2pt->fr);
             } else {
                 o2pt->fr = strdup(origin);
-                //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "fr 필드가 없을때 : %s ", o2pt->fr);
+                logger("WEBSOCKET", LOG_LEVEL_DEBUG, "fr 필드가 없을때 : %s ", o2pt->fr);
             }
 
             // 나머지 필드들 처리
@@ -133,19 +133,21 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                 logger("WEBSOCKET", LOG_LEVEL_DEBUG, "to: %s", o2pt->to);
             }
 
+        
             if (rqi) o2pt->rqi = strdup(rqi->valuestring);
             if (ty) o2pt->ty = ty->valueint;
-            if (rvi) o2pt->rvi = strdup(rvi->valuestring);
+            if (rvi) o2pt->rvi = strdup(rvi->valuestring); // rvi는 문자임
             if (pc) o2pt->pc = cJSON_Duplicate(pc, 1);
 
             // 요청 로깅
-            logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed request: op=%d, to=%s, rqi=%s, ty=%d", 
-                    o2pt->op, o2pt->to, o2pt->rqi, o2pt->ty);
+            logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed request: op=%d, to=%s, rqi=%s, ty=%d, rvi=%s",
+                    o2pt->op, o2pt->to, o2pt->rqi, o2pt->ty, o2pt->rvi);
             logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed content: %s", cJSON_Print(o2pt->request_pc));
 
             // 요청 라우팅
             route(o2pt);
 
+            
             // 응답 생성
             if (o2pt->rsc == 2001) {  // 생성 요청
                 const char *resource_key = get_resource_key(o2pt->ty);
@@ -184,6 +186,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                 send_websocket_message(wsi, error_message);
                 free(error_message);
             }
+            
 
             // 응답 메시지 생성 및 전송
             if (o2pt->response_pc != NULL) {
@@ -193,6 +196,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             } else {
                 logger("WEBSOCKET", LOG_LEVEL_INFO, "response_pc is NULL");
             }
+        
 
             cJSON_Delete(json);
             free(o2pt);  // 프리미티브 메모리 해제
