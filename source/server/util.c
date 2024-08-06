@@ -1543,11 +1543,11 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		cJSON_Delete(root);
 		if (o2pt->op == OP_CREATE)
 		{
-			root = cJSON_Duplicate(target_rtnode->obj, true);
+			cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);
 		}
 		else
 		{
-			root = cJSON_Duplicate(o2pt->request_pc, true);
+			cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), o2pt->request_pc);
 		}
 		break;
 	case RCN_SEMANTIC_CONTENT:
@@ -2312,6 +2312,7 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 {
 
 	cJSON *pjson = NULL;
+	char *ptr = NULL;
 	int rsc = 0;
 	if (!rtnode)
 		return RSC_NOT_FOUND;
@@ -2335,6 +2336,7 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		}
 		Protocol prot;
 		HTTPRequest *req = NULL;
+		HTTPResponse *res = NULL;
 		char *host, *path;
 		int port;
 
@@ -2350,6 +2352,7 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 			case PROT_HTTP:
 				logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource HTTP [%s]", pjson->valuestring);
 				req = (HTTPRequest *)calloc(1, sizeof(HTTPRequest));
+				res = (HTTPResponse *)calloc(1, sizeof(HTTPResponse));
 				req->method = op_to_method(o2pt->op);
 				req->uri = strdup(path);
 				req->payload = cJSON_PrintUnformatted(o2pt->request_pc);
@@ -2364,7 +2367,17 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 					add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
 				}
 
-				rsc = send_http_request(host, port, req, NULL);
+				send_http_request(host, port, req, res);
+				ptr = search_header(res->headers, "X-M2M-RSC");
+				if (ptr)
+				{
+					rsc = atoi(ptr);
+				}
+				else
+				{
+					rsc = RSC_BAD_REQUEST;
+				}
+				free_HTTPResponse(res);
 				free_HTTPRequest(req);
 				break;
 			case PROT_MQTT:
@@ -2447,8 +2460,6 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		{
 		case PROT_HTTP:
 			rsc = http_notify(o2pt, host, port, nt);
-			if (rsc >= 400)
-				rsc = RSC_BAD_REQUEST;
 			break;
 		case PROT_MQTT:
 #ifdef ENABLE_MQTT
