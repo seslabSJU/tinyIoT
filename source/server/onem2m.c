@@ -510,6 +510,10 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 	if (!isValidChildType(parent_rtnode->ty, o2pt->ty))
 	{
+		if (o2pt->ty == RT_SUB)
+		{
+			return handle_error(o2pt, RSC_TARGET_NOT_SUBSCRIBABLE, "target not subscribable");
+		}
 		return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type error");
 	}
 
