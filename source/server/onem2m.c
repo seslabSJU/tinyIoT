@@ -301,6 +301,7 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		}
 	}
 	logger("O2M", LOG_LEVEL_DEBUG, "delete_process [%s]", rtnode->uri);
+	int idx = 0;
 	switch (rtnode->ty)
 	{
 	case RT_ACP:
@@ -316,22 +317,14 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		detach_subs(rtnode->parent, rtnode);
 		break;
 	case RT_CSR:
+		logger("O2M", LOG_LEVEL_DEBUG, "delete csr");
 		csr = rtnode->obj;
 		dcse = cJSON_GetObjectItem(rt->cb->obj, "dcse");
 		dcse_item = NULL;
-		int idx = 0;
-		cJSON_ArrayForEach(dcse_item, dcse)
-		{
-			if (strcmp(dcse_item->valuestring, cJSON_GetObjectItem(csr, "csi")->valuestring) == 0)
-			{
-				break;
-			}
-			idx++;
-		}
-		if (idx < cJSON_GetArraySize(dcse))
+		idx = cJSON_getArrayIdx(dcse, cJSON_GetObjectItem(csr, "csi")->valuestring);
+		if (idx != -1)
 			cJSON_DeleteItemFromArray(dcse, idx);
 		update_remote_csr_dcse(rtnode);
-		logger("O2M", LOG_LEVEL_DEBUG, "delete csr");
 		detach_csrlist(rtnode);
 		break;
 	case RT_GRP:
@@ -405,7 +398,12 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 	return 1;
 }
-
+/**
+ * @brief find the index of value in String Array
+ * @param arr String Array
+ * @param value value to find
+ * @return index of value in String Array, -1 if not found
+ */
 int cJSON_getArrayIdx(cJSON *arr, char *value)
 {
 	if (!arr)
