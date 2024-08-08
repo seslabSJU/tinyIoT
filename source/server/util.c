@@ -992,22 +992,25 @@ int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 int check_acco(cJSON *accos, char *ip)
 {
-	cJSON *acco;
+	cJSON *acco = NULL;
 	if (!accos)
+		return 1;
+	if (cJSON_GetArraySize(accos) == 0)
 		return 1;
 	if (!ip)
 		return 1;
+	cJSON *pjson = NULL;
+	char *ip_str = NULL;
+	int res = 0;
+	struct in_addr addr, addr2;
+	char *subnet_ptr;
+	int mask = 0xFFFFFFFF;
+	cJSON *acip;
+	cJSON *ipv4;
 	cJSON_ArrayForEach(acco, accos)
 	{
-
-		cJSON *acip = cJSON_GetObjectItem(acco, "acip");
-		cJSON *ipv4 = cJSON_GetObjectItem(acip, "ipv4");
-		cJSON *pjson = NULL;
-		char *ip_str = NULL;
-		int res = 0;
-		struct in_addr addr, addr2;
-		char *subnet_ptr;
-		int mask = 0xFFFFFFFF;
+		acip = cJSON_GetObjectItem(acco, "acip");
+		ipv4 = cJSON_GetObjectItem(acip, "ipv4");
 
 		cJSON_ArrayForEach(pjson, ipv4)
 		{
@@ -1030,11 +1033,15 @@ int check_acco(cJSON *accos, char *ip)
 				if (res == 0)
 				{
 					logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : %s is not valid ipv4 address", ip_str);
+					free(ip_str);
+					ip_str = NULL;
 					continue;
 				}
 				else if (res == -1)
 				{
 					logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : inet_pton error");
+					free(ip_str);
+					ip_str = NULL;
 					continue;
 				}
 
@@ -1042,11 +1049,15 @@ int check_acco(cJSON *accos, char *ip)
 				if (res == 0)
 				{
 					logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : %s is not valid ipv4 address", ip);
+					free(ip_str);
+					ip_str = NULL;
 					continue;
 				}
 				else if (res == -1)
 				{
 					logger("UTIL", LOG_LEVEL_DEBUG, "check_acco/ipv4 : inet_pton error");
+					free(ip_str);
+					ip_str = NULL;
 					continue;
 				}
 				logger("UTIL", LOG_LEVEL_DEBUG, "addr & mask : %X, addr2 & mask : %X", (addr.s_addr & mask), (addr2.s_addr & mask));

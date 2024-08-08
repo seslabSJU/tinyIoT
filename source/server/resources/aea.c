@@ -101,13 +101,8 @@ int update_aea(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     result = db_update_resource(m2m_aea, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_AEA);
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "m2m:aea", target_rtnode->obj);
-
     make_response_body(o2pt, target_rtnode);
-    o2pt->rsc = RSC_UPDATED;
 
-    cJSON_DetachItemFromObject(root, "m2m:aea");
-    cJSON_Delete(root);
+    o2pt->rsc = RSC_UPDATED;
     return RSC_UPDATED;
 }

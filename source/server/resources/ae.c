@@ -154,7 +154,7 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
                 logger("UTIL", LOG_LEVEL_INFO, "acpi deleted : %s", orig_acpi_obj->valuestring);
                 if (!has_acpi_update_privilege(o2pt, orig_acpi_obj->valuestring))
                 {
-                    return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
+                    return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "no privilege to update acpi");
                 }
             }
         }

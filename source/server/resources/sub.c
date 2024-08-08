@@ -62,10 +62,11 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_AddBoolToObject(sgn, "vrq", true);
     cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(sub, "nu"))
     {
-        if (strncmp(pjson->valuestring, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0)
+
+        nu_rtnode = find_rtnode(pjson->valuestring);
+        if (nu_rtnode)
         {
-            nu_rtnode = find_rtnode(pjson->valuestring);
-            if (nu_rtnode == NULL || nu_rtnode->ty != RT_AE)
+            if (nu_rtnode->ty != RT_AE)
             {
                 handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "nu is invalid");
                 cJSON_Delete(noti_cjson);

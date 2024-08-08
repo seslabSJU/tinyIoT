@@ -146,7 +146,7 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
                 logger("UTIL", LOG_LEVEL_INFO, "acpi %s", acpi_obj->valuestring);
                 if (!has_acpi_update_privilege(o2pt, acpi_obj->valuestring))
                 {
-                    return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
+                    return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "no privilege to update acpi");
                 }
             }
         }
