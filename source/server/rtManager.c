@@ -26,17 +26,17 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
     char *target_uri = strdup(o2pt->to);
     if (RAT == CSE_RELATIVE)
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "CSE_RELATIVE");
+        logger("RTM", LOG_LEVEL_DEBUG, "CSE_RELATIVE");
         rtnode = find_rtnode(target_uri);
     }
     else if (RAT == SP_RELATIVE)
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "SP_RELATIVE");
+        logger("RTM", LOG_LEVEL_DEBUG, "SP_RELATIVE");
         rtnode = parse_spr_uri(o2pt, target_uri);
     }
     else if (RAT == ABSOLUTE)
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "ABSOLUTE");
+        logger("RTM", LOG_LEVEL_DEBUG, "ABSOLUTE");
         rtnode = parse_abs_uri(o2pt, target_uri);
     }
 
@@ -132,7 +132,7 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
         ptr = target_uri + strlen(CSE_BASE_RI) + 2; // for first / and end /
         if (strlen(ptr) == 0)
         {
-            logger("UTIL", LOG_LEVEL_DEBUG, "addr is empty");
+            logger("RTM", LOG_LEVEL_DEBUG, "addr is empty");
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
             free(target_uri);
             return NULL;
@@ -222,23 +222,33 @@ RTNode *find_csr_rtnode_by_uri(char *uri)
  */
 RTNode *find_rtnode(char *addr)
 {
-    logger("UTIL", LOG_LEVEL_DEBUG, "find_rtnode [%s]", addr);
     if (!addr)
         return NULL;
+    char *foptPtr = NULL;
     RTNode *rtnode = NULL;
     if (strcmp(addr, CSE_BASE_NAME) == 0 || strcmp(addr, "-") == 0)
     {
         return rt->cb;
     }
+    if ((foptPtr = strstr(addr, "/fopt")))
+    {
+        foptPtr[0] = '\0';
+    }
+    logger("RTM", LOG_LEVEL_DEBUG, "find_rtnode [%s]", addr);
+
     if ((strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 && addr[strlen(CSE_BASE_NAME)] == '/') || (addr[0] == '-' && addr[1] == '/'))
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "Hierarchical Addressing");
+        logger("RTM", LOG_LEVEL_DEBUG, "Hierarchical Addressing");
         rtnode = find_rtnode_by_uri(addr);
     }
     else
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "Non-Hierarchical Addressing");
+        logger("RTM", LOG_LEVEL_DEBUG, "Non-Hierarchical Addressing");
         rtnode = find_rtnode_by_ri(addr);
+    }
+    if (foptPtr)
+    {
+        foptPtr[0] = '/';
     }
     return rtnode;
 }
@@ -299,7 +309,7 @@ RTNode *find_rtnode_by_uri(char *uri)
         return NULL;
     if (!strcmp(ptr, "-"))
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "root node -");
+        logger("RTM", LOG_LEVEL_DEBUG, "root node -");
         rtnode = rt->cb->child;
         ptr = strtok(NULL, "/");
     }
@@ -338,7 +348,7 @@ RTNode *find_rtnode_by_uri(char *uri)
             {
                 if (strcmp(cJSON_GetObjectItem(parent_rtnode->child->obj, "rn")->valuestring, ptr) == 0)
                 {
-                    logger("UTIL", LOG_LEVEL_DEBUG, "resource is latest");
+                    logger("RTM", LOG_LEVEL_DEBUG, "resource is latest");
                     rtnode = parent_rtnode->child;
                 }
             }
@@ -363,13 +373,13 @@ RTNode *find_rtnode_by_uri(char *uri)
                 }
             }
         }
-        if (parent_rtnode->ty == RT_GRP && ptr)
-        {
-            if (!strcmp(ptr, "fopt"))
-            { // fopt
-                rtnode = parent_rtnode;
-            }
-        }
+        // if (parent_rtnode->ty == RT_GRP && ptr)
+        // {
+        //     if (!strcmp(ptr, "fopt"))
+        //     { // fopt
+        //         rtnode = parent_rtnode;
+        //     }
+        // }
     }
 
     free(target_uri);
@@ -384,13 +394,14 @@ RTNode *find_rtnode_by_uri(char *uri)
  */
 RTNode *find_rtnode_by_ri(char *ri)
 {
+    logger("RTM", LOG_LEVEL_DEBUG, "find_rtnode_by_ri [%s]", ri);
     cJSON *resource = NULL;
     RTNode *rtnode = NULL;
     char *fopt = strstr(ri, "/fopt");
     // logger("UTIL", LOG_LEVEL_DEBUG, "RI : %s", ri);
     if (strncmp(ri, "4-", 2) == 0)
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "CIN");
+        logger("RTM", LOG_LEVEL_DEBUG, "CIN");
         resource = db_get_resource(ri, RT_CIN);
         rtnode = create_rtnode(resource, RT_CIN);
         rtnode->parent = find_rtnode_by_ri(get_pi_rtnode(rtnode));
@@ -398,7 +409,7 @@ RTNode *find_rtnode_by_ri(char *ri)
     }
     else if (strncmp(ri, "9-", 2) == 0)
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "GRP");
+        logger("RTM", LOG_LEVEL_DEBUG, "GRP");
         if (fopt)
         {
             *fopt = '\0';
@@ -425,13 +436,13 @@ RTNode *rt_search_ri(RTNode *rtnode, char *ri)
         return NULL;
     while (rtnode)
     {
-        if (rtnode->child)
-            ret = rt_search_ri(rtnode->child, ri);
         if (!strcmp(get_ri_rtnode(rtnode), ri))
         {
             ret = rtnode;
             break;
         }
+        if (rtnode->child)
+            ret = rt_search_ri(rtnode->child, ri);
         rtnode = rtnode->sibling_right;
     }
 

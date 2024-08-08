@@ -301,7 +301,6 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		}
 	}
 	logger("O2M", LOG_LEVEL_DEBUG, "delete_process [%s]", rtnode->uri);
-	int idx = 0;
 	switch (rtnode->ty)
 	{
 	case RT_ACP:
