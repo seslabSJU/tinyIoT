@@ -1496,7 +1496,7 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 
 	cJSON *root = NULL;
-	cJSON *pjson = NULL;
+	cJSON *pjson = NULL, *pjson2 = NULL, *pjson3 = NULL;
 	int lim = DEFAULT_DISCOVERY_LIMIT;
 	int ofst = 0;
 	int lvl = 99999;
@@ -1555,10 +1555,15 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			cJSON_Delete(root);
 			return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "Internal Server Error");
 		}
-		cJSON_Delete(root);
 		if (o2pt->op == OP_CREATE)
 		{
 			cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);
+			pjson2 = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(target_rtnode->ty));
+			pjson3 = cJSON_GetObjectItem(root, get_resource_key(target_rtnode->ty));
+			cJSON_ArrayForEach(pjson, pjson2)
+			{
+				cJSON_DeleteItemFromObject(pjson3, pjson->string);
+			}
 		}
 		else
 		{
