@@ -720,7 +720,7 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	new_pc = cJSON_CreateObject();
 	cJSON_AddItemToObject(new_pc, "m2m:agr", agr = cJSON_CreateObject());
 	cJSON_AddItemToObject(agr, "m2m:rsp", rsp = cJSON_CreateArray());
-	cJSON *mid_arr = cJSON_GetObjectItem(grp, "mid");
+	cJSON *mid_arr = cJSON_Duplicate(cJSON_GetObjectItem(grp, "mid"), true);
 	cJSON *mid_obj = NULL;
 	cJSON *mid_prev = NULL;
 	cJSON_InsertItemInArray(mid_arr, 0, cJSON_CreateString(""));
@@ -730,7 +730,7 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	{
 		rsc = 0;
 		char *mid = cJSON_GetStringValue(mid_obj);
-		if (strlen(mid) == 0)
+		if (mid == NULL || strlen(mid) == 0)
 			continue;
 		if (req_o2pt->to)
 			free(req_o2pt->to);
@@ -808,17 +808,19 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		if (rsc == RSC_DELETED)
 		{
 			updated = true;
-			mid_obj = mid_prev;
-			// cJSON_DeleteItemFromArray(mid_arr, idx);
-			// idx--;
 		}
-		// idx++;
 	}
 	cJSON_DeleteItemFromArray(mid_arr, 0);
 	cJSON_DeleteItemFromArray(mid_arr, cJSON_GetArraySize(mid_arr) - 1);
-	if (updated)
+	if (updated && cJSON_IsObject(grp))
 	{
+
+		cJSON_ReplaceItemInObject(grp, "mid", mid_arr);
 		db_update_resource(grp, cJSON_GetObjectItem(grp, "ri")->valuestring, RT_GRP);
+	}
+	else
+	{
+		cJSON_Delete(mid_arr);
 	}
 
 	o2pt->response_pc = new_pc;

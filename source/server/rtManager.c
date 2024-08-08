@@ -222,6 +222,7 @@ RTNode *find_csr_rtnode_by_uri(char *uri)
  */
 RTNode *find_rtnode(char *addr)
 {
+    logger("UTIL", LOG_LEVEL_DEBUG, "find_rtnode [%s]", addr);
     if (!addr)
         return NULL;
     RTNode *rtnode = NULL;
