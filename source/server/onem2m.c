@@ -596,8 +596,8 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		e = check_resource_type_equal(o2pt);
 	if (e != -1)
 		e = check_privilege(o2pt, target_rtnode, ACOP_UPDATE);
-	if (e != -1)
-		e = check_rn_duplicate(o2pt, target_rtnode->parent);
+	// if (e != -1)
+	// 	e = check_rn_duplicate(o2pt, target_rtnode->parent);
 	if (e == -1)
 		return o2pt->rsc;
 
