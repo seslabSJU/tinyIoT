@@ -129,6 +129,8 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *pjson = NULL;
     cJSON *m2m_sub = cJSON_GetObjectItem(o2pt->request_pc, "m2m:sub");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
+    int updateAttrCnt = cJSON_GetArraySize(m2m_sub);
+
     for (int i = 0; i < invalid_key_size; i++)
     {
         if (cJSON_GetObjectItem(m2m_sub, invalid_key[i]))
@@ -194,6 +196,11 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     update_resource(sub, m2m_sub);
 
     db_update_resource(m2m_sub, cJSON_GetObjectItem(sub, "ri")->valuestring, RT_SUB);
+
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_sub, 0);
+    }
 
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;

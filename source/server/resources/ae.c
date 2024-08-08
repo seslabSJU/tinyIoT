@@ -122,6 +122,9 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *m2m_ae = cJSON_GetObjectItem(o2pt->request_pc, "m2m:ae");
     cJSON *pjson = NULL;
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
+
+    int updateAttrCnt = cJSON_GetArraySize(m2m_ae);
+
     for (int i = 0; i < invalid_key_size; i++)
     {
         if (cJSON_GetObjectItem(m2m_ae, invalid_key[i]))
@@ -182,15 +185,14 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     }
 
     result = db_update_resource(m2m_ae, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_AE);
-
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "m2m:ae", target_rtnode->obj);
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_ae, 0);
+    }
 
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
 
-    cJSON_DetachItemFromObject(root, "m2m:ae");
-    cJSON_Delete(root);
     return RSC_UPDATED;
 }
 

@@ -77,6 +77,8 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *m2m_grp = cJSON_GetObjectItem(o2pt->request_pc, "m2m:grp");
     cJSON *pjson = NULL;
 
+    int updateAttrCnt = cJSON_GetArraySize(m2m_grp);
+
     int invalid_key_size = 6;
     for (int i = 0; i < invalid_key_size; i++)
     {
@@ -111,14 +113,13 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     set_grp_member(target_rtnode);
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "m2m:grp", target_rtnode->obj);
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_grp, 0);
+    }
+
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
-
-    cJSON_DetachItemFromObject(root, "m2m:grp");
-    cJSON_Delete(root);
-    root = NULL;
 
     return RSC_UPDATED;
 }

@@ -77,6 +77,9 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
     cJSON *m2m_csr = cJSON_GetObjectItem(o2pt->request_pc, "m2m:csr");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
+
+    int updateAttrCnt = cJSON_GetArraySize(m2m_csr);
+
     for (int i = 0; i < invalid_key_size; i++)
     {
         if (cJSON_GetObjectItem(m2m_csr, invalid_key[i]))
@@ -101,6 +104,11 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     result = db_update_resource(m2m_csr, cJSON_GetStringValue(cJSON_GetObjectItem(csr, "ri")), RT_CSR);
 
     update_remote_csr_dcse(target_rtnode);
+
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_csr, 0);
+    }
 
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
