@@ -506,7 +506,6 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
     add_header("Content-Type", "application/json", req->headers);
     send_http_request(host, port, req, res);
     logger("HTTP", LOG_LEVEL_DEBUG, "http_notify response: %d", res->status_code);
-    rsc = res->status_code;
     char *ptr = search_header(res->headers, "X-M2M-RSC");
     if (ptr)
     {
@@ -788,7 +787,7 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
             normalize_payload(res->payload);
     }
     close(sock);
-    return 200;
+    return res->status_code ? res->status_code : 0;
 }
 
 char *op_to_method(Operation op)
