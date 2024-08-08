@@ -164,7 +164,7 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 	{
 		if (pjson->type != cJSON_True || pjson->type != cJSON_False)
 		{
-			if (pjson->valueint == 1)
+			if (cJSON_IsTrue(pjson) || pjson->valueint == 1)
 			{
 				cJSON_ReplaceItemInObject(obj, "mtv", cJSON_CreateTrue());
 			}

@@ -21,6 +21,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         return logger("O2M", LOG_LEVEL_DEBUG, "Group Validation failed");
     }
+
     cJSON *pjson = NULL;
     // Add cr attribute
     if ((pjson = cJSON_GetObjectItem(grp, "cr")))
@@ -38,9 +39,6 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     }
 
     cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
-
-    // if(o2pt->pc) free(o2pt->pc);
-    // o2pt->pc = cJSON_PrintUnformatted(root);
 
     o2pt->rsc = RSC_CREATED;
 
@@ -123,6 +121,7 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     return RSC_UPDATED;
 }
+
 int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
 {
     logger("UTIL", LOG_LEVEL_DEBUG, "Validating GRP");
@@ -159,7 +158,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
 
     if ((pjson = cJSON_GetObjectItem(grp, "mtv")))
     {
-        if (pjson->valueint == 1)
+        if (cJSON_IsTrue(pjson))
             return RSC_OK;
     }
 
@@ -224,6 +223,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
 
     if (result == 0)
     {
+        logger("UTIL", LOG_LEVEL_DEBUG, "Validated GRP member successful");
         cJSON_AddBoolToObject(grp, "mtv", true);
     }
     else
@@ -242,7 +242,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
  * @param final_mid cJSON of validated grp member ids
  * @param csy consistency policy
  * @param mt member type
- * @return 0 if mtv is false, 1 if mtv is true, RSC error code if error
+ * @return 0 if mtv is true, 1 if mtv is false, RSC error code if error
  */
 int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
 {
@@ -315,10 +315,6 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
                         // CSY_ABANDON_MEMBER - member unsaved
                         continue;
                     }
-                }
-                if (rt_node == NULL)
-                {
-                    return 0;
                 }
             }
         }
@@ -555,6 +551,11 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
     return RSC_OK;
 }
 
+/**
+ * @brief set memberOf attribute of group member
+ * @param grp_rtnode group resource node
+ * @return 0 if success
+ */
 int set_grp_member(RTNode *grp_rtnode)
 {
     cJSON *mid_Arr = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
