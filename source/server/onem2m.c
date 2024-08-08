@@ -663,7 +663,6 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
 	int rsc = 0;
-	int cnt = 0;
 	int cnm = 0;
 	int idx = 1;
 	bool updated = false;
@@ -675,7 +674,8 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	cJSON *rsp = NULL;
 	cJSON *json = NULL;
 	cJSON *grp = NULL;
-	cJSON *delete_list = NULL;
+
+	int mt = 0;
 
 	if (parent_rtnode == NULL)
 	{
@@ -683,6 +683,8 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		return RSC_NOT_FOUND;
 	}
 	logger("O2M", LOG_LEVEL_DEBUG, "handle fopt");
+
+	mt = cJSON_GetObjectItem(parent_rtnode->obj, "mt")->valueint;
 
 	if (cJSON_GetObjectItem(parent_rtnode->obj, "macp"))
 	{
@@ -770,8 +772,13 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		if (target_rtnode)
 		{
 			rsc = handle_onem2m_request(req_o2pt, target_rtnode);
-			if (rsc < 4000)
-				cnt++;
+			if (mt != RT_MIXED && rsc == RSC_INVALID_CHILD_RESOURCETYPE)
+			{
+				cJSON_Delete(mid_arr);
+				free_o2pt(req_o2pt);
+				cJSON_Delete(new_pc);
+				return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "invalid child resource type");
+			}
 			json = o2pt_to_json(req_o2pt);
 			if (json)
 			{
@@ -821,8 +828,6 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	}
 
 	o2pt->response_pc = new_pc;
-
-	cJSON_Delete(delete_list);
 
 	o2pt->rsc = RSC_OK;
 
