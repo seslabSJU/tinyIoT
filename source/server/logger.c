@@ -40,8 +40,8 @@ void logger_free()
 #endif
 }
 
-#if MULTI_THREAD == 1
-
+#if MULTI_THREAD == 0
+bool writing = false;
 #endif
 
 /**
@@ -59,7 +59,13 @@ int logger(const char *tag, LOGLEVEL level, const char *msg, ...)
     char *t = NULL;
     char *llChar;
     int charsCnt = 0, fcolor = 0;
-
+#if MULTI_THREAD == 0
+    while (writing)
+    {
+        usleep(20);
+    }
+#endif
+    writing = true;
     switch (level)
     {
     case LOG_LEVEL_DEBUG:
@@ -108,6 +114,6 @@ int logger(const char *tag, LOGLEVEL level, const char *msg, ...)
         fprintf(log_file, "\r%s %-5s [%s]: %s\n", t, llChar, tag, log_buffer);
 #endif
     }
-
+    writing = false;
     return charsCnt;
 }
