@@ -721,10 +721,6 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	cJSON_AddItemToObject(agr, "m2m:rsp", rsp = cJSON_CreateArray());
 	cJSON *mid_arr = cJSON_Duplicate(cJSON_GetObjectItem(grp, "mid"), true);
 	cJSON *mid_obj = NULL;
-	cJSON *mid_prev = NULL;
-	cJSON_InsertItemInArray(mid_arr, 0, cJSON_CreateString(""));
-	cJSON_AddItemToArray(mid_arr, cJSON_CreateString(""));
-
 	cJSON_ArrayForEach(mid_obj, mid_arr)
 	{
 		rsc = 0;
@@ -768,17 +764,17 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 				}
 			}
 		}
-		mid_prev = mid_obj->prev;
 		if (target_rtnode)
 		{
-			rsc = handle_onem2m_request(req_o2pt, target_rtnode);
-			if (mt != RT_MIXED && rsc == RSC_INVALID_CHILD_RESOURCETYPE)
+			if (o2pt->op == OP_CREATE && mt == RT_MIXED && !isValidChildType(target_rtnode->ty, req_o2pt->ty))
 			{
 				cJSON_Delete(mid_arr);
 				free_o2pt(req_o2pt);
 				cJSON_Delete(new_pc);
 				return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "invalid child resource type");
 			}
+
+			rsc = handle_onem2m_request(req_o2pt, target_rtnode);
 			json = o2pt_to_json(req_o2pt);
 			if (json)
 			{
@@ -814,18 +810,12 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 			updated = true;
 		}
 	}
-	cJSON_DeleteItemFromArray(mid_arr, 0);
-	cJSON_DeleteItemFromArray(mid_arr, cJSON_GetArraySize(mid_arr) - 1);
 	if (updated && cJSON_IsObject(grp))
 	{
-
-		cJSON_ReplaceItemInObject(grp, "mid", mid_arr);
 		db_update_resource(grp, cJSON_GetObjectItem(grp, "ri")->valuestring, RT_GRP);
 	}
-	else
-	{
-		cJSON_Delete(mid_arr);
-	}
+
+	cJSON_Delete(mid_arr);
 
 	o2pt->response_pc = new_pc;
 
