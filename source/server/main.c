@@ -21,6 +21,10 @@
 #include "mqttClient.h"
 #endif
 
+#if UPPERTESTER
+#include "upperTester.h"
+#endif
+
 #include "coap.h"
 
 ResourceTree *rt;
@@ -193,6 +197,13 @@ void route(oneM2MPrimitive *o2pt)
 	double start;
 
 	start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
+
+	if (o2pt->op == OP_UPPERTESTER)
+	{
+		handle_uppertester_procedure(o2pt);
+		log_runtime(start);
+		return;
+	}
 
 	RTNode *target_rtnode = get_rtnode(o2pt);
 	if (o2pt->rsc >= 4000)
