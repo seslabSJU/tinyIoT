@@ -1404,6 +1404,8 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	int lim = DEFAULT_DISCOVERY_LIMIT;
 	int ofst = 0;
 	int lvl = 99999;
+	int rsc = 0;
+	RTNode *remote = NULL;
 
 	if ((pjson = cJSON_GetObjectItem(o2pt->fc, "lim")))
 	{
@@ -1447,7 +1449,25 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		build_rcn6(o2pt, target_rtnode, root, ofst, lim, lvl);
 		break;
 	case RCN_ORIGINAL_RESOURCE:
-		// TODO
+		if (target_rtnode->ty < 10000)
+		{
+			handle_error(o2pt, RSC_BAD_REQUEST, "rcn 7 is not supported for non anncounced resources");
+			break;
+		}
+
+		remote = get_remote_resource(cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring, &rsc);
+		logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body : %s", cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring);
+		if (remote && rsc == RSC_OK)
+		{
+			logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body : %s", remote->uri);
+			cJSON_AddItemToObject(root, get_resource_key(remote->ty), cJSON_Duplicate(remote->obj, true));
+			free_rtnode(remote);
+		}
+		else
+		{
+			cJSON_Delete(root);
+			return handle_error(o2pt, rsc, "original resource is not reachable");
+		}
 		break;
 	case RCN_CHILD_RESOURCES:
 		build_rcn8(o2pt, target_rtnode, root, ofst, lim, lvl);
