@@ -29,7 +29,8 @@ typedef enum
 	OP_DISCOVERY = 6,
 	OP_VIEWER = 1000,
 	OP_OPTIONS,
-	OP_FORWARDING
+	OP_FORWARDING,
+	OP_UPPERTESTER
 } Operation;
 
 typedef enum

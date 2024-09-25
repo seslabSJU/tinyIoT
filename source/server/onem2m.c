@@ -552,14 +552,14 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		rsc = create_csr(o2pt, parent_rtnode);
 		break;
 
+	case RT_ACPA:
 	case RT_AEA:
-		logger("O2M", LOG_LEVEL_INFO, "Create AEA");
-		rsc = create_aea(o2pt, parent_rtnode);
-		break;
-
 	case RT_CBA:
-		logger("O2M", LOG_LEVEL_INFO, "Create CBA");
-		rsc = create_cba(o2pt, parent_rtnode);
+	case RT_CNTA:
+	case RT_CINA:
+	case RT_GRPA:
+		logger("O2M", LOG_LEVEL_INFO, "Create ANNC");
+		rsc = create_annc(o2pt, parent_rtnode);
 		break;
 
 	case RT_MIXED:
@@ -634,21 +634,25 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Update GRP");
 		rsc = update_grp(o2pt, target_rtnode);
 		break;
+  case RT_CSR:
+		logger("O2M", LOG_LEVEL_INFO, "Update CSR");
+		rsc = update_csr(o2pt, target_rtnode);
+		break;
+
 #if CSE_RVI >= RVI_3
 	case RT_AEA:
 		logger("O2M", LOG_LEVEL_INFO, "Update AEA");
 		rsc = update_aea(o2pt, target_rtnode);
 		break;
-
-	case RT_CSR:
-		logger("O2M", LOG_LEVEL_INFO, "Update CSR");
-		rsc = update_csr(o2pt, target_rtnode);
+	case RT_ACPA:
+	case RT_CBA:
+	case RT_AEA:
+	case RT_CNTA:
+	case RT_CINA:
+	case RT_GRPA:
+		update_annc(o2pt, target_rtnode);
 		break;
-#endif
-		// case RT_CBA:
-		// 	logger("O2M", LOG_LEVEL_INFO, "Update CBA");
-		// 	rsc = update_cba(o2pt, target_rtnode);
-		// 	break;
+ #endif
 
 	default:
 		handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` is unsupported");

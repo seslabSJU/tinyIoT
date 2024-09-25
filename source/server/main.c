@@ -21,6 +21,10 @@
 #include "mqttClient.h"
 #endif
 
+#if UPPERTESTER
+#include "upperTester.h"
+#endif
+
 #include "coap.h"
 
 ResourceTree *rt;
@@ -83,8 +87,8 @@ int main(int argc, char **argv)
 		\"m2m:grp\": {\"cr\":\"\", \"mt\":0, \"cnm\":0, \"mnm\":0, \"mid\":[\"\"], \"macp\":[\"\"], \"mtv\":true, \"csy\":0}, \
 		\"m2m:csr\": {\"cst\":0, \"poa\":[\"\"], \"cb\":\"\", \"dcse\":[\"\"], \"csi\":\"\", \"mei\":\"\", \"tri\":\"\", \"csz\":[\"\"], \"rr\":true, \"nl\":\"\", \"srv\":[\"\"]},\
 		\"m2m:cb\": {\"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[0], \"rr\":true, \"at\":[], \"aa\":[],\"ast\":0}, \
-		\"m2m:cbA\": {\"lnk\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[\"\"], \"rr\":true}, \
-		\"m2m:aeA\": {\"lnk\":\"\", \"api\":\"\", \"aei\":\"\", \"rr\":true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"]} \
+		\"m2m:cbA\": {\"lnk\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[\"\"], \"rr\":true, \"ast\":0}, \
+		\"m2m:aeA\": {\"lnk\":\"\", \"api\":\"\", \"aei\":\"\", \"rr\":true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"], \"ast\":0} \
 	 }");
 
 	if (ATTRIBUTES == NULL)
@@ -193,6 +197,13 @@ void route(oneM2MPrimitive *o2pt)
 	double start;
 
 	start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
+
+	if (o2pt->op == OP_UPPERTESTER)
+	{
+		handle_uppertester_procedure(o2pt);
+		log_runtime(start);
+		return;
+	}
 
 	RTNode *target_rtnode = get_rtnode(o2pt);
 	if (o2pt->rsc >= 4000)

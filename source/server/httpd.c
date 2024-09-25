@@ -308,7 +308,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
             o2pt->to[0] = '/';
             strcat(o2pt->to, req->uri + 3);
         }
-        else if (req->uri[1] == '_')
+        else if (req->uri[1] == '_' && req->uri[2] == '/')
         { // absolute
             o2pt->to = (char *)calloc(sizeof(char), (strlen(req->uri + 1) + 2));
             o2pt->to[0] = '/';
@@ -323,8 +323,20 @@ void handle_http_request(HTTPRequest *req, int slotno)
         logger("HTTP", LOG_LEVEL_DEBUG, "to: %s", o2pt->to);
     }
 
+#if UPPERTESTER
+    if (!strcmp(o2pt->to, UPPERTESTER_URI))
+    {
+        o2pt->op = OP_UPPERTESTER;
+    }
+    else
+    {
+        o2pt->op = http_parse_operation(req->method);
+    }
+#else
     o2pt->op = http_parse_operation(req->method);
     logger("HTTP", LOG_LEVEL_INFO, "Request : %s (%d)", req->method, o2pt->op);
+
+#endif
     // Setting default rcn
     switch (o2pt->op)
     {

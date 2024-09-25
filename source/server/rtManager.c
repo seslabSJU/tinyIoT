@@ -20,6 +20,11 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
     char *ptr = NULL;
     if (!o2pt)
         return NULL;
+    if (o2pt->to == NULL)
+    {
+        handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
+        return NULL;
+    }
 
     ResourceAddressingType RAT = checkResourceAddressingType(o2pt->to);
     RTNode *rtnode = NULL;

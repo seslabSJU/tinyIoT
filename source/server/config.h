@@ -25,6 +25,13 @@
 
 #define MONO_THREAD 0 // 0 → multi-thread, 1 → mono-thread
 
+
+#define UPPERTESTER 1 // 0 → disable, 1 → enable
+
+#if UPPERTESTER == 1
+#define UPPERTESTER_URI "__ut__"
+#endif
+
 #define MAX_PAYLOAD_SIZE 65536
 #define MAX_URI_SIZE 1024
 #define MAX_ATTRIBUTE_SIZE 4096
