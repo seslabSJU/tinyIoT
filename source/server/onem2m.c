@@ -634,25 +634,21 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Update GRP");
 		rsc = update_grp(o2pt, target_rtnode);
 		break;
-  case RT_CSR:
+	case RT_CSR:
 		logger("O2M", LOG_LEVEL_INFO, "Update CSR");
 		rsc = update_csr(o2pt, target_rtnode);
 		break;
 
 #if CSE_RVI >= RVI_3
 	case RT_AEA:
-		logger("O2M", LOG_LEVEL_INFO, "Update AEA");
-		rsc = update_aea(o2pt, target_rtnode);
-		break;
 	case RT_ACPA:
 	case RT_CBA:
-	case RT_AEA:
 	case RT_CNTA:
 	case RT_CINA:
 	case RT_GRPA:
 		update_annc(o2pt, target_rtnode);
 		break;
- #endif
+#endif
 
 	default:
 		handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` is unsupported");
