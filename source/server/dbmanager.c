@@ -45,7 +45,7 @@ int init_dbp()
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS general ( id INTEGER PRIMARY KEY AUTOINCREMENT, \
         rn VARCHAR(60), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), \
-        uri VARCHAR(255), acpi VARCHAR(255), lbl VARCHAR(255), ty INT );");
+        uri VARCHAR(255), acpi VARCHAR(255), lbl VARCHAR(255), ty INT, memberOf VARCHAR(255) );");
 
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if (rc != SQLITE_OK)
@@ -70,7 +70,7 @@ int init_dbp()
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS ae ( id INTEGER, \
-        api VARCHAR(45), aei VARCHAR(200), rr VARCHAR(10), poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
+        api VARCHAR(45), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
         CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if (rc != SQLITE_OK)
@@ -117,7 +117,7 @@ int init_dbp()
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS sub ( id INTEGER, \
-        enc VARCHAR(45), exc VARCHAR(45), nu VARCHAR(200), gpi VARCHAR(45), nfu VARCHAR(45), bn VARCHAR(45), rl VARCHAR(45), \
+        enc VARCHAR(45), exc INT, nu VARCHAR(200), gpi VARCHAR(45), nfu VARCHAR(45), bn VARCHAR(45), rl VARCHAR(45), \
         sur VARCHAR(200), nct VARCHAR(45), net VARCHAR(45), cr VARCHAR(45), su VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
         CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
@@ -166,7 +166,7 @@ int init_dbp()
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS aeA ( id INTEGER, \
-        api VARCHAR(45), lnk VARCHAR(100), aei VARCHAR(200), rr VARCHAR(10), poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
+        api VARCHAR(45), lnk VARCHAR(100), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
         CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if (rc != SQLITE_OK)
@@ -277,8 +277,6 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
         bytes = sqlite3_column_bytes(stmt, col);
         coltype = sqlite3_column_type(stmt, col);
 
-        if (bytes == 0)
-            continue;
         if (strcmp(colname, "id") == 0)
             continue;
         switch (coltype)
@@ -356,8 +354,6 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
         bytes = sqlite3_column_bytes(stmt, col);
         coltype = sqlite3_column_type(stmt, col);
 
-        if (bytes == 0)
-            continue;
         if (strcmp(colname, "id") == 0)
             continue;
         switch (coltype)
@@ -428,6 +424,7 @@ int db_store_resource(cJSON *obj, char *uri)
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
     {
+        logger("DB", LOG_LEVEL_DEBUG, "%s", sql);
         free(sql);
         logger("DB", LOG_LEVEL_ERROR, "prepare error store_resource");
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
@@ -818,8 +815,6 @@ RTNode *db_get_all_resource_as_rtnode()
             coltype = sqlite3_column_type(res, col);
 
             // logger("DB", LOG_LEVEL_DEBUG, "rc : %s", colname);
-            if (bytes == 0)
-                continue;
             // if(strcmp(colname, "id") == 0) continue;
             switch (coltype)
             {
@@ -1172,12 +1167,12 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 
     if (o2pt->drt == DRT_STRUCTURED)
     {
-        sprintf(buf, "SELECT uri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
+        sprintf(buf, "SELECT rn, ty, uri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
         strcat(sql, buf);
     }
     else
     {
-        sprintf(buf, "SELECT ri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
+        sprintf(buf, "SELECT rn, ty, ri FROM general WHERE uri LIKE '%s/%%' AND ", uri);
         strcat(sql, buf);
     }
 
@@ -1497,6 +1492,7 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 
     json = cJSON_CreateArray();
     rc = sqlite3_step(res);
+    pjson = NULL;
     while (rc == SQLITE_ROW)
     {
         bytes = sqlite3_column_bytes(res, 0);
@@ -1505,7 +1501,11 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
             logger("DB", LOG_LEVEL_ERROR, "empty URI");
             break;
         }
-        cJSON_AddItemToArray(json, cJSON_CreateString(sqlite3_column_text(res, 0)));
+        pjson = cJSON_CreateObject();
+        cJSON_AddItemToObject(pjson, "name", cJSON_CreateString(sqlite3_column_text(res, 0)));
+        cJSON_AddItemToObject(pjson, "type", cJSON_CreateNumber(sqlite3_column_int(res, 1)));
+        cJSON_AddItemToObject(pjson, "val", cJSON_CreateString(sqlite3_column_text(res, 2)));
+        cJSON_AddItemToArray(json, pjson);
         rc = sqlite3_step(res);
     }
     sqlite3_finalize(res);

@@ -11,10 +11,6 @@ extern cJSON *ATTRIBUTES;
 int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
     int rsc = 0;
-    if (parent_rtnode->ty != RT_AE && parent_rtnode->ty != RT_CSE)
-    {
-        return o2pt->rsc = RSC_INVALID_CHILD_RESOURCETYPE;
-    }
 
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *grp = cJSON_GetObjectItem(root, "m2m:grp");
@@ -25,6 +21,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         return logger("O2M", LOG_LEVEL_DEBUG, "Group Validation failed");
     }
+
     cJSON *pjson = NULL;
     // Add cr attribute
     if ((pjson = cJSON_GetObjectItem(grp, "cr")))
@@ -42,9 +39,6 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     }
 
     cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
-
-    // if(o2pt->pc) free(o2pt->pc);
-    // o2pt->pc = cJSON_PrintUnformatted(root);
 
     o2pt->rsc = RSC_CREATED;
 
@@ -81,6 +75,8 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *m2m_grp = cJSON_GetObjectItem(o2pt->request_pc, "m2m:grp");
     cJSON *pjson = NULL;
 
+    int updateAttrCnt = cJSON_GetArraySize(m2m_grp);
+
     int invalid_key_size = 6;
     for (int i = 0; i < invalid_key_size; i++)
     {
@@ -115,17 +111,17 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     set_grp_member(target_rtnode);
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "m2m:grp", target_rtnode->obj);
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_grp, 0);
+    }
+
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
 
-    cJSON_DetachItemFromObject(root, "m2m:grp");
-    cJSON_Delete(root);
-    root = NULL;
-
     return RSC_UPDATED;
 }
+
 int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
 {
     logger("UTIL", LOG_LEVEL_DEBUG, "Validating GRP");
@@ -162,7 +158,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
 
     if ((pjson = cJSON_GetObjectItem(grp, "mtv")))
     {
-        if (pjson->valueint == 1)
+        if (cJSON_IsTrue(pjson))
             return RSC_OK;
     }
 
@@ -204,7 +200,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
         }
         else
         {
-            if (validate_acpi(o2pt, pjson, OP_CREATE) != RSC_OK)
+            if (validate_acpi(o2pt, pjson, ACOP_CREATE) != RSC_OK)
                 return o2pt->rsc;
         }
     }
@@ -212,7 +208,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
     pjson = cJSON_GetObjectItem(grp, "acpi");
     if (pjson)
     {
-        int result = validate_acpi(o2pt, pjson, OP_CREATE);
+        int result = validate_acpi(o2pt, pjson, ACOP_CREATE);
         if (result != RSC_OK)
             return result;
     }
@@ -227,11 +223,12 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
 
     if (result == 0)
     {
-        cJSON_AddBoolToObject(grp, "mtv", false);
-    }
-    else if (result == 1)
-    {
+        logger("UTIL", LOG_LEVEL_DEBUG, "Validated GRP member successful");
         cJSON_AddBoolToObject(grp, "mtv", true);
+    }
+    else
+    {
+        cJSON_AddBoolToObject(grp, "mtv", false);
     }
 
     cJSON_DeleteItemFromObject(grp, "mid");
@@ -245,7 +242,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
  * @param final_mid cJSON of validated grp member ids
  * @param csy consistency policy
  * @param mt member type
- * @return 0 if mtv is false, 1 if mtv is true, RSC error code if error
+ * @return 0 if mtv is true, 1 if mtv is false, RSC error code if error
  */
 int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
 {
@@ -319,10 +316,6 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
                         continue;
                     }
                 }
-                if (rt_node == NULL)
-                {
-                    return 0;
-                }
             }
         }
         else
@@ -330,7 +323,7 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
             logger("UTIL", LOG_LEVEL_DEBUG, "GRP member %s not present", tStr);
             if (csy == CSY_ABANDON_GROUP)
                 return RSC_BAD_REQUEST;
-            else if (csy == CSY_ABANDON_MEMBER)
+            else if (csy == CSY_ABANDON_MEMBER || csy == CSY_SET_MIXED)
             {
                 // CSY_ABANDON_MEMBER - member unsaved
                 continue;
@@ -341,7 +334,7 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
             logger("UTIL", LOG_LEVEL_DEBUG, "GRP member %s not present", tStr);
             if (csy == CSY_ABANDON_GROUP)
                 return RSC_BAD_REQUEST;
-            else if (csy == CSY_ABANDON_MEMBER)
+            else if (csy == CSY_ABANDON_MEMBER || csy == CSY_SET_MIXED)
             {
                 // CSY_ABANDON_MEMBER - member unsaved
                 continue;
@@ -359,7 +352,15 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
             }
             else if (csy == CSY_SET_MIXED)
             {
-                cJSON_SetIntValue(cJSON_GetObjectItem(grp, "mt"), RT_MIXED);
+                pjson = cJSON_GetObjectItem(grp, "mt");
+                if (pjson == NULL)
+                {
+                    cJSON_AddItemToObject(grp, "mt", cJSON_CreateNumber(RT_MIXED));
+                }
+                else
+                {
+                    cJSON_SetIntValue(pjson, RT_MIXED);
+                }
                 mt = RT_MIXED;
             }
             else
@@ -425,7 +426,7 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
         if (resourceLocation == 2)
             free_rtnode(rt_node);
     }
-    return 1;
+    return 0;
 }
 
 int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
@@ -448,7 +449,7 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
         {
             return handle_error(o2pt, RSC_BAD_REQUEST, "`acpi` should be only attribute when updating");
         }
-        int result = validate_acpi(o2pt, pjson, OP_UPDATE);
+        int result = validate_acpi(o2pt, pjson, ACOP_UPDATE);
         if (result != RSC_OK)
             return result;
     }
@@ -481,13 +482,13 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
         if (pjson->valueint < cJSON_GetArraySize(midArr))
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "`mnm` is less than `mid` size");
-            return RSC_BAD_REQUEST;
+            return RSC_MAX_NUMBER_OF_MEMBER_EXCEEDED;
         }
 
         if (pjson->valueint < cJSON_GetObjectItem(grp_old, "cnm")->valueint)
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "`mnm` can't be smaller than `cnm` size");
-            return RSC_BAD_REQUEST;
+            return RSC_MAX_NUMBER_OF_MEMBER_EXCEEDED;
         }
     }
     else if ((pjson = cJSON_GetObjectItem(grp_old, "mnm")))
@@ -501,7 +502,7 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
 
     if ((pjson = cJSON_GetObjectItem(grp_new, "macp")))
     {
-        if (validate_acpi(o2pt, pjson, OP_UPDATE) != RSC_OK)
+        if (validate_acpi(o2pt, pjson, ACOP_UPDATE) != RSC_OK)
             return RSC_BAD_REQUEST;
 
         if (cJSON_GetArraySize(pjson) == 0)
@@ -521,15 +522,23 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
             csy = pjson->valueint;
         }
         cJSON *final_mid = cJSON_CreateArray();
-        bool mtv = validate_grp_member(grp_new, final_mid, csy, mt);
-        cJSON_SetBoolValue(cJSON_GetObjectItem(grp_new, "mtv"), mtv);
-
+        int result = validate_grp_member(grp_new, final_mid, csy, mt);
+        if (result != 0)
+        {
+            return handle_error(o2pt, result, "GRP member is invalid");
+        }
+        cJSON_SetBoolValue(cJSON_GetObjectItem(grp_new, "mtv"), true);
+        RTNode *mid_rtnode;
         cJSON_ArrayForEach(mid_obj, midArr)
         {
             char *mid = cJSON_GetStringValue(mid_obj);
             if (cJSON_getArrayIdx(final_mid, mid) == -1)
             {
-                deleteNodeList(find_rtnode(mid)->memberOf, find_rtnode(mid));
+                mid_rtnode = find_rtnode(mid);
+                if (mid_rtnode)
+                    cJSON_DeleteItemFromArray(mid_rtnode->memberOf, cJSON_getArrayIdx(mid_rtnode->memberOf, o2pt->to));
+                else
+                    logger("UTIL", LOG_LEVEL_DEBUG, "GRP member %s not found", mid);
             }
         }
 
@@ -542,40 +551,41 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
     return RSC_OK;
 }
 
-// int set_grp_member(RTNode *grp_rtnode)
-// {
-//     cJSON *mid_Arr = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
-//     cJSON *mid_obj = NULL;
-//     NodeList *nl = NULL;
-//     bool duplicated = false;
+/**
+ * @brief set memberOf attribute of group member
+ * @param grp_rtnode group resource node
+ * @return 0 if success
+ */
+int set_grp_member(RTNode *grp_rtnode)
+{
+    cJSON *mid_Arr = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
+    cJSON *mid_obj = NULL;
+    cJSON *update_obj;
 
-//     cJSON_ArrayForEach(mid_obj, mid_Arr)
-//     {
-//         char *mid = cJSON_GetStringValue(mid_obj);
-//         RTNode *mid_rtnode = find_rtnode(mid);
-//         if (mid_rtnode)
-//         {
-//             duplicated = false;
-//             nl = mid_rtnode->memberOf;
-//             while (nl)
-//             {
-//                 if (nl->rtnode == grp_rtnode)
-//                 {
-//                     duplicated = true;
-//                     break;
-//                 }
-//                 nl = nl->next;
-//             }
+    bool duplicated = false;
 
-//             if (!duplicated)
-//             {
-//                 logger("UTIL", LOG_LEVEL_DEBUG, "set_grp_member : %s is now member of %s", mid, grp_rtnode->uri);
-//                 addNodeList(mid_rtnode->memberOf, grp_rtnode);
-//             }
-//             else
-//             {
-//                 logger("UTIL", LOG_LEVEL_DEBUG, "set_grp_member : %s is already member of %s", mid, grp_rtnode->uri);
-//             }
-//         }
-//     }
-// }
+    cJSON_ArrayForEach(mid_obj, mid_Arr)
+    {
+        char *mid = cJSON_GetStringValue(mid_obj);
+        RTNode *mid_rtnode = find_rtnode(mid);
+        if (mid_rtnode)
+        {
+            if (cJSON_getArrayIdx(mid_rtnode->memberOf, grp_rtnode->uri) == -1)
+            {
+                logger("UTIL", LOG_LEVEL_DEBUG, "set_grp_member : %s is now member of %s", mid, grp_rtnode->uri);
+                cJSON_AddItemToArray(mid_rtnode->memberOf, cJSON_CreateString(grp_rtnode->uri));
+                // update_db
+                update_obj = cJSON_CreateObject();
+                cJSON_AddItemToObject(update_obj, "memberOf", mid_rtnode->memberOf);
+                db_update_resource(update_obj, cJSON_GetObjectItem(mid_rtnode->obj, "ri")->valuestring, mid_rtnode->ty);
+                cJSON_DetachItemFromObject(update_obj, "memberOf");
+                cJSON_Delete(update_obj);
+            }
+            else
+            {
+                logger("UTIL", LOG_LEVEL_DEBUG, "set_grp_member : %s is already member of %s", mid, grp_rtnode->uri);
+            }
+        }
+    }
+    return 0;
+}

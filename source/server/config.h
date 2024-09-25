@@ -10,15 +10,21 @@
 #define SERVER_PORT "3000"
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
+#define CSE_BASE_SP_ID "tinyiot.example.com"
+#define CSE_RVI RVI_2a
 
 #if SERVER_TYPE == MN_CSE
 #define REMOTE_CSE_ID ""
 #define REMOTE_CSE_NAME ""
 #define REMOTE_CSE_HOST ""
+#define REMOTE_CSE_SP_ID ""
 #define REMOTE_CSE_PORT 0
 #endif
 
+#define ADMIN_AE_ID "CAdmin"
+
 #define MONO_THREAD 0 // 0 → multi-thread, 1 → mono-thread
+
 
 #define UPPERTESTER 1 // 0 → disable, 1 → enable
 
@@ -85,6 +91,7 @@
 
 #define LOG_LEVEL LOG_LEVEL_DEBUG
 #define LOG_BUFFER_SIZE MAX_PAYLOAD_SIZE
+#define SAVE_LOG
 
 #endif
 
@@ -98,5 +105,11 @@
 #else
 #define COAP_PORT 5683
 #endif
+
+// Additional Settings
+// Add CORS headers to HTTP response
+// You may modify the context at httpd.h
+// #define CORS
+#define CORS
 
 #endif

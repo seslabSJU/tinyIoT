@@ -27,7 +27,7 @@ typedef struct RTNode
 	struct RTNode *parent;
 	struct RTNode *child;
 	struct NodeList *subs;
-	struct NodeList *memberOf;
+	cJSON *memberOf;
 	struct RTNode *sibling_left;
 	struct RTNode *sibling_right;
 	char *rn;
@@ -57,7 +57,7 @@ typedef struct _o
 	char *to;  // To
 	char *fr;  // From
 	char *rqi; // Request ID
-	char *rvi; // Request Version Indicator
+	RVI rvi;   // Request Version Indicator
 	// char *pc;
 	Operation op;		// Operation
 	cJSON *request_pc;	// Primitive Content
@@ -94,6 +94,7 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int retrieve_object_filtercriteria(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode);

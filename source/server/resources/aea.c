@@ -15,8 +15,8 @@ int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         e = check_rn_invalid(o2pt, RT_AE);
     if (e == -1)
         return o2pt->rsc;
-    // logger("UTIL", LOG_LEVEL_DEBUG, "%s", cJSON_PrintUnformatted(parent_rtnode->obj));
-    if (parent_rtnode->ty != RT_CBA)
+
+    if (!(parent_rtnode->ty == RT_CBA || parent_rtnode->ty == RT_CSR))
     {
         handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
         return o2pt->rsc;
@@ -68,6 +68,9 @@ int update_aea(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
     cJSON *m2m_aea = cJSON_GetObjectItem(o2pt->request_pc, "m2m:aea");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
+
+    int updateAttrCnt = cJSON_GetArraySize(m2m_aea);
+
     for (int i = 0; i < invalid_key_size; i++)
     {
         if (cJSON_GetObjectItem(m2m_aea, invalid_key[i]))
@@ -101,13 +104,13 @@ int update_aea(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     result = db_update_resource(m2m_aea, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_AEA);
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "m2m:aea", target_rtnode->obj);
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_aea, 0);
+    }
 
     make_response_body(o2pt, target_rtnode);
-    o2pt->rsc = RSC_UPDATED;
 
-    cJSON_DetachItemFromObject(root, "m2m:aea");
-    cJSON_Delete(root);
+    o2pt->rsc = RSC_UPDATED;
     return RSC_UPDATED;
 }

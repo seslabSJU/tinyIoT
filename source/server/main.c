@@ -78,11 +78,11 @@ int main(int argc, char **argv)
 
 	ATTRIBUTES = cJSON_Parse(
 		"{ \
-		\"general\": {\"rn\": \"\", \"ri\": \"\", \"pi\": \"\", \"ct\": \"\", \"et\": \"\", \"lt\": \"\" , \"uri\": \"\" , \"acpi\": [\"\"], \"lbl\": [\"\"], \"ty\":0}, \
+		\"general\": {\"rn\": \"\", \"ri\": \"\", \"pi\": \"\", \"ct\": \"\", \"et\": \"\", \"lt\": \"\" , \"uri\": \"\" , \"acpi\": [\"\"], \"lbl\": [\"\"], \"ty\":0, \"memberOf\": [\"\"]}, \
 		\"m2m:ae\": {\"api\": \"\", \"aei\" : \"\", \"rr\": true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"], \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
 		\"m2m:cnt\": {\"cr\": null, \"mni\":0, \"mbs\":0, \"st\":0, \"cni\":0, \"cbs\":0,\"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
 		\"m2m:cin\": {\"cs\":0, \"cr\":null, \"con\":\"\", \"cnf\":\"\", \"st\":\"\",\"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
-		\"m2m:acp\": {\"pv\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"pvs\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}}]}, \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
+		\"m2m:acp\": {\"pv\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":[{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}]}]}, \"pvs\":{\"acr\":[{\"acor\":[\"\"],\"acop\":0, \"acco\":[{\"acip\":{\"ipv4\":[\"\"], \"ipv6\":[\"\"]}}]}]}, \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0}, \
 		\"m2m:sub\": {\"enc\":{\"net\":[1], \"atr\":[\"\"], \"chty\":[0] }, \"exc\":0, \"nu\":[\"\"], \"gpi\":0, \"nfu\":0, \"bn\":0, \"rl\":0, \"sur\":0, \"nct\":0, \"cr\":\"\", \"su\":\"\"},\
 		\"m2m:grp\": {\"cr\":\"\", \"mt\":0, \"cnm\":0, \"mnm\":0, \"mid\":[\"\"], \"macp\":[\"\"], \"mtv\":true, \"csy\":0}, \
 		\"m2m:csr\": {\"cst\":0, \"poa\":[\"\"], \"cb\":\"\", \"dcse\":[\"\"], \"csi\":\"\", \"mei\":\"\", \"tri\":\"\", \"csz\":[\"\"], \"rr\":true, \"nl\":\"\", \"srv\":[\"\"]},\
@@ -251,7 +251,7 @@ void route(oneM2MPrimitive *o2pt)
 		}
 	}
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
-		notify_onem2m_resource(o2pt, target_rtnode);
+		notify_via_sub(o2pt, target_rtnode);
 	log_runtime(start);
 }
 
@@ -274,7 +274,8 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			o2pt->rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES ||
 			o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES ||
 			o2pt->rcn == RCN_ORIGINAL_RESOURCE ||
-			o2pt->rcn == RCN_SEMANTIC_CONTENT)
+			o2pt->rcn == RCN_SEMANTIC_CONTENT ||
+			o2pt->rcn == RCN_PERMISSIONS)
 		{
 			handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for create operation");
 			break;
@@ -296,8 +297,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		break;
 
 	case OP_UPDATE:
-		if (o2pt->rcn == RCN_MODIFIED_ATTRIBUTES ||
-			o2pt->rcn == RCN_HIERARCHICAL_ADDRESS ||
+		if (o2pt->rcn == RCN_HIERARCHICAL_ADDRESS ||
 			o2pt->rcn == RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES ||
 			o2pt->rcn == RCN_CHILD_RESOURCES ||
 			o2pt->rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES ||
@@ -344,13 +344,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		break;
 
 	case OP_NOTIFY:
-		if (check_privilege(o2pt, target_rtnode, ACOP_NOTIFY) != 0)
-		{
-			handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "permission denied");
-			break;
-		}
-		requestToResource(o2pt, target_rtnode);
-		o2pt->rsc = RSC_OK;
+		notify_onem2m_resource(o2pt, target_rtnode);
 		break;
 
 	default:
