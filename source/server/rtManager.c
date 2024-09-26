@@ -29,7 +29,6 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
     ResourceAddressingType RAT = checkResourceAddressingType(o2pt->to);
     RTNode *rtnode = NULL;
     char *target_uri = strdup(o2pt->to);
-
     if (RAT == CSE_RELATIVE)
     {
         logger("RTM", LOG_LEVEL_DEBUG, "CSE_RELATIVE");
@@ -230,9 +229,8 @@ RTNode *find_rtnode(char *addr)
 {
     if (!addr)
         return NULL;
+    char *foptPtr = NULL;
     RTNode *rtnode = NULL;
-    
-    // Check if the address is the CSE base name or root identifier
     if (strcmp(addr, CSE_BASE_NAME) == 0 || strcmp(addr, "-") == 0)
     {
         return rt->cb;
@@ -259,7 +257,6 @@ RTNode *find_rtnode(char *addr)
     }
     return rtnode;
 }
-
 
 /**
  * @brief get resource from remote cse with sp-relative uri
@@ -308,7 +305,7 @@ RTNode *get_remote_resource(char *address, int *rsc)
  * @param uri hierarchical uri
  * @return resource node or NULL
  */
-RTNode *find_rtnode_by_uri(const char *uri)
+RTNode *find_rtnode_by_uri(char *uri)
 {
     RTNode *rtnode = rt->cb, *parent_rtnode = NULL;
     char *target_uri = strdup(uri);
@@ -423,23 +420,13 @@ RTNode *find_rtnode_by_ri(char *ri)
             *fopt = '\0';
         }
     }
-
-    logger("UTIL22", LOG_LEVEL_DEBUG, "RI : %s", ri);
     rtnode = rt_search_ri(rt->cb, ri);
-
-    if (fopt) {
+    if (fopt)
+    {
         *fopt = '/';
     }
-
-    if (rtnode == NULL) {
-        logger("UTIL", LOG_LEVEL_ERROR, "RTNode not found for RI: %s", ri);
-    } else {
-        logger("UTIL224", LOG_LEVEL_DEBUG, "RTNode found: %s", rtnode->rn);
-    }
-
     return rtnode;
 }
-
 
 /**
  * @brief recursive search of resource tree
@@ -447,7 +434,8 @@ RTNode *find_rtnode_by_ri(char *ri)
  * @param ri resource identifier
  * @return resource node or NULL
  */
-RTNode *rt_search_ri(RTNode *rtnode, char *ri) {
+RTNode *rt_search_ri(RTNode *rtnode, char *ri)
+{
     RTNode *ret = NULL;
     if (!rtnode)
         return NULL;
@@ -463,13 +451,8 @@ RTNode *rt_search_ri(RTNode *rtnode, char *ri) {
         rtnode = rtnode->sibling_right;
     }
 
-    return NULL;
+    return ret;
 }
-
-
-
-
-
 
 int add_child_resource_tree(RTNode *parent, RTNode *child)
 {
@@ -531,15 +514,8 @@ void init_resource_tree()
     RTNode *rtnode_list = (RTNode *)calloc(1, sizeof(RTNode));
     RTNode *tail = rtnode_list;
 
-    //logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree 시작");
     logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree");
     RTNode *resource_list = db_get_all_resource_as_rtnode();
-    if (resource_list == NULL) {
-        //logger("UTIL", LOG_LEVEL_DEBUG, "Unable to get resource list from DB");
-    } else {
-        //logger("UTIL", LOG_LEVEL_DEBUG, "Importing a list of resources from DB");
-    }
-
     tail->sibling_right = resource_list;
     if (resource_list)
         resource_list->sibling_left = tail;
@@ -569,10 +545,7 @@ void init_resource_tree()
 
     if (rtnode_list)
         restruct_resource_tree(rt->cb, rtnode_list);
-
-    //logger("UTIL", LOG_LEVEL_DEBUG, "init_resource_tree 완료");
 }
-
 
 RTNode *restruct_resource_tree(RTNode *parent_rtnode, RTNode *list)
 {

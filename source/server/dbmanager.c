@@ -426,7 +426,7 @@ int db_store_resource(cJSON *obj, char *uri)
     {
         logger("DB", LOG_LEVEL_DEBUG, "%s", sql);
         free(sql);
-        logger("DB", LOG_LEVEL_ERROR, "prepare error store_resource");
+        logger("DB", LOG_LEVEL_ERROR, "prepare error store_resource %d(%s)", rc ,err_msg);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         sqlite3_finalize(stmt);
         return 0;

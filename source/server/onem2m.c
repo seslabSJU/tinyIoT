@@ -92,59 +92,33 @@ void init_csr(cJSON *csr)
 
 void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty)
 {
-    logger("O2M", LOG_LEVEL_DEBUG, "add_general_attribute 시작");
+	char *ct = get_local_time(0);
+	char *ptr = NULL;
 
-    // Check if parent_rtnode and root are valid
-    if (!parent_rtnode || !root) {
-        logger("O2M", LOG_LEVEL_ERROR, "parent_rtnode 또는 root가 NULL입니다.");
-        return;
-    }
+	cJSON_AddNumberToObject(root, "ty", ty);
+	cJSON_AddStringToObject(root, "ct", ct);
 
-    logger("O2M", LOG_LEVEL_DEBUG, "parent_rtnode: %p, root: %p", parent_rtnode, root);
+	ptr = resource_identifier(ty, ct);
+	cJSON_AddStringToObject(root, "ri", ptr);
 
-    char *ct = get_local_time(0);
-    char *ptr = NULL;
+	if (cJSON_GetObjectItem(root, "rn") == NULL)
+	{
+		cJSON_AddStringToObject(root, "rn", ptr);
+	}
+	free(ptr);
+	ptr = NULL;
 
-    cJSON_AddNumberToObject(root, "ty", ty);
-    cJSON_AddStringToObject(root, "ct", ct);
+	cJSON_AddStringToObject(root, "lt", ct);
 
-    ptr = resource_identifier(ty, ct);
-    cJSON_AddStringToObject(root, "ri", ptr);
+	cJSON *pi = cJSON_GetObjectItem(parent_rtnode->obj, "ri");
+	cJSON_AddStringToObject(root, "pi", pi->valuestring);
 
-    if (cJSON_GetObjectItem(root, "rn") == NULL) {
-        cJSON_AddStringToObject(root, "rn", ptr);
-    }
-
-    free(ptr);
-    ptr = NULL;
-
-    cJSON_AddStringToObject(root, "lt", ct);
-
-    // Check if parent_rtnode->obj is valid and contains "ri"
-    if (!parent_rtnode->obj) {
-        logger("O2M", LOG_LEVEL_ERROR, "parent_rtnode->obj가 NULL입니다.");
-        free(ct);
-        return;
-    }
-
-    cJSON *pi = cJSON_GetObjectItem(parent_rtnode->obj, "ri");
-    if (!pi) {
-        logger("O2M", LOG_LEVEL_ERROR, "parent_rtnode->obj에서 'ri'를 찾을 수 없습니다.");
-        free(ct);
-        return;
-    }
-
-    cJSON_AddStringToObject(root, "pi", pi->valuestring);
-
-    ptr = get_local_time(DEFAULT_EXPIRE_TIME);
-    cJSON_AddStringToObject(root, "et", ptr);
-    free(ptr);
-    ptr = NULL;
-    free(ct);
-
-    logger("O2M", LOG_LEVEL_DEBUG, "add_general_attribute 완료");
+	ptr = get_local_time(DEFAULT_EXPIRE_TIME);
+	cJSON_AddStringToObject(root, "et", ptr);
+	free(ptr);
+	ptr = NULL;
+	free(ct);
 }
-
 
 RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 {
@@ -594,7 +568,6 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	}
 	return rsc;
 }
-
 
 int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
@@ -1374,48 +1347,3 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	return o2pt->rsc;
 }
-
-/**
- * @brief handle oneM2M request\nreturn stored in o2pt
- * @param o2pt oneM2M request primitive
- * @param target_rtnode target resource node
- * @return int result code
- */
-
- /** 
-int process_onem2m_request(cJSON *json, oneM2MPrimitive *o2pt) {
-    if (!cJSON_IsObject(json)) {
-        logger("WEBSOCKET", LOG_LEVEL_ERROR, "JSON is not an object");
-        return -1;
-    }
-
-    // oneM2MPrimitive 구조 초기화
-    memset(o2pt, 0, sizeof(oneM2MPrimitive));
-
-    // JSON 데이터 파싱
-    cJSON *op = cJSON_GetObjectItem(json, "op");
-    cJSON *to = cJSON_GetObjectItem(json, "to");
-    cJSON *rqi = cJSON_GetObjectItem(json, "rqi");
-    cJSON *ty = cJSON_GetObjectItem(json, "ty");
-    cJSON *pc = cJSON_GetObjectItem(json, "pc");
-
-    // 필수 필드 확인
-    if (!op || !to || !rqi || !ty || !pc) {
-        logger("WEBSOCKET", LOG_LEVEL_ERROR, "Mandatory fields missing");
-        return -1;
-    }
-
-    o2pt->op = op->valueint;
-    o2pt->to = strdup(to->valuestring);
-    o2pt->rqi = strdup(rqi->valuestring);
-    o2pt->ty = ty->valueint;
-    o2pt->request_pc = cJSON_Duplicate(pc, 1); // 'pc' 필드의 깊은 복사
-    o2pt->fr = strdup("CAdmin");
-
-    // 파싱된 값 로깅
-    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed request: op=%d, to=%s, rqi=%s, ty=%d", o2pt->op, o2pt->to, o2pt->rqi, o2pt->ty);
-    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed content: \n %s", cJSON_Print(o2pt->request_pc));
-
-    return 0;
-}
-*/

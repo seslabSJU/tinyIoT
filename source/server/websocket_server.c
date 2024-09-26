@@ -5,7 +5,6 @@
 #include "onem2m.h"
 #include "logger.h"
 #include "websocket_server.h"
-#include "rtManager.h"
 #include "util.h"
 
 // Function prototypes
@@ -62,14 +61,14 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                 return -1;
             }
 
-            // JSON 구조체를 문자열로 변환하여 출력 -> 여기서 헤더 사라짐
-            char *json_string = cJSON_Print(json); 
-            if (json_string != NULL) {
-                logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed JSON data: %s", json_string);
-                free(json_string); // 메모리 해제 필요
-            } else {
-                logger("WEBSOCKET", LOG_LEVEL_ERROR, "Failed to print JSON");
-            }
+            // // JSON 구조체를 문자열로 변환하여 출력 -> 여기서 헤더 사라짐
+            // char *json_string = cJSON_Print(json); 
+            // if (json_string != NULL) {
+            //     logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed JSON data: %s", json_string);
+            //     free(json_string); // 메모리 해제 필요
+            // } else {
+            //     logger("WEBSOCKET", LOG_LEVEL_ERROR, "Failed to print JSON");
+            // }
 
             // 프리미티브 초기화
             oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
@@ -136,11 +135,11 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
         
             if (rqi) o2pt->rqi = strdup(rqi->valuestring);
             if (ty) o2pt->ty = ty->valueint;
-            if (rvi) o2pt->rvi = strdup(rvi->valuestring); // rvi는 문자임
-            if (pc) o2pt->pc = cJSON_Duplicate(pc, 1);
+            if (rvi) o2pt->rvi = to_rvi(rvi->valuestring); // rvi는 문자임
+            // if (pc) o2pt->pc = cJSON_Duplicate(pc, 1);
 
             // 요청 로깅
-            logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed request: op=%d, to=%s, rqi=%s, ty=%d, rvi=%s",
+            logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed request: op=%d, to=%s, rqi=%s, ty=%d, rvi=%d",
                     o2pt->op, o2pt->to, o2pt->rqi, o2pt->ty, o2pt->rvi);
             logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Parsed content: %s", cJSON_Print(o2pt->request_pc));
 
@@ -198,8 +197,8 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             }
         
 
-            cJSON_Delete(json);
-            free(o2pt);  // 프리미티브 메모리 해제
+            // cJSON_Delete(json);
+            free_o2pt(o2pt);  // 프리미티브 메모리 해제
             break;
         }
 
@@ -263,7 +262,7 @@ void response_create(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *res
     cJSON *response = cJSON_CreateObject();
     cJSON_AddNumberToObject(response, "rsc", o2pt->rsc);  // 응답 상태 코드
     cJSON_AddStringToObject(response, "rqi", o2pt->rqi);  // 요청 ID
-    cJSON_AddStringToObject(response, "rvi", o2pt->rvi);  // 버전
+    cJSON_AddStringToObject(response, "rvi", from_rvi(o2pt->rvi));  // 버전
 
     
     if (resource_obj != NULL) {
@@ -289,7 +288,7 @@ void response_update(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *res
     cJSON *response = cJSON_CreateObject();
     cJSON_AddNumberToObject(response, "rsc", o2pt->rsc);  // 응답 상태 코드
     cJSON_AddStringToObject(response, "rqi", o2pt->rqi);  // 요청 ID
-    cJSON_AddStringToObject(response, "rvi", o2pt->rvi);  // 버전
+    cJSON_AddStringToObject(response, "rvi", from_rvi(o2pt->rvi));  // 버전
 
     
     if (resource_obj != NULL) {
@@ -311,7 +310,7 @@ int response_delete(oneM2MPrimitive *o2pt) {
     cJSON *response = cJSON_CreateObject();
     cJSON_AddNumberToObject(response, "rsc", o2pt->rsc);  // 응답 상태 코드
     cJSON_AddStringToObject(response, "rqi", o2pt->rqi);  // 요청 ID
-    cJSON_AddStringToObject(response, "rvi", o2pt->rvi);  // 버전
+    cJSON_AddStringToObject(response, "rvi", from_rvi(o2pt->rvi));  // 버전
     cJSON_AddStringToObject(response, "pc", o2pt->request_pc);  // 요청 ID
 
     o2pt->response_pc = response;

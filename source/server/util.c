@@ -1249,38 +1249,38 @@ int check_rn_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 int check_aei_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode)
 {
-    if (!rtnode) {
-        logger("UTIL", LOG_LEVEL_ERROR, "rtnode is NULL");
-        return 0;
-    }
+	if (!rtnode)
+		return 0;
 
-    char aei[1024] = {'\0'};
-    if (!o2pt->fr) {
-        logger("UTIL", LOG_LEVEL_ERROR, "o2pt->fr is NULL");
-        return 0;
-    }
+	char aei[1024] = {
+		'\0',
+	};
+	if (!o2pt->fr)
+	{
+		return 0;
+	}
 
-    strcat(aei, o2pt->fr);
-    logger("UTIL", LOG_LEVEL_DEBUG, "check_aei_duplicate : %s", aei);
-    RTNode *child = rtnode->child;
+	strcat(aei, o2pt->fr);
+	logger("UTIL", LOG_LEVEL_DEBUG, "check_aei_duplicate : %s", aei);
+	RTNode *child = rtnode->child;
 
-    while (child) {
-        if (child->ty != RT_AE) {
-            logger("UTIL", LOG_LEVEL_DEBUG, "child->ty != RT_AE, moving to sibling_right");
-            child = child->sibling_right;
-            continue;
-        }
-        logger("UTIL", LOG_LEVEL_DEBUG, "Comparing child ri: %s with aei: %s", get_ri_rtnode(child), aei);
-        if (!strcmp(get_ri_rtnode(child), aei)) {
-            handle_error(o2pt, RSC_ORIGINATOR_HAS_ALREADY_REGISTERD, "attribute `aei` is duplicated");
-            return -1;
-        }
-        child = child->sibling_right;
-    }
+	while (child)
+	{
+		if (child->ty != RT_AE)
+		{
+			child = child->sibling_right;
+			continue;
+		}
+		if (!strcmp(get_ri_rtnode(child), aei))
+		{
+			handle_error(o2pt, RSC_ORIGINATOR_HAS_ALREADY_REGISTERD, "attribute `aei` is duplicated");
+			return -1;
+		}
+		child = child->sibling_right;
+	}
 
-    return 0;
+	return 0;
 }
-
 
 int check_csi_duplicate(char *new_csi, RTNode *rtnode)
 {
