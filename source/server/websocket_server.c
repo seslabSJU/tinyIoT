@@ -146,7 +146,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 
             // 요청 라우팅
             route(o2pt);
-
+            cJSON * response = o2pt_to_json(o2pt);
             
             // 응답 생성
             if (o2pt->rsc == 2001) {  // 생성 요청
@@ -182,7 +182,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                 }
             } 
             else if (o2pt->rsc == 4105) {  // 충돌 상태
-                char *error_message = cJSON_PrintUnformatted(o2pt->request_pc);
+                char *error_message = cJSON_PrintUnformatted(response);
                 send_websocket_message(wsi, error_message);
                 free(error_message);
             }
@@ -190,7 +190,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 
             // 응답 메시지 생성 및 전송
             if (o2pt->response_pc != NULL) {
-                char *response_message = cJSON_PrintUnformatted(o2pt->response_pc);
+                char *response_message = cJSON_PrintUnformatted(response);
                 send_websocket_message(wsi, response_message);
                 free(response_message);
             } else {
