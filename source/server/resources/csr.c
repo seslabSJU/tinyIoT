@@ -14,23 +14,16 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     if (e == -1)
         return o2pt->rsc;
 
-    if (parent_rtnode->ty != RT_CSE)
-    {
-        handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
-        return o2pt->rsc;
-    }
-
     if (SERVER_TYPE == ASN_CSE)
     {
-        handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation not allowed");
-        return o2pt->rsc;
+        return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation not allowed");
     }
 
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *csr = cJSON_GetObjectItem(root, "m2m:csr");
 
     int rsc = validate_csr(o2pt, parent_rtnode, csr, OP_CREATE);
-    if (rsc != RSC_OK)
+    if (rsc != 0)
     {
         cJSON_Delete(root);
         return rsc;
@@ -84,6 +77,9 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
     cJSON *m2m_csr = cJSON_GetObjectItem(o2pt->request_pc, "m2m:csr");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
+
+    int updateAttrCnt = cJSON_GetArraySize(m2m_csr);
+
     for (int i = 0; i < invalid_key_size; i++)
     {
         if (cJSON_GetObjectItem(m2m_csr, invalid_key[i]))
@@ -95,8 +91,11 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *csr = target_rtnode->obj;
     int result;
 
-    // result = validate_csr(o2pt, target_rtnode->p)
-    // if(result != 1) return result;
+    result = validate_csr(o2pt, target_rtnode->parent, m2m_csr, OP_UPDATE);
+    if (result != 0)
+    {
+        return result;
+    }
 
     cJSON_AddItemToObject(m2m_csr, "lt", cJSON_CreateString(get_local_time(0)));
 
@@ -106,13 +105,12 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     update_remote_csr_dcse(target_rtnode);
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "m2m:csr", target_rtnode->obj);
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_csr, 0);
+    }
 
-    o2pt->response_pc = root;
-    o2pt->rsc = RSC_UPDATED;
-
-    cJSON_DetachItemFromObject(root, "m2m:csr");
+    make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
     return RSC_UPDATED;
 }
@@ -178,5 +176,5 @@ int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Opera
         }
     }
 
-    return RSC_OK;
+    return 0;
 }

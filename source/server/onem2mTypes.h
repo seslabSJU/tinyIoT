@@ -29,7 +29,8 @@ typedef enum
 	OP_DISCOVERY = 6,
 	OP_VIEWER = 1000,
 	OP_OPTIONS,
-	OP_FORWARDING
+	OP_FORWARDING,
+	OP_UPPERTESTER
 } Operation;
 
 typedef enum
@@ -41,6 +42,17 @@ typedef enum
 	ACOP_NOTIFY = 16,
 	ACOP_DISCOVERY = 32
 } ACOP;
+
+typedef enum
+{
+	RVI_NONE,
+	RVI_1,
+	RVI_2,
+	RVI_2a,
+	RVI_3,
+	RVI_4,
+	RVI_5,
+} RVI;
 
 typedef enum
 {
@@ -175,22 +187,22 @@ typedef enum
 typedef enum
 {
 	RT_MIXED = 0,
-	RT_ACP = 1,
-	RT_AE = 2,
-	RT_CNT = 3,
-	RT_CIN = 4,
-	RT_CSE = 5,
-	RT_GRP = 9,
-	RT_MGMTOBJ = 13,
-	RT_NOD = 14,
-	RT_PCH = 15,
-	RT_CSR = 16,
-	RT_REQ = 17,
-	RT_SUB = 23,
-	RT_SMD = 24,
-	RT_FCNT = 28,
-	RT_TS = 29,
-	RT_TSI = 30,
+	RT_ACP = 1,		 // Access Control Policy
+	RT_AE = 2,		 // Application Entity
+	RT_CNT = 3,		 // Container
+	RT_CIN = 4,		 // Content Instance
+	RT_CSE = 5,		 // Common Services Entity Base
+	RT_GRP = 9,		 // Group
+	RT_MGMTOBJ = 13, // Management Object
+	RT_NOD = 14,	 // Node
+	RT_PCH = 15,	 // Polling Channel
+	RT_CSR = 16,	 // Remote CSE
+	RT_REQ = 17,	 // Request
+	RT_SUB = 23,	 // Subscription
+	RT_SMD = 24,	 // Semantic Descriptor
+	RT_FCNT = 28,	 // FlexContainer
+	RT_TS = 29,		 // Time Series
+	RT_TSI = 30,	 // Time Series Instance
 	RT_CRS = 48,
 	RT_FCI = 58,
 	RT_TSB = 60,

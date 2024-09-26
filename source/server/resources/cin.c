@@ -10,12 +10,6 @@ extern cJSON *ATTRIBUTES;
 
 int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
-    if (parent_rtnode->ty != RT_CNT)
-    {
-        handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
-        return o2pt->rsc;
-    }
-
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *cin = cJSON_GetObjectItem(root, "m2m:cin");
     cJSON *rn = NULL;
@@ -24,7 +18,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     rn = cJSON_GetObjectItem(cin, "rn");
     if (rn != NULL)
     {
-        handle_error(o2pt, RSC_NOT_IMPLEMENTED, "rn attribute for cin is assigned by CSE");
+        handle_error(o2pt, RSC_BAD_REQUEST, "rn attribute for cin is assigned by CSE");
         cJSON_Delete(root);
         return o2pt->rsc;
     }
@@ -62,7 +56,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
             return o2pt->rsc;
         }
     }
-
+#if CSE_RVI >= RVI_3
     cJSON *final_at = cJSON_CreateArray();
     if (handle_annc_create(parent_rtnode, cin, cJSON_GetObjectItem(cin, "at"), final_at) == -1)
     {
@@ -80,6 +74,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         cJSON_Delete(final_at);
     }
+#endif
 
     RTNode *cin_rtnode = create_rtnode(cin, RT_CIN);
     update_cnt_cin(parent_rtnode, cin_rtnode, 1);
@@ -166,14 +161,13 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
 
     if ((mbs = cJSON_GetObjectItem(parent_cnt, "mbs")))
     {
-        logger("UTIL", LOG_LEVEL_DEBUG, "mbs %d", mbs->valueint);
+        logger("CIN", LOG_LEVEL_DEBUG, "mbs %d", mbs->valueint);
         if ((cs = cJSON_GetObjectItem(cin, "cs")))
         {
-            logger("UTIL", LOG_LEVEL_DEBUG, "cs %d", cs->valueint);
+            logger("CIN", LOG_LEVEL_DEBUG, "cs %d", cs->valueint);
             if (mbs->valueint >= 0 && cs->valueint > mbs->valueint)
             {
-                handle_error(o2pt, RSC_NOT_ACCEPTABLE, "contentInstance size exceed `mbs`");
-                return RSC_NOT_ACCEPTABLE;
+                return handle_error(o2pt, RSC_NOT_ACCEPTABLE, "contentInstance size exceed `mbs`");
             }
         }
     }
@@ -182,8 +176,11 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
     {
         // check cnf
     }
-
     cJSON *aa = cJSON_GetObjectItem(cin, "aa");
+    if (aa && CSE_RVI < RVI_3)
+    {
+        return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `aa` is not supported");
+    }
     cJSON *attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(RT_CIN));
     cJSON_ArrayForEach(pjson, aa)
     {

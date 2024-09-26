@@ -229,6 +229,7 @@ void respond(int slot)
     // call router
     handle_http_request(req, slot);
     free(buf[slot]);
+    buf[slot] = NULL;
     free_HTTPRequest(req);
 }
 
@@ -256,9 +257,15 @@ void handle_http_request(HTTPRequest *req, int slotno)
     cJSON *fcjson = NULL;
     char *header = NULL;
 
-    if (req->payload)
+    if (req->payload && strlen(req->payload) > 0)
     {
         o2pt->request_pc = cJSON_Parse(req->payload);
+        if (!o2pt->request_pc)
+        {
+            handle_error(o2pt, RSC_BAD_REQUEST, "Invalid JSON format");
+            http_respond_to_client(o2pt, slotno);
+            return;
+        }
     }
 
     if ((header = search_header(req->headers, "x-m2m-origin")))
@@ -274,7 +281,11 @@ void handle_http_request(HTTPRequest *req, int slotno)
 
     if ((header = search_header(req->headers, "x-m2m-rvi")))
     {
-        o2pt->rvi = strdup(header);
+        o2pt->rvi = to_rvi(header);
+    }
+    else
+    {
+        o2pt->rvi = RVI_NONE;
     }
 
     if ((header = search_header(req->headers, "content-type")))
@@ -283,19 +294,23 @@ void handle_http_request(HTTPRequest *req, int slotno)
         {
             o2pt->ty = atoi(strstr(header, "ty=") + 3);
         }
+        else
+        {
+            o2pt->ty = 0;
+        }
     }
 
     if (req->uri)
     {
         if (req->uri[1] == '~')
         { // SP relative
-            o2pt->to = (char *)calloc((strlen(req->uri + 1)), sizeof(char));
+            o2pt->to = (char *)calloc(sizeof(char), (strlen(req->uri + 1) + 2));
             o2pt->to[0] = '/';
             strcat(o2pt->to, req->uri + 3);
         }
-        else if (req->uri[1] == '_')
+        else if (req->uri[1] == '_' && req->uri[2] == '/')
         { // absolute
-            o2pt->to = (char *)calloc((strlen(req->uri + 1)), sizeof(char));
+            o2pt->to = (char *)calloc(sizeof(char), (strlen(req->uri + 1) + 2));
             o2pt->to[0] = '/';
             o2pt->to[1] = '/';
             strcat(o2pt->to, req->uri + 3);
@@ -308,9 +323,19 @@ void handle_http_request(HTTPRequest *req, int slotno)
         logger("HTTP", LOG_LEVEL_DEBUG, "to: %s", o2pt->to);
     }
 
+#if UPPERTESTER
+    if (!strcmp(o2pt->to, UPPERTESTER_URI))
+    {
+        o2pt->op = OP_UPPERTESTER;
+    }
+    else
+    {
+        o2pt->op = http_parse_operation(req->method);
+    }
+#else
     o2pt->op = http_parse_operation(req->method);
-   
-    logger("HTTP", LOG_LEVEL_INFO, "Request : %s", req->method);
+    logger("HTTP", LOG_LEVEL_INFO, "Request : %s (%d)", req->method, o2pt->op);
+#endif
     // Setting default rcn
     switch (o2pt->op)
     {
@@ -328,8 +353,8 @@ void handle_http_request(HTTPRequest *req, int slotno)
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     getpeername(clients[slotno], (struct sockaddr *)&client_addr, &client_addr_len);
-    o2pt->ip = (char *)malloc((INET_ADDRSTRLEN + 1) * sizeof(char));
-    logger("HTTP", LOG_LEVEL_INFO, "Client connected %d.%d.%d.%d\n",
+    o2pt->ip = (char *)calloc(sizeof(char), (INET_ADDRSTRLEN + 1));
+    logger("HTTP", LOG_LEVEL_INFO, "Client connected %d.%d.%d.%d",
            (int)(client_addr.sin_addr.s_addr & 0xFF), (int)((client_addr.sin_addr.s_addr & 0xFF00) >> 8), (int)((client_addr.sin_addr.s_addr & 0xFF0000) >> 16), (int)((client_addr.sin_addr.s_addr & 0xFF000000) >> 24));
 
     inet_ntop(AF_INET, &(client_addr.sin_addr.s_addr), o2pt->ip, INET_ADDRSTRLEN);
@@ -444,19 +469,22 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         set_header("Content-Length", content_length, response_headers);
 
     set_header("X-M2M-RSC", rsc, response_headers);
-    set_header("X-M2M-RVI", o2pt->rvi, response_headers);
+    if (o2pt->rvi != RVI_NONE)
+    {
+        set_header("X-M2M-RVI", from_rvi(o2pt->rvi), response_headers);
+    }
     set_header("X-M2M-RI", o2pt->rqi, response_headers);
 
     if (o2pt->cnst > 0)
     {
         sprintf(cnst, "%d", o2pt->cnst);
-        set_header("X-M2M-CNST", cnst, response_headers);
+        set_header("X-M2M-CTS", cnst, response_headers);
     }
 
     if (o2pt->cnot > 0)
     {
         sprintf(ot, "%d", o2pt->cnot);
-        set_header("X-M2M-CNOT", ot, response_headers);
+        set_header("X-M2M-CTO", ot, response_headers);
     }
 
     sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
@@ -465,9 +493,9 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         strncat(buf, pc, BUF_SIZE - strlen(buf) - 1);
         strncat(buf, "\r\n", BUF_SIZE - strlen(buf) - 1);
     }
+    logger("HTTP", LOG_LEVEL_DEBUG, "Response: \n%s", buf);
 
     write(clients[slotno], buf, strlen(buf));
-    logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buf);
 
     if (pc)
     {
@@ -489,11 +517,18 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
     req->uri = strdup(o2pt->to);
     req->headers = calloc(1, sizeof(header_t));
     add_header("X-M2M-Origin", "/" CSE_BASE_RI, req->headers);
-    add_header("X-M2M-RVI", "2a", req->headers);
     add_header("Content-Type", "application/json", req->headers);
     send_http_request(host, port, req, res);
     logger("HTTP", LOG_LEVEL_DEBUG, "http_notify response: %d", res->status_code);
-    rsc = res->status_code;
+    char *ptr = search_header(res->headers, "X-M2M-RSC");
+    if (ptr)
+    {
+        rsc = atoi(ptr);
+    }
+    else
+    {
+        rsc = RSC_BAD_REQUEST;
+    }
     free_HTTPRequest(req);
     free_HTTPResponse(res);
     return rsc;
@@ -501,7 +536,7 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
 
 void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
 {
-    logger("HTTP", LOG_LEVEL_DEBUG, "http_forwarding");
+    logger("HTTP", LOG_LEVEL_DEBUG, "http_forwarding %s:%d", host, port);
     struct sockaddr_in serv_addr;
 
     int rcvd = 0;
@@ -512,7 +547,7 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     ResourceAddressingType rat = checkResourceAddressingType(o2pt->to);
 
     req->method = op_to_method(o2pt->op);
-    req->uri = calloc(1, sizeof(char) * (strlen(o2pt->to) + 4));
+    req->uri = calloc(1, sizeof(char) * (strlen(o2pt->to) + 5));
     req->uri[0] = '/';
     if (rat == SP_RELATIVE)
         req->uri[1] = '~';
@@ -521,7 +556,10 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     strcat(req->uri, o2pt->to);
     req->headers = (header_t *)calloc(sizeof(header_t), 1);
     add_header("X-M2M-Origin", o2pt->fr, req->headers);
-    add_header("X-M2M-RVI", "2a", req->headers);
+    if (o2pt->rvi != RVI_NONE)
+    {
+        add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
+    }
     add_header("X-M2M-RI", o2pt->rqi, req->headers);
 
     if (o2pt->fc)
@@ -752,7 +790,7 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
     }
     else
     { // message received
-        logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buffer);
+        // logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buffer);
         parse_http_response(res, buffer);
         if (res->payload_size > 0 && ((res->payload == NULL) || strlen(res->payload) == 0))
         { // if there is payload but it is not in the buffer
@@ -763,7 +801,7 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
             normalize_payload(res->payload);
     }
     close(sock);
-    return 200;
+    return res->status_code ? res->status_code : 0;
 }
 
 char *op_to_method(Operation op)

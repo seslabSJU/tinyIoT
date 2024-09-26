@@ -28,14 +28,6 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     if (e == -1)
         return o2pt->rsc;
 
-    logger("O2M", LOG_LEVEL_DEBUG, "%d", parent_rtnode->ty);
-    if (parent_rtnode->ty != RT_CSE)
-    {
-        handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
-        return o2pt->rsc;
-    }
-
-    logger("O2M", LOG_LEVEL_DEBUG, "parent_rtnode: %s", o2pt->request_pc);
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     logger("O2M", LOG_LEVEL_DEBUG, "root: %s", cJSON_Print(root));
     if (!root) {
@@ -65,6 +57,18 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
                 cJSON_Delete(root);
                 return RSC_BAD_REQUEST;
             }
+        }
+    }
+    else if (o2pt->fr && o2pt->fr[0] == 'S')
+    {
+        if (strlen(o2pt->fr) > 1)
+        {
+            cJSON_ReplaceItemInObject(ae, "ri", cJSON_CreateString(o2pt->fr));
+        }
+        else
+        {
+            cJSON *ri = cJSON_GetObjectItem(ae, "ri");
+            ri->valuestring[0] = 'S';
         }
     }
     else
@@ -101,7 +105,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
             }
         }
     }
-
+#if CSE_RVI >= RVI_3
     cJSON *final_at = cJSON_CreateArray();
     if (handle_annc_create(parent_rtnode, ae, cJSON_GetObjectItem(ae, "at"), final_at) == -1)
     {
@@ -120,6 +124,7 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(final_at);
         cJSON_DeleteItemFromObject(ae, "at");
     }
+#endif
 
     // Add uri attribute
     char *ptr = malloc(1024);
@@ -179,6 +184,9 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *m2m_ae = cJSON_GetObjectItem(o2pt->request_pc, "m2m:ae");
     cJSON *pjson = NULL;
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
+
+    int updateAttrCnt = cJSON_GetArraySize(m2m_ae);
+
     for (int i = 0; i < invalid_key_size; i++)
     {
         if (cJSON_GetObjectItem(m2m_ae, invalid_key[i]))
@@ -200,34 +208,20 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         logger("O2", LOG_LEVEL_ERROR, "validation failed");
         return result;
     }
-    cJSON *acpi_obj = NULL;
+    cJSON *orig_acpi_obj = NULL;
     bool acpi_flag = false;
     if (cJSON_GetObjectItem(m2m_ae, "acpi"))
     {
-        cJSON_ArrayForEach(acpi_obj, cJSON_GetObjectItem(target_rtnode->obj, "acpi"))
+        cJSON_ArrayForEach(orig_acpi_obj, cJSON_GetObjectItem(target_rtnode->obj, "acpi"))
         {
-            acpi_flag = false;
-            cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(m2m_ae, "acpi"))
+            if (cJSON_getArrayIdx(cJSON_GetObjectItem(m2m_ae, "acpi"), orig_acpi_obj->valuestring) == -1)
             {
-                if (strcmp(acpi_obj->valuestring, pjson->valuestring) != 0)
+                logger("UTIL", LOG_LEVEL_INFO, "acpi deleted : %s", orig_acpi_obj->valuestring);
+                if (!has_acpi_update_privilege(o2pt, orig_acpi_obj->valuestring))
                 {
-                    acpi_flag = true;
-                    break;
+                    return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "no privilege to update acpi");
                 }
             }
-            if (!acpi_flag)
-            {
-                logger("UTIL", LOG_LEVEL_INFO, "acpi %s", acpi_obj->valuestring);
-                if (!has_acpi_update_privilege(o2pt, acpi_obj->valuestring))
-                {
-                    return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
-                }
-            }
-        }
-
-        if (validate_acpi(o2pt, pjson, OP_UPDATE) != RSC_OK)
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
         }
     }
 
@@ -252,18 +246,15 @@ int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         pjson = NULL;
     }
 
-    // announce_to_annc(target_rtnode);
-
     result = db_update_resource(m2m_ae, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_AE);
-
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "m2m:ae", target_rtnode->obj);
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_ae, 0);
+    }
 
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
 
-    cJSON_DetachItemFromObject(root, "m2m:ae");
-    cJSON_Delete(root);
     return RSC_UPDATED;
 }
 
@@ -277,8 +268,11 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
     char *ptr = NULL;
     if (!ae)
     {
-        logger("O2M", LOG_LEVEL_ERROR, "ae is NULL");
-        return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
+
+        if (o2pt->rvi >= RVI_3)
+            return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
+        else
+            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
     }
 
 
@@ -291,17 +285,15 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
 
     if (op == OP_CREATE) // 문제 발견!!
     {
+
         pjson = cJSON_GetObjectItem(ae, "api");
         if (!pjson)
         {
-            logger("O2M", LOG_LEVEL_ERROR, "insufficient mandatory attribute(s): api is missing");
-            return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
+
+            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
         }
         ptr = pjson->valuestring;
-        logger("O2M", LOG_LEVEL_DEBUG, "api 값: %s", ptr);
-        logger("O2M", LOG_LEVEL_DEBUG, "rvi 값: %d", o2pt->rvi);
-        // o2pt->rvi = "3";
-        if (!strcmp(o2pt->rvi, "1") || !strcmp(o2pt->rvi, "2") || !strcmp(o2pt->rvi, "2a") || !strcmp(o2pt->rvi, "3"))
+        if (o2pt->rvi <= RVI_3)
         {
             if (ptr[0] != 'R' && ptr[0] != 'N' && ptr[0] != 'r')
             {
@@ -310,13 +302,18 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
                 return RSC_BAD_REQUEST;
             }
         }
-        else
-        {   
+        else if (o2pt->rvi >= RVI_4)
+        {
             if (ptr[0] != 'R' && ptr[0] != 'N')
             {
                 logger("O2M", LOG_LEVEL_ERROR, "attribute `api` prefix is invalid");
                 return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
             }
+        }
+        pjson = cJSON_GetObjectItem(ae, "rr");
+        if (!pjson)
+        {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
         }
     }
     
@@ -340,6 +337,8 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
 
     if (cJSON_GetObjectItem(ae, "aa"))
     {
+        if (CSE_RVI < RVI_3)
+            return handle_error(o2pt, RSC_BAD_REQUEST, "`aa` attribute is not supported");
         cJSON *aa_final = cJSON_CreateArray();
         cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(ae, "aa"))
         {
@@ -379,6 +378,12 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
         }
     }
 
+    if ((pjson = cJSON_GetObjectItem(ae, "at")))
+    {
+        if (CSE_RVI < RVI_3)
+            return handle_error(o2pt, RSC_BAD_REQUEST, "`at` attribute is not supported");
+    }
+
     pjson = cJSON_GetObjectItem(ae, "acpi");
     if (pjson)
     {
@@ -386,9 +391,9 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
         {
             if (pjson)
             {
-                int result = validate_acpi(o2pt, pjson, op);
-                if (result != RSC_OK) {
-                    logger("O2M", LOG_LEVEL_ERROR, "validate_acpi 실패: %d", result);
+
+                int result = validate_acpi(o2pt, pjson, op_to_acop(op));
+                if (result != RSC_OK)
                     return result;
                 }
             }
@@ -401,6 +406,8 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
                 handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
                 return RSC_BAD_REQUEST;
             }
+
+            validate_acpi(o2pt, pjson, op_to_acop(op));
         }
 
         if (!cJSON_IsNull(pjson) && cJSON_GetArraySize(pjson) == 0)
@@ -447,6 +454,6 @@ int check_aei_invalid(oneM2MPrimitive *o2pt)
         free(origin);
         origin = NULL;
     }
-    handle_error(o2pt, RSC_BAD_REQUEST, "originator is invalid");
+    handle_error(o2pt, RSC_APP_RULE_VALIDATION_FAILED, "originator is invalid");
     return -1;
 }

@@ -12,11 +12,6 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *pjson = NULL;
-    if (parent_rtnode->ty != RT_CNT && parent_rtnode->ty != RT_AE && parent_rtnode->ty != RT_CSE)
-    {
-        handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type is invalid");
-        return RSC_INVALID_CHILD_RESOURCETYPE;
-    }
 
     cJSON *cnt = cJSON_GetObjectItem(root, "m2m:cnt");
 
@@ -48,7 +43,7 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_AddNumberToObject(cnt, "st", 0);
     cJSON_AddNumberToObject(cnt, "cni", 0);
     cJSON_AddNumberToObject(cnt, "cbs", 0);
-
+#if CSE_RVI >= RVI_3
     cJSON *final_at = cJSON_CreateArray();
     if (handle_annc_create(parent_rtnode, cnt, cJSON_GetObjectItem(cnt, "at"), final_at) == -1)
     {
@@ -66,7 +61,7 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         cJSON_Delete(final_at);
     }
-
+#endif
     if (rsc != RSC_OK)
     {
         cJSON_Delete(root);
@@ -113,6 +108,9 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     char invalid_key[][9] = {"ty", "pi", "ri", "rn", "ct", "cr"};
     cJSON *m2m_cnt = cJSON_GetObjectItem(o2pt->request_pc, "m2m:cnt");
     int invalid_key_size = sizeof(invalid_key) / (9 * sizeof(char));
+
+    int updateAttrCnt = cJSON_GetArraySize(m2m_cnt);
+
     for (int i = 0; i < invalid_key_size; i++)
     {
         if (cJSON_GetObjectItem(m2m_cnt, invalid_key[i]))
@@ -151,7 +149,7 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
                 logger("UTIL", LOG_LEVEL_INFO, "acpi %s", acpi_obj->valuestring);
                 if (!has_acpi_update_privilege(o2pt, acpi_obj->valuestring))
                 {
-                    return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
+                    return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "no privilege to update acpi");
                 }
             }
         }
@@ -159,7 +157,7 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         // validate new acpi
         if (cJSON_GetArraySize(cJSON_GetObjectItem(m2m_cnt, "acpi")) > 0)
         {
-            if (validate_acpi(o2pt, cJSON_GetObjectItem(m2m_cnt, "acpi"), OP_UPDATE) != RSC_OK)
+            if (validate_acpi(o2pt, cJSON_GetObjectItem(m2m_cnt, "acpi"), ACOP_UPDATE) != RSC_OK)
             {
                 return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
             }
@@ -188,6 +186,11 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     result = db_update_resource(m2m_cnt, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_CNT);
 
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_cnt, 0);
+    }
+
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
     return RSC_UPDATED;
@@ -199,8 +202,10 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op)
     char *ptr = NULL;
     if (!cnt)
     {
-        handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
-        return RSC_CONTENTS_UNACCEPTABLE;
+        if (o2pt->rvi >= 3)
+            return handle_error(o2pt, RSC_CONTENTS_UNACCEPTABLE, "insufficient mandatory attribute(s)");
+        else
+            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
     }
 
     pjson = cJSON_GetObjectItem(cnt, "rn");
@@ -224,7 +229,7 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op)
         pjson = cJSON_GetObjectItem(cnt, "acpi");
         if (pjson && cJSON_GetArraySize(pjson) > 0)
         {
-            int result = validate_acpi(o2pt, pjson, op);
+            int result = validate_acpi(o2pt, pjson, ACOP_CREATE);
             if (result != RSC_OK)
                 return result;
         }

@@ -34,8 +34,11 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_GRP));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CSR));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_SUB));
-	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CBA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_ACPA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_AEA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CNTA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CINA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CBA));
 
 	cJSON_AddStringToObject(cse, "ct", ct);
 	cJSON_AddStringToObject(cse, "ri", CSE_BASE_RI);
@@ -48,7 +51,7 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srv, cJSON_CreateString("2a"));
 
 	cJSON_AddItemToObject(cse, "srv", srv);
-	cJSON_AddItemToObject(cse, "pi", cJSON_CreateNull());
+	cJSON_AddItemToObject(cse, "pi", cJSON_CreateString(""));
 	cJSON_AddNumberToObject(cse, "ty", RT_CSE);
 	cJSON_AddStringToObject(cse, "uri", CSE_BASE_NAME);
 	cJSON_AddStringToObject(cse, "csi", csi);
@@ -147,6 +150,8 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 {
 	RTNode *rtnode = (RTNode *)calloc(1, sizeof(RTNode));
 	cJSON *uri = NULL;
+	cJSON *memberOf = NULL;
+	cJSON *pjson = NULL;
 
 	rtnode->ty = ty;
 	rtnode->obj = obj;
@@ -162,11 +167,39 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 		rtnode->uri = strdup(uri->valuestring);
 		cJSON_DeleteItemFromObject(obj, "uri");
 	}
-
-	rtnode->memberOf = (NodeList *)calloc(1, sizeof(NodeList));
-	rtnode->memberOf->next = NULL;
-	rtnode->memberOf->rtnode = NULL;
-	rtnode->memberOf->uri = NULL;
+	rtnode->memberOf = cJSON_DetachItemFromObject(obj, "memberOf");
+	if (!rtnode->memberOf)
+	{
+		rtnode->memberOf = cJSON_CreateArray();
+	}
+	if ((pjson = cJSON_GetObjectItem(obj, "rr")))
+	{
+		if (pjson->type != cJSON_True || pjson->type != cJSON_False)
+		{
+			if (pjson->valueint == 1)
+			{
+				cJSON_ReplaceItemInObject(obj, "rr", cJSON_CreateTrue());
+			}
+			else
+			{
+				cJSON_ReplaceItemInObject(obj, "rr", cJSON_CreateFalse());
+			}
+		}
+	}
+	if ((pjson = cJSON_GetObjectItem(obj, "mtv")))
+	{
+		if (pjson->type != cJSON_True || pjson->type != cJSON_False)
+		{
+			if (cJSON_IsTrue(pjson) || pjson->valueint == 1)
+			{
+				cJSON_ReplaceItemInObject(obj, "mtv", cJSON_CreateTrue());
+			}
+			else
+			{
+				cJSON_ReplaceItemInObject(obj, "mtv", cJSON_CreateFalse());
+			}
+		}
+	}
 
 	rtnode->rn = strdup(cJSON_GetObjectItem(obj, "rn")->valuestring);
 
@@ -200,7 +233,7 @@ int update_cb(cJSON *csr, cJSON *cb)
  * @param cnt_rtnode rtnode of cnt
  * @param cin_rtnode rtnode of cin
  * @param sign 1 for create, -1 for delete
- * @return int 1 for success, -1 for fail
+ * @return 0 for success, -1 for fail
  */
 int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 {
@@ -218,11 +251,13 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 	cJSON_SetIntValue(cbs, cbs->valueint + (sign * cJSON_GetObjectItem(cin, "cs")->valueint));
 	cJSON_SetIntValue(st, st->valueint + 1);
 	logger("O2", LOG_LEVEL_DEBUG, "cni: %d, cbs: %d, st: %d", cni->valueint, cbs->valueint, st->valueint);
-	delete_cin_under_cnt_mni_mbs(cnt_rtnode);
+
+	if (sign == 1)
+		delete_cin_under_cnt_mni_mbs(cnt_rtnode);
 
 	db_update_resource(cnt, get_ri_rtnode(cnt_rtnode), RT_CNT);
 
-	return 1;
+	return 0;
 }
 
 int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
@@ -249,6 +284,7 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	if (target_rtnode->ty == RT_CIN)
 	{
+
 		// logger("O2M", LOG_LEVEL_DEBUG, "delete cin rtnode %s", target_rtnode->rn);
 		if (!strcmp(target_rtnode->rn, "la"))
 		{
@@ -278,7 +314,9 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 {
 	cJSON *csr, *dcse, *dcse_item;
 	cJSON *pjson = NULL;
+	cJSON *update_obj = NULL;
 	RTNode *ptr_rtnode = NULL;
+	int idx = 0;
 	if (rtnode->child)
 	{
 		ptr_rtnode = rtnode->child;
@@ -304,22 +342,14 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		detach_subs(rtnode->parent, rtnode);
 		break;
 	case RT_CSR:
+		logger("O2M", LOG_LEVEL_DEBUG, "delete csr");
 		csr = rtnode->obj;
 		dcse = cJSON_GetObjectItem(rt->cb->obj, "dcse");
 		dcse_item = NULL;
-		int idx = 0;
-		cJSON_ArrayForEach(dcse_item, dcse)
-		{
-			if (strcmp(dcse_item->valuestring, cJSON_GetObjectItem(csr, "csi")->valuestring) == 0)
-			{
-				break;
-			}
-			idx++;
-		}
-		if (idx < cJSON_GetArraySize(dcse))
+		idx = cJSON_getArrayIdx(dcse, cJSON_GetObjectItem(csr, "csi")->valuestring);
+		if (idx != -1)
 			cJSON_DeleteItemFromArray(dcse, idx);
 		update_remote_csr_dcse(rtnode);
-		logger("O2M", LOG_LEVEL_DEBUG, "delete csr");
 		detach_csrlist(rtnode);
 		break;
 	case RT_GRP:
@@ -328,8 +358,17 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 			ptr_rtnode = find_rtnode(pjson->valuestring);
 			if (ptr_rtnode)
 			{
-				logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", ptr_rtnode->uri, pjson->valuestring);
-				deleteNodeList(ptr_rtnode->memberOf, rtnode);
+				logger("O2M", LOG_LEVEL_DEBUG, "delete %s from memberOf[%s] ", rtnode->uri, ptr_rtnode->uri);
+				idx = cJSON_getArrayIdx(ptr_rtnode->memberOf, rtnode->uri);
+				logger("O2M", LOG_LEVEL_DEBUG, "%d", idx);
+				if (idx >= 0)
+					cJSON_DeleteItemFromArray(ptr_rtnode->memberOf, idx);
+
+				update_obj = cJSON_CreateObject();
+				cJSON_AddItemToObject(update_obj, "memberOf", ptr_rtnode->memberOf);
+				db_update_resource(update_obj, cJSON_GetObjectItem(ptr_rtnode->obj, "ri")->valuestring, ptr_rtnode->ty);
+				cJSON_DetachItemFromObject(update_obj, "memberOf");
+				cJSON_Delete(update_obj);
 			}
 		}
 		break;
@@ -338,37 +377,32 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	case RT_CBA:
 		break;
 	}
+	cJSON *member;
+	RTNode *grp_rtnode = NULL;
 
-	NodeList *nl = NULL;
-	int idx = -1;
-	nl = rtnode->memberOf->next;
-	if (nl)
+	cJSON_ArrayForEach(member, rtnode->memberOf)
 	{
-		while (nl)
+		grp_rtnode = find_rtnode(member->valuestring);
+		logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", grp_rtnode->uri, member->valuestring);
+		if (!grp_rtnode)
 		{
-			logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", rtnode->uri, nl->uri);
-			if (!nl->rtnode)
-			{
-				nl = nl->next;
-				continue;
-			}
-			pjson = cJSON_GetObjectItem(nl->rtnode->obj, "mid");
-			idx = cJSON_getArrayIdx(pjson, rtnode->uri);
-			if (idx >= 0)
-			{
-				cJSON_DeleteItemFromArray(pjson, idx);
-				cJSON_SetIntValue(cJSON_GetObjectItem(nl->rtnode->obj, "cnm"), cJSON_GetArraySize(pjson));
-			}
-			// logger("O2M", LOG_LEVEL_DEBUG, "new mid =  %s", cJSON_Print(pjson));
-
-			db_update_resource(nl->rtnode->obj, cJSON_GetObjectItem(nl->rtnode->obj, "ri")->valuestring, nl->rtnode->ty);
-			nl = nl->next;
+			logger("O2M", LOG_LEVEL_ERROR, "Node of MemberOf missing - INTERNAL SERVER ERROR");
+			continue;
 		}
+		pjson = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
+		idx = cJSON_getArrayIdx(pjson, rtnode->uri);
+		if (idx >= 0)
+		{
+			cJSON_DeleteItemFromArray(pjson, idx);
+			cJSON_SetIntValue(cJSON_GetObjectItem(grp_rtnode->obj, "cnm"), cJSON_GetArraySize(pjson));
+		}
+
+		db_update_resource(grp_rtnode->obj, cJSON_GetObjectItem(grp_rtnode->obj, "ri")->valuestring, grp_rtnode->ty);
 	}
 
 	Operation op = o2pt->op;
 	o2pt->op = OP_DELETE;
-	notify_onem2m_resource(o2pt, rtnode);
+	notify_via_sub(o2pt, rtnode);
 	o2pt->op = op;
 
 	cJSON *at_list = cJSON_GetObjectItem(rtnode->obj, "at");
@@ -389,9 +423,16 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 	return 1;
 }
-
+/**
+ * @brief find the index of value in String Array
+ * @param arr String Array
+ * @param value value to find
+ * @return index of value in String Array, -1 if not found
+ */
 int cJSON_getArrayIdx(cJSON *arr, char *value)
 {
+	if (!arr)
+		return -1;
 	cJSON *item = NULL;
 	int idx = 0;
 	cJSON_ArrayForEach(item, arr)
@@ -451,7 +492,7 @@ void free_rtnode(RTNode *rtnode)
 
 	if (rtnode->memberOf)
 	{
-		free_all_nodelist(rtnode->memberOf);
+		cJSON_Delete(rtnode->memberOf);
 		rtnode->memberOf = NULL;
 	}
 
@@ -488,6 +529,15 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
 	{
 		return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+	}
+
+	if (!isValidChildType(parent_rtnode->ty, o2pt->ty))
+	{
+		if (o2pt->ty == RT_SUB)
+		{
+			return handle_error(o2pt, RSC_TARGET_NOT_SUBSCRIBABLE, "target not subscribable");
+		}
+		return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type error");
 	}
 
 	switch (o2pt->ty)
@@ -528,14 +578,14 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		rsc = create_csr(o2pt, parent_rtnode);
 		break;
 
+	case RT_ACPA:
 	case RT_AEA:
-		logger("O2M", LOG_LEVEL_INFO, "Create AEA");
-		rsc = create_aea(o2pt, parent_rtnode);
-		break;
-
 	case RT_CBA:
-		logger("O2M", LOG_LEVEL_INFO, "Create CBA");
-		rsc = create_cba(o2pt, parent_rtnode);
+	case RT_CNTA:
+	case RT_CINA:
+	case RT_GRPA:
+		logger("O2M", LOG_LEVEL_INFO, "Create ANNC");
+		rsc = create_annc(o2pt, parent_rtnode);
 		break;
 
 	case RT_MIXED:
@@ -570,8 +620,8 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		e = check_resource_type_equal(o2pt);
 	if (e != -1)
 		e = check_privilege(o2pt, target_rtnode, ACOP_UPDATE);
-	if (e != -1)
-		e = check_rn_duplicate(o2pt, target_rtnode->parent);
+	// if (e != -1)
+	// 	e = check_rn_duplicate(o2pt, target_rtnode->parent);
 	if (e == -1)
 		return o2pt->rsc;
 
@@ -611,34 +661,35 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Update GRP");
 		rsc = update_grp(o2pt, target_rtnode);
 		break;
-
-	case RT_AEA:
-		logger("O2M", LOG_LEVEL_INFO, "Update AEA");
-		rsc = update_aea(o2pt, target_rtnode);
-		break;
-
 	case RT_CSR:
 		logger("O2M", LOG_LEVEL_INFO, "Update CSR");
 		rsc = update_csr(o2pt, target_rtnode);
 		break;
 
-		// case RT_CBA:
-		// 	logger("O2M", LOG_LEVEL_INFO, "Update CBA");
-		// 	rsc = update_cba(o2pt, target_rtnode);
-		// 	break;
+#if CSE_RVI >= RVI_3
+	case RT_AEA:
+	case RT_ACPA:
+	case RT_CBA:
+	case RT_CNTA:
+	case RT_CINA:
+	case RT_GRPA:
+		update_annc(o2pt, target_rtnode);
+		break;
+#endif
 
 	default:
 		handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` is unsupported");
 		rsc = o2pt->rsc;
 	}
+#if CSE_RVI >= RVI_3
 	announce_to_annc(target_rtnode);
+#endif
 	return rsc;
 }
 
 int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
 	int rsc = 0;
-	int cnt = 0;
 	int cnm = 0;
 	int idx = 1;
 	bool updated = false;
@@ -650,7 +701,8 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	cJSON *rsp = NULL;
 	cJSON *json = NULL;
 	cJSON *grp = NULL;
-	cJSON *delete_list = NULL;
+
+	int mt = 0;
 
 	if (parent_rtnode == NULL)
 	{
@@ -658,6 +710,8 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		return RSC_NOT_FOUND;
 	}
 	logger("O2M", LOG_LEVEL_DEBUG, "handle fopt");
+
+	mt = cJSON_GetObjectItem(parent_rtnode->obj, "mt")->valueint;
 
 	if (cJSON_GetObjectItem(parent_rtnode->obj, "macp"))
 	{
@@ -692,17 +746,13 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	new_pc = cJSON_CreateObject();
 	cJSON_AddItemToObject(new_pc, "m2m:agr", agr = cJSON_CreateObject());
 	cJSON_AddItemToObject(agr, "m2m:rsp", rsp = cJSON_CreateArray());
-	cJSON *mid_arr = cJSON_GetObjectItem(grp, "mid");
+	cJSON *mid_arr = cJSON_Duplicate(cJSON_GetObjectItem(grp, "mid"), true);
 	cJSON *mid_obj = NULL;
-	cJSON *mid_prev = NULL;
-	cJSON_InsertItemInArray(mid_arr, 0, cJSON_CreateString(""));
-	cJSON_AddItemToArray(mid_arr, cJSON_CreateString(""));
-
 	cJSON_ArrayForEach(mid_obj, mid_arr)
 	{
 		rsc = 0;
 		char *mid = cJSON_GetStringValue(mid_obj);
-		if (strlen(mid) == 0)
+		if (mid == NULL || strlen(mid) == 0)
 			continue;
 		if (req_o2pt->to)
 			free(req_o2pt->to);
@@ -741,12 +791,17 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 				}
 			}
 		}
-		mid_prev = mid_obj->prev;
 		if (target_rtnode)
 		{
+			if (o2pt->op == OP_CREATE && mt == RT_MIXED && !isValidChildType(target_rtnode->ty, req_o2pt->ty))
+			{
+				cJSON_Delete(mid_arr);
+				free_o2pt(req_o2pt);
+				cJSON_Delete(new_pc);
+				return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "invalid child resource type");
+			}
+
 			rsc = handle_onem2m_request(req_o2pt, target_rtnode);
-			if (rsc < 4000)
-				cnt++;
 			json = o2pt_to_json(req_o2pt);
 			if (json)
 			{
@@ -780,22 +835,16 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		if (rsc == RSC_DELETED)
 		{
 			updated = true;
-			mid_obj = mid_prev;
-			// cJSON_DeleteItemFromArray(mid_arr, idx);
-			// idx--;
 		}
-		// idx++;
 	}
-	cJSON_DeleteItemFromArray(mid_arr, 0);
-	cJSON_DeleteItemFromArray(mid_arr, cJSON_GetArraySize(mid_arr) - 1);
-	if (updated)
+	if (updated && cJSON_IsObject(grp))
 	{
 		db_update_resource(grp, cJSON_GetObjectItem(grp, "ri")->valuestring, RT_GRP);
 	}
 
-	o2pt->response_pc = new_pc;
+	cJSON_Delete(mid_arr);
 
-	cJSON_Delete(delete_list);
+	o2pt->response_pc = new_pc;
 
 	o2pt->rsc = RSC_OK;
 
@@ -862,10 +911,20 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		o2pt->cnot = ofst + lim;
 	}
 
-	if (o2pt->drt == DRT_STRUCTURED)
-		cJSON_AddItemToObject(root, "m2m:uril", list);
+	if (o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES)
+	{
+		cJSON *rrl = cJSON_AddObjectToObject(root, "m2m:rrl");
+		cJSON_AddItemToObject(rrl, "rrf", list);
+	}
 	else
-		cJSON_AddItemToObject(root, "m2m:rrl", list);
+	{
+		cJSON *uril = cJSON_CreateArray();
+		cJSON_ArrayForEach(pjson, list)
+		{
+			cJSON_AddItemToArray(uril, cJSON_GetObjectItem(pjson, "val"));
+		}
+		cJSON_AddItemToObject(root, "m2m:uril", uril);
+	}
 
 	o2pt->response_pc = root;
 	free(o2pt->to);
@@ -876,7 +935,32 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-	logger("O2M", LOG_LEVEL_DEBUG, "Notify onem2m Resource [%s]", target_rtnode->uri);
+	cJSON *sgn = cJSON_GetObjectItem(o2pt->request_pc, "m2m:sgn");
+	cJSON *vrq = cJSON_GetObjectItem(sgn, "vrq");
+	if (vrq && vrq->type == cJSON_True)
+	{
+		logger("O2M", LOG_LEVEL_DEBUG, "verification request");
+		if (check_privilege(o2pt, target_rtnode, ACOP_NOTIFY) == -1)
+		{
+			return o2pt->rsc = RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE;
+		}
+		else
+		{
+			return o2pt->rsc = RSC_OK;
+		}
+	}
+
+	if (check_privilege(o2pt, target_rtnode, ACOP_NOTIFY) != 0)
+	{
+		return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "permission denied");
+	}
+	requestToResource(o2pt, target_rtnode);
+	o2pt->rsc = RSC_OK;
+}
+
+int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
+{
+	logger("O2M", LOG_LEVEL_DEBUG, "Notify via SUB [%s]", target_rtnode->uri);
 	cJSON *pjson = NULL;
 	NodeList *del = NULL;
 	NodeList *node = NULL;
@@ -888,6 +972,7 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 	if (o2pt->ty == RT_SUB && (o2pt->op == OP_CREATE || o2pt->op == OP_UPDATE))
 	{
+		logger("O2M", LOG_LEVEL_DEBUG, "skip sub notification");
 		return 1;
 	}
 
@@ -895,6 +980,7 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	{
 		return 1;
 	}
+
 	int net = NET_NONE;
 
 	switch (o2pt->op)
@@ -933,10 +1019,14 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		cJSON *enc = cJSON_GetObjectItem(node->rtnode->obj, "enc");
 		exc = cJSON_GetObjectItem(node->rtnode->obj, "exc");
 		cJSON_AddStringToObject(sgn, "sur", node->rtnode->uri);
+
 		if (node->rtnode->obj && (nct = cJSON_GetObjectItem(node->rtnode->obj, "nct")))
 		{
+			cJSON_DeleteItemFromObject(nev, "rep");
+			logger("O2M", LOG_LEVEL_DEBUG, "nct : %d", nct->valueint);
 			switch (nct->valueint)
 			{
+			case 0:
 			case NCT_ALL_ATTRIBUTES:
 				cJSON_AddItemReferenceToObject(nev, "rep", o2pt->response_pc);
 				break;
@@ -1097,7 +1187,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 		o2pt->op = OP_CREATE;
 		o2pt->ty = ty + 10000;
 		o2pt->rqi = strdup("create-annc");
-		o2pt->rvi = strdup("3");
+		o2pt->rvi = CSE_RVI;
 
 		cJSON *root = cJSON_CreateObject();
 		cJSON *annc = cJSON_CreateObject();

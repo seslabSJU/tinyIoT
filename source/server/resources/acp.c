@@ -29,6 +29,7 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return rsc;
     }
 
+#if CSE_RVI >= RVI_3
     cJSON *final_at = cJSON_CreateArray();
     cJSON *at = NULL;
     char *at_str = NULL;
@@ -53,7 +54,7 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(final_at);
         cJSON_DeleteItemFromObject(acp, "at");
     }
-
+#endif
     // Add uri attribute
     char *ptr = malloc(1024);
     cJSON *rn = cJSON_GetObjectItem(acp, "rn");
@@ -88,6 +89,9 @@ int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
     cJSON *m2m_acp = cJSON_GetObjectItem(o2pt->request_pc, "m2m:acp");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
+
+    int updateAttrCnt = cJSON_GetArraySize(m2m_acp);
+
     for (int i = 0; i < invalid_key_size; i++)
     {
         if (cJSON_GetObjectItem(m2m_acp, invalid_key[i]))
@@ -117,6 +121,17 @@ int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     update_resource(target_rtnode->obj, m2m_acp);
 
     result = db_update_resource(m2m_acp, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_ACP);
+
+    if (result != 1)
+    {
+        return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB update fail");
+        ;
+    }
+
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_acp, 0);
+    }
 
     make_response_body(o2pt, target_rtnode);
 

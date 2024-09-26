@@ -11,10 +11,6 @@ extern cJSON *ATTRIBUTES;
 int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
     int result = 0;
-    if (parent_rtnode->ty == RT_CIN || parent_rtnode->ty == RT_SUB)
-    {
-        return handle_error(o2pt, RSC_TARGET_NOT_SUBSCRIBABLE, "target not subscribable");
-    }
 
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *sub = cJSON_GetObjectItem(root, "m2m:sub");
@@ -64,13 +60,13 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_AddItemReferenceToObject(rep, "m2m:sub", sub);
     cJSON_AddStringToObject(sgn, "sur", ptr);
     cJSON_AddBoolToObject(sgn, "vrq", true);
-    // logger("SUB", LOG_LEVEL_INFO, "vrq \n%s", cJSON_Print(noti_cjson));
     cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(sub, "nu"))
     {
-        if (strncmp(pjson->valuestring, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0)
+
+        nu_rtnode = find_rtnode(pjson->valuestring);
+        if (nu_rtnode)
         {
-            nu_rtnode = find_rtnode(pjson->valuestring);
-            if (nu_rtnode == NULL || nu_rtnode->ty != RT_AE)
+            if (nu_rtnode->ty != RT_AE)
             {
                 handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "nu is invalid");
                 cJSON_Delete(noti_cjson);
@@ -89,18 +85,19 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         }
 
         result = send_verification_request(pjson->valuestring, noti_cjson);
+        logger("SUB", LOG_LEVEL_INFO, "vrq result : %d", result);
 
         if (result == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE)
         {
             cJSON_Delete(noti_cjson);
             cJSON_Delete(root);
-            return handle_error(o2pt, RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE, "notification error");
+            return handle_error(o2pt, RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE, "subscription verification error");
         }
-        else if (result == RSC_BAD_REQUEST)
+        else if (result / 1000 == 4 || result / 1000 == 5)
         {
             cJSON_Delete(noti_cjson);
             cJSON_Delete(root);
-            return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification error");
+            return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "subscription verification error");
         }
 
         cJSON_DeleteItemFromObject(sgn, "vrq");
@@ -132,6 +129,8 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *pjson = NULL;
     cJSON *m2m_sub = cJSON_GetObjectItem(o2pt->request_pc, "m2m:sub");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
+    int updateAttrCnt = cJSON_GetArraySize(m2m_sub);
+
     for (int i = 0; i < invalid_key_size; i++)
     {
         if (cJSON_GetObjectItem(m2m_sub, invalid_key[i]))
@@ -198,6 +197,11 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     db_update_resource(m2m_sub, cJSON_GetObjectItem(sub, "ri")->valuestring, RT_SUB);
 
+    for (int i = 0; i < updateAttrCnt; i++)
+    {
+        cJSON_DeleteItemFromArray(m2m_sub, 0);
+    }
+
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
     return RSC_UPDATED;
@@ -212,7 +216,7 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
     pjson = cJSON_GetObjectItem(sub, "acpi");
     if (pjson)
     {
-        int result = validate_acpi(o2pt, pjson, op);
+        int result = validate_acpi(o2pt, pjson, op_to_acop(op));
         if (result != RSC_OK)
             return result;
     }
