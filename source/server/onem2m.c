@@ -634,16 +634,12 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Update GRP");
 		rsc = update_grp(o2pt, target_rtnode);
 		break;
-  case RT_CSR:
+	case RT_CSR:
 		logger("O2M", LOG_LEVEL_INFO, "Update CSR");
 		rsc = update_csr(o2pt, target_rtnode);
 		break;
 
 #if CSE_RVI >= RVI_3
-	case RT_AEA:
-		logger("O2M", LOG_LEVEL_INFO, "Update AEA");
-		rsc = update_aea(o2pt, target_rtnode);
-		break;
 	case RT_ACPA:
 	case RT_CBA:
 	case RT_AEA:
@@ -652,7 +648,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	case RT_GRPA:
 		update_annc(o2pt, target_rtnode);
 		break;
- #endif
+#endif
 
 	default:
 		handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` is unsupported");
@@ -1343,9 +1339,9 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 	}
 
-	if (o2pt->rsc >= 4000)
+	if (o2pt->rsc == RSC_TARGET_NOT_REACHABLE)
 	{
-		logger("O2M", LOG_LEVEL_ERROR, "forwarding failed");
+		logger("O2M", LOG_LEVEL_ERROR, "forwarding target not reachable");
 		return o2pt->rsc;
 	}
 

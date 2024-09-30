@@ -131,7 +131,6 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
         if (strcmp(target_uri + 1, CSE_BASE_RI) == 0)
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
-            free(target_uri);
             return NULL;
         }
         ptr = target_uri + strlen(CSE_BASE_RI) + 2; // for first / and end /
@@ -139,7 +138,6 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
         {
             logger("RTM", LOG_LEVEL_DEBUG, "addr is empty");
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
-            free(target_uri);
             return NULL;
         }
         rtnode = find_rtnode(ptr);
@@ -159,7 +157,6 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
             if (SERVER_TYPE == IN_CSE)
             {
                 handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
-                free(target_uri);
                 return NULL;
             }
             else
@@ -168,15 +165,12 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
                 if (strcmp(cJSON_GetStringValue(cJSON_GetObjectItem(registrar_csr, "csi")), target_uri) != 0)
                 {
                     handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
-                    free(target_uri);
                     return NULL;
                 }
             }
         }
 
         rsc = forwarding_onem2m_resource(o2pt, csr);
-        free(target_uri);
-        return NULL;
         if (rsc >= 4000)
         {
             handle_error(o2pt, rsc, "Forwarding Failed");
