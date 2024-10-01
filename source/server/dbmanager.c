@@ -155,6 +155,7 @@ int init_dbp()
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS cbA ( id INTEGER, \
         cst INT, lnk VARCHAR(100), csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, \
+        at VARCHAR(200), aa VARCHAR(100), ast INT,\
         CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if (rc != SQLITE_OK)
