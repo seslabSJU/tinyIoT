@@ -3758,7 +3758,7 @@ bool isValidChildType(ResourceType parent, ResourceType child)
 		break;
 	case RT_CSE:
 		if (child == RT_ACP || child == RT_AE || child == RT_CNT || child == RT_GRP || child == RT_SUB ||
-			child == RT_CSR || child == RT_NOD || child == RT_MGMTOBJ)
+			child == RT_CSR || child == RT_NOD || child == RT_MGMTOBJ || child == RT_CBA)
 			return true;
 		break;
 	case RT_GRP:
@@ -3771,6 +3771,26 @@ bool isValidChildType(ResourceType parent, ResourceType child)
 			return true;
 		break;
 	case RT_SUB:
+		break;
+	case RT_ACPA:
+		if (child == RT_SUB)
+			return true;
+		break;
+	case RT_AEA:
+		if (child == RT_SUB || child == RT_CNT || child == RT_CNTA || child ==  RT_GRP || child ==  RT_GRPA || child == RT_ACP || child == RT_ACPA)
+			return true;
+		break;
+	case RT_CNTA:
+		if (child == RT_CNT || child == RT_CNTA || child == RT_CIN || child == RT_CINA || child == RT_SUB)
+			return true;
+		break;
+	case RT_CBA:
+		if (child == RT_CNT || child == RT_CNTA || child == RT_GRP || child == RT_GRPA || child == RT_ACP || child == RT_ACPA || child == RT_SUB || child == RT_AEA)
+			return true;
+		break;
+	case RT_GRPA:
+		if (child == RT_SUB)
+			return true;
 		break;
 	}
 	return false;
