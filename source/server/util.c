@@ -3289,12 +3289,10 @@ int create_remote_cba(char *poa, char **cbA_url)
 			logger("UTIL", LOG_LEVEL_ERROR, "Creation failed");
 			return -1;
 		}
-
-		cJSON *result = cJSON_Parse(o2pt->response_pc);
-		if (result)
+		if (o2pt->response_pc)
 		{
 			// logger("UTIL", LOG_LEVEL_DEBUG, "cba_target: %s", cJSON_PrintUnformatted(result));
-			root = cJSON_GetObjectItem(result, get_resource_key(RT_CBA));
+			root = cJSON_GetObjectItem(o2pt->response_pc, get_resource_key(RT_CBA));
 			sprintf(buf, "%s/%s", poa, cJSON_GetObjectItem(root, "ri")->valuestring);
 			*cbA_url = strdup(buf);
 		}
@@ -3302,7 +3300,6 @@ int create_remote_cba(char *poa, char **cbA_url)
 		{
 			logger("UTIL", LOG_LEVEL_ERROR, "%s", cJSON_GetErrorPtr());
 		}
-		cJSON_Delete(result);
 		free_o2pt(o2pt);
 	}
 	else if (rat == ABSOLUTE)

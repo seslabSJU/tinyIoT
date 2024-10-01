@@ -433,7 +433,7 @@ RTNode *rt_search_ri(RTNode *rtnode, char *ri)
     RTNode *ret = NULL;
     if (!rtnode)
         return NULL;
-    while (rtnode)
+    while (!ret && rtnode)
     {
         if (!strcmp(get_ri_rtnode(rtnode), ri))
         {
