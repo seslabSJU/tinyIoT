@@ -48,7 +48,7 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToObject(cse, "srt", srt);
 
 	cJSON *srv = cJSON_CreateArray();
-	cJSON_AddItemToArray(srv, cJSON_CreateString("2a"));
+	cJSON_AddItemToArray(srv, cJSON_CreateString(from_rvi(CSE_RVI)));
 
 	cJSON_AddItemToObject(cse, "srv", srv);
 	cJSON_AddItemToObject(cse, "pi", cJSON_CreateString(""));
