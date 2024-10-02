@@ -3289,12 +3289,10 @@ int create_remote_cba(char *poa, char **cbA_url)
 			logger("UTIL", LOG_LEVEL_ERROR, "Creation failed");
 			return -1;
 		}
-
-		cJSON *result = cJSON_Parse(o2pt->response_pc);
-		if (result)
+		if (o2pt->response_pc)
 		{
 			// logger("UTIL", LOG_LEVEL_DEBUG, "cba_target: %s", cJSON_PrintUnformatted(result));
-			root = cJSON_GetObjectItem(result, get_resource_key(RT_CBA));
+			root = cJSON_GetObjectItem(o2pt->response_pc, get_resource_key(RT_CBA));
 			sprintf(buf, "%s/%s", poa, cJSON_GetObjectItem(root, "ri")->valuestring);
 			*cbA_url = strdup(buf);
 		}
@@ -3302,7 +3300,6 @@ int create_remote_cba(char *poa, char **cbA_url)
 		{
 			logger("UTIL", LOG_LEVEL_ERROR, "%s", cJSON_GetErrorPtr());
 		}
-		cJSON_Delete(result);
 		free_o2pt(o2pt);
 	}
 	else if (rat == ABSOLUTE)
@@ -3543,39 +3540,40 @@ void announce_to_annc(RTNode *target_rtnode)
 		cJSON *aa_list = cJSON_GetObjectItem(target_rtnode->obj, "aa");
 		cJSON *aa = NULL;
 		cJSON *root = cJSON_CreateObject();
-		cJSON *temp_ae = cJSON_CreateObject();
-		cJSON_AddItemToObject(root, "m2m:aeA", temp_ae);
+		cJSON *resource = cJSON_CreateObject();
+		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty + 10000), resource);
 		cJSON_ArrayForEach(aa, aa_list)
 		{
 			if ((pjson = cJSON_GetObjectItem(target_rtnode->obj, aa->valuestring)))
 			{
-				cJSON_AddItemToObject(temp_ae, aa->valuestring, cJSON_Duplicate(pjson, 1));
+				cJSON_AddItemToObject(resource, aa->valuestring, cJSON_Duplicate(pjson, 1));
 			}
 		}
 		if ((pjson = cJSON_GetObjectItem(target_rtnode->obj, "lbl")))
 		{
-			cJSON_AddItemToObject(temp_ae, "lbl", cJSON_Duplicate(pjson, 1));
+			cJSON_AddItemToObject(resource, "lbl", cJSON_Duplicate(pjson, 1));
 		}
+		oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+		o2pt->op = OP_UPDATE;
+		o2pt->fr = strdup("/" CSE_BASE_RI);
+		o2pt->ty = target_rtnode->ty + 10000;
+		o2pt->rvi = CSE_RVI;
+		o2pt->rqi = strdup("update_announce");
+		o2pt->request_pc = root;
+		o2pt->isForwarding = true;
 		cJSON_ArrayForEach(at, at_list)
 		{
 			logger("UTIL", LOG_LEVEL_INFO, "at %s", at->valuestring);
 			if (at->valuestring[0] == '/')
 			{
-				char buf[128] = {0};
-				oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
-				o2pt->op = OP_UPDATE;
 				o2pt->to = strdup(at->valuestring);
-				o2pt->fr = strdup("/" CSE_BASE_RI);
-				o2pt->ty = target_rtnode->ty + 10000;
-				o2pt->rqi = strdup("ae_update_announce");
-				o2pt->request_pc = root;
-				o2pt->isForwarding = true;
-
 				forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
-				free_o2pt(o2pt);
+				free(o2pt->to);
+				o2pt->to = NULL;
 			}
 		}
-
+		o2pt->request_pc = NULL;
+		free_o2pt(o2pt);
 		cJSON_Delete(root);
 	}
 }

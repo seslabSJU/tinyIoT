@@ -1218,7 +1218,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 			cJSON_AddItemToObject(annc, pjson->valuestring, cJSON_Duplicate(temp, true));
 		}
 
-		o2pt->response_pc = root;
+		o2pt->request_pc = root;
 		o2pt->isForwarding = true;
 		RTNode *rtnode = find_csr_rtnode_by_uri(at);
 		if (!rtnode)
@@ -1249,7 +1249,6 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 			cJSON_AddItemToArray(at, cJSON_CreateString(buf));
 			db_update_resource(obj, cJSON_GetObjectItem(obj, "ri")->valuestring, ty);
 		}
-		cJSON_Delete(result);
 		free_o2pt(o2pt);
 		free(parent_target);
 
