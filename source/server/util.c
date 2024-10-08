@@ -804,8 +804,9 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	logger("UTIL", LOG_LEVEL_DEBUG, "check_privilege : %s : %d", o2pt->fr, acop);
 	bool deny = false;
 	char *origin = NULL;
+	cJSON *acpi = NULL;
 
-	RTNode *parent_rtnode = rtnode;
+	RTNode *target_rtnode = rtnode;
 #ifdef ADMIN_AE_ID
 	if (o2pt->fr && !strcmp(o2pt->fr, ADMIN_AE_ID))
 	{
@@ -814,34 +815,54 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	}
 #endif
 
-	while (parent_rtnode && parent_rtnode->ty != RT_AE)
+	while (target_rtnode->parent && (acpi = cJSON_GetObjectItem(target_rtnode->obj, "acpi")) == NULL)
 	{
-		parent_rtnode = parent_rtnode->parent;
+		if (target_rtnode->parent->ty == RT_CSE)
+			break;
+		target_rtnode = target_rtnode->parent;
 	}
 
 	if (o2pt->fr == NULL || strlen(o2pt->fr) == 0)
 	{
 		if (!(o2pt->op == OP_CREATE && o2pt->ty == RT_AE))
 		{
-			return true;
+			return -1;
 		}
 	}
-	if (parent_rtnode && parent_rtnode->ty == RT_AE)
-		origin = cJSON_GetObjectItem(parent_rtnode->obj, "aei")->valuestring;
-	else
-		origin = o2pt->fr;
 
-	if ((parent_rtnode && strcmp(origin, get_ri_rtnode(parent_rtnode))))
+	if (isSPIDLocal(o2pt->fr))
 	{
-		deny = true;
+		origin = get_ri_rtnode(find_rtnode(o2pt->fr));
+		if (!origin)
+			origin = o2pt->fr;
+	}
+	else
+	{
+		origin = o2pt->fr;
+	}
+	if (target_rtnode)
+	{
+		if (target_rtnode->ty == RT_AE)
+		{
+			if (strcmp(origin, get_ri_rtnode(target_rtnode)))
+			{
+				deny = true;
+				logger("UTIL", LOG_LEVEL_DEBUG, "originator is not owner");
+			}
+		}
+		else if (target_rtnode->ty == RT_CSR)
+		{
+			if (strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
+			{
+				deny = true;
+				logger("UTIL", LOG_LEVEL_DEBUG, "originator is not owner");
+			}
+		}
 	}
 
-	if (rtnode->ty == RT_CIN)
-		rtnode = rtnode->parent;
-
-	if (rtnode->ty != RT_CSE)
+	if (deny && target_rtnode->ty != RT_CSE)
 	{
-		if ((get_acpi_rtnode(rtnode) && cJSON_GetArraySize(get_acpi_rtnode(rtnode)) > 0) || rtnode->ty == RT_ACP)
+		if ((acpi && cJSON_GetArraySize(acpi) > 0) || rtnode->ty == RT_ACP)
 		{
 			deny = true;
 			if ((get_acop(o2pt, origin, rtnode) & acop) == acop)
