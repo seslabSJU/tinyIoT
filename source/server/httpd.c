@@ -411,7 +411,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
         o2pt->fc = qs;
     }
 
-    pthread_mutex_trylock(&mutex_lock);
+    pthread_mutex_lock(&mutex_lock);
     route(o2pt);
     pthread_mutex_unlock(&mutex_lock);
     http_respond_to_client(o2pt, slotno);
