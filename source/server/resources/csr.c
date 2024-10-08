@@ -69,6 +69,8 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_AddItemToArray(dcse, cJSON_CreateString(cJSON_GetObjectItem(csr, "csi")->valuestring));
     update_remote_csr_dcse(rtnode);
 
+    cJSON_DetachItemFromObject(root, "m2m:csr");
+    cJSON_Delete(root);
     return RSC_CREATED;
 }
 

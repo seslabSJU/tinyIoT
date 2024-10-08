@@ -375,14 +375,24 @@ void stop_server(int sig)
 		}
 	}
 #ifdef ENABLE_MQTT
-	pthread_kill(mqtt, SIGINT);
+	if (mqtt)
+	{
+		pthread_kill(mqtt, SIGINT);
+		pthread_detach(mqtt);
+	}
 #endif
 #ifdef ENABLE_COAP
-	pthread_kill(coap, SIGINT);
+	logger("MAIN", LOG_LEVEL_INFO, "Closing CoAP...");
+	if (coap)
+	{
+		pthread_kill(coap, SIGINT);
+		pthread_detach(coap);
+	}
 #endif
 	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
 	close_dbp();
 	logger("MAIN", LOG_LEVEL_INFO, "Cleaning ResourceTree...");
+	free_all_nodelist(rt->csr_list);
 	free_rtnode(rt->cb);
 	free(rt);
 	cJSON_Delete(ATTRIBUTES);

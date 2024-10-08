@@ -799,11 +799,9 @@ RTNode *db_get_all_resource_as_rtnode()
         logger("DB", LOG_LEVEL_ERROR, "Failed select from general");
         return 0;
     }
-    // logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
     RTNode *head = NULL, *rtnode = NULL;
     rc = sqlite3_step(res);
     cols = sqlite3_column_count(res);
-    // logger("DB", LOG_LEVEL_DEBUG, "cols : %d", cols);
     cJSON *arr = NULL;
     while (rc == SQLITE_ROW)
     {
@@ -815,8 +813,6 @@ RTNode *db_get_all_resource_as_rtnode()
             bytes = sqlite3_column_bytes(res, col);
             coltype = sqlite3_column_type(res, col);
 
-            // logger("DB", LOG_LEVEL_DEBUG, "rc : %s", colname);
-            // if(strcmp(colname, "id") == 0) continue;
             switch (coltype)
             {
             case SQLITE_TEXT:
@@ -887,6 +883,7 @@ RTNode *db_get_all_resource_as_rtnode()
             }
             rc = sqlite3_step(res2);
         }
+        sqlite3_finalize(res2);
 
         cJSON_DeleteItemFromObject(json, "id");
 

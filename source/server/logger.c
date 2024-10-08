@@ -25,6 +25,7 @@ void logger_init()
     char *t = get_local_time(0);
     sprintf(logFileName, "%s.log", t);
     log_file = fopen(logFileName, "w");
+    free(t);
 #endif
 }
 

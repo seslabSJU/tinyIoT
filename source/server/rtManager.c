@@ -457,6 +457,8 @@ int add_child_resource_tree(RTNode *parent, RTNode *child)
     strcpy(uri, parent->uri);
     strcat(uri, "/");
     strcat(uri, child->rn);
+    if (child->uri)
+        free(child->uri);
     child->uri = uri;
 
     logger("O2M", LOG_LEVEL_DEBUG, "Add Resource Tree Node [Parent-ID] : %s, [Child-ID] : %s", get_ri_rtnode(parent), get_ri_rtnode(child));
@@ -731,7 +733,7 @@ void add_csrlist(RTNode *csr)
     {
         rt->csr_list = calloc(sizeof(NodeList), 1);
         rt->csr_list->rtnode = csr;
-        rt->csr_list->uri = csr->uri;
+        rt->csr_list->uri = strdup(csr->uri);
         rt->csr_list->next = NULL;
         return;
     }
@@ -755,7 +757,7 @@ void detach_csrlist(RTNode *csr)
     if (pnode->rtnode == csr)
     {
         rt->csr_list = pnode->next;
-        free(pnode);
+        free_nodelist(pnode);
         return;
     }
     while (pnode->next)
@@ -764,7 +766,7 @@ void detach_csrlist(RTNode *csr)
         {
             NodeList *temp = pnode->next;
             pnode->next = pnode->next->next;
-            free(temp);
+            free_nodelist(temp);
             temp = NULL;
             return;
         }

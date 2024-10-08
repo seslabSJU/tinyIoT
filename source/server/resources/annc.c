@@ -65,7 +65,9 @@ int create_annc(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     RTNode *child_rtnode = create_rtnode(resource, o2pt->ty);
     add_child_resource_tree(parent_rtnode, child_rtnode);
 
-    o2pt->response_pc = root;
+    make_response_body(o2pt, child_rtnode);
+    cJSON_DetachItemFromObject(root, get_resource_key(o2pt->ty));
+    cJSON_Delete(root);
 
     return o2pt->rsc = RSC_CREATED;
 }
