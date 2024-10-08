@@ -47,6 +47,10 @@ void init_cse(cJSON *cse)
 	cJSON_AddNumberToObject(cse, "cst", SERVER_TYPE);
 	cJSON_AddItemToObject(cse, "srt", srt);
 
+	cJSON *acpi = cJSON_CreateArray();
+	cJSON_AddItemToArray(acpi, cJSON_CreateString(CSE_BASE_NAME "/defaultACP"));
+	cJSON_AddItemToObject(cse, "acpi", acpi);
+
 	cJSON *srv = cJSON_CreateArray();
 	cJSON_AddItemToArray(srv, cJSON_CreateString(from_rvi(CSE_RVI)));
 
@@ -63,6 +67,54 @@ void init_cse(cJSON *cse)
 	ct = NULL;
 	free(csi);
 	csi = NULL;
+}
+
+void init_acp(cJSON *acp)
+{
+	char *ct = get_local_time(0);
+	char *ptr = NULL;
+
+	cJSON_AddStringToObject(acp, "ct", ct);
+	cJSON_AddStringToObject(acp, "lt", ct);
+
+	ptr = resource_identifier(RT_ACP, ct);
+	cJSON_AddStringToObject(acp, "ri", ptr);
+	cJSON_AddStringToObject(acp, "pi", CSE_BASE_RI);
+	cJSON_AddStringToObject(acp, "rn", "defaultACP");
+	free(ptr);
+	ptr = NULL;
+	cJSON *pv = cJSON_CreateObject();
+	cJSON *pvs = cJSON_CreateObject();
+	cJSON *acr = cJSON_CreateArray();
+	cJSON *obj = cJSON_CreateObject();
+	cJSON *acor = cJSON_CreateArray();
+
+	cJSON_AddItemToObject(pv, "acr", acr);
+	cJSON_AddItemToObject(obj, "acor", acor);
+
+	cJSON_AddItemToArray(acor, cJSON_CreateString("all"));
+	cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(DEFAULT_ACOP));
+	cJSON_AddItemToArray(acr, obj);
+
+	obj = cJSON_CreateObject();
+	acr = cJSON_CreateArray();
+	acor = cJSON_CreateArray();
+
+	cJSON_AddItemToObject(pvs, "acr", acr);
+
+	cJSON_AddItemToObject(obj, "acor", acor);
+	cJSON_AddItemToArray(acor, cJSON_CreateString(ADMIN_AE_ID));
+	cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(ALL_ACOP));
+	cJSON_AddItemToArray(acr, obj);
+
+	cJSON_AddItemToObject(acp, "pv", pv);
+	cJSON_AddItemToObject(acp, "pvs", pvs);
+
+	cJSON_AddNumberToObject(acp, "ty", RT_ACP);
+	cJSON_AddStringToObject(acp, "et", get_local_time(DEFAULT_EXPIRE_TIME));
+
+	free(ct);
+	ct = NULL;
 }
 
 void init_csr(cJSON *csr)

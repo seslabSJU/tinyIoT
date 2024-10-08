@@ -697,19 +697,24 @@ void log_runtime(double start)
 
 void init_server()
 {
+	bool setup = false;
 	char poa[128] = {0};
 
 	rt = (ResourceTree *)calloc(1, sizeof(ResourceTree));
 
-	cJSON *cse;
+	cJSON *cse, *acp;
 
 	cse = db_get_resource(CSE_BASE_RI, RT_CSE);
 
 	if (!cse)
 	{
+		setup = true;
 		cse = cJSON_CreateObject();
+		acp = cJSON_CreateObject();
 		init_cse(cse);
+		init_acp(acp);
 		db_store_resource(cse, CSE_BASE_NAME);
+		db_store_resource(acp, CSE_BASE_NAME "/defaultACP");
 	}
 	else
 	{
@@ -762,6 +767,12 @@ void init_server()
 	cJSON_AddItemToObject(cse, "poa", poa_obj);
 
 	rt->cb = create_rtnode(cse, RT_CSE);
+
+	if (setup)
+	{
+		RTNode *acp_rtnode = create_rtnode(acp, RT_ACP);
+		add_child_resource_tree(rt->cb, acp_rtnode);
+	}
 }
 
 int result_parse_uri(oneM2MPrimitive *o2pt, RTNode *rtnode)
@@ -802,7 +813,7 @@ int check_mandatory_attributes(oneM2MPrimitive *o2pt)
 int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "check_privilege : %s : %d", o2pt->fr, acop);
-	bool deny = false;
+	bool deny = true;
 	char *origin = NULL;
 	cJSON *acpi = NULL;
 
@@ -811,24 +822,9 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	if (o2pt->fr && !strcmp(o2pt->fr, ADMIN_AE_ID))
 	{
 		logger("UTIL", LOG_LEVEL_DEBUG, "ADMIN_AE_ID : %s", o2pt->fr);
-		return false;
+		return 0;
 	}
 #endif
-
-	while (target_rtnode->parent && (acpi = cJSON_GetObjectItem(target_rtnode->obj, "acpi")) == NULL)
-	{
-		if (target_rtnode->parent->ty == RT_CSE)
-			break;
-		target_rtnode = target_rtnode->parent;
-	}
-
-	if (o2pt->fr == NULL || strlen(o2pt->fr) == 0)
-	{
-		if (!(o2pt->op == OP_CREATE && o2pt->ty == RT_AE))
-		{
-			return -1;
-		}
-	}
 
 	if (isSPIDLocal(o2pt->fr))
 	{
@@ -840,36 +836,42 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	{
 		origin = o2pt->fr;
 	}
-	if (target_rtnode)
+	// if target is AE, check ri of resource
+	if (rtnode->ty == RT_AE)
 	{
-		if (target_rtnode->ty == RT_AE)
+		if (!strcmp(origin, get_ri_rtnode(target_rtnode)))
 		{
-			if (strcmp(origin, get_ri_rtnode(target_rtnode)))
-			{
-				deny = true;
-				logger("UTIL", LOG_LEVEL_DEBUG, "originator is not owner");
-			}
+			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
+			return 0;
 		}
-		else if (target_rtnode->ty == RT_CSR)
+	}
+	// if target is CSR, check csi of resource
+	if (rtnode->ty == RT_CSR)
+	{
+		if (!strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
 		{
-			if (strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
-			{
-				deny = true;
-				logger("UTIL", LOG_LEVEL_DEBUG, "originator is not owner");
-			}
+			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
+			return 0;
 		}
 	}
 
-	if (deny && target_rtnode->ty != RT_CSE)
+	// if resource is not an AE|CSR, find acpi for all parent nodes
+	while (target_rtnode->parent && (acpi = cJSON_GetObjectItem(target_rtnode->obj, "acpi")) == NULL)
 	{
-		if ((acpi && cJSON_GetArraySize(acpi) > 0) || rtnode->ty == RT_ACP)
+		target_rtnode = target_rtnode->parent;
+	}
+
+	if (o2pt->fr == NULL || strlen(o2pt->fr) == 0)
+	{
+		if (!(o2pt->op == OP_CREATE && o2pt->ty == RT_AE))
 		{
-			deny = true;
-			if ((get_acop(o2pt, origin, rtnode) & acop) == acop)
-			{
-				deny = false;
-			}
+			return -1;
 		}
+	}
+
+	if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop)
+	{
+		deny = false;
 	}
 
 	if (deny)
@@ -925,34 +927,24 @@ int check_macp_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 int get_acop(oneM2MPrimitive *o2pt, char *corigin, RTNode *rtnode)
 {
 	int acop = 0;
-	char *origin;
-	if (!corigin || strlen(corigin) == 0)
-	{
-		origin = strdup("all");
-	}
-	else
-	{
-		origin = strdup(corigin);
-	}
 
 #ifdef ADMIN_AE_ID
-	if (!strcmp(origin, ADMIN_AE_ID))
+	if (!strcmp(corigin, ADMIN_AE_ID))
 	{
-		free(origin);
 		return ALL_ACOP;
 	}
 #endif
 
 	if (rtnode->ty == RT_ACP)
 	{
-		acop = (acop | get_acop_origin(o2pt, rtnode, 1));
-		free(origin);
+		acop = (acop | get_acop_origin(o2pt, corigin, rtnode, 1));
 		return acop;
 	}
 
 	cJSON *acpiArr = get_acpi_rtnode(rtnode);
 	if (!acpiArr)
 		return 0;
+	logger("UTIL", LOG_LEVEL_DEBUG, "get_acop : %s", rtnode->uri);
 
 	cJSON *acpi = NULL;
 	cJSON_ArrayForEach(acpi, acpiArr)
@@ -960,11 +952,9 @@ int get_acop(oneM2MPrimitive *o2pt, char *corigin, RTNode *rtnode)
 		RTNode *acp = find_rtnode(acpi->valuestring);
 		if (acp)
 		{
-			acop = (acop | get_acop_origin(o2pt, acp, 0));
+			acop = (acop | get_acop_origin(o2pt, corigin, acp, 0));
 		}
 	}
-
-	free(origin);
 	return acop;
 }
 
@@ -1003,7 +993,7 @@ int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		RTNode *acp = find_rtnode(acpi->valuestring);
 		if (acp)
 		{
-			acop = (acop | get_acop_origin(o2pt, acp, 0));
+			acop = (acop | get_acop_origin(o2pt, origin, acp, 0));
 		}
 	}
 
@@ -1111,7 +1101,7 @@ int check_acco(cJSON *accos, char *ip)
  * @param flag 1 : pvs, 0 : pv
  * @return acop
  */
-int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag)
+int get_acop_origin(oneM2MPrimitive *o2pt, char *origin, RTNode *acp_rtnode, int flag)
 {
 	int ret_acop = 0, cnt = 0;
 	cJSON *acp = acp_rtnode->obj;
@@ -1120,17 +1110,7 @@ int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag)
 	cJSON *acr = NULL;
 	cJSON *acor = NULL;
 	bool found = false;
-	char *origin = NULL;
 	char *asterisk = NULL;
-
-	if (!o2pt->fr)
-	{
-		origin = strdup("all");
-	}
-	else
-	{
-		origin = strdup(o2pt->fr);
-	}
 
 	if (flag)
 	{
@@ -1184,7 +1164,6 @@ int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag)
 		}
 	}
 	logger("UTIL", LOG_LEVEL_DEBUG, "get_acop_origin [%s]: %d", origin, ret_acop);
-	free(origin);
 	return ret_acop;
 }
 
@@ -1197,7 +1176,7 @@ int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop)
 		return 1;
 
 	RTNode *acp = find_rtnode(acpi);
-	int result = get_acop_origin(o2pt, acp, 0);
+	int result = get_acop_origin(o2pt, origin, acp, 0);
 	if ((result & acop) == acop)
 	{
 		return 1;
@@ -1215,7 +1194,7 @@ int has_acpi_update_privilege(oneM2MPrimitive *o2pt, char *acpi)
 		return 1;
 
 	RTNode *acp = find_rtnode(acpi);
-	int result = get_acop_origin(o2pt, acp, 1);
+	int result = get_acop_origin(o2pt, origin, acp, 1);
 	if ((result & ACOP_UPDATE) == ACOP_UPDATE)
 	{
 		return 1;
@@ -2308,7 +2287,7 @@ bool check_acpi_valid(oneM2MPrimitive *o2pt, cJSON *acpi)
 		}
 		else
 		{
-			if ((get_acop_origin(o2pt, acp_rtnode, 1) & ACOP_UPDATE) != ACOP_UPDATE)
+			if ((get_acop_origin(o2pt, o2pt->fr, acp_rtnode, 1) & ACOP_UPDATE) != ACOP_UPDATE)
 			{
 				ret = false;
 				handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "originator has no privilege");
@@ -2327,7 +2306,7 @@ cJSON *getNonDiscoverableAcp(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	{
 		if (rtnode->ty == RT_ACP)
 		{
-			if ((get_acop_origin(o2pt, rtnode, 0) & ACOP_DISCOVERY) != ACOP_DISCOVERY)
+			if ((get_acop_origin(o2pt, o2pt->fr, rtnode, 0) & ACOP_DISCOVERY) != ACOP_DISCOVERY)
 			{
 				cJSON_AddItemToArray(acp_list, cJSON_CreateString(get_uri_rtnode(rtnode)));
 			}
@@ -2355,7 +2334,7 @@ cJSON *getNoPermAcopDiscovery(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	{
 		if (rtnode->ty == RT_ACP)
 		{
-			if ((get_acop_origin(o2pt, rtnode, 0) & acop) != acop)
+			if ((get_acop_origin(o2pt, o2pt->fr, rtnode, 0) & acop) != acop)
 			{
 				cJSON_AddItemToArray(acp_list, cJSON_CreateString(get_uri_rtnode(rtnode)));
 			}
@@ -2876,8 +2855,7 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op)
 
 		if (op == OP_UPDATE)
 		{
-			acop = (acop | get_acop_origin(o2pt, acp, 1));
-			logger("UTIL", LOG_LEVEL_DEBUG, "acop-pvs : %d, op : %d", acop, op);
+			acop = (acop | get_acop_origin(o2pt, o2pt->fr, acp, 1));
 			if ((acop & op_to_acop(op)) == op_to_acop(op))
 			{
 				break;
@@ -3226,13 +3204,14 @@ int deRegister_csr()
 int update_remote_csr_dcse(RTNode *skip_rtnode)
 {
 	NodeList *node = rt->csr_list;
-	cJSON *root = cJSON_CreateObject();
+	cJSON *root = NULL;
 	cJSON *dcse = cJSON_GetObjectItem(rt->cb->obj, "dcse");
 	if (!dcse)
 	{
 		logger("UTIL", LOG_LEVEL_DEBUG, "dcse not found");
 		return -1;
 	}
+	root = cJSON_CreateObject();
 	dcse = cJSON_Duplicate(dcse, 1);
 	cJSON *csr = cJSON_CreateObject();
 	cJSON_AddItemToObject(root, get_resource_key(RT_CSR), csr);
