@@ -392,6 +392,7 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
  */
 int db_store_resource(cJSON *obj, char *uri)
 {
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
     char *sql = NULL, *err_msg = NULL;
     cJSON *pjson = NULL;
     cJSON *GENERAL_ATTR = cJSON_GetObjectItem(ATTRIBUTES, "general");
@@ -430,7 +431,8 @@ int db_store_resource(cJSON *obj, char *uri)
         logger("DB", LOG_LEVEL_ERROR, "prepare error store_resource");
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         sqlite3_finalize(stmt);
-        return 0;
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return -1;
     }
 
     for (int i = 0; i < general_cnt; i++)
@@ -458,6 +460,7 @@ int db_store_resource(cJSON *obj, char *uri)
         logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
         sqlite3_finalize(stmt);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
         return -1;
     }
 
@@ -492,6 +495,7 @@ int db_store_resource(cJSON *obj, char *uri)
         logger("DB", LOG_LEVEL_ERROR, "prepare error %d", rc);
         free(sql);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
         return -1;
     }
 
@@ -517,17 +521,24 @@ int db_store_resource(cJSON *obj, char *uri)
         free(sql);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         sqlite3_finalize(stmt);
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
         return -1;
     }
     sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &err_msg);
+    if (err_msg)
+    {
+        logger("DB", LOG_LEVEL_ERROR, "Error: %s", err_msg);
+    }
 
     sqlite3_finalize(stmt);
     free(sql);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
     return 1;
 }
 
 int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
 {
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
     logger("DB", LOG_LEVEL_DEBUG, "Call db_update_resource [RI]: %s", ri);
     char *sql = NULL;
     cJSON *pjson = NULL;
@@ -540,6 +551,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
     {
         logger("DB", LOG_LEVEL_ERROR, "Failed Begin Transaction: %s", err_msg);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
         return 0;
     }
     int idx = 0;
@@ -570,6 +582,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             free(sql);
             logger("DB", LOG_LEVEL_ERROR, "prepare error");
             sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite3_mutex_leave(sqlite3_db_mutex(db));
             return 0;
         }
         int idx = 1;
@@ -590,6 +603,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             free(sql);
             logger("DB", LOG_LEVEL_ERROR, "Failed Update SQL: %s, msg : %s", sql, err_msg);
             sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite3_mutex_leave(sqlite3_db_mutex(db));
             return 0;
         }
 
@@ -623,6 +637,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             free(sql);
             sqlite3_finalize(stmt);
             sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite3_mutex_leave(sqlite3_db_mutex(db));
             return 0;
         }
 
@@ -644,6 +659,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
             free(sql);
             sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite3_mutex_leave(sqlite3_db_mutex(db));
             return 0;
         }
 
@@ -652,7 +668,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
 
     sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
     free(sql);
-
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
     // Update uri of all child resources
     return 1;
 }
@@ -716,6 +732,7 @@ int db_delete_onem2m_resource(RTNode *rtnode)
     {
         return 0;
     }
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
 
     // sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
     sprintf(sql, "DELETE FROM general WHERE uri LIKE '%s/%%' OR ri='%s';", get_uri_rtnode(rtnode), ri);
@@ -725,8 +742,10 @@ int db_delete_onem2m_resource(RTNode *rtnode)
     {
         logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from %s/ msg : %s", tableName, err_msg);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
         return 0;
     }
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
 
     return 1;
 }

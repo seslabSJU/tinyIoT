@@ -30,6 +30,11 @@
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
 
+#if MONO_THREAD == 0
+pthread_mutex_t main_lock;
+pthread_mutex_t csr_lock;
+#endif
+
 void route(oneM2MPrimitive *o2pt);
 void stop_server(int sig);
 cJSON *ATTRIBUTES;
@@ -75,6 +80,11 @@ int main(int argc, char **argv)
 {
 	signal(SIGINT, stop_server);
 	logger_init();
+
+#if MONO_THREAD == 0
+	pthread_mutex_init(&main_lock, NULL);
+	pthread_mutex_init(&csr_lock, NULL);
+#endif
 
 	ATTRIBUTES = cJSON_Parse(
 		"{ \
@@ -206,6 +216,7 @@ void route(oneM2MPrimitive *o2pt)
 	}
 
 	RTNode *target_rtnode = get_rtnode(o2pt);
+
 	if (o2pt->rsc >= 4000)
 	{
 		log_runtime(start);

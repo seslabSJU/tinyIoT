@@ -31,7 +31,8 @@ char *method, // "GET" or "POST"
 
 int payload_size;
 
-void serve_forever(const char *PORT) {
+void serve_forever(const char *PORT)
+{
   struct sockaddr_in clientaddr;
   socklen_t addrlen;
 
@@ -54,21 +55,28 @@ void serve_forever(const char *PORT) {
   signal(SIGCHLD, SIG_IGN);
 
   // ACCEPT connections
-  while (1) {
+  while (1)
+  {
     addrlen = sizeof(clientaddr);
     clients[slot] = accept(listenfd, (struct sockaddr *)&clientaddr, &addrlen);
 
-    if (clients[slot] < 0) {
+    if (clients[slot] < 0)
+    {
       perror("accept() error");
       exit(1);
-    } else {
-      if (fork() == 0) {
+    }
+    else
+    {
+      if (fork() == 0)
+      {
         close(listenfd);
         respond(slot);
         close(clients[slot]);
         clients[slot] = -1;
         exit(0);
-      } else {
+      }
+      else
+      {
         close(clients[slot]);
       }
     }
@@ -79,7 +87,8 @@ void serve_forever(const char *PORT) {
 }
 
 // start server
-void start_server(const char *port) {
+void start_server(const char *port)
+{
   struct addrinfo hints, *res, *p;
 
   // getaddrinfo for host
@@ -87,12 +96,14 @@ void start_server(const char *port) {
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_PASSIVE;
-  if (getaddrinfo(NULL, port, &hints, &res) != 0) {
+  if (getaddrinfo(NULL, port, &hints, &res) != 0)
+  {
     perror("getaddrinfo() error");
     exit(1);
   }
   // socket and bind
-  for (p = res; p != NULL; p = p->ai_next) {
+  for (p = res; p != NULL; p = p->ai_next)
+  {
     int option = 1;
     listenfd = socket(p->ai_family, p->ai_socktype, 0);
     setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
@@ -101,7 +112,8 @@ void start_server(const char *port) {
     if (bind(listenfd, p->ai_addr, p->ai_addrlen) == 0)
       break;
   }
-  if (p == NULL) {
+  if (p == NULL)
+  {
     perror("socket() or bind()");
     exit(1);
   }
@@ -109,16 +121,19 @@ void start_server(const char *port) {
   freeaddrinfo(res);
 
   // listen for incoming connections
-  if (listen(listenfd, QUEUE_SIZE) != 0) {
+  if (listen(listenfd, QUEUE_SIZE) != 0)
+  {
     perror("listen() error");
     exit(1);
   }
 }
 
 // get request header by name
-char *request_header(const char *name) {
+char *request_header(const char *name)
+{
   header_t *h = reqhdr;
-  while (h->name) {
+  while (h->name)
+  {
     if (strcmp(h->name, name) == 0)
       return h->value;
     h++;
@@ -130,7 +145,8 @@ char *request_header(const char *name) {
 header_t *request_headers(void) { return reqhdr; }
 
 // Handle escape characters (%xx)
-static void uri_unescape(char *uri) {
+static void uri_unescape(char *uri)
+{
   char chr = 0;
   char *src = uri;
   char *dst = uri;
@@ -141,15 +157,18 @@ static void uri_unescape(char *uri) {
 
   // Replace encoded characters with corresponding code.
   dst = src;
-  while (*src && !isspace((int)(*src))) {
+  while (*src && !isspace((int)(*src)))
+  {
     if (*src == '+')
       chr = ' ';
-    else if ((*src == '%') && src[1] && src[2]) {
+    else if ((*src == '%') && src[1] && src[2])
+    {
       src++;
       chr = ((*src & 0x0F) + 9 * (*src > '9')) * 16;
       src++;
       chr += ((*src & 0x0F) + 9 * (*src > '9'));
-    } else
+    }
+    else
       chr = *src;
     *dst++ = chr;
     src++;
@@ -158,8 +177,11 @@ static void uri_unescape(char *uri) {
 }
 
 // client connection
-void respond(int slot) {
+void respond(int slot)
+{
   int rcvd;
+  char *reqPtr = NULL;
+  ;
 
   buf = malloc(BUF_SIZE);
   rcvd = recv(clients[slot], buf, BUF_SIZE, 0);
@@ -172,9 +194,9 @@ void respond(int slot) {
   {
     buf[rcvd] = '\0';
 
-    method = strtok(buf, " \t\r\n");
-    uri = strtok(NULL, " \t");
-    prot = strtok(NULL, " \t\r\n");
+    method = strtok_r(buf, " \t\r\n", &reqPtr);
+    uri = strtok_r(NULL, " \t", &reqPtr);
+    prot = strtok_r(NULL, " \t\r\n", &reqPtr);
 
     uri_unescape(uri);
 
@@ -189,7 +211,8 @@ void respond(int slot) {
 
     header_t *h = reqhdr;
     char *t, *t2;
-    while (h < reqhdr + 16) {
+    while (h < reqhdr + 16)
+    {
       char *key, *val;
 
       key = strtok(NULL, "\r\n: \t");
@@ -203,7 +226,7 @@ void respond(int slot) {
       h->name = key;
       h->value = val;
       h++;
-      //fprintf(stderr, "[H] %s: %s\n", key, val);
+      // fprintf(stderr, "[H] %s: %s\n", key, val);
       t = val + 1 + strlen(val);
       if (t[1] == '\r' && t[2] == '\n')
         break;

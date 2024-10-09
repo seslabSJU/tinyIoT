@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <sys/timeb.h>
 #include <limits.h>
+#include <pthread.h>
 #include "onem2m.h"
 #include "dbmanager.h"
 #include "httpd.h"
@@ -18,6 +19,7 @@
 #include "coap.h"
 
 extern ResourceTree *rt;
+extern pthread_mutex_t main_lock;
 
 void init_cse(cJSON *cse)
 {
@@ -305,6 +307,9 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	make_response_body(o2pt, target_rtnode);
 
+#if MONO_THREAD == 0
+	pthread_mutex_lock(&main_lock);
+#endif
 	delete_process(o2pt, target_rtnode);
 	db_delete_onem2m_resource(target_rtnode);
 
@@ -330,6 +335,9 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	{
 		free_rtnode(target_rtnode);
 	}
+#if MONO_THREAD == 0
+	pthread_mutex_unlock(&main_lock);
+#endif
 
 	target_rtnode = NULL;
 	o2pt->rsc = RSC_DELETED;
@@ -1100,9 +1108,15 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				del = node;
 				node = node->next;
 				logger("O2M", LOG_LEVEL_DEBUG, "deleting [%s]", del->uri);
+#if MONO_THREAD == 0
+				pthread_mutex_lock(&main_lock);
+#endif
 				delete_process(o2pt, del->rtnode);
 				logger("O2M", LOG_LEVEL_DEBUG, "delete_process done [%s]", del->uri);
 				db_delete_onem2m_resource(del->rtnode);
+#if MONO_THREAD == 0
+				pthread_mutex_unlock(&main_lock);
+#endif
 				logger("O2M", LOG_LEVEL_DEBUG, "db_delete_onem2m_resource done");
 				free_rtnode(del->rtnode);
 				free_nodelist(del);

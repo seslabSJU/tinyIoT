@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "onem2m.h"
 #include "logger.h"
 #include "dbmanager.h"
@@ -8,6 +9,7 @@
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
+extern pthread_mutex_t main_lock;
 
 /**
  * @brief get resource with oneM2MPrimitive
@@ -186,11 +188,12 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
  */
 RTNode *find_csr_rtnode_by_uri(char *uri)
 {
+    char *uriPtr;
     // RTNode *rtnode = rt->cb->child, *parent_rtnode = NULL;
     if (!uri)
         return NULL;
     char *target_uri = strdup(uri); // remove second '/'
-    char *ptr = strtok(target_uri + 1, "/");
+    char *ptr = strtok_r(target_uri + 1, "/", &uriPtr);
     if (!ptr)
         return NULL;
 
@@ -303,16 +306,19 @@ RTNode *find_rtnode_by_uri(char *uri)
 {
     RTNode *rtnode = rt->cb, *parent_rtnode = NULL;
     char *target_uri = strdup(uri);
-    char *ptr = strtok(target_uri, "/");
+    char *target_ptr;
+    char *ptr = strtok_r(target_uri, "/", &target_ptr);
     if (!ptr)
         return NULL;
     if (!strcmp(ptr, "-"))
     {
         logger("RTM", LOG_LEVEL_DEBUG, "root node -");
         rtnode = rt->cb->child;
-        ptr = strtok(NULL, "/");
+        ptr = strtok_r(NULL, "/", &target_ptr);
     }
-
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&main_lock);
+#endif
     while (ptr)
     {
         while (rtnode)
@@ -323,7 +329,7 @@ RTNode *find_rtnode_by_uri(char *uri)
         }
         if (!rtnode)
             break;
-        ptr = strtok(NULL, "/");
+        ptr = strtok_r(NULL, "/", &target_ptr);
         if (ptr)
         {
             parent_rtnode = rtnode;
@@ -334,6 +340,9 @@ RTNode *find_rtnode_by_uri(char *uri)
     if (rtnode)
     {
         free(target_uri);
+#if MONO_THREAD == 0
+        pthread_mutex_unlock(&main_lock);
+#endif
         return rtnode;
     }
     int flag = -1;
@@ -351,7 +360,7 @@ RTNode *find_rtnode_by_uri(char *uri)
                     rtnode = parent_rtnode->child;
                 }
             }
-            if (!rtnode && !strtok(NULL, "/"))
+            if (!rtnode && !strtok_r(NULL, "/", &target_ptr))
             { // if next '/' doesn't exist
                 if (!strcmp(ptr, "ol") || !strcmp(ptr, "oldest"))
                 {
@@ -372,17 +381,12 @@ RTNode *find_rtnode_by_uri(char *uri)
                 }
             }
         }
-        // if (parent_rtnode->ty == RT_GRP && ptr)
-        // {
-        //     if (!strcmp(ptr, "fopt"))
-        //     { // fopt
-        //         rtnode = parent_rtnode;
-        //     }
-        // }
     }
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&main_lock);
+#endif
 
     free(target_uri);
-
     return rtnode;
 }
 
@@ -414,7 +418,15 @@ RTNode *find_rtnode_by_ri(char *ri)
             *fopt = '\0';
         }
     }
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&main_lock);
+#endif
+
     rtnode = rt_search_ri(rt->cb, ri);
+
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&main_lock);
+#endif
     if (fopt)
     {
         *fopt = '/';
@@ -463,6 +475,10 @@ int add_child_resource_tree(RTNode *parent, RTNode *child)
 
     logger("O2M", LOG_LEVEL_DEBUG, "Add Resource Tree Node [Parent-ID] : %s, [Child-ID] : %s", get_ri_rtnode(parent), get_ri_rtnode(child));
 
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&main_lock);
+#endif
+
     if (!node)
     {
         parent->child = child;
@@ -501,6 +517,10 @@ int add_child_resource_tree(RTNode *parent, RTNode *child)
     {
         add_subs(parent, child);
     }
+
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&main_lock);
+#endif
     return 1;
 }
 
@@ -728,6 +748,10 @@ void detach_subs(RTNode *parent, RTNode *sub)
 
 void add_csrlist(RTNode *csr)
 {
+    extern pthread_mutex_t csr_lock;
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&csr_lock);
+#endif
     NodeList *pnode = rt->csr_list;
     if (!pnode)
     {
@@ -735,6 +759,9 @@ void add_csrlist(RTNode *csr)
         rt->csr_list->rtnode = csr;
         rt->csr_list->uri = strdup(csr->uri);
         rt->csr_list->next = NULL;
+#if MONO_THREAD == 0
+        pthread_mutex_unlock(&csr_lock);
+#endif
         return;
     }
     while (pnode->next)
@@ -745,6 +772,9 @@ void add_csrlist(RTNode *csr)
     pnode->next->rtnode = csr;
     pnode->next->uri = csr->uri;
     pnode->next->next = NULL;
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&csr_lock);
+#endif
 }
 
 void detach_csrlist(RTNode *csr)

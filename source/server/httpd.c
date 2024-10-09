@@ -3,6 +3,7 @@
 #include "onem2m.h"
 #include "util.h"
 
+#include <pthread.h>
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <netdb.h>
@@ -21,7 +22,7 @@
 #define BUF_SIZE 65535
 #define QUEUE_SIZE 128
 
-pthread_mutex_t mutex_lock;
+extern pthread_mutex_t mutex_lock;
 int listenfd;
 int clients[MAX_CONNECTIONS];
 static void start_server(const char *);
@@ -44,7 +45,6 @@ void *respond_thread(void *ps)
 
 void serve_forever(const char *PORT)
 {
-    pthread_mutex_init(&mutex_lock, NULL);
     struct sockaddr_in clientaddr;
     socklen_t addrlen = 0;
 
@@ -411,9 +411,8 @@ void handle_http_request(HTTPRequest *req, int slotno)
         o2pt->fc = qs;
     }
 
-    pthread_mutex_lock(&mutex_lock);
     route(o2pt);
-    pthread_mutex_unlock(&mutex_lock);
+
     http_respond_to_client(o2pt, slotno);
     free_o2pt(o2pt);
 }
