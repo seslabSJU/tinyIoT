@@ -1105,6 +1105,13 @@ int get_acop_origin(oneM2MPrimitive *o2pt, char *origin, RTNode *acp_rtnode, int
 	bool found = false;
 	char *asterisk = NULL;
 
+#ifdef ADMIN_AE_ID
+	if (origin && !strcmp(origin, ADMIN_AE_ID))
+	{
+		return ALL_ACOP;
+	}
+#endif
+
 	if (flag)
 	{
 		privilege = cJSON_GetObjectItem(acp, "pvs");
@@ -1304,6 +1311,9 @@ int check_csi_duplicate(char *new_csi, RTNode *rtnode)
 	{
 		if (!strcmp(get_ri_rtnode(child), new_csi))
 		{
+#if MONO_THREAD == 0
+			pthread_mutex_unlock(&main_lock);
+#endif
 			return -1;
 		}
 		child = child->sibling_right;
@@ -2332,12 +2342,16 @@ bool check_acpi_valid(oneM2MPrimitive *o2pt, cJSON *acpi)
 	return ret;
 }
 
+/**
+ * @brief get the list of acps that originator has no discovery privilege
+ * @param o2pt oneM2MPrimitive
+ * @param rtnode target resource node
+ * @return list of acps
+ * @note for Thread-Safe behavior, lock mutex outside initial call as the function is recursive.
+ */
 cJSON *getNonDiscoverableAcp(oneM2MPrimitive *o2pt, RTNode *rtnode)
 {
 	cJSON *acp_list = cJSON_CreateArray();
-#if MONO_THREAD == 0
-	pthread_mutex_lock(&main_lock);
-#endif
 	while (rtnode)
 	{
 		if (rtnode->ty == RT_ACP)
@@ -2359,9 +2373,6 @@ cJSON *getNonDiscoverableAcp(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		}
 		rtnode = rtnode->sibling_right;
 	}
-#if MONO_THREAD == 0
-	pthread_mutex_unlock(&main_lock);
-#endif
 	return acp_list;
 }
 
@@ -2369,9 +2380,6 @@ cJSON *getNoPermAcopDiscovery(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 {
 	cJSON *acp_list = cJSON_CreateArray();
 
-#if MONO_THREAD == 0
-	pthread_mutex_lock(&main_lock);
-#endif
 	while (rtnode)
 	{
 		if (rtnode->ty == RT_ACP)
@@ -2393,9 +2401,7 @@ cJSON *getNoPermAcopDiscovery(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		}
 		rtnode = rtnode->sibling_right;
 	}
-#if MONO_THREAD == 0
-	pthread_mutex_unlock(&main_lock);
-#endif
+
 	return acp_list;
 }
 

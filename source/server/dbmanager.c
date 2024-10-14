@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 #include "onem2m.h"
 #include "dbmanager.h"
 #include "logger.h"
@@ -1164,6 +1165,7 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol)
 cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 {
     logger("DB", LOG_LEVEL_DEBUG, "call db_get_filter_criteria");
+    extern pthread_mutex_t main_lock;
     char buf[256] = {0};
     int rc = 0;
     int cols = 0, bytes = 0, coltype = 0;
@@ -1283,10 +1285,18 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
         strcat(sql, ") ");
         filterOptionStr(fo, sql);
     }
+// get only discoverable resource
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&main_lock);
+#endif
 
-    // get only discoverable resource
     cJSON *acpiList = getNonDiscoverableAcp(o2pt, rt->cb);
     cJSON *forbiddenURI = getForbiddenUri(acpiList);
+
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&main_lock);
+#endif
+    logger("DB", LOG_LEVEL_DEBUG, "Forbidden URI : %s", cJSON_Print(forbiddenURI));
     if (cJSON_GetArraySize(forbiddenURI) > 0)
     {
         strcat(sql, "(");
@@ -1308,8 +1318,15 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 
     if ((pjson = cJSON_GetObjectItem(fc, "ops")))
     {
+#if MONO_THREAD == 0
+        pthread_mutex_lock(&main_lock);
+#endif
         acpiList = getNoPermAcopDiscovery(o2pt, rt->cb, pjson->valueint);
         forbiddenURI = getForbiddenUri(acpiList);
+
+#if MONO_THREAD == 0
+        pthread_mutex_unlock(&main_lock);
+#endif
         if (cJSON_GetArraySize(forbiddenURI) > 0)
         {
             strcat(sql, " (");
