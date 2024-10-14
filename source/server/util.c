@@ -696,7 +696,7 @@ void log_runtime(double start)
 	logger("UTIL", LOG_LEVEL_INFO, "Run time : %lf", end - start);
 }
 
-void init_server()
+bool init_server()
 {
 	bool setup = false;
 	char poa[128] = {0};
@@ -711,11 +711,8 @@ void init_server()
 	{
 		setup = true;
 		cse = cJSON_CreateObject();
-		acp = cJSON_CreateObject();
 		init_cse(cse);
-		init_acp(acp);
 		db_store_resource(cse, CSE_BASE_NAME);
-		db_store_resource(acp, CSE_BASE_NAME "/defaultACP");
 	}
 	else
 	{
@@ -768,12 +765,7 @@ void init_server()
 	cJSON_AddItemToObject(cse, "poa", poa_obj);
 
 	rt->cb = create_rtnode(cse, RT_CSE);
-
-	if (setup)
-	{
-		RTNode *acp_rtnode = create_rtnode(acp, RT_ACP);
-		add_child_resource_tree(rt->cb, acp_rtnode);
-	}
+	return setup;
 }
 
 int result_parse_uri(oneM2MPrimitive *o2pt, RTNode *rtnode)
@@ -857,7 +849,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	}
 
 	// if resource is not an AE|CSR, find acpi for all parent nodes
-	while (target_rtnode->parent && (acpi = cJSON_GetObjectItem(target_rtnode->obj, "acpi")) == NULL)
+	while (target_rtnode->parent && cJSON_GetObjectItem(target_rtnode->obj, "acpi") == NULL)
 	{
 		target_rtnode = target_rtnode->parent;
 	}
@@ -1284,6 +1276,9 @@ int check_aei_duplicate(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		if (!strcmp(get_ri_rtnode(child), aei))
 		{
 			handle_error(o2pt, RSC_ORIGINATOR_HAS_ALREADY_REGISTERD, "attribute `aei` is duplicated");
+#if MONO_THREAD == 0
+			pthread_mutex_unlock(&main_lock);
+#endif
 			return -1;
 		}
 		child = child->sibling_right;
@@ -1590,10 +1585,10 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 
 		remote = get_remote_resource(cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring, &rsc);
-		logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body : %s", cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring);
+		// logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body : %s", cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring);
 		if (remote && rsc == RSC_OK)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body : %s", remote->uri);
+			// logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body : %s", remote->uri);
 			cJSON_AddItemToObject(root, get_resource_key(remote->ty), cJSON_Duplicate(remote->obj, true));
 			free_rtnode(remote);
 		}
@@ -2251,7 +2246,7 @@ cJSON *qs_to_json(char *qs)
 
 		if (key != NULL && value != NULL)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "key = %s, value = %s", key, value);
+			// logger("UTIL", LOG_LEVEL_DEBUG, "key = %s, value = %s", key, value);
 			if (strstr(value, "+") != NULL)
 			{
 				ptr = strtok_r(value, "+", &tokPtr);

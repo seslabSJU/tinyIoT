@@ -78,6 +78,7 @@ static ssize_t cmdline_read_key(char *arg, unsigned char **buf, size_t maxlen)
 
 int main(int argc, char **argv)
 {
+	bool initialBoot = false;
 	signal(SIGINT, stop_server);
 	logger_init();
 
@@ -147,9 +148,18 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	init_server();
+	initialBoot = init_server();
 
 	init_resource_tree();
+
+	if (initialBoot)
+	{
+		cJSON *acp = cJSON_CreateObject();
+		init_acp(acp);
+		db_store_resource(acp, CSE_BASE_NAME "/defaultACP");
+		RTNode *acp_rtnode = create_rtnode(acp, RT_ACP);
+		add_child_resource_tree(rt->cb, acp_rtnode);
+	}
 
 	if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
 	{

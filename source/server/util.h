@@ -6,7 +6,7 @@
 #include "cJSON.h"
 #include "httpd.h"
 
-void init_server();
+bool init_server();
 
 void set_o2pt_pc(oneM2MPrimitive *o2pt, char *pc, ...);
 void set_o2pt_rsc(oneM2MPrimitive *o2pt, int rsc);
