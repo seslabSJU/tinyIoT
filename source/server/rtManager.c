@@ -404,10 +404,9 @@ RTNode *find_rtnode_by_ri(char *ri)
     // logger("UTIL", LOG_LEVEL_DEBUG, "RI : %s", ri);
     if (strncmp(ri, "4-", 2) == 0)
     {
-        logger("RTM", LOG_LEVEL_DEBUG, "CIN");
         resource = db_get_resource(ri, RT_CIN);
         rtnode = create_rtnode(resource, RT_CIN);
-        rtnode->parent = find_rtnode_by_ri(get_pi_rtnode(rtnode));
+        rtnode->parent = find_rtnode_by_uri(rtnode->uri);
         return rtnode;
     }
     else if (strncmp(ri, "9-", 2) == 0)

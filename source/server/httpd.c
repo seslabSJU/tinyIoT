@@ -22,7 +22,6 @@
 #define BUF_SIZE 65535
 #define QUEUE_SIZE 128
 
-extern pthread_mutex_t mutex_lock;
 int listenfd;
 int clients[MAX_CONNECTIONS];
 static void start_server(const char *);
