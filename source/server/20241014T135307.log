@@ -1,0 +1,1090 @@
+Mon Oct 14 13:53:07 2024 DEBUG [DB]: SQL: INSERT INTO cb (id, cst,csi,srt,poa,srv,rr,at,aa,ast) VALUES( (SELECT id FROM general WHERE ri=?),?,?,?,?,?,?,?,?,?);
+Mon Oct 14 13:53:07 2024 DEBUG [UTIL]: init_resource_tree
+Mon Oct 14 13:53:07 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Mon Oct 14 13:53:07 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Mon Oct 14 13:53:07 2024 INFO  [COAP]: CoAP Setup Completed
+Mon Oct 14 13:53:07 2024 INFO  [WEBSOCKET]: WebSocket Server(ws) started on port 8081
+Mon Oct 14 13:53:07 2024 INFO  [WEBSOCKET]: WebSocket Server (wss) started on port 8443
+Mon Oct 14 13:53:19 2024 DEBUG [WEBSOCKET]: Connection established
+Mon Oct 14 13:53:20 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAdmin", "to": "TinyIoT", "op": 2, "rqi": "880541629238407922", "rvi": "4"}WebSocket-Key: l0HXttjgp0Czu+Zmsx73wQ==
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: CAdmin
+User-Agent: Python/3.12 websockets/12.0
+
+--
+
+Mon Oct 14 13:53:20 2024 INFO  [WEBSOCKET]: X-M2M-Origin: CAdmin
+Mon Oct 14 13:53:20 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAdmin
+Mon Oct 14 13:53:20 2024 INFO  [WEBSOCKET]: op: 2
+Mon Oct 14 13:53:20 2024 DEBUG [WEBSOCKET]: to: TinyIoT
+Mon Oct 14 13:53:20 2024 DEBUG [WEBSOCKET]: Parsed request: op=2, to=TinyIoT, rqi=880541629238407922, ty=0, rvi=5
+Mon Oct 14 13:53:20 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Mon Oct 14 13:53:20 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:20 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:20 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 13:53:20 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:20 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:20 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:20 2024 DEBUG [MAIN]: o2pt->op : 2
+Mon Oct 14 13:53:20 2024 DEBUG [UTIL]: check_privilege : CAdmin : 2
+Mon Oct 14 13:53:20 2024 DEBUG [UTIL]: ADMIN_AE_ID : CAdmin
+Mon Oct 14 13:53:20 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Mon Oct 14 13:53:20 2024 INFO  [UTIL]: Run time : 0.000151
+Mon Oct 14 13:53:20 2024 DEBUG [WEBSOCKET]: rsc : 2000
+Mon Oct 14 13:53:20 2024 DEBUG [WEBSOCKET]: retrieve 응답 메세지 : {"rsc":2000,"rqi":"880541629238407922","rvi":"4","pc":{"general":{"ct":"20241014T135307","ri":"tinyiot","lt":"20241014T135307","rn":"TinyIoT","cst":1,"srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"pi":"","ty":5,"csi":"/tinyiot","rr":false,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"]}}}
+Mon Oct 14 13:53:20 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2000,"rqi":"880541629238407922","to":"TinyIoT","fr":"CAdmin","rvi":"4","pc":{"m2m:cb":{"ct":"20241014T135307","ri":"tinyiot","lt":"20241014T135307","rn":"TinyIoT","cst":1,"srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"pi":"","ty":5,"csi":"/tinyiot","rr":false,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"]}}}
+Mon Oct 14 13:53:22 2024 DEBUG [HTTP]: 
+
+GET /TinyIoT HTTP/1.1
+Host: localhost:3000
+User-Agent: python-requests/2.32.3
+Accept-Encoding: gzip, deflate
+Accept: application/json
+Connection: keep-alive
+Content-Type: application/json
+X-M2M-RI: 5334791748253585797
+X-M2M-RVI: 4
+X-M2M-Origin: CAdmin
+
+
+
+Mon Oct 14 13:53:22 2024 DEBUG [HTTP]: [36m[GET] /TinyIoT[0m
+Mon Oct 14 13:53:22 2024 DEBUG [HTTP]: fr: CAdmin
+Mon Oct 14 13:53:22 2024 DEBUG [HTTP]: to: TinyIoT
+Mon Oct 14 13:53:22 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Mon Oct 14 13:53:22 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Mon Oct 14 13:53:22 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:22 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 13:53:22 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:22 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:22 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:22 2024 DEBUG [MAIN]: o2pt->op : 2
+Mon Oct 14 13:53:22 2024 DEBUG [UTIL]: check_privilege : CAdmin : 2
+Mon Oct 14 13:53:22 2024 DEBUG [UTIL]: ADMIN_AE_ID : CAdmin
+Mon Oct 14 13:53:22 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Mon Oct 14 13:53:22 2024 INFO  [UTIL]: Run time : 0.000282
+Mon Oct 14 13:53:22 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 200 OK
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+Content-Length: 264
+X-M2M-RSC: 2000
+X-M2M-RVI: 4
+X-M2M-RI: 5334791748253585797
+
+{"m2m:cb":{"ct":"20241014T135307","ri":"tinyiot","lt":"20241014T135307","rn":"TinyIoT","cst":1,"srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"pi":"","ty":5,"csi":"/tinyiot","rr":false,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"]}}
+
+Mon Oct 14 13:53:23 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAdmin", "to": "TinyIoT", "op": 2, "rqi": "910698071693196573", "rvi": "4"}WebSocket-Key: l0HXttjgp0Czu+Zmsx73wQ==
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: CAdmin
+User-Agent: Python/3.12 websockets/12.0
+
+--
+
+Mon Oct 14 13:53:23 2024 INFO  [WEBSOCKET]: X-M2M-Origin: CAdmin
+Mon Oct 14 13:53:23 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAdmin
+Mon Oct 14 13:53:23 2024 INFO  [WEBSOCKET]: op: 2
+Mon Oct 14 13:53:23 2024 DEBUG [WEBSOCKET]: to: TinyIoT
+Mon Oct 14 13:53:23 2024 DEBUG [WEBSOCKET]: Parsed request: op=2, to=TinyIoT, rqi=910698071693196573, ty=0, rvi=5
+Mon Oct 14 13:53:23 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Mon Oct 14 13:53:23 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:23 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:23 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 13:53:23 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:23 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:23 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:23 2024 DEBUG [MAIN]: o2pt->op : 2
+Mon Oct 14 13:53:23 2024 DEBUG [UTIL]: check_privilege : CAdmin : 2
+Mon Oct 14 13:53:23 2024 DEBUG [UTIL]: ADMIN_AE_ID : CAdmin
+Mon Oct 14 13:53:23 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Mon Oct 14 13:53:23 2024 INFO  [UTIL]: Run time : 0.000279
+Mon Oct 14 13:53:23 2024 DEBUG [WEBSOCKET]: rsc : 2000
+Mon Oct 14 13:53:23 2024 DEBUG [WEBSOCKET]: retrieve 응답 메세지 : {"rsc":2000,"rqi":"910698071693196573","rvi":"4","pc":{"general":{"ct":"20241014T135307","ri":"tinyiot","lt":"20241014T135307","rn":"TinyIoT","cst":1,"srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"pi":"","ty":5,"csi":"/tinyiot","rr":false,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"]}}}
+Mon Oct 14 13:53:23 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2000,"rqi":"910698071693196573","to":"TinyIoT","fr":"CAdmin","rvi":"4","pc":{"m2m:cb":{"ct":"20241014T135307","ri":"tinyiot","lt":"20241014T135307","rn":"TinyIoT","cst":1,"srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"pi":"","ty":5,"csi":"/tinyiot","rr":false,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"]}}}
+Mon Oct 14 13:53:25 2024 DEBUG [WEBSOCKET]: Connection established
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "C", "to": "TinyIoT", "op": 1, "rqi": "6132396873145105867", "rvi": "4", "ty": 2, "pc": {"m2m:ae": {"rn": "testAE", "api": "NMyApp1Id", "rr": false, "srv": ["4"]}}}ns: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: C
+User-Agent: Python/3.12 websockets/12.0
+
+0
+
+--
+
+Mon Oct 14 13:53:26 2024 INFO  [WEBSOCKET]: X-M2M-Origin: C
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"rn":	"testAE",
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : C
+Mon Oct 14 13:53:26 2024 INFO  [WEBSOCKET]: op: 1
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: to: TinyIoT
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: Parsed request: op=1, to=TinyIoT, rqi=6132396873145105867, ty=2, rvi=5
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"rn":	"testAE",
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:26 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 13:53:26 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:26 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:26 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:26 2024 DEBUG [MAIN]: o2pt->op : 1
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: create_onem2m_resource
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: create_onem2m_resource2
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: create_onem2m_resource3
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: e = 0
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: create_onem2m_resource4
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: create_onem2m_resource5
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: check_privilege : C : 1
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: create_onem2m_resource6
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: create_onem2m_resource7
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: request_pc : 
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking1
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: obj = 
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking2
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: attr = ��g�WU
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: obj : 
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: ty : 2
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: pjson = 
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: o2pt->ty: 2
+Mon Oct 14 13:53:26 2024 INFO  [O2M]: Create AE
+Mon Oct 14 13:53:26 2024 DEBUG [UTIL]: check_aei_duplicate : C
+Mon Oct 14 13:53:26 2024 DEBUG [DB]: SQL: INSERT INTO ae (id, api,aei,rr,poa,apn,srv,at,aa,ast) VALUES( (SELECT id FROM general WHERE ri=?),?,?,?,?,?,?,?,?,?);
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : tinyiot, [Child-ID] : CAE20241014T1353260000
+Mon Oct 14 13:53:26 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Mon Oct 14 13:53:26 2024 INFO  [UTIL]: Run time : 0.002037
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: rsc : 2001
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: Resource name: testAE
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: Created resource path: TinyIoT/testAE
+Mon Oct 14 13:53:26 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:26 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: create 응답 메세지 : {"rsc":2001,"rqi":"6132396873145105867","rvi":"4","pc":{"m2m:ae":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135326","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000"}}}
+Mon Oct 14 13:53:26 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2001,"rqi":"6132396873145105867","to":"TinyIoT","fr":"C","rvi":"4","pc":{"m2m:ae":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135326","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000"}}}
+Mon Oct 14 13:53:27 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "C", "to": "TinyIoT/testAE", "op": 1, "rqi": "4991886668868350324", "rvi": "4", "ty": 2, "pc": {"m2m:ae": {"rn": "testAE1", "api": "NMyApp1Id", "rr": false, "srv": ["4"]}}}essage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: C
+User-Agent: Python/3.12 websockets/12.0
+
+0
+
+--
+
+Mon Oct 14 13:53:27 2024 INFO  [WEBSOCKET]: X-M2M-Origin: C
+Mon Oct 14 13:53:27 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"rn":	"testAE1",
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:27 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : C
+Mon Oct 14 13:53:27 2024 INFO  [WEBSOCKET]: op: 1
+Mon Oct 14 13:53:27 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:27 2024 DEBUG [WEBSOCKET]: Parsed request: op=1, to=TinyIoT/testAE, rqi=4991886668868350324, ty=2, rvi=5
+Mon Oct 14 13:53:27 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"rn":	"testAE1",
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:27 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:27 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:27 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:27 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:27 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:27 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:27 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:27 2024 DEBUG [MAIN]: o2pt->op : 1
+Mon Oct 14 13:53:27 2024 DEBUG [O2M]: create_onem2m_resource
+Mon Oct 14 13:53:27 2024 DEBUG [O2M]: create_onem2m_resource2
+Mon Oct 14 13:53:27 2024 DEBUG [O2M]: create_onem2m_resource3
+Mon Oct 14 13:53:27 2024 DEBUG [O2M]: e = 0
+Mon Oct 14 13:53:27 2024 DEBUG [O2M]: create_onem2m_resource4
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:27 2024 DEBUG [O2M]: create_onem2m_resource5
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: check_privilege : C : 1
+Mon Oct 14 13:53:27 2024 DEBUG [O2M]: create_onem2m_resource6
+Mon Oct 14 13:53:27 2024 DEBUG [O2M]: create_onem2m_resource7
+Mon Oct 14 13:53:27 2024 DEBUG [O2M]: request_pc : 
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking1
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: obj = 
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking2
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: attr = ��g�WU
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: obj : 
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: ty : 2
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: pjson = 
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:27 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:27 2024 INFO  [UTIL]: child type error
+Mon Oct 14 13:53:27 2024 INFO  [UTIL]: Run time : 0.002019
+Mon Oct 14 13:53:27 2024 DEBUG [WEBSOCKET]: rsc : 4108
+Mon Oct 14 13:53:27 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4108,"rqi":"4991886668868350324","to":"TinyIoT/testAE","fr":"C","rvi":"4","pc":{"m2m:dbg":"child type error"}}
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "C", "to": "TinyIoT", "op": 1, "rqi": "7313135490947383626", "rvi": "4", "ty": 2, "pc": {"m2m:ae": {"rn": "testAE", "api": "NMyApp1Id", "rr": false, "srv": ["4"]}}}["4"]}}}essage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: C
+User-Agent: Python/3.12 websockets/12.0
+
+0
+
+--
+
+Mon Oct 14 13:53:28 2024 INFO  [WEBSOCKET]: X-M2M-Origin: C
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"rn":	"testAE",
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : C
+Mon Oct 14 13:53:28 2024 INFO  [WEBSOCKET]: op: 1
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: to: TinyIoT
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: Parsed request: op=1, to=TinyIoT, rqi=7313135490947383626, ty=2, rvi=5
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"rn":	"testAE",
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:28 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:28 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 13:53:28 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:28 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:28 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:28 2024 DEBUG [MAIN]: o2pt->op : 1
+Mon Oct 14 13:53:28 2024 DEBUG [O2M]: create_onem2m_resource
+Mon Oct 14 13:53:28 2024 DEBUG [O2M]: create_onem2m_resource2
+Mon Oct 14 13:53:28 2024 DEBUG [O2M]: create_onem2m_resource3
+Mon Oct 14 13:53:28 2024 DEBUG [O2M]: e = 0
+Mon Oct 14 13:53:28 2024 DEBUG [O2M]: create_onem2m_resource4
+Mon Oct 14 13:53:28 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:28 2024 DEBUG [O2M]: create_onem2m_resource5
+Mon Oct 14 13:53:28 2024 DEBUG [UTIL]: check_privilege : C : 1
+Mon Oct 14 13:53:28 2024 DEBUG [O2M]: create_onem2m_resource6
+Mon Oct 14 13:53:28 2024 INFO  [UTIL]: attribute `rn` is duplicated
+Mon Oct 14 13:53:28 2024 DEBUG [O2M]: create_onem2m_resource7
+Mon Oct 14 13:53:28 2024 INFO  [UTIL]: Run time : 0.000489
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: rsc : 4105
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4105,"rqi":"7313135490947383626","to":"TinyIoT","fr":"C","rvi":"4","pc":{"m2m:dbg":"attribute `rn` is duplicated"}}
+Mon Oct 14 13:53:28 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4105,"rqi":"7313135490947383626","to":"TinyIoT","fr":"C","rvi":"4","pc":{"m2m:dbg":"attribute `rn` is duplicated"}}
+Mon Oct 14 13:53:30 2024 DEBUG [WEBSOCKET]: Connection established
+Mon Oct 14 13:53:31 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAE20241014T1353260000", "to": "TinyIoT", "op": 1, "rqi": "5082301614220044568", "rvi": "4", "ty": 2, "pc": {"m2m:ae": {"api": "NMyApp1Id", "rr": false, "srv": ["4"]}}}ermessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: CAE20241014T1353260000
+User-Agent: Python/3.12 websockets/12.0
+
+--
+
+Mon Oct 14 13:53:31 2024 INFO  [WEBSOCKET]: X-M2M-Origin: CAE20241014T1353260000
+Mon Oct 14 13:53:31 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:31 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAE20241014T1353260000
+Mon Oct 14 13:53:31 2024 INFO  [WEBSOCKET]: op: 1
+Mon Oct 14 13:53:31 2024 DEBUG [WEBSOCKET]: to: TinyIoT
+Mon Oct 14 13:53:31 2024 DEBUG [WEBSOCKET]: Parsed request: op=1, to=TinyIoT, rqi=5082301614220044568, ty=2, rvi=5
+Mon Oct 14 13:53:31 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:31 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:31 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 13:53:31 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:31 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:31 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:31 2024 DEBUG [MAIN]: o2pt->op : 1
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: create_onem2m_resource
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: create_onem2m_resource2
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: create_onem2m_resource3
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: e = 0
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: create_onem2m_resource4
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: create_onem2m_resource5
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: check_privilege : CAE20241014T1353260000 : 1
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: create_onem2m_resource6
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: create_onem2m_resource7
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: request_pc : 
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking1
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: obj = 
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking2
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: attr = ��g�WU
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: obj : 
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: ty : 2
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: pjson = 
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:31 2024 DEBUG [O2M]: o2pt->ty: 2
+Mon Oct 14 13:53:31 2024 INFO  [O2M]: Create AE
+Mon Oct 14 13:53:31 2024 DEBUG [UTIL]: check_aei_duplicate : CAE20241014T1353260000
+Mon Oct 14 13:53:31 2024 INFO  [UTIL]: attribute `aei` is duplicated
+Mon Oct 14 13:53:31 2024 INFO  [UTIL]: Run time : 0.001814
+Mon Oct 14 13:53:31 2024 DEBUG [WEBSOCKET]: rsc : 4117
+Mon Oct 14 13:53:31 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4117,"rqi":"5082301614220044568","to":"TinyIoT","fr":"CAE20241014T1353260000","rvi":"4","pc":{"m2m:dbg":"attribute `aei` is duplicated"}}
+Mon Oct 14 13:53:33 2024 DEBUG [WEBSOCKET]: Connection established
+Mon Oct 14 13:53:34 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "tinyiot", "to": "TinyIoT", "op": 1, "rqi": "8886321552967038203", "rvi": "4", "ty": 2, "pc": {"m2m:ae": {"api": "NMyApp1Id", "rr": false, "srv": ["4"]}}}t-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: tinyiot
+User-Agent: Python/3.12 websockets/12.0
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:34 2024 INFO  [WEBSOCKET]: X-M2M-Origin: tinyiot
+Mon Oct 14 13:53:34 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:34 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : tinyiot
+Mon Oct 14 13:53:34 2024 INFO  [WEBSOCKET]: op: 1
+Mon Oct 14 13:53:34 2024 DEBUG [WEBSOCKET]: to: TinyIoT
+Mon Oct 14 13:53:34 2024 DEBUG [WEBSOCKET]: Parsed request: op=1, to=TinyIoT, rqi=8886321552967038203, ty=2, rvi=5
+Mon Oct 14 13:53:34 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"api":	"NMyApp1Id",
+		"rr":	false,
+		"srv":	["4"]
+	}
+}
+Mon Oct 14 13:53:34 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:34 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 13:53:34 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:34 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:34 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:34 2024 DEBUG [MAIN]: o2pt->op : 1
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: create_onem2m_resource
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: create_onem2m_resource2
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: create_onem2m_resource3
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: e = 0
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: create_onem2m_resource4
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: create_onem2m_resource5
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: check_privilege : tinyiot : 1
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: create_onem2m_resource6
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: create_onem2m_resource7
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: request_pc : 
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking1
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: obj = 
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking2
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: attr = ��g�WU
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: obj : 
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: ty : 2
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: pjson = 
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:53:34 2024 DEBUG [O2M]: o2pt->ty: 2
+Mon Oct 14 13:53:34 2024 INFO  [O2M]: Create AE
+Mon Oct 14 13:53:34 2024 DEBUG [UTIL]: check_aei_duplicate : tinyiot
+Mon Oct 14 13:53:34 2024 INFO  [UTIL]: originator is invalid
+Mon Oct 14 13:53:34 2024 INFO  [UTIL]: Run time : 0.001382
+Mon Oct 14 13:53:34 2024 DEBUG [WEBSOCKET]: rsc : 4126
+Mon Oct 14 13:53:34 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4126,"rqi":"8886321552967038203","to":"TinyIoT","fr":"tinyiot","rvi":"4","pc":{"m2m:dbg":"originator is invalid"}}}
+Mon Oct 14 13:53:35 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAE20241014T1353260000", "to": "TinyIoT/testAE", "op": 2, "rqi": "3515561704437591968", "rvi": "4"}m:ae": {"api": "NMyApp1Id", "rr": false, "srv": ["4"]}}}t-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: tinyiot
+User-Agent: Python/3.12 websockets/12.0
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:35 2024 INFO  [WEBSOCKET]: X-M2M-Origin: tinyiot
+Mon Oct 14 13:53:35 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAE20241014T1353260000
+Mon Oct 14 13:53:35 2024 INFO  [WEBSOCKET]: op: 2
+Mon Oct 14 13:53:35 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:35 2024 DEBUG [WEBSOCKET]: Parsed request: op=2, to=TinyIoT/testAE, rqi=3515561704437591968, ty=0, rvi=5
+Mon Oct 14 13:53:35 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Mon Oct 14 13:53:35 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:35 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:35 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:35 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:35 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:35 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:35 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:35 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:35 2024 DEBUG [MAIN]: o2pt->op : 2
+Mon Oct 14 13:53:35 2024 DEBUG [UTIL]: check_privilege : CAE20241014T1353260000 : 2
+Mon Oct 14 13:53:35 2024 DEBUG [O2M]: Notify via SUB [TinyIoT/testAE]
+Mon Oct 14 13:53:35 2024 INFO  [UTIL]: Run time : 0.000169
+Mon Oct 14 13:53:35 2024 DEBUG [WEBSOCKET]: rsc : 2000
+Mon Oct 14 13:53:35 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:35 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:35 2024 DEBUG [WEBSOCKET]: retrieve 응답 메세지 : {"rsc":2000,"rqi":"3515561704437591968","rvi":"4","pc":{"general":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135326","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000"}}}
+Mon Oct 14 13:53:35 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2000,"rqi":"3515561704437591968","to":"TinyIoT/testAE","fr":"CAE20241014T1353260000","rvi":"4","pc":{"m2m:ae":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135326","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000"}}}
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: Connection established
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "Cwrong", "to": "TinyIoT/testAE", "op": 2, "rqi": "8248730058764508539", "rvi": "4"}t-Key: vyt2f2BCRJtTW2hoB6MgqQ==
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: Cwrong
+User-Agent: Python/3.12 websockets/12.0
+
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:37 2024 INFO  [WEBSOCKET]: X-M2M-Origin: Cwrong
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : Cwrong
+Mon Oct 14 13:53:37 2024 INFO  [WEBSOCKET]: op: 2
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: Parsed request: op=2, to=TinyIoT/testAE, rqi=8248730058764508539, ty=0, rvi=5
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:37 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:37 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:37 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:37 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:37 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:37 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:37 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:37 2024 DEBUG [MAIN]: o2pt->op : 2
+Mon Oct 14 13:53:37 2024 DEBUG [UTIL]: check_privilege : Cwrong : 2
+Mon Oct 14 13:53:37 2024 DEBUG [O2M]: Notify via SUB [TinyIoT/testAE]
+Mon Oct 14 13:53:37 2024 INFO  [UTIL]: Run time : 0.000166
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: rsc : 2000
+Mon Oct 14 13:53:37 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:37 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: retrieve 응답 메세지 : {"rsc":2000,"rqi":"8248730058764508539","rvi":"4","pc":{"general":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135326","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000"}}}
+Mon Oct 14 13:53:37 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2000,"rqi":"8248730058764508539","to":"TinyIoT/testAE","fr":"Cwrong","rvi":"4","pc":{"m2m:ae":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135326","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000"}}}
+Mon Oct 14 13:53:38 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAE20241014T1353260000", "to": "TinyIoT/testAE", "op": 2, "rqi": "7244742123301566857", "rvi": "4"}JtTW2hoB6MgqQ==
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: Cwrong
+User-Agent: Python/3.12 websockets/12.0
+
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:38 2024 INFO  [WEBSOCKET]: X-M2M-Origin: Cwrong
+Mon Oct 14 13:53:38 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAE20241014T1353260000
+Mon Oct 14 13:53:38 2024 INFO  [WEBSOCKET]: op: 2
+Mon Oct 14 13:53:38 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:38 2024 DEBUG [WEBSOCKET]: Parsed request: op=2, to=TinyIoT/testAE, rqi=7244742123301566857, ty=0, rvi=5
+Mon Oct 14 13:53:38 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Mon Oct 14 13:53:38 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:38 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:38 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:38 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:38 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:38 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:38 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:38 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:38 2024 DEBUG [MAIN]: o2pt->op : 2
+Mon Oct 14 13:53:38 2024 DEBUG [UTIL]: check_privilege : CAE20241014T1353260000 : 2
+Mon Oct 14 13:53:38 2024 DEBUG [O2M]: Notify via SUB [TinyIoT/testAE]
+Mon Oct 14 13:53:38 2024 INFO  [UTIL]: Run time : 0.000229
+Mon Oct 14 13:53:38 2024 DEBUG [WEBSOCKET]: rsc : 2000
+Mon Oct 14 13:53:38 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:38 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:38 2024 DEBUG [WEBSOCKET]: retrieve 응답 메세지 : {"rsc":2000,"rqi":"7244742123301566857","rvi":"4","pc":{"general":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135326","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000"}}}
+Mon Oct 14 13:53:38 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2000,"rqi":"7244742123301566857","to":"TinyIoT/testAE","fr":"CAE20241014T1353260000","rvi":"4","pc":{"m2m:ae":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135326","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000"}}}
+Mon Oct 14 13:53:39 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAE20241014T1353260000", "to": "TinyIoT/testAE", "op": 3, "rqi": "5499950507677713361", "rvi": "4", "pc": {"m2m:ae": {"lbl": ["aTag"]}}} 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: Cwrong
+User-Agent: Python/3.12 websockets/12.0
+
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:39 2024 INFO  [WEBSOCKET]: X-M2M-Origin: Cwrong
+Mon Oct 14 13:53:39 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"lbl":	["aTag"]
+	}
+}
+Mon Oct 14 13:53:39 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAE20241014T1353260000
+Mon Oct 14 13:53:39 2024 INFO  [WEBSOCKET]: op: 3
+Mon Oct 14 13:53:39 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:39 2024 DEBUG [WEBSOCKET]: Parsed request: op=3, to=TinyIoT/testAE, rqi=5499950507677713361, ty=0, rvi=5
+Mon Oct 14 13:53:39 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"lbl":	["aTag"]
+	}
+}
+Mon Oct 14 13:53:39 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:39 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:39 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:39 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:39 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:39 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:39 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:39 2024 DEBUG [MAIN]: o2pt->op : 3
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: check_privilege : CAE20241014T1353260000 : 4
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: checking1
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: obj = 
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: checking2
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: attr = ��g�WU
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: obj : 
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: ty : 2
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: pjson = 
+Mon Oct 14 13:53:39 2024 INFO  [O2M]: Update AE
+Mon Oct 14 13:53:39 2024 DEBUG [DB]: Call db_update_resource [RI]: CAE20241014T1353260000
+Mon Oct 14 13:53:39 2024 DEBUG [UTIL]: announce_to_annc
+Mon Oct 14 13:53:39 2024 DEBUG [O2M]: Notify via SUB [TinyIoT/testAE]
+Mon Oct 14 13:53:39 2024 INFO  [UTIL]: Run time : 0.001308
+Mon Oct 14 13:53:39 2024 DEBUG [WEBSOCKET]: rsc : 2004
+Mon Oct 14 13:53:39 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:39 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:39 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2004,"rqi":"5499950507677713361","to":"TinyIoT/testAE","fr":"CAE20241014T1353260000","rvi":"4","pc":{"m2m:ae":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135339","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000","lbl":["aTag"]}}}
+Mon Oct 14 13:53:40 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAE20241014T1353260000", "to": "TinyIoT/testAE", "op": 2, "rqi": "4647706827356201938", "rvi": "4"}", "pc": {"m2m:ae": {"lbl": ["aTag"]}}} 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: Cwrong
+User-Agent: Python/3.12 websockets/12.0
+
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:40 2024 INFO  [WEBSOCKET]: X-M2M-Origin: Cwrong
+Mon Oct 14 13:53:40 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAE20241014T1353260000
+Mon Oct 14 13:53:40 2024 INFO  [WEBSOCKET]: op: 2
+Mon Oct 14 13:53:40 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:40 2024 DEBUG [WEBSOCKET]: Parsed request: op=2, to=TinyIoT/testAE, rqi=4647706827356201938, ty=0, rvi=5
+Mon Oct 14 13:53:40 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Mon Oct 14 13:53:40 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:40 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:40 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:40 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:40 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:40 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:40 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:40 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:40 2024 DEBUG [MAIN]: o2pt->op : 2
+Mon Oct 14 13:53:40 2024 DEBUG [UTIL]: check_privilege : CAE20241014T1353260000 : 2
+Mon Oct 14 13:53:40 2024 DEBUG [O2M]: Notify via SUB [TinyIoT/testAE]
+Mon Oct 14 13:53:40 2024 INFO  [UTIL]: Run time : 0.000353
+Mon Oct 14 13:53:40 2024 DEBUG [WEBSOCKET]: rsc : 2000
+Mon Oct 14 13:53:40 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:40 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:40 2024 DEBUG [WEBSOCKET]: retrieve 응답 메세지 : {"rsc":2000,"rqi":"4647706827356201938","rvi":"4","pc":{"general":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135339","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000","lbl":["aTag"]}}}
+Mon Oct 14 13:53:40 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2000,"rqi":"4647706827356201938","to":"TinyIoT/testAE","fr":"CAE20241014T1353260000","rvi":"4","pc":{"m2m:ae":{"rn":"testAE","api":"NMyApp1Id","rr":false,"srv":["4"],"ty":2,"ct":"20241014T135326","ri":"CAE20241014T1353260000","lt":"20241014T135339","pi":"tinyiot","et":"20261014T135326","aei":"CAE20241014T1353260000","lbl":["aTag"]}}}
+Mon Oct 14 13:53:41 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAE20241014T1353260000", "to": "TinyIoT/testAE", "op": 3, "rqi": "8399243227148867204", "rvi": "4", "pc": {"m2m:ae": {"ty": 5}}}Tag"]}}} 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: Cwrong
+User-Agent: Python/3.12 websockets/12.0
+
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:41 2024 INFO  [WEBSOCKET]: X-M2M-Origin: Cwrong
+Mon Oct 14 13:53:41 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"ty":	5
+	}
+}
+Mon Oct 14 13:53:41 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAE20241014T1353260000
+Mon Oct 14 13:53:41 2024 INFO  [WEBSOCKET]: op: 3
+Mon Oct 14 13:53:41 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:41 2024 DEBUG [WEBSOCKET]: Parsed request: op=3, to=TinyIoT/testAE, rqi=8399243227148867204, ty=0, rvi=5
+Mon Oct 14 13:53:41 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"ty":	5
+	}
+}
+Mon Oct 14 13:53:41 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:41 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:41 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:41 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:41 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:41 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:41 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:41 2024 DEBUG [MAIN]: o2pt->op : 3
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: check_privilege : CAE20241014T1353260000 : 4
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: checking1
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: obj = 
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: checking2
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: attr = ��g�WU
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: obj : 
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: ty : 2
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: pjson = 
+Mon Oct 14 13:53:41 2024 INFO  [O2M]: Update AE
+Mon Oct 14 13:53:41 2024 INFO  [UTIL]: unsupported attribute on update
+Mon Oct 14 13:53:41 2024 DEBUG [UTIL]: announce_to_annc
+Mon Oct 14 13:53:41 2024 INFO  [UTIL]: Run time : 0.000725
+Mon Oct 14 13:53:41 2024 DEBUG [WEBSOCKET]: rsc : 4000
+Mon Oct 14 13:53:41 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4000,"rqi":"8399243227148867204","to":"TinyIoT/testAE","fr":"CAE20241014T1353260000","rvi":"4","pc":{"m2m:dbg":"unsupported attribute on update"}}
+Mon Oct 14 13:53:42 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAE20241014T1353260000", "to": "TinyIoT/testAE", "op": 3, "rqi": "596532903446461216", "rvi": "4", "pc": {"m2m:ae": {"pi": "wrongID"}}}} 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: Cwrong
+User-Agent: Python/3.12 websockets/12.0
+
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:42 2024 INFO  [WEBSOCKET]: X-M2M-Origin: Cwrong
+Mon Oct 14 13:53:42 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"pi":	"wrongID"
+	}
+}
+Mon Oct 14 13:53:42 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAE20241014T1353260000
+Mon Oct 14 13:53:42 2024 INFO  [WEBSOCKET]: op: 3
+Mon Oct 14 13:53:42 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:42 2024 DEBUG [WEBSOCKET]: Parsed request: op=3, to=TinyIoT/testAE, rqi=596532903446461216, ty=0, rvi=5
+Mon Oct 14 13:53:42 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"pi":	"wrongID"
+	}
+}
+Mon Oct 14 13:53:42 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:42 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:42 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:42 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:42 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:42 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:42 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:42 2024 DEBUG [MAIN]: o2pt->op : 3
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: check_privilege : CAE20241014T1353260000 : 4
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: checking1
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: obj = 
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: checking2
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: attr = ��g�WU
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: obj : 
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: ty : 2
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: pjson = 
+Mon Oct 14 13:53:42 2024 INFO  [O2M]: Update AE
+Mon Oct 14 13:53:42 2024 INFO  [UTIL]: unsupported attribute on update
+Mon Oct 14 13:53:42 2024 DEBUG [UTIL]: announce_to_annc
+Mon Oct 14 13:53:42 2024 INFO  [UTIL]: Run time : 0.000208
+Mon Oct 14 13:53:42 2024 DEBUG [WEBSOCKET]: rsc : 4000
+Mon Oct 14 13:53:42 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4000,"rqi":"596532903446461216","to":"TinyIoT/testAE","fr":"CAE20241014T1353260000","rvi":"4","pc":{"m2m:dbg":"unsupported attribute on update"}}e
+Mon Oct 14 13:53:43 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAE20241014T1353260000", "to": "TinyIoT/testAE", "op": 3, "rqi": "5717419954172747554", "rvi": "4", "pc": {"m2m:ae": {"unknown": "unknown"}}}Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: Cwrong
+User-Agent: Python/3.12 websockets/12.0
+
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:43 2024 INFO  [WEBSOCKET]: X-M2M-Origin: Cwrong
+Mon Oct 14 13:53:43 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"unknown":	"unknown"
+	}
+}
+Mon Oct 14 13:53:43 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAE20241014T1353260000
+Mon Oct 14 13:53:43 2024 INFO  [WEBSOCKET]: op: 3
+Mon Oct 14 13:53:43 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:43 2024 DEBUG [WEBSOCKET]: Parsed request: op=3, to=TinyIoT/testAE, rqi=5717419954172747554, ty=0, rvi=5
+Mon Oct 14 13:53:43 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"unknown":	"unknown"
+	}
+}
+Mon Oct 14 13:53:43 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:43 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:43 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:43 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:43 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:43 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:43 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:43 2024 DEBUG [MAIN]: o2pt->op : 3
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: check_privilege : CAE20241014T1353260000 : 4
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: checking1
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: obj = 
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: checking2
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: attr = ��g�WU
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: obj : 
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: ty : 2
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:53:43 2024 DEBUG [UTIL]: pjson = 
+Mon Oct 14 13:53:43 2024 INFO  [UTIL]: invalid attribute : unknown
+Mon Oct 14 13:53:43 2024 INFO  [UTIL]: Run time : 0.000263
+Mon Oct 14 13:53:43 2024 DEBUG [WEBSOCKET]: rsc : 4000
+Mon Oct 14 13:53:43 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4000,"rqi":"5717419954172747554","to":"TinyIoT/testAE","fr":"CAE20241014T1353260000","rvi":"4","pc":{"m2m:dbg":"invalid attribute : unknown"}}
+Mon Oct 14 13:53:44 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "Cwrong", "to": "TinyIoT/testAE", "op": 4, "rqi": "8354339570191112419", "rvi": "4"}7554", "rvi": "4", "pc": {"m2m:ae": {"unknown": "unknown"}}}Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: Cwrong
+User-Agent: Python/3.12 websockets/12.0
+
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:44 2024 INFO  [WEBSOCKET]: X-M2M-Origin: Cwrong
+Mon Oct 14 13:53:44 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : Cwrong
+Mon Oct 14 13:53:44 2024 INFO  [WEBSOCKET]: op: 4
+Mon Oct 14 13:53:44 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:44 2024 DEBUG [WEBSOCKET]: Parsed request: op=4, to=TinyIoT/testAE, rqi=8354339570191112419, ty=0, rvi=5
+Mon Oct 14 13:53:44 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Mon Oct 14 13:53:44 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:44 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:44 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:44 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:44 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:44 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:44 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:44 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:53:44 2024 DEBUG [MAIN]: o2pt->op : 4
+Mon Oct 14 13:53:44 2024 INFO  [O2M]: Delete oneM2M resource
+Mon Oct 14 13:53:44 2024 DEBUG [UTIL]: check_privilege : Cwrong : 8
+Mon Oct 14 13:53:44 2024 DEBUG [O2M]: delete_process [TinyIoT/testAE]
+Mon Oct 14 13:53:44 2024 DEBUG [O2M]: Notify via SUB [TinyIoT/testAE]
+Mon Oct 14 13:53:44 2024 DEBUG [DB]: Delete [RI] CAE20241014T1353260000
+Mon Oct 14 13:53:44 2024 DEBUG [DB]: SQL : DELETE FROM general WHERE uri LIKE 'TinyIoT/testAE/%' OR ri='CAE20241014T1353260000';
+Mon Oct 14 13:53:44 2024 INFO  [UTIL]: Run time : 0.002379
+Mon Oct 14 13:53:44 2024 DEBUG [WEBSOCKET]: rsc : 2002
+Mon Oct 14 13:53:44 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2002,"rqi":"8354339570191112419","to":"TinyIoT/testAE","fr":"Cwrong","rvi":"4"}
+Mon Oct 14 13:53:45 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAdmin", "to": "TinyIoT/testAE", "op": 4, "rqi": "5918505863878945397", "rvi": "4"}7554", "rvi": "4", "pc": {"m2m:ae": {"unknown": "unknown"}}}Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: Cwrong
+User-Agent: Python/3.12 websockets/12.0
+
+
+ockets/12.0
+
+--
+
+Mon Oct 14 13:53:45 2024 INFO  [WEBSOCKET]: X-M2M-Origin: Cwrong
+Mon Oct 14 13:53:45 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAdmin
+Mon Oct 14 13:53:45 2024 INFO  [WEBSOCKET]: op: 4
+Mon Oct 14 13:53:45 2024 DEBUG [WEBSOCKET]: to: TinyIoT/testAE
+Mon Oct 14 13:53:45 2024 DEBUG [WEBSOCKET]: Parsed request: op=4, to=TinyIoT/testAE, rqi=5918505863878945397, ty=0, rvi=5
+Mon Oct 14 13:53:45 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Mon Oct 14 13:53:45 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 13:53:45 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:53:45 2024 DEBUG [UTIL]: uri : TinyIoT/testAE
+Mon Oct 14 13:53:45 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:53:45 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:53:45 2024 DEBUG [RTM]: find_rtnode [TinyIoT/testAE]
+Mon Oct 14 13:53:45 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:53:45 2024 INFO  [UTIL]: URI is invalid
+Mon Oct 14 13:53:45 2024 INFO  [UTIL]: Run time : 0.000352
+Mon Oct 14 13:53:45 2024 DEBUG [WEBSOCKET]: rsc : 4004
+Mon Oct 14 13:53:45 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4004,"rqi":"5918505863878945397","to":"TinyIoT/testAE","fr":"CAdmin","rvi":"4","pc":{"m2m:dbg":"URI is invalid"}}�
+Mon Oct 14 13:59:13 2024 DEBUG [HTTP]: 
+
+POST /TinyIoT HTTP/1.1
+Accept: application/vnd.onem2m-res+json;ty=2
+X-M2M-RI: create_ae
+X-M2M-origin: CAdmin
+Content-Type: application/json;ty=2
+X-M2M-RVI: 2a
+User-Agent: PostmanRuntime/7.42.0
+Cache-Control: no-cache
+Postman-Token: 786375c8-c30b-426d-80d4-d5ef6974b7f7
+Host: 127.0.0.1:3000
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 205
+
+{
+    "m2m:ae": {
+        "rn": "myAE",
+        "api": "Nmyapp3",
+        "lbl": [
+            "key1",
+            "key2"
+        ],
+        "srv": [
+            "3"
+        ],
+        "rr": true
+    }
+}
+
+
+
+Mon Oct 14 13:59:13 2024 DEBUG [HTTP]: [36m[POST] /TinyIoT[0m
+Mon Oct 14 13:59:13 2024 DEBUG [HTTP]: fr: CAdmin
+Mon Oct 14 13:59:13 2024 DEBUG [HTTP]: to: TinyIoT
+Mon Oct 14 13:59:13 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Mon Oct 14 13:59:13 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Mon Oct 14 13:59:13 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 13:59:13 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:59:13 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:59:13 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:59:13 2024 DEBUG [MAIN]: o2pt->op : 1
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: create_onem2m_resource
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: create_onem2m_resource2
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: create_onem2m_resource3
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: e = 0
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: create_onem2m_resource4
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: ty = 2
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: create_onem2m_resource5
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: check_privilege : CAdmin : 1
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: ADMIN_AE_ID : CAdmin
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: create_onem2m_resource6
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: create_onem2m_resource7
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: request_pc : 
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking1
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: obj = 
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking2
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: attr = ��g�WU
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: obj : 
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: ty : 2
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: key : m2m:ae
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking3
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: pjson = 
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking4
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: checking5
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: o2pt->ty: 2
+Mon Oct 14 13:59:13 2024 INFO  [O2M]: Create AE
+Mon Oct 14 13:59:13 2024 DEBUG [UTIL]: check_aei_duplicate : CAdmin
+Mon Oct 14 13:59:13 2024 DEBUG [DB]: SQL: INSERT INTO ae (id, api,aei,rr,poa,apn,srv,at,aa,ast) VALUES( (SELECT id FROM general WHERE ri=?),?,?,?,?,?,?,?,?,?);
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : tinyiot, [Child-ID] : CAdmin
+Mon Oct 14 13:59:13 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Mon Oct 14 13:59:13 2024 INFO  [UTIL]: Run time : 0.001927
+Mon Oct 14 13:59:13 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 201 Created
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+Content-Length: 204
+X-M2M-RSC: 2001
+X-M2M-RVI: 2
+X-M2M-RI: create_ae
+
+{"m2m:ae":{"rn":"myAE","api":"Nmyapp3","lbl":["key1","key2"],"srv":["3"],"rr":true,"ty":2,"ct":"20241014T135913","ri":"CAdmin","lt":"20241014T135913","pi":"tinyiot","et":"20261014T135913","aei":"CAdmin"}}
+
+Mon Oct 14 13:59:48 2024 DEBUG [HTTP]: 
+
+DELETE /TinyIoT/myAE HTTP/1.1
+Accept: application/json
+X-M2M-RI: delete_ae
+X-M2M-Origin: Cwrong
+X-M2M-RVI: 2a
+User-Agent: PostmanRuntime/7.42.0
+Cache-Control: no-cache
+Postman-Token: fbb801ff-734b-4733-bda0-98c5135262af
+Host: 127.0.0.1:3000
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+
+
+
+Mon Oct 14 13:59:48 2024 DEBUG [HTTP]: [36m[DELETE] /TinyIoT/myAE[0m
+Mon Oct 14 13:59:48 2024 DEBUG [HTTP]: fr: Cwrong
+Mon Oct 14 13:59:48 2024 DEBUG [HTTP]: to: TinyIoT/myAE
+Mon Oct 14 13:59:48 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Mon Oct 14 13:59:48 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Mon Oct 14 13:59:48 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 13:59:48 2024 DEBUG [UTIL]: uri : TinyIoT/myAE
+Mon Oct 14 13:59:48 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 13:59:48 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 13:59:48 2024 DEBUG [RTM]: find_rtnode [TinyIoT/myAE]
+Mon Oct 14 13:59:48 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 13:59:48 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 13:59:48 2024 DEBUG [MAIN]: o2pt->op : 4
+Mon Oct 14 13:59:48 2024 INFO  [O2M]: Delete oneM2M resource
+Mon Oct 14 13:59:48 2024 DEBUG [UTIL]: check_privilege : Cwrong : 8
+Mon Oct 14 13:59:48 2024 DEBUG [O2M]: delete_process [TinyIoT/myAE]
+Mon Oct 14 13:59:48 2024 DEBUG [O2M]: Notify via SUB [TinyIoT/myAE]
+Mon Oct 14 13:59:48 2024 DEBUG [DB]: Delete [RI] CAdmin
+Mon Oct 14 13:59:48 2024 DEBUG [DB]: SQL : DELETE FROM general WHERE uri LIKE 'TinyIoT/myAE/%' OR ri='CAdmin';
+Mon Oct 14 13:59:48 2024 INFO  [UTIL]: Run time : 0.001290
+Mon Oct 14 13:59:48 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 200 OK
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+X-M2M-RSC: 2002
+X-M2M-RVI: 2
+X-M2M-RI: delete_ae
+
+
+Mon Oct 14 14:00:07 2024 DEBUG [HTTP]: 
+
+GET /TinyIoT/myAE HTTP/1.1
+Accept: application/json
+X-M2M-RI: retrieve_ae
+X-M2M-Origin: CAdmin
+X-M2M-RVI: 2a
+User-Agent: PostmanRuntime/7.42.0
+Cache-Control: no-cache
+Postman-Token: 57dfbc0a-6e29-461e-a79a-33486729416e
+Host: 127.0.0.1:3000
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+
+
+
+Mon Oct 14 14:00:07 2024 DEBUG [HTTP]: [36m[GET] /TinyIoT/myAE[0m
+Mon Oct 14 14:00:07 2024 DEBUG [HTTP]: fr: CAdmin
+Mon Oct 14 14:00:07 2024 DEBUG [HTTP]: to: TinyIoT/myAE
+Mon Oct 14 14:00:07 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Mon Oct 14 14:00:07 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Mon Oct 14 14:00:07 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 14:00:07 2024 DEBUG [UTIL]: uri : TinyIoT/myAE
+Mon Oct 14 14:00:07 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 14:00:07 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 14:00:07 2024 DEBUG [RTM]: find_rtnode [TinyIoT/myAE]
+Mon Oct 14 14:00:07 2024 DEBUG [RTM]: Hierarchical Addressing
+Mon Oct 14 14:00:07 2024 INFO  [UTIL]: URI is invalid
+Mon Oct 14 14:00:07 2024 INFO  [UTIL]: Run time : 0.000092
+Mon Oct 14 14:00:07 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 404 Not Found
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+Content-Length: 28
+X-M2M-RSC: 4004
+X-M2M-RVI: 2
+X-M2M-RI: retrieve_ae
+
+{"m2m:dbg":"URI is invalid"}
+
+Mon Oct 14 14:00:45 2024 INFO  [MAIN]: Shutting down server...
+Mon Oct 14 14:00:45 2024 INFO  [MAIN]: De-registrating cse...
+Mon Oct 14 14:00:45 2024 INFO  [MAIN]: Closing DB...
+Mon Oct 14 14:00:45 2024 INFO  [MAIN]: Cleaning ResourceTree...
+Mon Oct 14 14:00:45 2024 INFO  [MAIN]: Done

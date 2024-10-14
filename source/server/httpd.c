@@ -3,6 +3,7 @@
 #include "onem2m.h"
 #include "util.h"
 
+#include <sys/time.h>
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <netdb.h>
@@ -16,6 +17,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <fcntl.h>
+
 
 #define MAX_CONNECTIONS 1024
 #define BUF_SIZE 65535

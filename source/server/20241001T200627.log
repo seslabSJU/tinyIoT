@@ -1,0 +1,267 @@
+Tue Oct  1 20:06:27 2024 DEBUG [UTIL]: init_resource_tree
+Tue Oct  1 20:06:27 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Tue Oct  1 20:06:27 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : tinyiot, [Child-ID] : CAE20241001T2004390012
+Tue Oct  1 20:06:27 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : tinyiot, [Child-ID] : CAE20241001T2005321125
+Tue Oct  1 20:06:27 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : CAE20241001T2004390012, [Child-ID] : 3-20241001T2004390013
+Tue Oct  1 20:06:27 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : CAE20241001T2004390012, [Child-ID] : 3-20241001T2004390014
+Tue Oct  1 20:06:27 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : CAE20241001T2005321125, [Child-ID] : 3-20241001T2005321126
+Tue Oct  1 20:06:27 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Tue Oct  1 20:06:27 2024 INFO  [COAP]: CoAP Setup Completed
+Tue Oct  1 20:06:27 2024 INFO  [WEBSOCKET]: WebSocket Server started
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: 
+
+OPTIONS /TinyIoT HTTP/1.1
+Host: 127.0.0.1:3000
+Connection: keep-alive
+Accept: */*
+Access-Control-Request-Method: GET
+Access-Control-Request-Headers: x-m2m-origin,x-m2m-ri,x-m2m-rvi
+Origin: http://localhost:5173
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: cross-site
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5173/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7
+
+
+
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: [36m[OPTIONS] /TinyIoT[0m
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: to: TinyIoT
+Tue Oct  1 20:06:29 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 200 OK
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+X-M2M-RSC: 2000
+
+
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: 
+
+GET /TinyIoT HTTP/1.1
+Host: 127.0.0.1:3000
+Connection: keep-alive
+sec-ch-ua-platform: "Windows"
+sec-ch-ua: "Google Chrome";v="129", "Not=A?Brand";v="8", "Chromium";v="129"
+sec-ch-ua-mobile: ?0
+X-M2M-RVI: 3
+X-M2M-RI: 12345
+X-M2M-Origin: Cae-test-1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+Accept: application/json
+Origin: http://localhost:5173
+Sec-Fetch-Site: cross-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5173/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7
+
+
+
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: [36m[GET] /TinyIoT[0m
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: fr: Cae-test-1
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: to: TinyIoT
+Tue Oct  1 20:06:29 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Tue Oct  1 20:06:29 2024 DEBUG [RTM]: CSE_RELATIVE
+Tue Oct  1 20:06:29 2024 DEBUG [MAIN]: handle_onem2m_request
+Tue Oct  1 20:06:29 2024 DEBUG [UTIL]: check_privilege : Cae-test-1 : 2
+Tue Oct  1 20:06:29 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Tue Oct  1 20:06:29 2024 INFO  [UTIL]: Run time : 0.000062
+Tue Oct  1 20:06:29 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 200 OK
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+Content-Length: 263
+X-M2M-RSC: 2000
+X-M2M-RVI: 3
+X-M2M-RI: 12345
+
+{"m2m:cb":{"rn":"TinyIoT","ri":"tinyiot","pi":"","ct":"20241001T200414","lt":"20241001T200414","ty":5,"cst":1,"csi":"/tinyiot","srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"rr":true,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"]}}
+
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: 
+
+OPTIONS /TinyIoT?rcn=4&undefined HTTP/1.1
+Host: 127.0.0.1:3000
+Connection: keep-alive
+Accept: */*
+Access-Control-Request-Method: GET
+Access-Control-Request-Headers: x-m2m-origin,x-m2m-rvi
+Origin: http://localhost:5173
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: cross-site
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5173/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7
+
+
+
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: [36m[OPTIONS] /TinyIoT?rcn=4&undefined[0m
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: to: TinyIoT
+Tue Oct  1 20:06:34 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 200 OK
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+X-M2M-RSC: 2000
+
+
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: 
+
+GET /TinyIoT?rcn=4&undefined HTTP/1.1
+Host: 127.0.0.1:3000
+Connection: keep-alive
+sec-ch-ua-platform: "Windows"
+X-M2M-Origin: CAdmin
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+Accept: application/json
+sec-ch-ua: "Google Chrome";v="129", "Not=A?Brand";v="8", "Chromium";v="129"
+sec-ch-ua-mobile: ?0
+X-M2M-RVI: 1.0
+Origin: http://localhost:5173
+Sec-Fetch-Site: cross-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5173/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7
+
+
+
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: [36m[GET] /TinyIoT?rcn=4&undefined[0m
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: fr: CAdmin
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: to: TinyIoT
+Tue Oct  1 20:06:34 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Tue Oct  1 20:06:34 2024 DEBUG [UTIL]: key = rcn, value = 4
+Tue Oct  1 20:06:34 2024 DEBUG [RTM]: CSE_RELATIVE
+Tue Oct  1 20:06:34 2024 INFO  [UTIL]: rvi is mandatory
+Tue Oct  1 20:06:34 2024 INFO  [UTIL]: Run time : 0.000029
+Tue Oct  1 20:06:34 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 400 Bad Request
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+Content-Length: 30
+X-M2M-RSC: 4000
+
+{"m2m:dbg":"rvi is mandatory"}
+
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: 
+
+OPTIONS /TinyIoT?rcn=4&undefined HTTP/1.1
+Host: 127.0.0.1:3000
+Connection: keep-alive
+Accept: */*
+Access-Control-Request-Method: GET
+Access-Control-Request-Headers: x-m2m-origin,x-m2m-rvi
+Origin: http://localhost:5173
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: cross-site
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5173/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7
+
+
+
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: [36m[OPTIONS] /TinyIoT?rcn=4&undefined[0m
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: to: TinyIoT
+Tue Oct  1 20:07:43 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 200 OK
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+X-M2M-RSC: 2000
+
+
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: 
+
+GET /TinyIoT?rcn=4&undefined HTTP/1.1
+Host: 127.0.0.1:3000
+Connection: keep-alive
+sec-ch-ua-platform: "Windows"
+X-M2M-Origin: CAdmin
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+Accept: application/json
+sec-ch-ua: "Google Chrome";v="129", "Not=A?Brand";v="8", "Chromium";v="129"
+sec-ch-ua-mobile: ?0
+X-M2M-RVI: 3
+Origin: http://localhost:5173
+Sec-Fetch-Site: cross-site
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://localhost:5173/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7
+
+
+
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: [36m[GET] /TinyIoT?rcn=4&undefined[0m
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: fr: CAdmin
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: to: TinyIoT
+Tue Oct  1 20:07:43 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Tue Oct  1 20:07:43 2024 DEBUG [UTIL]: key = rcn, value = 4
+Tue Oct  1 20:07:43 2024 DEBUG [RTM]: CSE_RELATIVE
+Tue Oct  1 20:07:43 2024 DEBUG [MAIN]: handle_onem2m_request
+Tue Oct  1 20:07:43 2024 DEBUG [UTIL]: check_privilege : CAdmin : 2
+Tue Oct  1 20:07:43 2024 DEBUG [UTIL]: ADMIN_AE_ID : CAdmin
+Tue Oct  1 20:07:43 2024 DEBUG [DB]: call db_get_cin_rtnode_list
+Tue Oct  1 20:07:43 2024 DEBUG [DB]: call db_get_cin_rtnode_list
+Tue Oct  1 20:07:43 2024 DEBUG [DB]: call db_get_cin_rtnode_list
+Tue Oct  1 20:07:43 2024 DEBUG [UTIL]: ofst : 0, lim : 145
+Tue Oct  1 20:07:43 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Tue Oct  1 20:07:43 2024 INFO  [UTIL]: Run time : 0.000518
+Tue Oct  1 20:07:43 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 200 OK
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+Content-Length: 1309
+X-M2M-RSC: 2000
+X-M2M-RVI: 3
+
+{"m2m:cb":{"rn":"TinyIoT","ri":"tinyiot","pi":"","ct":"20241001T200414","lt":"20241001T200414","ty":5,"cst":1,"csi":"/tinyiot","srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"rr":true,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"],"m2m:ae":[{"rn":"testAE","ri":"CAE20241001T2004390012","pi":"tinyiot","ct":"20241001T200439","et":"20261001T200439","lt":"20241001T200439","ty":2,"api":"NMyApp1Id","aei":"CAE20241001T2004390012","rr":true,"srv":["4"],"m2m:cnt":[{"rn":"testCNT","ri":"3-20241001T2004390013","pi":"CAE20241001T2004390012","ct":"20241001T200439","et":"20261001T200439","lt":"20241001T200439","ty":3,"mni":10,"st":0,"cni":0,"cbs":0},{"rn":"testCNT2","ri":"3-20241001T2004390014","pi":"CAE20241001T2004390012","ct":"20241001T200439","et":"20261001T200439","lt":"20241001T200439","ty":3,"mni":10,"st":0,"cni":0,"cbs":0}]},{"rn":"1727780732046-8397408897241030302","ri":"CAE20241001T2005321125","pi":"tinyiot","ct":"20241001T200532","et":"20261001T200532","lt":"20241001T200532","ty":2,"api":"NMyApp1Id","aei":"CAE20241001T2005321125","rr":false,"srv":["4"],"m2m:cnt":[{"rn":"3-20241001T2005321126","ri":"3-20241001T2005321126","pi":"CAE20241001T2005321125","ct":"20241

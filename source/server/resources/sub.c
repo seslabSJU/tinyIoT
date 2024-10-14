@@ -62,12 +62,31 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_AddBoolToObject(sgn, "vrq", true);
     cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(sub, "nu"))
     {
+            // nu가 웹소켓이나 HTTP URI인 경우 처리
+        if (strncmp(pjson->valuestring, "ws://", 5) == 0 || strncmp(pjson->valuestring, "http://", 7) == 0) {
+         logger("SUB", LOG_LEVEL_INFO, "Sending notification to external URI: %s", pjson->valuestring);
+            result = send_verification_request(pjson->valuestring, noti_cjson);
+            if (result == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE) {
+                cJSON_Delete(noti_cjson);
+                cJSON_Delete(root);
+                return handle_error(o2pt, RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE, "subscription verification error");
+            } else if (result / 1000 == 4 || result / 1000 == 5) {
+                cJSON_Delete(noti_cjson);
+                cJSON_Delete(root);
+                return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "subscription verification error");
+            }
+            continue;
+            }
 
+
+        logger("SUB", LOG_LEVEL_DEBUG , "nu_rtnode");
         nu_rtnode = find_rtnode(pjson->valuestring);
+        logger("SUB", LOG_LEVEL_DEBUG,"nu_rtnode : %s", nu_rtnode);
         if (nu_rtnode)
         {
             if (nu_rtnode->ty != RT_AE)
             {
+                logger("SUB", LOG_LEVEL_INFO, "check");
                 handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "nu is invalid");
                 cJSON_Delete(noti_cjson);
                 cJSON_DetachItemFromObject(root, "m2m:sub");
@@ -84,7 +103,9 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
             continue;
         }
 
+        logger("SUB", LOG_LEVEL_INFO, "check");
         result = send_verification_request(pjson->valuestring, noti_cjson);
+        // result = send_verification_request(pjson->valuestring, noti_cjson);
         logger("SUB", LOG_LEVEL_INFO, "vrq result : %d", result);
 
         if (result == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE)

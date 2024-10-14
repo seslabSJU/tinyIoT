@@ -279,6 +279,7 @@ void route(oneM2MPrimitive *o2pt)
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
 		notify_via_sub(o2pt, target_rtnode);
 	log_runtime(start);
+
 }
 
 
@@ -292,6 +293,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		return o2pt->rsc = RSC_INTERNAL_SERVER_ERROR;
 	}
 
+	logger("MAIN", LOG_LEVEL_DEBUG, "o2pt->op : %d", o2pt->op);
 	switch (o2pt->op)
 	{
 

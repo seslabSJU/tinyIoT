@@ -1,0 +1,136 @@
+Wed Oct  2 02:34:18 2024 DEBUG [UTIL]: init_resource_tree
+Wed Oct  2 02:34:18 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Wed Oct  2 02:34:18 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Wed Oct  2 02:34:18 2024 INFO  [COAP]: CoAP Setup Completed
+Wed Oct  2 02:34:18 2024 INFO  [WEBSOCKET]: WebSocket Server started
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Connection established
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"to": "/TinyIoT", "op": 1, "rqi": "8744316748745260609", "rvi": "4", "ty": 2, "pc": {"m2m:ae": {"api": "NmyApp", "rr": true, "rn": "myAE", "srv": ["3", "4"], "poa": ["ws://localhost:8081"]}}, "fr": "C"}dow_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: C
+User-Agent: Python/3.12 websockets/12.0
+
+--
+
+Wed Oct  2 02:34:23 2024 INFO  [WEBSOCKET]: X-M2M-Origin: C
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"api":	"NmyApp",
+		"rr":	true,
+		"rn":	"myAE",
+		"srv":	["3", "4"],
+		"poa":	["ws://localhost:8081"]
+	}
+}
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 : C
+Wed Oct  2 02:34:23 2024 INFO  [WEBSOCKET]: op: 1
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: to: TinyIoT
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Parsed request: op=1, to=TinyIoT, rqi=8744316748745260609, ty=2, rvi=5
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"api":	"NmyApp",
+		"rr":	true,
+		"rn":	"myAE",
+		"srv":	["3", "4"],
+		"poa":	["ws://localhost:8081"]
+	}
+}
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: CSE_RELATIVE
+Wed Oct  2 02:34:23 2024 DEBUG [MAIN]: handle_onem2m_request
+Wed Oct  2 02:34:23 2024 DEBUG [UTIL]: check_privilege : C : 1
+Wed Oct  2 02:34:23 2024 INFO  [O2M]: Create AE
+Wed Oct  2 02:34:23 2024 DEBUG [UTIL]: check_aei_duplicate : C
+Wed Oct  2 02:34:23 2024 DEBUG [DB]: SQL: INSERT INTO ae (id, api,aei,rr,poa,apn,srv,at,aa,ast) VALUES( (SELECT id FROM general WHERE ri=?),?,?,?,?,?,?,?,?,?);
+Wed Oct  2 02:34:23 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : tinyiot, [Child-ID] : CAE20241002T0234230000
+Wed Oct  2 02:34:23 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Wed Oct  2 02:34:23 2024 INFO  [UTIL]: Run time : 0.000977
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Resource name: myAE
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Created resource path: TinyIoT/myAE
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: find_rtnode [TinyIoT/myAE]
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: Hierarchical Addressing
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: create 응답 메세지 : {"rsc":2001,"rqi":"8744316748745260609","rvi":"4","pc":{"m2m:ae":{"api":"NmyApp","rr":true,"rn":"myAE","srv":["3","4"],"poa":["ws://localhost:8081"],"ty":2,"ct":"20241002T023423","ri":"CAE20241002T0234230000","lt":"20241002T023423","pi":"tinyiot","et":"20261002T023423","aei":"CAE20241002T0234230000"}}}
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2001,"rqi":"8744316748745260609","to":"TinyIoT","fr":"C","rvi":"4","pc":{"m2m:ae":{"api":"NmyApp","rr":true,"rn":"myAE","srv":["3","4"],"poa":["ws://localhost:8081"],"ty":2,"ct":"20241002T023423","ri":"CAE20241002T0234230000","lt":"20241002T023423","pi":"tinyiot","et":"20261002T023423","aei":"CAE20241002T0234230000"}}}
+Wed Oct  2 02:34:23 2024 INFO  [WEBSOCKET]: Connection closed
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Connection established
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"to": "/TinyIoT/myAE", "op": 1, "rqi": "4671535579410656171", "rvi": "4", "ty": 23, "pc": {"m2m:sub": {"rn": "mySub", "nu": ["ws://localhost:8081"]}}, "fr": "CAE20241002T0234230000"}late; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: CAE20241002T0234230000
+User-Agent: Python/3.12 websockets/12.0
+
+--
+
+Wed Oct  2 02:34:23 2024 INFO  [WEBSOCKET]: X-M2M-Origin: CAE20241002T0234230000
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:sub":	{
+		"rn":	"mySub",
+		"nu":	["ws://localhost:8081"]
+	}
+}
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 : CAE20241002T0234230000
+Wed Oct  2 02:34:23 2024 INFO  [WEBSOCKET]: op: 1
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: to: TinyIoT/myAE
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Parsed request: op=1, to=TinyIoT/myAE, rqi=4671535579410656171, ty=23, rvi=5
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:sub":	{
+		"rn":	"mySub",
+		"nu":	["ws://localhost:8081"]
+	}
+}
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: CSE_RELATIVE
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: find_rtnode [TinyIoT/myAE]
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: Hierarchical Addressing
+Wed Oct  2 02:34:23 2024 DEBUG [MAIN]: handle_onem2m_request
+Wed Oct  2 02:34:23 2024 DEBUG [UTIL]: check_privilege : CAE20241002T0234230000 : 1
+Wed Oct  2 02:34:23 2024 INFO  [O2M]: Create SUB
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: find_rtnode [ws://localhost:8081]
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: Non-Hierarchical Addressing
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: find_rtnode_by_ri [ws://localhost:8081]
+Wed Oct  2 02:34:23 2024 DEBUG [UTIL]: RI : ws://localhost:8081
+Wed Oct  2 02:34:23 2024 DEBUG [UTIL]: send_verification_request
+Wed Oct  2 02:34:23 2024 DEBUG [UTIL]: CSE_RELATIVE
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: find_rtnode [ws://localhost:8081]
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: Non-Hierarchical Addressing
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: find_rtnode_by_ri [ws://localhost:8081]
+Wed Oct  2 02:34:23 2024 DEBUG [UTIL]: RI : ws://localhost:8081
+Wed Oct  2 02:34:23 2024 INFO  [SUB]: vrq result : 4004
+Wed Oct  2 02:34:23 2024 INFO  [UTIL]: subscription verification error
+Wed Oct  2 02:34:23 2024 INFO  [O2M]: SUB_rsc = 5204
+Wed Oct  2 02:34:23 2024 INFO  [UTIL]: Run time : 0.000709
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":5204,"rqi":"4671535579410656171","to":"TinyIoT/myAE","fr":"CAE20241002T0234230000","rvi":"4","pc":{"m2m:dbg":"subscription verification error"}}
+Wed Oct  2 02:34:23 2024 INFO  [WEBSOCKET]: Connection closed
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Connection established
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"to": "/TinyIoT/myAE", "op": 4, "rqi": "16209302366674098", "rvi": "4", "fr": "CAE20241002T0234230000"}ouDFCmJpuA==
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: CAE20241002T0234230000
+User-Agent: Python/3.12 websockets/12.0
+
+--
+
+Wed Oct  2 02:34:23 2024 INFO  [WEBSOCKET]: X-M2M-Origin: CAE20241002T0234230000
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 : CAE20241002T0234230000
+Wed Oct  2 02:34:23 2024 INFO  [WEBSOCKET]: op: 4
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: to: TinyIoT/myAE
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Parsed request: op=4, to=TinyIoT/myAE, rqi=16209302366674098, ty=0, rvi=5
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: CSE_RELATIVE
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: find_rtnode [TinyIoT/myAE]
+Wed Oct  2 02:34:23 2024 DEBUG [RTM]: Hierarchical Addressing
+Wed Oct  2 02:34:23 2024 DEBUG [MAIN]: handle_onem2m_request
+Wed Oct  2 02:34:23 2024 INFO  [O2M]: Delete oneM2M resource
+Wed Oct  2 02:34:23 2024 DEBUG [UTIL]: check_privilege : CAE20241002T0234230000 : 8
+Wed Oct  2 02:34:23 2024 DEBUG [O2M]: delete_process [TinyIoT/myAE]
+Wed Oct  2 02:34:23 2024 DEBUG [O2M]: Notify via SUB [TinyIoT/myAE]
+Wed Oct  2 02:34:23 2024 DEBUG [DB]: Delete [RI] CAE20241002T0234230000
+Wed Oct  2 02:34:23 2024 DEBUG [DB]: SQL : DELETE FROM general WHERE uri LIKE 'TinyIoT/myAE/%' OR ri='CAE20241002T0234230000';
+Wed Oct  2 02:34:23 2024 INFO  [UTIL]: Run time : 0.001067
+Wed Oct  2 02:34:23 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2002,"rqi":"16209302366674098","to":"TinyIoT/myAE","fr":"CAE20241002T0234230000","rvi":"4"}
+Wed Oct  2 02:34:23 2024 INFO  [WEBSOCKET]: Connection closed
+Wed Oct  2 02:40:30 2024 INFO  [MAIN]: Shutting down server...
+Wed Oct  2 02:40:30 2024 INFO  [MAIN]: De-registrating cse...
+Wed Oct  2 02:40:30 2024 INFO  [MAIN]: Closing DB...
+Wed Oct  2 02:40:30 2024 INFO  [MAIN]: Cleaning ResourceTree...
+Wed Oct  2 02:40:30 2024 INFO  [MAIN]: Done

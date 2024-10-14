@@ -1,0 +1,11 @@
+Tue Oct  8 01:43:06 2024 DEBUG [DB]: SQL: INSERT INTO cb (id, cst,csi,srt,poa,srv,rr,at,aa,ast) VALUES( (SELECT id FROM general WHERE ri=?),?,?,?,?,?,?,?,?,?);
+Tue Oct  8 01:43:06 2024 DEBUG [UTIL]: init_resource_tree
+Tue Oct  8 01:43:06 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Tue Oct  8 01:43:06 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Tue Oct  8 01:43:06 2024 INFO  [COAP]: CoAP Setup Completed
+Tue Oct  8 01:43:06 2024 INFO  [WEBSOCKET]: WebSocket Server started
+Tue Oct  8 01:47:58 2024 INFO  [MAIN]: Shutting down server...
+Tue Oct  8 01:47:58 2024 INFO  [MAIN]: De-registrating cse...
+Tue Oct  8 01:47:58 2024 INFO  [MAIN]: Closing DB...
+Tue Oct  8 01:47:58 2024 INFO  [MAIN]: Cleaning ResourceTree...
+Tue Oct  8 01:47:58 2024 INFO  [MAIN]: Done

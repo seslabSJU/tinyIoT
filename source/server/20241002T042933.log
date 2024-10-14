@@ -1,0 +1,2 @@
+Wed Oct  2 04:29:33 2024 DEBUG [UTIL]: init_resource_tree
+Wed Oct  2 04:29:33 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode

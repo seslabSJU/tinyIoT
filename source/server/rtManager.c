@@ -403,7 +403,7 @@ RTNode *find_rtnode_by_ri(char *ri)
     cJSON *resource = NULL;
     RTNode *rtnode = NULL;
     char *fopt = strstr(ri, "/fopt");
-    // logger("UTIL", LOG_LEVEL_DEBUG, "RI : %s", ri);
+    logger("UTIL", LOG_LEVEL_DEBUG, "RI : %s", ri);
     if (strncmp(ri, "4-", 2) == 0)
     {
         logger("RTM", LOG_LEVEL_DEBUG, "CIN");
@@ -421,6 +421,7 @@ RTNode *find_rtnode_by_ri(char *ri)
         }
     }
     rtnode = rt_search_ri(rt->cb, ri);
+    logger("RTM", LOG_LEVEL_DEBUG,"rtnode = %d", rtnode);
     if (fopt)
     {
         *fopt = '/';
@@ -437,6 +438,7 @@ RTNode *find_rtnode_by_ri(char *ri)
 RTNode *rt_search_ri(RTNode *rtnode, char *ri)
 {
     RTNode *ret = NULL;
+    logger("RTM", LOG_LEVEL_DEBUG, "rtnode in rt_search_ri = %d", rtnode);
     if (!rtnode)
         return NULL;
     while (rtnode)

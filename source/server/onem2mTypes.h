@@ -15,7 +15,9 @@ typedef enum
 	PROT_HTTP = 1,
 	PROT_MQTT,
 	PROT_COAP = 3,
-	PROT_COAPS = 4
+	PROT_COAPS = 4,
+	PROT_WEBSOCKET =5, // 추가
+	PROT_WEBSOCKETS=6, // 추가
 } Protocol;
 
 typedef enum
@@ -80,7 +82,7 @@ typedef enum
 	CSE_RELATIVE = 1,	  // CSEBase relative  starts with ''
 	SP_RELATIVE = 2,	  // SP relative starts with '/'
 	ABSOLUTE = 3,		  // absolute starts with '//'
-	PROTOCOL_BINDING = 4, // protocol binding starts with 'http://, coap://, mqtt://'
+	PROTOCOL_BINDING = 4, // protocol binding starts with 'http://, coap://, mqtt://, ws://'
 } ResourceAddressingType;
 
 typedef enum
@@ -206,7 +208,7 @@ typedef enum
 	RT_CRS = 48,
 	RT_FCI = 58,
 	RT_TSB = 60,
-	RT_ACTR = 63,
+	RT_ACTR = 65,  // 임의정의  -> 원래는 63번이였음
 	RT_ACPA = 10001,
 	RT_AEA = 10002,
 	RT_CNTA = 10003,

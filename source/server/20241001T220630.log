@@ -1,0 +1,60 @@
+Tue Oct  1 22:06:30 2024 DEBUG [UTIL]: init_resource_tree
+Tue Oct  1 22:06:30 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Tue Oct  1 22:06:30 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : tinyiot, [Child-ID] : CAE20241001T2206000000
+Tue Oct  1 22:06:30 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Tue Oct  1 22:06:30 2024 INFO  [COAP]: CoAP Setup Completed
+Tue Oct  1 22:06:30 2024 INFO  [WEBSOCKET]: WebSocket Server started
+Tue Oct  1 22:06:33 2024 DEBUG [WEBSOCKET]: Connection established
+Tue Oct  1 22:06:33 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"to": "/tinyiot", "op": 1, "rqi": "4368364515275201953", "rvi": "4", "ty": 2, "pc": {"m2m:ae": {"api": "NmyApp", "rr": true, "rn": "myAE", "srv": ["3", "4"]}}, "fr": "C"}rmessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: C
+User-Agent: Python/3.12 websockets/12.0
+
+--
+
+Tue Oct  1 22:06:33 2024 INFO  [WEBSOCKET]: X-M2M-Origin: C
+Tue Oct  1 22:06:33 2024 DEBUG [WEBSOCKET]: pc: {
+	"m2m:ae":	{
+		"api":	"NmyApp",
+		"rr":	true,
+		"rn":	"myAE",
+		"srv":	["3", "4"]
+	}
+}
+Tue Oct  1 22:06:33 2024 INFO  [websocket]: pc22: {
+	"m2m:ae":	{
+		"api":	"NmyApp",
+		"rr":	true,
+		"rn":	"myAE",
+		"srv":	["3", "4"]
+	}
+}
+Tue Oct  1 22:06:33 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 : C
+Tue Oct  1 22:06:33 2024 INFO  [WEBSOCKET]: op: 1
+Tue Oct  1 22:06:33 2024 DEBUG [WEBSOCKET]: to: tinyiot
+Tue Oct  1 22:06:33 2024 DEBUG [WEBSOCKET]: Parsed request: op=1, to=tinyiot, rqi=4368364515275201953, ty=2, rvi=5
+Tue Oct  1 22:06:33 2024 DEBUG [WEBSOCKET]: Parsed content: {
+	"m2m:ae":	{
+		"api":	"NmyApp",
+		"rr":	true,
+		"rn":	"myAE",
+		"srv":	["3", "4"]
+	}
+}
+Tue Oct  1 22:06:33 2024 DEBUG [RTM]: CSE_RELATIVE
+Tue Oct  1 22:06:33 2024 DEBUG [RTM]: find_rtnode [tinyiot]
+Tue Oct  1 22:06:33 2024 DEBUG [RTM]: Non-Hierarchical Addressing
+Tue Oct  1 22:06:33 2024 DEBUG [RTM]: find_rtnode_by_ri [tinyiot]
+Tue Oct  1 22:06:33 2024 DEBUG [MAIN]: handle_onem2m_request
+Tue Oct  1 22:06:33 2024 DEBUG [UTIL]: check_privilege : C : 1
+Tue Oct  1 22:06:33 2024 INFO  [UTIL]: attribute `rn` is duplicated
+Tue Oct  1 22:06:33 2024 INFO  [UTIL]: Run time : 0.000090
+Tue Oct  1 22:06:33 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4105,"rqi":"4368364515275201953","to":"tinyiot","fr":"C","rvi":"4","pc":{"m2m:dbg":"attribute `rn` is duplicated"}}
+Tue Oct  1 22:06:33 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":4105,"rqi":"4368364515275201953","to":"tinyiot","fr":"C","rvi":"4","pc":{"m2m:dbg":"attribute `rn` is duplicated"}}
+Tue Oct  1 22:06:33 2024 INFO  [WEBSOCKET]: Connection closed
+Tue Oct  1 22:06:39 2024 INFO  [MAIN]: Shutting down server...
+Tue Oct  1 22:06:39 2024 INFO  [MAIN]: De-registrating cse...
+Tue Oct  1 22:06:39 2024 INFO  [MAIN]: Closing DB...
+Tue Oct  1 22:06:39 2024 INFO  [MAIN]: Cleaning ResourceTree...
+Tue Oct  1 22:06:39 2024 INFO  [MAIN]: Done
