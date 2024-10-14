@@ -73,8 +73,9 @@ RTNode *get_rtnode(oneM2MPrimitive *o2pt)
             }
         }
     }
-
+    
     free(target_uri);
+    // printf("this?\n");
     return rtnode;
 }
 

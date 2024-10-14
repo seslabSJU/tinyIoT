@@ -1,4 +1,4 @@
-#ifndef __CONFIG_H__
+	#ifndef __CONFIG_H__
 #define __CONFIG_H__
 #include "logger.h"
 
@@ -8,10 +8,10 @@
 // #define NIC_NAME "eth0"
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT "3000"
-#define CSE_BASE_NAME "TinyIoT"
-#define CSE_BASE_RI "tinyiot"
+#define CSE_BASE_NAME "TinyIoT1"
+#define CSE_BASE_RI "tinyiot1"
 #define CSE_BASE_SP_ID "tinyiot.example.com"
-#define CSE_RVI RVI_2a
+#define CSE_RVI RVI_3
 
 #if SERVER_TYPE == MN_CSE
 #define REMOTE_CSE_ID ""
@@ -21,15 +21,22 @@
 #define REMOTE_CSE_PORT 0
 #endif
 
+// Security
 #define ADMIN_AE_ID "CAdmin"
+#define DEFAULT_ACOP ACOP_CREATE
 
 #define MONO_THREAD 0 // 0 → multi-thread, 1 → mono-thread
 
-
 #define UPPERTESTER 1 // 0 → disable, 1 → enable
 
-#if UPPERTESTER == 1
+#if UPPERTESTER == 1 // under development (Not supported yet)
 #define UPPERTESTER_URI "__ut__"
+#endif
+
+#define RESOURCE_EXPORT 1 // 0 → disable, 1 → enable
+
+#if RESOURCE_EXPORT == 1 // now developing...
+#define RESOURCE_EXPORT_URI "__export__"
 #endif
 
 #define MAX_PAYLOAD_SIZE 65536
@@ -96,7 +103,7 @@
 #endif
 
 // CoAP Settings
-#define ENABLE_COAP
+// #define ENABLE_COAP
 #ifdef ENABLE_COAP
 
 // #define ENABLE_COAP_DTLS

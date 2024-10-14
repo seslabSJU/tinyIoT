@@ -16,6 +16,7 @@
 #include "util.h"
 #include "config.h"
 #include "onem2mTypes.h"
+#include "export.h"
 
 #ifdef ENABLE_MQTT
 #include "mqttClient.h"
@@ -208,13 +209,20 @@ void route(oneM2MPrimitive *o2pt)
 
 	start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
 
+	if (strncmp(o2pt->to, "__export__", strchr(o2pt->to, '/') - o2pt->to) == 0) 
+	{
+    	RTNode *export_target = find_export_target(o2pt);
+		resource_export(export_target);
+    	return;
+	}
+
+
 	if (o2pt->op == OP_UPPERTESTER)
 	{
-		handle_uppertester_procedure(o2pt);
+		// handle_uppertester_procedure(o2pt);
 		log_runtime(start);
 		return;
 	}
-
 	RTNode *target_rtnode = get_rtnode(o2pt);
 
 	if (o2pt->rsc >= 4000)

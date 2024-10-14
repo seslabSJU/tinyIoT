@@ -414,7 +414,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
     route(o2pt);
 
     http_respond_to_client(o2pt, slotno);
-    free_o2pt(o2pt);
+    // free_o2pt(o2pt);
 }
 
 void set_header(char *key, char *value, char *response_headers)
