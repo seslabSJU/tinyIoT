@@ -1,0 +1,11 @@
+Mon Oct 14 13:52:39 2024 DEBUG [UTIL]: init_resource_tree
+Mon Oct 14 13:52:39 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Mon Oct 14 13:52:39 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Mon Oct 14 13:52:39 2024 INFO  [COAP]: CoAP Setup Completed
+Mon Oct 14 13:52:39 2024 INFO  [WEBSOCKET]: WebSocket Server(ws) started on port 8081
+Mon Oct 14 13:52:39 2024 INFO  [WEBSOCKET]: WebSocket Server (wss) started on port 8443
+Mon Oct 14 13:52:44 2024 INFO  [MAIN]: Shutting down server...
+Mon Oct 14 13:52:44 2024 INFO  [MAIN]: De-registrating cse...
+Mon Oct 14 13:52:44 2024 INFO  [MAIN]: Closing DB...
+Mon Oct 14 13:52:44 2024 INFO  [MAIN]: Cleaning ResourceTree...
+Mon Oct 14 13:52:44 2024 INFO  [MAIN]: Done

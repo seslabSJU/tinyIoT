@@ -26,6 +26,7 @@
 #endif
 
 #include "coap.h"
+#include "websocket_server.h" // WebSocket 서버 헤더 파일 추가
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
@@ -56,20 +57,30 @@ extern int key_defined;
 
 static ssize_t cmdline_read_key(char *arg, unsigned char **buf, size_t maxlen)
 {
-	size_t len = strnlen(arg, maxlen);
-	if (len)
-	{
-		*buf = (unsigned char *)arg;
-		return len;
-	}
+    size_t len = strnlen(arg, maxlen);
+    if (len)
+    {
+        *buf = (unsigned char *)arg;
+        return len;
+    }
 
-	/* Need at least one byte for the pre-shared key */
-	logger("COAP", LOG_LEVEL_ERROR, "Invalid Pre-Shared Key specified\n");
+    /* Need at least one byte for the pre-shared key */
+    logger("COAP", LOG_LEVEL_ERROR, "Invalid Pre-Shared Key specified\n");
 
-	return -1;
+    return -1;
 }
 #endif
 #endif
+
+void *http_server_thread(void *arg) {
+    serve_forever((const char *)arg);
+    return NULL;
+}
+
+void *websocket_server_thread(void *arg) {
+    initialize_websocket_server();
+    return NULL;
+}
 
 int main(int argc, char **argv)
 {
@@ -110,85 +121,100 @@ int main(int argc, char **argv)
 	}
 
 #ifdef ENABLE_COAP_DTLS
-	int opt;
-	while ((opt = getopt(argc, argv, "c:C:h:j:k:r")) != -1)
-	{
-		switch (opt)
-		{
-		case 'c':
-			cert_file = optarg;
-			break;
-		case 'C':
-			ca_file = optarg;
-			break;
-		case 'j':
-			key_file = optarg;
-			break;
-		case 'k':
-			key_length = cmdline_read_key(optarg, &key, MAX_KEY);
-			if (key_length < 0)
-				break;
-			key_defined = 1;
-			break;
-		case 'r':
-			root_ca_file = optarg;
-			break;
-		}
-	}
+    int opt;
+    while ((opt = getopt(argc, argv, "c:C:h:j:k:r")) != -1)
+    {
+        switch (opt)
+        {
+        case 'c':
+            cert_file = optarg;
+            break;
+        case 'C':
+            ca_file = optarg;
+            break;
+        case 'j':
+            key_file = optarg;
+            break;
+        case 'k':
+            key_length = cmdline_read_key(optarg, &key, MAX_KEY);
+            if (key_length < 0)
+                break;
+            key_defined = 1;
+            break;
+        case 'r':
+            root_ca_file = optarg;
+            break;
+        }
+    }
 #endif
 
-	init_server();
+    init_server();
 
-	init_resource_tree();
+    init_resource_tree();
 
-	if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
-	{
-		if (register_remote_cse() != 0)
-		{
-			logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE registration failed");
-			return 0;
-		}
+    if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
+    {
+        if (register_remote_cse() != 0)
+        {
+            logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE registration failed");
+            return 0;
+        }
 
-		if (create_local_csr())
-		{
-			logger("MAIN", LOG_LEVEL_ERROR, "Local CSR creation failed");
-			return 0;
-		}
-	}
+        if (create_local_csr())
+        {
+            logger("MAIN", LOG_LEVEL_ERROR, "Local CSR creation failed");
+            return 0;
+        }
+    }
 
 #ifdef ENABLE_MQTT
-	mqtt_thread_id = pthread_create(&mqtt, NULL, (void *)mqtt_serve, "mqtt Client");
-	if (mqtt_thread_id < 0)
-	{
-		fprintf(stderr, "MQTT thread create error\n");
-		return 0;
-	}
+    mqtt_thread_id = pthread_create(&mqtt, NULL, (void *)mqtt_serve, "mqtt Client");
+    if (mqtt_thread_id < 0)
+    {
+        fprintf(stderr, "MQTT thread create error\n");
+        return 0;
+    }
 #endif
 
 #ifdef ENABLE_COAP
-	coap_thread_id = pthread_create(&coap, NULL, coap_serve, "CoAP Server");
-	if (coap_thread_id < 0)
-	{
-		fprintf(stderr, "CoAP thread create error\n");
-		return 0;
-	}
+    coap_thread_id = pthread_create(&coap, NULL, coap_serve, "CoAP Server");
+    if (coap_thread_id < 0)
+    {
+        fprintf(stderr, "CoAP thread create error\n");
+        return 0;
+    }
 #endif
 
-	serve_forever(PORT); // main oneM2M operation logic in void route()
+    // WebSocket 및 HTTP 서버 스레드 생성
+    pthread_t http_thread, websocket_thread;
+
+    if (pthread_create(&http_thread, NULL, http_server_thread, (void *)PORT) != 0) {
+        perror("Failed to create HTTP server thread");
+        return 1;
+    }
+
+    if (pthread_create(&websocket_thread, NULL, websocket_server_thread, NULL) != 0) {
+        perror("Failed to create WebSocket server thread");
+        return 1;
+    }
+
+    // 스레드가 종료될 때까지 대기
+    pthread_join(http_thread, NULL);
+    pthread_join(websocket_thread, NULL);
 
 #ifdef ENABLE_MQTT
-	pthread_join(mqtt, NULL);
-	if (terminate)
-	{
-		return 0;
-	}
+    pthread_join(mqtt, NULL);
+    if (terminate)
+    {
+        return 0;
+    }
 #endif
 
 #ifdef ENABLE_COAP
-	pthread_join(coap, NULL);
+    pthread_join(coap, NULL);
 #endif
 
-	return 0;
+    return 0;
 }
 
 void route(oneM2MPrimitive *o2pt)
@@ -253,7 +279,9 @@ void route(oneM2MPrimitive *o2pt)
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
 		notify_via_sub(o2pt, target_rtnode);
 	log_runtime(start);
+
 }
+
 
 int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
@@ -265,6 +293,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		return o2pt->rsc = RSC_INTERNAL_SERVER_ERROR;
 	}
 
+	logger("MAIN", LOG_LEVEL_DEBUG, "o2pt->op : %d", o2pt->op);
 	switch (o2pt->op)
 	{
 
@@ -355,39 +384,93 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	return rsc;
 }
 
+
+
 void stop_server(int sig)
 {
-	if (call_stop)
-	{
-		// logger("MAIN", LOG_LEVEL_WARN, "Server is already shutting down...");
-		return;
-	}
-	call_stop = 1;
+    if (call_stop)
+    {
+        // logger("MAIN", LOG_LEVEL_WARN, "Server is already shutting down...");
+        return;
+    }
+    call_stop = 1;
 
-	logger("MAIN", LOG_LEVEL_INFO, "Shutting down server...");
+    logger("MAIN", LOG_LEVEL_INFO, "Shutting down server...");
 
-	logger("MAIN", LOG_LEVEL_INFO, "De-registrating cse...");
-	if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
-	{
-		if (deRegister_csr() != 0)
-		{
-			logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE de-registration failed");
-		}
-	}
+    logger("MAIN", LOG_LEVEL_INFO, "De-registrating cse...");
+    if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
+    {
+        if (deRegister_csr() != 0)
+        {
+        logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE de-registration failed");
+        }
+    }
 #ifdef ENABLE_MQTT
-	pthread_kill(mqtt, SIGINT);
+    pthread_kill(mqtt, SIGINT);
 #endif
 #ifdef ENABLE_COAP
-	pthread_kill(coap, SIGINT);
+    pthread_kill(coap, SIGINT);
 #endif
-	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
-	close_dbp();
-	logger("MAIN", LOG_LEVEL_INFO, "Cleaning ResourceTree...");
-	free_rtnode(rt->cb);
-	free(rt);
-	cJSON_Delete(ATTRIBUTES);
+    logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
+    close_dbp();
+    logger("MAIN", LOG_LEVEL_INFO, "Cleaning ResourceTree...");
+    free_rtnode(rt->cb);
+    free(rt);
+    cJSON_Delete(ATTRIBUTES);
 
-	logger("MAIN", LOG_LEVEL_INFO, "Done");
-	logger_free();
-	exit(0);
+    logger("MAIN", LOG_LEVEL_INFO, "Done");
+    logger_free();
+    exit(0);
 }
+
+/*
+void create_response(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key) {
+    // 응답 객체 생성
+   cJSON *response = cJSON_CreateObject();
+    cJSON_AddNumberToObject(response, "rsc", o2pt->rsc);  // 응답 상태 코드
+    cJSON_AddStringToObject(response, "rqi", o2pt->rqi);  // 요청 ID
+    cJSON_AddStringToObject(response, "rvi", o2pt->rvi);  // 버전
+
+    // 생성된 리소스의 정보를 가져옴
+    if (resource_obj != NULL) {
+        cJSON *resource = cJSON_Duplicate(resource_obj, 1);
+        cJSON *pc = cJSON_CreateObject();
+
+        cJSON_AddItemToObject(pc, resource_key, resource);
+        cJSON_AddItemToObject(response, "pc", pc);
+    } else {
+        logger("RESPONSE", LOG_LEVEL_ERROR, "Resource object is NULL");
+    }
+
+    o2pt->response_pc = response;
+}
+
+*/
+
+
+RTNode* find_created_rtnode(const char *parent_ri, const char *child_rn) {
+    char parent_ri_mutable[256];
+    strncpy(parent_ri_mutable, parent_ri, sizeof(parent_ri_mutable));
+
+    RTNode *parent_node = find_rtnode(parent_ri_mutable);
+    if (parent_node == NULL) {
+        return NULL;
+    }
+
+    RTNode *child_node = parent_node->child;
+    while (child_node) {
+        if (strcmp(child_node->rn, child_rn) == 0) {
+            return child_node;
+        }
+        child_node = child_node->sibling_right;
+    }
+
+    return NULL;
+}
+
+
+
+
+
+
+

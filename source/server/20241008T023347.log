@@ -1,0 +1,13 @@
+Tue Oct  8 02:33:47 2024 DEBUG [UTIL]: init_resource_tree
+Tue Oct  8 02:33:47 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Tue Oct  8 02:33:47 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : tinyiot, [Child-ID] : CAE20241008T0209230008
+Tue Oct  8 02:33:47 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : CAE20241008T0209230008, [Child-ID] : 3-20241008T0209230009
+Tue Oct  8 02:33:47 2024 DEBUG [O2M]: Add Resource Tree Node [Parent-ID] : 3-20241008T0209230009, [Child-ID] : 4-20241008T0209230011
+Tue Oct  8 02:33:47 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Tue Oct  8 02:33:47 2024 INFO  [COAP]: CoAP Setup Completed
+Tue Oct  8 02:33:47 2024 INFO  [WEBSOCKET]: WebSocket Server started
+Tue Oct  8 02:33:52 2024 INFO  [MAIN]: Shutting down server...
+Tue Oct  8 02:33:52 2024 INFO  [MAIN]: De-registrating cse...
+Tue Oct  8 02:33:52 2024 INFO  [MAIN]: Closing DB...
+Tue Oct  8 02:33:52 2024 INFO  [MAIN]: Cleaning ResourceTree...
+Tue Oct  8 02:33:52 2024 INFO  [MAIN]: Done

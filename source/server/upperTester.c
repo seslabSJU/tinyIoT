@@ -65,7 +65,7 @@ int handle_uppertester_procedure(oneM2MPrimitive *o2pt)
 
     if ((pjson = cJSON_GetObjectItem(pc, "rvi")))
     {
-        req->rvi = strdup(pjson->valuestring);
+        req->rvi = to_rvi(pjson->valuestring);
     }
     else
     {

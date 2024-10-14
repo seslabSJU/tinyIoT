@@ -3,6 +3,7 @@
 #include "onem2m.h"
 #include "util.h"
 
+#include <sys/time.h>
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <netdb.h>
@@ -16,6 +17,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <fcntl.h>
+
 
 #define MAX_CONNECTIONS 1024
 #define BUF_SIZE 65535
@@ -207,7 +209,7 @@ void respond(int slot)
     }
     else if (rcvd == 0)
     { // receive socket closed
-        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
+        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected unexpectedly");
         return;
     }
     // message received
@@ -243,7 +245,7 @@ Operation http_parse_operation(char *method)
         op = OP_RETRIEVE;
     else if (strcmp(method, "PUT") == 0)
         op = OP_UPDATE;
-    else if (strcmp(method, "DELETE") == 0)
+    else if (strcmp(method, "DELETE") == 0) 
         op = OP_DELETE;
     else if (strcmp(method, "OPTIONS") == 0)
         op = OP_OPTIONS;
@@ -335,7 +337,6 @@ void handle_http_request(HTTPRequest *req, int slotno)
 #else
     o2pt->op = http_parse_operation(req->method);
     logger("HTTP", LOG_LEVEL_INFO, "Request : %s (%d)", req->method, o2pt->op);
-
 #endif
     // Setting default rcn
     switch (o2pt->op)
@@ -441,6 +442,8 @@ void normalize_payload(char *body)
     body[index] = '\0';
 }
 
+
+// 추가: HTTP 응답을 기록하는 로직을 수정
 void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
 {
     char *status_msg = NULL;
@@ -501,7 +504,8 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         free(pc);
         pc = NULL;
     }
-}
+}   
+
 
 int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
 {

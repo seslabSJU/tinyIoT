@@ -1,0 +1,77 @@
+Wed Oct  2 04:46:35 2024 DEBUG [UTIL]: init_resource_tree
+Wed Oct  2 04:46:35 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Wed Oct  2 04:46:35 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Wed Oct  2 04:46:35 2024 INFO  [COAP]: CoAP Setup Completed
+Wed Oct  2 04:46:35 2024 INFO  [WEBSOCKET]: WebSocket Server started
+Wed Oct  2 04:46:38 2024 DEBUG [HTTP]: 
+
+POST /TinyIoT HTTP/1.1
+Accept: application/json
+X-M2M-RI: 12345
+X-M2M-Origin: SOrigin
+Content-Type: application/json;ty=23
+X-M2M-RVI: 3
+User-Agent: PostmanRuntime/7.36.0
+Cache-Control: no-cache
+Postman-Token: 4330d05e-ba93-4922-9cea-9f3a2979aa9b
+Host: 127.0.0.1:3000
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 108
+
+{
+    "m2m:sub": {
+        "rn": "sub1",
+        "nu": [
+            "ws://localhost:8081"
+        ]
+    }
+}
+
+Wed Oct  2 04:46:38 2024 DEBUG [HTTP]: [36m[POST] /TinyIoT[0m
+Wed Oct  2 04:46:38 2024 DEBUG [HTTP]: fr: SOrigin
+Wed Oct  2 04:46:38 2024 DEBUG [HTTP]: to: TinyIoT
+Wed Oct  2 04:46:38 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Wed Oct  2 04:46:38 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Wed Oct  2 04:46:38 2024 INFO  [UTIL]: chekAdd1
+Wed Oct  2 04:46:38 2024 DEBUG [UTIL]: uri : TinyIoT
+Wed Oct  2 04:46:38 2024 INFO  [UTIL]: chekAdd2
+Wed Oct  2 04:46:38 2024 DEBUG [RTM]: CSE_RELATIVE
+Wed Oct  2 04:46:38 2024 DEBUG [MAIN]: handle_onem2m_request
+Wed Oct  2 04:46:38 2024 DEBUG [UTIL]: check_privilege : SOrigin : 1
+Wed Oct  2 04:46:38 2024 INFO  [O2M]: Create SUB
+Wed Oct  2 04:46:38 2024 INFO  [SUB]: Sending notification to external URI: ws://localhost:8081
+Wed Oct  2 04:46:38 2024 DEBUG [UTIL]: send_verification_request
+Wed Oct  2 04:46:38 2024 INFO  [UTIL]: next1
+Wed Oct  2 04:46:38 2024 INFO  [UTIL]: next2
+Wed Oct  2 04:46:38 2024 INFO  [UTIL]: chekAdd1
+Wed Oct  2 04:46:38 2024 DEBUG [UTIL]: uri : ws://localhost:8081
+Wed Oct  2 04:46:38 2024 INFO  [UTIL]: chekAdd2
+Wed Oct  2 04:46:38 2024 INFO  [UTIL]: rat 4
+Wed Oct  2 04:46:38 2024 DEBUG [UTIL]: protocol binding
+Wed Oct  2 04:46:38 2024 DEBUG [UTIL]: poa parse error
+Wed Oct  2 04:46:38 2024 INFO  [UTIL]: subscription verification error
+Wed Oct  2 04:46:38 2024 INFO  [O2M]: SUB_rsc = 5204
+Wed Oct  2 04:46:38 2024 INFO  [UTIL]: Run time : 0.000592
+Wed Oct  2 04:46:38 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 500 Internal Server Error
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+Content-Length: 45
+X-M2M-RSC: 5204
+X-M2M-RVI: 3
+X-M2M-RI: 12345
+
+{"m2m:dbg":"subscription verification error"}
+
+Wed Oct  2 04:49:51 2024 INFO  [MAIN]: Shutting down server...
+Wed Oct  2 04:49:51 2024 INFO  [MAIN]: De-registrating cse...
+Wed Oct  2 04:49:51 2024 INFO  [MAIN]: Closing DB...
+Wed Oct  2 04:49:51 2024 INFO  [MAIN]: Cleaning ResourceTree...
+Wed Oct  2 04:49:51 2024 INFO  [MAIN]: Done

@@ -486,22 +486,33 @@ void free_rtnode_list(RTNode *rtnode)
 
 int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
+	logger("O2M", LOG_LEVEL_DEBUG, "create_onem2m_resource");
 	int rsc = 0;
 	char err_msg[256] = {0};
+	logger("O2M", LOG_LEVEL_DEBUG, "create_onem2m_resource2");
 	int e = check_resource_type_invalid(o2pt);
+	logger("O2M", LOG_LEVEL_DEBUG, "create_onem2m_resource3");
+	logger("O2M",LOG_LEVEL_DEBUG, "e = %d", e);
 	if (e != -1)
 		e = check_payload_empty(o2pt);
+		logger("O2M", LOG_LEVEL_DEBUG, "create_onem2m_resource4");
 	if (e != -1)
 		e = check_resource_type_equal(o2pt);
+		logger("O2M", LOG_LEVEL_DEBUG, "create_onem2m_resource5");
 	if (e != -1)
 		e = check_privilege(o2pt, parent_rtnode, ACOP_CREATE);
+		logger("O2M", LOG_LEVEL_DEBUG, "create_onem2m_resource6");
 	if (e != -1)
 		e = check_rn_duplicate(o2pt, parent_rtnode);
+		logger("O2M", LOG_LEVEL_DEBUG, "create_onem2m_resource7");
 	if (e == -1)
 		return o2pt->rsc;
 
-	if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
+	logger("O2M", LOG_LEVEL_DEBUG, "request_pc : %s", o2pt->request_pc);
+	if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg)) // 거짓일때 근데 거짓을 리턴함
 	{
+		logger("O2M", LOG_LEVEL_DEBUG, "create_onem2m_resource8");
+
 		return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
 	}
 
@@ -514,6 +525,7 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type error");
 	}
 
+	logger("O2M", LOG_LEVEL_DEBUG, "o2pt->ty: %d", o2pt->ty);
 	switch (o2pt->ty)
 	{
 	case RT_AE:
@@ -535,6 +547,7 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	case RT_SUB:
 		logger("O2M", LOG_LEVEL_INFO, "Create SUB");
 		rsc = create_sub(o2pt, parent_rtnode);
+		logger("O2M", LOG_LEVEL_INFO,"SUB_rsc = %d", rsc);
 		break;
 
 	case RT_ACP:

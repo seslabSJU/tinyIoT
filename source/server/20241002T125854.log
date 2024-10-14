@@ -1,0 +1,110 @@
+Wed Oct  2 12:58:54 2024 DEBUG [DB]: SQL: INSERT INTO cb (id, cst,csi,srt,poa,srv,rr,at,aa,ast) VALUES( (SELECT id FROM general WHERE ri=?),?,?,?,?,?,?,?,?,?);
+Wed Oct  2 12:58:54 2024 DEBUG [UTIL]: init_resource_tree
+Wed Oct  2 12:58:54 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Wed Oct  2 12:58:54 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Wed Oct  2 12:58:54 2024 INFO  [WEBSOCKET]: WebSocket Server started
+Wed Oct  2 12:58:54 2024 INFO  [COAP]: CoAP Setup Completed
+Wed Oct  2 12:58:57 2024 DEBUG [HTTP]: 
+
+POST /TinyIoT HTTP/1.1
+Accept: application/json
+X-M2M-RI: 12345
+X-M2M-Origin: SOrigin
+Content-Type: application/json;ty=2
+X-M2M-RVI: 3
+User-Agent: PostmanRuntime/7.36.0
+Cache-Control: no-cache
+Postman-Token: 7e43eb55-7a81-4ce2-9c97-fe33c96696a0
+Host: 127.0.0.1:3000
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 116
+
+{
+	"m2m:ae" : {
+		"rn": "justin",
+		"api": "0.2.481.2.0001.001.000111",
+		"lbl": ["key1", "key2"],
+		"rr": true
+	}
+}
+
+Wed Oct  2 12:58:57 2024 DEBUG [HTTP]: [36m[POST] /TinyIoT[0m
+Wed Oct  2 12:58:57 2024 DEBUG [HTTP]: fr: SOrigin
+Wed Oct  2 12:58:57 2024 DEBUG [HTTP]: to: TinyIoT
+Wed Oct  2 12:58:57 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Wed Oct  2 12:58:57 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Wed Oct  2 12:58:57 2024 INFO  [UTIL]: chekAdd1
+Wed Oct  2 12:58:57 2024 DEBUG [UTIL]: uri : TinyIoT
+Wed Oct  2 12:58:57 2024 INFO  [UTIL]: chekAdd2
+Wed Oct  2 12:58:57 2024 DEBUG [RTM]: CSE_RELATIVE
+Wed Oct  2 12:58:57 2024 DEBUG [MAIN]: handle_onem2m_request
+Wed Oct  2 12:58:57 2024 DEBUG [UTIL]: check_privilege : SOrigin : 1
+Wed Oct  2 12:58:57 2024 INFO  [O2M]: Create AE
+Wed Oct  2 12:58:57 2024 DEBUG [UTIL]: check_aei_duplicate : SOrigin
+Wed Oct  2 12:58:57 2024 INFO  [UTIL]: attribute `api` prefix is invalid
+Wed Oct  2 12:58:57 2024 INFO  [UTIL]: Run time : 0.000282
+Wed Oct  2 12:58:57 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 400 Bad Request
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+Content-Length: 47
+X-M2M-RSC: 4000
+X-M2M-RVI: 3
+X-M2M-RI: 12345
+
+{"m2m:dbg":"attribute `api` prefix is invalid"}
+
+Wed Oct  2 12:59:09 2024 DEBUG [HTTP]: 
+
+POST /TinyIoT HTTP/1.1
+Accept: application/json
+X-M2M-RI: 12345
+X-M2M-Origin: SOrigin
+Content-Type: application/json;ty=2
+X-M2M-RVI: 3
+User-Agent: PostmanRuntime/7.36.0
+Cache-Control: no-cache
+Postman-Token: 150ef486-f163-48a6-9525-e78850cd897e
+Host: 127.0.0.1:3000
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 95
+
+{
+	"m2m:ae" : {
+		"rn": "justin",
+		"api": "true",
+		"lbl": ["key1", "key2"],
+		"rr": true
+	}
+}
+
+Wed Oct  2 12:59:09 2024 DEBUG [HTTP]: [36m[POST] /TinyIoT[0m
+Wed Oct  2 12:59:09 2024 DEBUG [HTTP]: fr: SOrigin
+Wed Oct  2 12:59:09 2024 DEBUG [HTTP]: to: TinyIoT
+Wed Oct  2 12:59:09 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Wed Oct  2 12:59:09 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Wed Oct  2 12:59:09 2024 INFO  [UTIL]: chekAdd1
+Wed Oct  2 12:59:09 2024 DEBUG [UTIL]: uri : TinyIoT
+Wed Oct  2 12:59:09 2024 INFO  [UTIL]: chekAdd2
+Wed Oct  2 12:59:09 2024 DEBUG [RTM]: CSE_RELATIVE
+Wed Oct  2 12:59:09 2024 DEBUG [MAIN]: handle_onem2m_request
+Wed Oct  2 12:59:09 2024 DEBUG [UTIL]: check_privilege : SOrigin : 1
+Wed Oct  2 12:59:09 2024 INFO  [O2M]: Create AE
+Wed Oct  2 12:59:09 2024 DEBUG [UTIL]: check_aei_duplicate : SOrigin
+Wed Oct  2 12:59:09 2024 INFO  [UTIL]: attribute `api` prefix is invalid
+Wed Oct  2 12:59:09 2024 INFO  [UTIL]: Run time : 0.000215
+Wed Oct  2 12:59:09 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 400 Bad Request
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Contr

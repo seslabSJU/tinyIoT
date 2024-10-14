@@ -1,0 +1,90 @@
+Mon Oct 14 12:45:56 2024 DEBUG [UTIL]: init_resource_tree
+Mon Oct 14 12:45:56 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Mon Oct 14 12:45:56 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Mon Oct 14 12:45:56 2024 INFO  [COAP]: CoAP Setup Completed
+Mon Oct 14 12:45:56 2024 INFO  [WEBSOCKET]: WebSocket Server(ws) started on port 8081
+Mon Oct 14 12:45:56 2024 INFO  [WEBSOCKET]: WebSocket Server (wss) started on port 8443
+Mon Oct 14 12:46:36 2024 DEBUG [WEBSOCKET]: Connection established
+Mon Oct 14 12:46:37 2024 DEBUG [WEBSOCKET]: Received raw data: 
+--{"fr": "CAdmin", "to": "TinyIoT", "op": 2, "rqi": "4370657474444793534", "rvi": "4"}ebSocket-Key: 6Zk7oMy8/5VgRd8u8Y9LEw==
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+Sec-WebSocket-Protocol: oneM2M.json
+X-M2M-Origin: CAdmin
+User-Agent: Python/3.12 websockets/12.0
+
+--
+
+Mon Oct 14 12:46:37 2024 INFO  [WEBSOCKET]: X-M2M-Origin: CAdmin
+Mon Oct 14 12:46:37 2024 DEBUG [WEBSOCKET]: fr 필드가 있을때 X-M2M-Origin : CAdmin
+Mon Oct 14 12:46:37 2024 INFO  [WEBSOCKET]: op: 2
+Mon Oct 14 12:46:37 2024 DEBUG [WEBSOCKET]: to: TinyIoT
+Mon Oct 14 12:46:37 2024 DEBUG [WEBSOCKET]: Parsed request: op=2, to=TinyIoT, rqi=4370657474444793534, ty=0, rvi=5
+Mon Oct 14 12:46:37 2024 DEBUG [WEBSOCKET]: Parsed content: (null)
+Mon Oct 14 12:46:37 2024 DEBUG [WEBSOCKET]: route 시작전
+Mon Oct 14 12:46:37 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 12:46:37 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 12:46:37 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 12:46:37 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 12:46:37 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 12:46:37 2024 DEBUG [MAIN]: o2pt->op : 2
+Mon Oct 14 12:46:37 2024 DEBUG [UTIL]: check_privilege : CAdmin : 2
+Mon Oct 14 12:46:37 2024 DEBUG [UTIL]: ADMIN_AE_ID : CAdmin
+Mon Oct 14 12:46:37 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Mon Oct 14 12:46:37 2024 INFO  [UTIL]: Run time : 0.000101
+Mon Oct 14 12:46:37 2024 DEBUG [WEBSOCKET]: rsc : 2000
+Mon Oct 14 12:46:37 2024 DEBUG [WEBSOCKET]: retrieve 응답 메세지 : {"rsc":2000,"rqi":"4370657474444793534","rvi":"4","pc":{"general":{"rn":"TinyIoT","ri":"tinyiot","pi":"","ct":"20241008T175612","lt":"20241008T175612","ty":5,"cst":1,"csi":"/tinyiot","srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"rr":true,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"]}}}
+Mon Oct 14 12:46:37 2024 DEBUG [WEBSOCKET]: Sending message: {"rsc":2000,"rqi":"4370657474444793534","to":"TinyIoT","fr":"CAdmin","rvi":"4","pc":{"m2m:cb":{"rn":"TinyIoT","ri":"tinyiot","pi":"","ct":"20241008T175612","lt":"20241008T175612","ty":5,"cst":1,"csi":"/tinyiot","srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"rr":true,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"]}}}
+Mon Oct 14 12:46:39 2024 DEBUG [HTTP]: 
+
+GET /TinyIoT HTTP/1.1
+Host: localhost:3000
+User-Agent: python-requests/2.32.3
+Accept-Encoding: gzip, deflate
+Accept: application/json
+Connection: keep-alive
+Content-Type: application/json
+X-M2M-RI: 5128244227145960004
+X-M2M-RVI: 4
+X-M2M-Origin: CAdmin
+
+
+
+Mon Oct 14 12:46:39 2024 DEBUG [HTTP]: [36m[GET] /TinyIoT[0m
+Mon Oct 14 12:46:39 2024 DEBUG [HTTP]: fr: CAdmin
+Mon Oct 14 12:46:39 2024 DEBUG [HTTP]: to: TinyIoT
+Mon Oct 14 12:46:39 2024 INFO  [HTTP]: Client connected 192.168.128.1
+Mon Oct 14 12:46:39 2024 DEBUG [HTTP]: ip: 192.168.128.1
+Mon Oct 14 12:46:39 2024 INFO  [UTIL]: chekAdd1
+Mon Oct 14 12:46:39 2024 DEBUG [UTIL]: uri : TinyIoT
+Mon Oct 14 12:46:39 2024 INFO  [UTIL]: chekAdd2
+Mon Oct 14 12:46:39 2024 DEBUG [RTM]: CSE_RELATIVE
+Mon Oct 14 12:46:39 2024 DEBUG [MAIN]: handle_onem2m_request
+Mon Oct 14 12:46:39 2024 DEBUG [MAIN]: o2pt->op : 2
+Mon Oct 14 12:46:39 2024 DEBUG [UTIL]: check_privilege : CAdmin : 2
+Mon Oct 14 12:46:39 2024 DEBUG [UTIL]: ADMIN_AE_ID : CAdmin
+Mon Oct 14 12:46:39 2024 DEBUG [O2M]: Notify via SUB [TinyIoT]
+Mon Oct 14 12:46:39 2024 INFO  [UTIL]: Run time : 0.000390
+Mon Oct 14 12:46:39 2024 DEBUG [HTTP]: Response: 
+HTTP/1.1 200 OK
+Connection: Close
+Server: tinyIoT v0.1
+Accept: application/json
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI
+Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
+Access-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS
+Content-Length: 263
+X-M2M-RSC: 2000
+X-M2M-RVI: 4
+X-M2M-RI: 5128244227145960004
+
+{"m2m:cb":{"rn":"TinyIoT","ri":"tinyiot","pi":"","ct":"20241008T175612","lt":"20241008T175612","ty":5,"cst":1,"csi":"/tinyiot","srt":[1,2,3,4,5,9,16,23,10001,10002,10003,10004,10005],"srv":["2a"],"rr":true,"poa":["http://127.0.0.1:3000","coap://127.0.0.1:5683"]}}
+
+Mon Oct 14 12:47:34 2024 INFO  [WEBSOCKET]: Connection closed
+Mon Oct 14 12:47:35 2024 INFO  [MAIN]: Shutting down server...
+Mon Oct 14 12:47:35 2024 INFO  [MAIN]: De-registrating cse...
+Mon Oct 14 12:47:35 2024 INFO  [MAIN]: Closing DB...
+Mon Oct 14 12:47:35 2024 INFO  [MAIN]: Cleaning ResourceTree...
+Mon Oct 14 12:47:35 2024 INFO  [MAIN]: Done

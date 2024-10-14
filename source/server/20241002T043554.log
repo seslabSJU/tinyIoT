@@ -1,0 +1,10 @@
+Wed Oct  2 04:35:54 2024 DEBUG [UTIL]: init_resource_tree
+Wed Oct  2 04:35:54 2024 DEBUG [DB]: Call db_get_all_resource_as_rtnode
+Wed Oct  2 04:35:54 2024 INFO  [HTTP]: Server started [92mhttp://127.0.0.1:3000[0m
+Wed Oct  2 04:35:54 2024 INFO  [WEBSOCKET]: WebSocket Server started
+Wed Oct  2 04:35:54 2024 INFO  [COAP]: CoAP Setup Completed
+Wed Oct  2 04:36:32 2024 INFO  [MAIN]: Shutting down server...
+Wed Oct  2 04:36:32 2024 INFO  [MAIN]: De-registrating cse...
+Wed Oct  2 04:36:32 2024 INFO  [MAIN]: Closing DB...
+Wed Oct  2 04:36:32 2024 INFO  [MAIN]: Cleaning ResourceTree...
+Wed Oct  2 04:36:32 2024 INFO  [MAIN]: Done

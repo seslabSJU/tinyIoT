@@ -20,6 +20,7 @@
 #include "jsonparser.h"
 #include "mqttClient.h"
 #include "coap.h"
+#include "websocket_server.h"
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
@@ -235,6 +236,9 @@ char *get_resource_key(ResourceType ty)
 	case RT_CBA:
 		key = "m2m:cbA";
 		break;
+	case RT_ACTR:
+		key = "m2m:actr"; // 추가
+		break;
 	default:
 		key = "general";
 		break;
@@ -279,9 +283,13 @@ ResourceType parse_object_type_cjson(cJSON *cjson)
 		ty = RT_CBA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:aea"))
 		ty = RT_AEA;
+	else if (cJSON_GetObjectItem(cjson, "m2m:actr"))
+		ty = RT_ACTR;
 	else
 		ty = RT_MIXED;
 
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "ty = %d", ty);
 	return ty;
 }
 
@@ -2443,6 +2451,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 	NotiTarget *nt;
 	RTNode *rtnode = NULL;
 	int rsc = 0;
+	logger("UTIL", LOG_LEVEL_INFO, "next%d", 1);
 
 	o2pt->op = OP_NOTIFY;
 	o2pt->fr = strdup("/" CSE_BASE_RI);
@@ -2450,14 +2459,18 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 	o2pt->rqi = strdup("notify");
 	o2pt->request_pc = cJSON_Duplicate(noti_cjson, true);
 
-	ResourceAddressingType rat = checkResourceAddressingType(noti_uri);
+	logger("UTIL", LOG_LEVEL_INFO, "next%d", 2);
+
+	ResourceAddressingType rat = checkResourceAddressingType(noti_uri); 
+	logger("UTIL", LOG_LEVEL_INFO, "rat %d", rat);
 
 	if (rat == CSE_RELATIVE)
 	{
-		logger("UTIL", LOG_LEVEL_DEBUG, "CSE_RELATIVE");
+		logger("UTIL", LOG_LEVEL_INFO, "CSE_RELATIVE");
 		rtnode = find_rtnode(noti_uri);
+		logger("UTIL", LOG_LEVEL_DEBUG, "rtnode2 = %s", rtnode);
 		if (!rtnode)
-			return RSC_NOT_FOUND;
+			return RSC_NOT_FOUND; // sub 생성 문제발견지점
 		rsc = requestToResource(o2pt, rtnode);
 	}
 	else if (rat == SP_RELATIVE)
@@ -2488,6 +2501,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
 		strncpy(nt->target, path, 256);
 		nt->prot = prot;
+		logger("UTIL", LOG_LEVEL_DEBUG, "prot : %d", nt->prot);
 
 		switch (prot)
 		{
@@ -2607,23 +2621,30 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 			switch (prot)
 			{
 			case PROT_HTTP:
-				rsc = http_notify(o2pt, host, port, nt);
-				break;
-			case PROT_MQTT:
-#ifdef ENABLE_MQTT
-				mqtt_notify(o2pt, noti_json, nt);
-#endif
-#ifdef ENABLE_COAP
-			case PROT_COAP:
-				coap_notify(o2pt, noti_json, nt);
-				break;
-#endif
-				break;
-			}
-			free(nt->noti_json);
-			free(nt);
-			if (host)
-				free(host);
+        rsc = http_notify(o2pt, host, port, nt);
+        break;
+    case PROT_MQTT:
+	#ifdef ENABLE_MQTT
+        mqtt_notify(o2pt, noti_cjson, nt);
+	#endif
+        break;
+    case PROT_COAP:
+	#ifdef ENABLE_COAP
+        coap_notify(o2pt, noti_cjson, nt);
+        break;
+	#endif
+        break;
+    case PROT_WEBSOCKET:  // 새로운 WebSocket 처리
+		logger("UTIL", LOG_LEVEL_DEBUG, "sub 삭제할때");
+       logger("UTIL", LOG_LEVEL_DEBUG, "Sending WebSocket notification to %s", host);
+        rsc = response_delete(o2pt);  // WebSocket 알림 함수 호출
+        break;
+    }
+
+	free(nt->noti_json);
+	free(nt);
+	if (host)
+	free(host);
 			if (path)
 				free(path);
 		}
@@ -2764,12 +2785,18 @@ bool validate_sub_attr(cJSON *obj, cJSON *attr, char *err_msg)
  */
 bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg)
 {
+	logger("UTIL", LOG_LEVEL_DEBUG, "checking1");
+	logger("UTIL", LOG_LEVEL_DEBUG, "obj = %s", obj);
 	extern cJSON *ATTRIBUTES;
 	cJSON *attrs = NULL;
 	cJSON *general_attrs = NULL;
 	bool flag = false;
+	logger("UTIL", LOG_LEVEL_DEBUG, "key : %s", get_resource_key(ty));
 	attrs = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
 	general_attrs = cJSON_GetObjectItem(ATTRIBUTES, "general");
+	logger("UTIL", LOG_LEVEL_DEBUG, "checking2");
+	logger("UTIL", LOG_LEVEL_DEBUG, "attr = %s", attrs);
+
 	if (!attrs)
 		return false;
 	if (!general_attrs)
@@ -2777,7 +2804,15 @@ bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg)
 	if (!cJSON_IsObject(attrs))
 		return false;
 
+	logger("UTIL", LOG_LEVEL_DEBUG, "checking3");
+	logger("UTIL", LOG_LEVEL_DEBUG, "obj : %s", obj);
+	logger("UTIL", LOG_LEVEL_DEBUG, "ty : %d", ty);
+	logger("UTIL", LOG_LEVEL_DEBUG, "key : %s", get_resource_key(ty));
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "checking3");
+
 	cJSON *pjson = cJSON_GetObjectItem(obj, get_resource_key(ty));
+	logger("UTIL", LOG_LEVEL_DEBUG, "pjson = %s", pjson);
 	cJSON *attr = NULL;
 	if (!pjson)
 		return false;
@@ -2790,11 +2825,13 @@ bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg)
 		// }
 		if (validate_sub_attr(attrs, pjson, err_msg))
 		{
+			logger("UTIL", LOG_LEVEL_DEBUG, "checking4");
 			flag = true;
 		}
 		if (flag)
 		{
 			pjson = pjson->next;
+			logger("UTIL", LOG_LEVEL_DEBUG, "checking5");
 			flag = false;
 			continue;
 		}
@@ -2805,6 +2842,7 @@ bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg)
 		if (!flag)
 		{
 			return false;
+			logger("UTIL", LOG_LEVEL_DEBUG, "checking6");
 		}
 		pjson = pjson->next;
 		flag = false;
@@ -3604,6 +3642,14 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 	{
 		*prot = PROT_COAPS;
 	}
+	else if (!strncmp(poa_str, "ws://", 5)) // 추가
+	{
+		*prot = PROT_WEBSOCKET;
+	}
+	else if (!strncmp(poa_str, "wss://", 6)){ // 추가
+		*prot = PROT_WEBSOCKETS;
+	}
+
 	else
 	{
 		free(p);
@@ -3661,31 +3707,44 @@ int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path)
 	{
 		*port = 5684;
 	}
+	else if (*prot == PROT_WEBSOCKET && port ==0)
+	{
+		*port = 8081;
+	}
+	else if (*prot == PROT_WEBSOCKETS && port ==0){
+		*port = 8443;
+	}
 	return 0;
 }
 
 ResourceAddressingType checkResourceAddressingType(char *uri)
 {
+	logger("UTIL", LOG_LEVEL_INFO, "chekAdd1");
+	logger("UTIL", LOG_LEVEL_DEBUG,"uri : %s", uri);
 	if (uri == NULL)
 	{
 		return -1;
 	}
+	logger("UTIL", LOG_LEVEL_INFO, "chekAdd2");
 	if (uri[0] == '/' && uri[1] == '/')
 	{
 		return ABSOLUTE;
 	}
 	else if (uri[0] == '/')
 	{
+		logger("UTIL", LOG_LEVEL_INFO, "chekAdd3");
 		return SP_RELATIVE;
 	}
-	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strcmp(uri, "coap://") == 0 || strcmp(uri, "coaps://") == 0)
-	{
+	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strcmp(uri, "coap://") == 0 
+	|| strcmp(uri, "coaps://")  == 0|| strncmp(uri, "ws://", 5) == 0 || strncmp(uri, "wss://", 6) ==0)
+	{	
 		return PROTOCOL_BINDING;
 	}
 	else
 	{
 		return CSE_RELATIVE;
 	}
+	logger("UTIL", LOG_LEVEL_INFO, "chekAdd3");
 
 	return -1;
 }
