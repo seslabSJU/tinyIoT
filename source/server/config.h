@@ -21,14 +21,15 @@
 #define REMOTE_CSE_PORT 0
 #endif
 
+// Security
 #define ADMIN_AE_ID "CAdmin"
+#define DEFAULT_ACOP ACOP_CREATE
 
 #define MONO_THREAD 0 // 0 → multi-thread, 1 → mono-thread
 
-
 #define UPPERTESTER 1 // 0 → disable, 1 → enable
 
-#if UPPERTESTER == 1
+#if UPPERTESTER == 1 // under development (Not supported yet)
 #define UPPERTESTER_URI "__ut__"
 #endif
 
