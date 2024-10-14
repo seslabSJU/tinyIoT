@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "onem2m.h"
 #include "logger.h"
 #include "dbmanager.h"
@@ -8,6 +9,7 @@
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
+extern pthread_mutex_t main_lock;
 
 /**
  * @brief get resource with oneM2MPrimitive
@@ -131,7 +133,6 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
         if (strcmp(target_uri + 1, CSE_BASE_RI) == 0)
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
-            free(target_uri);
             return NULL;
         }
         ptr = target_uri + strlen(CSE_BASE_RI) + 2; // for first / and end /
@@ -139,7 +140,6 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
         {
             logger("RTM", LOG_LEVEL_DEBUG, "addr is empty");
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
-            free(target_uri);
             return NULL;
         }
         rtnode = find_rtnode(ptr);
@@ -159,7 +159,6 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
             if (SERVER_TYPE == IN_CSE)
             {
                 handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
-                free(target_uri);
                 return NULL;
             }
             else
@@ -168,15 +167,12 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
                 if (strcmp(cJSON_GetStringValue(cJSON_GetObjectItem(registrar_csr, "csi")), target_uri) != 0)
                 {
                     handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
-                    free(target_uri);
                     return NULL;
                 }
             }
         }
 
         rsc = forwarding_onem2m_resource(o2pt, csr);
-        free(target_uri);
-        return NULL;
         if (rsc >= 4000)
         {
             handle_error(o2pt, rsc, "Forwarding Failed");
@@ -192,11 +188,12 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
  */
 RTNode *find_csr_rtnode_by_uri(char *uri)
 {
+    char *uriPtr;
     // RTNode *rtnode = rt->cb->child, *parent_rtnode = NULL;
     if (!uri)
         return NULL;
     char *target_uri = strdup(uri); // remove second '/'
-    char *ptr = strtok(target_uri + 1, "/");
+    char *ptr = strtok_r(target_uri + 1, "/", &uriPtr);
     if (!ptr)
         return NULL;
 
@@ -309,16 +306,19 @@ RTNode *find_rtnode_by_uri(char *uri)
 {
     RTNode *rtnode = rt->cb, *parent_rtnode = NULL;
     char *target_uri = strdup(uri);
-    char *ptr = strtok(target_uri, "/");
+    char *target_ptr;
+    char *ptr = strtok_r(target_uri, "/", &target_ptr);
     if (!ptr)
         return NULL;
     if (!strcmp(ptr, "-"))
     {
         logger("RTM", LOG_LEVEL_DEBUG, "root node -");
         rtnode = rt->cb->child;
-        ptr = strtok(NULL, "/");
+        ptr = strtok_r(NULL, "/", &target_ptr);
     }
-
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&main_lock);
+#endif
     while (ptr)
     {
         while (rtnode)
@@ -329,7 +329,7 @@ RTNode *find_rtnode_by_uri(char *uri)
         }
         if (!rtnode)
             break;
-        ptr = strtok(NULL, "/");
+        ptr = strtok_r(NULL, "/", &target_ptr);
         if (ptr)
         {
             parent_rtnode = rtnode;
@@ -340,6 +340,9 @@ RTNode *find_rtnode_by_uri(char *uri)
     if (rtnode)
     {
         free(target_uri);
+#if MONO_THREAD == 0
+        pthread_mutex_unlock(&main_lock);
+#endif
         return rtnode;
     }
     int flag = -1;
@@ -357,7 +360,7 @@ RTNode *find_rtnode_by_uri(char *uri)
                     rtnode = parent_rtnode->child;
                 }
             }
-            if (!rtnode && !strtok(NULL, "/"))
+            if (!rtnode && !strtok_r(NULL, "/", &target_ptr))
             { // if next '/' doesn't exist
                 if (!strcmp(ptr, "ol") || !strcmp(ptr, "oldest"))
                 {
@@ -378,17 +381,12 @@ RTNode *find_rtnode_by_uri(char *uri)
                 }
             }
         }
-        // if (parent_rtnode->ty == RT_GRP && ptr)
-        // {
-        //     if (!strcmp(ptr, "fopt"))
-        //     { // fopt
-        //         rtnode = parent_rtnode;
-        //     }
-        // }
     }
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&main_lock);
+#endif
 
     free(target_uri);
-
     return rtnode;
 }
 
@@ -420,8 +418,19 @@ RTNode *find_rtnode_by_ri(char *ri)
             *fopt = '\0';
         }
     }
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&main_lock);
+#endif
+
     rtnode = rt_search_ri(rt->cb, ri);
+<<<<<<< HEAD
     logger("RTM", LOG_LEVEL_DEBUG,"rtnode = %d", rtnode);
+=======
+
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&main_lock);
+#endif
+>>>>>>> origin/standard-fix
     if (fopt)
     {
         *fopt = '/';
@@ -441,7 +450,7 @@ RTNode *rt_search_ri(RTNode *rtnode, char *ri)
     logger("RTM", LOG_LEVEL_DEBUG, "rtnode in rt_search_ri = %d", rtnode);
     if (!rtnode)
         return NULL;
-    while (rtnode)
+    while (!ret && rtnode)
     {
         if (!strcmp(get_ri_rtnode(rtnode), ri))
         {
@@ -465,9 +474,15 @@ int add_child_resource_tree(RTNode *parent, RTNode *child)
     strcpy(uri, parent->uri);
     strcat(uri, "/");
     strcat(uri, child->rn);
+    if (child->uri)
+        free(child->uri);
     child->uri = uri;
 
     logger("O2M", LOG_LEVEL_DEBUG, "Add Resource Tree Node [Parent-ID] : %s, [Child-ID] : %s", get_ri_rtnode(parent), get_ri_rtnode(child));
+
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&main_lock);
+#endif
 
     if (!node)
     {
@@ -507,6 +522,10 @@ int add_child_resource_tree(RTNode *parent, RTNode *child)
     {
         add_subs(parent, child);
     }
+
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&main_lock);
+#endif
     return 1;
 }
 
@@ -734,13 +753,20 @@ void detach_subs(RTNode *parent, RTNode *sub)
 
 void add_csrlist(RTNode *csr)
 {
+    extern pthread_mutex_t csr_lock;
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&csr_lock);
+#endif
     NodeList *pnode = rt->csr_list;
     if (!pnode)
     {
         rt->csr_list = calloc(sizeof(NodeList), 1);
         rt->csr_list->rtnode = csr;
-        rt->csr_list->uri = csr->uri;
+        rt->csr_list->uri = strdup(csr->uri);
         rt->csr_list->next = NULL;
+#if MONO_THREAD == 0
+        pthread_mutex_unlock(&csr_lock);
+#endif
         return;
     }
     while (pnode->next)
@@ -751,6 +777,9 @@ void add_csrlist(RTNode *csr)
     pnode->next->rtnode = csr;
     pnode->next->uri = csr->uri;
     pnode->next->next = NULL;
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&csr_lock);
+#endif
 }
 
 void detach_csrlist(RTNode *csr)
@@ -763,7 +792,7 @@ void detach_csrlist(RTNode *csr)
     if (pnode->rtnode == csr)
     {
         rt->csr_list = pnode->next;
-        free(pnode);
+        free_nodelist(pnode);
         return;
     }
     while (pnode->next)
@@ -772,7 +801,7 @@ void detach_csrlist(RTNode *csr)
         {
             NodeList *temp = pnode->next;
             pnode->next = pnode->next->next;
-            free(temp);
+            free_nodelist(temp);
             temp = NULL;
             return;
         }

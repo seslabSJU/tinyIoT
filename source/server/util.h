@@ -147,7 +147,7 @@ char *from_rvi(RVI rvi);
 // privilege
 int get_acop(oneM2MPrimitive *o2pt, char *origin, RTNode *node);
 int get_acop_macp(oneM2MPrimitive *o2pt, RTNode *rtnode);
-int get_acop_origin(oneM2MPrimitive *o2pt, RTNode *acp_rtnode, int flag);
+int get_acop_origin(oneM2MPrimitive *o2pt, char *origin, RTNode *acp_rtnode, int flag);
 int has_privilege(oneM2MPrimitive *o2pt, char *acpi, ACOP acop);
 int has_acpi_update_privilege(oneM2MPrimitive *o2pt, char *acpi);
 

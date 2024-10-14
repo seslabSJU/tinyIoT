@@ -121,6 +121,7 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 
 void init_cse(cJSON *cse);
+void init_acp(cJSON *acp);
 void init_csr(cJSON *csr);
 
 // resource tree

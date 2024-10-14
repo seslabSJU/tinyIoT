@@ -1,9 +1,9 @@
+#include <sys/time.h>
 #include "httpd.h"
 #include "config.h"
 #include "onem2m.h"
 #include "util.h"
 
-#include <sys/time.h>
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <netdb.h>
@@ -23,7 +23,7 @@
 #define BUF_SIZE 65535
 #define QUEUE_SIZE 128
 
-pthread_mutex_t mutex_lock;
+extern pthread_mutex_t mutex_lock;
 int listenfd;
 int clients[MAX_CONNECTIONS];
 static void start_server(const char *);
@@ -46,7 +46,6 @@ void *respond_thread(void *ps)
 
 void serve_forever(const char *PORT)
 {
-    pthread_mutex_init(&mutex_lock, NULL);
     struct sockaddr_in clientaddr;
     socklen_t addrlen = 0;
 
@@ -197,7 +196,6 @@ void respond(int slot)
 {
     HTTPRequest *req = calloc(1, sizeof(HTTPRequest));
     int rcvd;
-    bool flag = false;
     char buffer[BUF_SIZE] = {0};
     buf[slot] = malloc(BUF_SIZE * sizeof(char));
     rcvd = recv(clients[slot], buf[slot], BUF_SIZE, 0);
@@ -212,6 +210,11 @@ void respond(int slot)
         logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected unexpectedly");
         return;
     }
+    if (rcvd > BUF_SIZE)
+    {
+        logger("HTTP", LOG_LEVEL_ERROR, "request too large");
+        return;
+    }
     // message received
     buf[slot][rcvd] = '\0';
     logger("HTTP", LOG_LEVEL_DEBUG, "\n\n%s\n", buf[slot]);
@@ -220,7 +223,8 @@ void respond(int slot)
     parse_http_request(req, buffer);
     if (req->payload_size > 0 && ((req->payload == NULL) || strlen(req->payload) == 0))
     { // if there is payload but it is not in the buffer
-        flag = true;
+        if (req->payload != NULL)
+            free(req->payload);
         req->payload = (char *)calloc(MAX_PAYLOAD_SIZE, sizeof(char));
         recv(clients[slot], req->payload, MAX_PAYLOAD_SIZE, 0); // receive payload
     }
@@ -407,9 +411,8 @@ void handle_http_request(HTTPRequest *req, int slotno)
         o2pt->fc = qs;
     }
 
-    pthread_mutex_trylock(&mutex_lock);
     route(o2pt);
-    pthread_mutex_unlock(&mutex_lock);
+
     http_respond_to_client(o2pt, slotno);
     free_o2pt(o2pt);
 }
@@ -605,11 +608,12 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
 
 void parse_http_request(HTTPRequest *req, char *packet)
 {
+    char *savePtr = NULL;
     char *ptr = NULL;
 
-    req->method = op_to_method(http_parse_operation(strtok(packet, " \t\r\n")));
-    req->uri = strdup(strtok(NULL, " \t"));
-    req->prot = strdup(strtok(NULL, " \t\r\n"));
+    req->method = op_to_method(http_parse_operation(strtok_r(packet, " \t\r\n", &savePtr)));
+    req->uri = strdup(strtok_r(NULL, " \t", &savePtr));
+    req->prot = strdup(strtok_r(NULL, " \t\r\n", &savePtr));
     if (!req->uri)
     {
         logger("HTTP", LOG_LEVEL_ERROR, "URI is NULL");
@@ -634,10 +638,10 @@ void parse_http_request(HTTPRequest *req, char *packet)
     while (true)
     {
         char *key, *val;
-        key = strtok(NULL, "\r\n: \t");
+        key = strtok_r(NULL, "\r\n: \t", &savePtr);
         if (!key)
             break;
-        val = strtok(NULL, "\r\n");
+        val = strtok_r(NULL, "\r\n", &savePtr);
         while (*val && *val == ' ')
             val++;
 
@@ -653,7 +657,7 @@ void parse_http_request(HTTPRequest *req, char *packet)
         h = h->next;
     }
     // t = strtok(NULL, "\r\n");
-    t = strtok(NULL, "\n");
+    t = strtok_r(NULL, "\n", &savePtr);
     if (t && t[0] == '\r')
         t += 2;                                         // now the *t shall be the beginning of user payload
     t2 = search_header(req->headers, "content-length"); // and the related header if there is
@@ -665,9 +669,10 @@ void parse_http_request(HTTPRequest *req, char *packet)
 void parse_http_response(HTTPResponse *res, char *packet)
 {
     char *ptr = NULL;
-    res->protocol = strdup(strtok(packet, " "));
-    res->status_code = atoi(strtok(NULL, " "));
-    res->status_msg = strdup(strtok(NULL, "\r\n"));
+    char *savePtr = NULL;
+    res->protocol = strdup(strtok_r(packet, " ", &savePtr));
+    res->status_code = atoi(strtok_r(NULL, " ", &savePtr));
+    res->status_msg = strdup(strtok_r(NULL, "\r\n", &savePtr));
 
     res->headers = (header_t *)calloc(sizeof(header_t), 1);
     header_t *h = res->headers;
@@ -675,10 +680,10 @@ void parse_http_response(HTTPResponse *res, char *packet)
     while (true)
     {
         char *key, *val;
-        key = strtok(NULL, "\r\n: \t");
+        key = strtok_r(NULL, "\r\n: \t", &savePtr);
         if (!key)
             break;
-        val = strtok(NULL, "\r\n");
+        val = strtok_r(NULL, "\r\n", &savePtr);
         while (*val && *val == ' ')
             val++;
 
@@ -694,7 +699,7 @@ void parse_http_response(HTTPResponse *res, char *packet)
         h = h->next;
     }
     // t = strtok(NULL, "\r\n");
-    t = strtok(NULL, "\n");
+    t = strtok_r(NULL, "\n", &savePtr);
     if (t && t[0] == '\r')
         t += 2;                                         // now the *t shall be the beginning of user payload
     t2 = search_header(res->headers, "content-length"); // and the related header if there is

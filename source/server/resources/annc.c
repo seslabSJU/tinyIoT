@@ -65,7 +65,9 @@ int create_annc(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     RTNode *child_rtnode = create_rtnode(resource, o2pt->ty);
     add_child_resource_tree(parent_rtnode, child_rtnode);
 
-    o2pt->response_pc = root;
+    make_response_body(o2pt, child_rtnode);
+    cJSON_DetachItemFromObject(root, get_resource_key(o2pt->ty));
+    cJSON_Delete(root);
 
     return o2pt->rsc = RSC_CREATED;
 }
@@ -83,36 +85,48 @@ int update_annc(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             return handle_error(o2pt, RSC_BAD_REQUEST, "unsupported attribute on update");
         }
     }
-
-    cJSON *ast = cJSON_GetObjectItem(target_rtnode->obj, "ast");
-    if (ast)
+    char *lnk = cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring;
+    logger("UTIL", LOG_LEVEL_DEBUG, "lnk : %s, fr : %s", lnk, o2pt->fr);
+    if (!lnk)
     {
-        if (ast->valueint != AST_BI_DIRECTIONAL)
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "resource is uni-directional");
-        }
-        else
-        {
-
-            char *lnk = cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring;
-
-            oneM2MPrimitive *req = calloc(1, sizeof(oneM2MPrimitive));
-            o2ptcpy(&req, o2pt);
-            req->to = strdup(lnk);
-            cJSON_Delete(req->request_pc);
-            req->request_pc = cJSON_CreateObject();
-            cJSON_AddItemReferenceToObject(req->request_pc, get_resource_key(o2pt->ty - 10000), req_src);
-
-            rsc = forwarding_onem2m_resource(req, find_csr_rtnode_by_uri(lnk));
-            if (rsc != RSC_UPDATED)
-            {
-                return handle_error(o2pt, RSC_BAD_REQUEST, "failed to update original resource");
-            }
-        }
+        return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "lnk is empty");
+    }
+    if (strncmp(o2pt->fr, lnk, strlen(o2pt->fr)) == 0 && lnk[strlen(o2pt->fr)] == '/')
+    {
+        logger("UTIL", LOG_LEVEL_DEBUG, "update from originator");
     }
     else
     {
-        return handle_error(o2pt, RSC_BAD_REQUEST, "resource is uni-directional");
+        cJSON *ast = cJSON_GetObjectItem(target_rtnode->obj, "ast");
+        if (ast)
+        {
+            if (ast->valueint != AST_BI_DIRECTIONAL)
+            {
+                return handle_error(o2pt, RSC_BAD_REQUEST, "resource is uni-directional");
+            }
+            else
+            {
+
+                char *lnk = cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring;
+
+                oneM2MPrimitive *req = calloc(1, sizeof(oneM2MPrimitive));
+                o2ptcpy(&req, o2pt);
+                req->to = strdup(lnk);
+                cJSON_Delete(req->request_pc);
+                req->request_pc = cJSON_CreateObject();
+                cJSON_AddItemReferenceToObject(req->request_pc, get_resource_key(o2pt->ty - 10000), req_src);
+
+                rsc = forwarding_onem2m_resource(req, find_csr_rtnode_by_uri(lnk));
+                if (rsc != RSC_UPDATED)
+                {
+                    return handle_error(o2pt, RSC_BAD_REQUEST, "failed to update original resource");
+                }
+            }
+        }
+        else
+        {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "resource is uni-directional");
+        }
     }
 
     int result = 0;

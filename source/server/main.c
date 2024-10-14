@@ -31,6 +31,11 @@
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
 
+#if MONO_THREAD == 0
+pthread_mutex_t main_lock;
+pthread_mutex_t csr_lock;
+#endif
+
 void route(oneM2MPrimitive *o2pt);
 void stop_server(int sig);
 cJSON *ATTRIBUTES;
@@ -86,6 +91,11 @@ int main(int argc, char **argv)
 {
 	signal(SIGINT, stop_server);
 	logger_init();
+
+#if MONO_THREAD == 0
+	pthread_mutex_init(&main_lock, NULL);
+	pthread_mutex_init(&csr_lock, NULL);
+#endif
 
 	ATTRIBUTES = cJSON_Parse(
 		"{ \
@@ -232,6 +242,7 @@ void route(oneM2MPrimitive *o2pt)
 	}
 
 	RTNode *target_rtnode = get_rtnode(o2pt);
+
 	if (o2pt->rsc >= 4000)
 	{
 		log_runtime(start);
@@ -406,6 +417,7 @@ void stop_server(int sig)
         }
     }
 #ifdef ENABLE_MQTT
+<<<<<<< HEAD
     pthread_kill(mqtt, SIGINT);
 #endif
 #ifdef ENABLE_COAP
@@ -474,3 +486,31 @@ RTNode* find_created_rtnode(const char *parent_ri, const char *child_rn) {
 
 
 
+=======
+	if (mqtt)
+	{
+		pthread_kill(mqtt, SIGINT);
+		pthread_detach(mqtt);
+	}
+#endif
+#ifdef ENABLE_COAP
+	logger("MAIN", LOG_LEVEL_INFO, "Closing CoAP...");
+	if (coap)
+	{
+		pthread_kill(coap, SIGINT);
+		pthread_detach(coap);
+	}
+#endif
+	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
+	close_dbp();
+	logger("MAIN", LOG_LEVEL_INFO, "Cleaning ResourceTree...");
+	free_all_nodelist(rt->csr_list);
+	free_rtnode(rt->cb);
+	free(rt);
+	cJSON_Delete(ATTRIBUTES);
+
+	logger("MAIN", LOG_LEVEL_INFO, "Done");
+	logger_free();
+	exit(0);
+}
+>>>>>>> origin/standard-fix

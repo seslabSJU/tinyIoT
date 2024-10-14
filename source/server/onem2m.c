@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <sys/timeb.h>
 #include <limits.h>
+#include <pthread.h>
 #include "onem2m.h"
 #include "dbmanager.h"
 #include "httpd.h"
@@ -18,6 +19,7 @@
 #include "coap.h"
 
 extern ResourceTree *rt;
+extern pthread_mutex_t main_lock;
 
 void init_cse(cJSON *cse)
 {
@@ -47,8 +49,12 @@ void init_cse(cJSON *cse)
 	cJSON_AddNumberToObject(cse, "cst", SERVER_TYPE);
 	cJSON_AddItemToObject(cse, "srt", srt);
 
+	cJSON *acpi = cJSON_CreateArray();
+	cJSON_AddItemToArray(acpi, cJSON_CreateString(CSE_BASE_NAME "/defaultACP"));
+	cJSON_AddItemToObject(cse, "acpi", acpi);
+
 	cJSON *srv = cJSON_CreateArray();
-	cJSON_AddItemToArray(srv, cJSON_CreateString("2a"));
+	cJSON_AddItemToArray(srv, cJSON_CreateString(from_rvi(CSE_RVI)));
 
 	cJSON_AddItemToObject(cse, "srv", srv);
 	cJSON_AddItemToObject(cse, "pi", cJSON_CreateString(""));
@@ -63,6 +69,54 @@ void init_cse(cJSON *cse)
 	ct = NULL;
 	free(csi);
 	csi = NULL;
+}
+
+void init_acp(cJSON *acp)
+{
+	char *ct = get_local_time(0);
+	char *ptr = NULL;
+
+	cJSON_AddStringToObject(acp, "ct", ct);
+	cJSON_AddStringToObject(acp, "lt", ct);
+
+	ptr = resource_identifier(RT_ACP, ct);
+	cJSON_AddStringToObject(acp, "ri", ptr);
+	cJSON_AddStringToObject(acp, "pi", CSE_BASE_RI);
+	cJSON_AddStringToObject(acp, "rn", "defaultACP");
+	free(ptr);
+	ptr = NULL;
+	cJSON *pv = cJSON_CreateObject();
+	cJSON *pvs = cJSON_CreateObject();
+	cJSON *acr = cJSON_CreateArray();
+	cJSON *obj = cJSON_CreateObject();
+	cJSON *acor = cJSON_CreateArray();
+
+	cJSON_AddItemToObject(pv, "acr", acr);
+	cJSON_AddItemToObject(obj, "acor", acor);
+
+	cJSON_AddItemToArray(acor, cJSON_CreateString("all"));
+	cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(DEFAULT_ACOP));
+	cJSON_AddItemToArray(acr, obj);
+
+	obj = cJSON_CreateObject();
+	acr = cJSON_CreateArray();
+	acor = cJSON_CreateArray();
+
+	cJSON_AddItemToObject(pvs, "acr", acr);
+
+	cJSON_AddItemToObject(obj, "acor", acor);
+	cJSON_AddItemToArray(acor, cJSON_CreateString(ADMIN_AE_ID));
+	cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(ALL_ACOP));
+	cJSON_AddItemToArray(acr, obj);
+
+	cJSON_AddItemToObject(acp, "pv", pv);
+	cJSON_AddItemToObject(acp, "pvs", pvs);
+
+	cJSON_AddNumberToObject(acp, "ty", RT_ACP);
+	cJSON_AddStringToObject(acp, "et", get_local_time(DEFAULT_EXPIRE_TIME));
+
+	free(ct);
+	ct = NULL;
 }
 
 void init_csr(cJSON *csr)
@@ -253,6 +307,9 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	make_response_body(o2pt, target_rtnode);
 
+#if MONO_THREAD == 0
+	pthread_mutex_lock(&main_lock);
+#endif
 	delete_process(o2pt, target_rtnode);
 	db_delete_onem2m_resource(target_rtnode);
 
@@ -278,6 +335,9 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	{
 		free_rtnode(target_rtnode);
 	}
+#if MONO_THREAD == 0
+	pthread_mutex_unlock(&main_lock);
+#endif
 
 	target_rtnode = NULL;
 	o2pt->rsc = RSC_DELETED;
@@ -653,6 +713,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		break;
 
 #if CSE_RVI >= RVI_3
+
 	case RT_AEA:
 	case RT_ACPA:
 	case RT_CBA:
@@ -1061,9 +1122,15 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				del = node;
 				node = node->next;
 				logger("O2M", LOG_LEVEL_DEBUG, "deleting [%s]", del->uri);
+#if MONO_THREAD == 0
+				pthread_mutex_lock(&main_lock);
+#endif
 				delete_process(o2pt, del->rtnode);
 				logger("O2M", LOG_LEVEL_DEBUG, "delete_process done [%s]", del->uri);
 				db_delete_onem2m_resource(del->rtnode);
+#if MONO_THREAD == 0
+				pthread_mutex_unlock(&main_lock);
+#endif
 				logger("O2M", LOG_LEVEL_DEBUG, "db_delete_onem2m_resource done");
 				free_rtnode(del->rtnode);
 				free_nodelist(del);
@@ -1231,7 +1298,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 			cJSON_AddItemToObject(annc, pjson->valuestring, cJSON_Duplicate(temp, true));
 		}
 
-		o2pt->response_pc = root;
+		o2pt->request_pc = root;
 		o2pt->isForwarding = true;
 		RTNode *rtnode = find_csr_rtnode_by_uri(at);
 		if (!rtnode)
@@ -1262,7 +1329,6 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 			cJSON_AddItemToArray(at, cJSON_CreateString(buf));
 			db_update_resource(obj, cJSON_GetObjectItem(obj, "ri")->valuestring, ty);
 		}
-		cJSON_Delete(result);
 		free_o2pt(o2pt);
 		free(parent_target);
 
@@ -1352,9 +1418,9 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 	}
 
-	if (o2pt->rsc >= 4000)
+	if (o2pt->rsc == RSC_TARGET_NOT_REACHABLE)
 	{
-		logger("O2M", LOG_LEVEL_ERROR, "forwarding failed");
+		logger("O2M", LOG_LEVEL_ERROR, "forwarding target not reachable");
 		return o2pt->rsc;
 	}
 
