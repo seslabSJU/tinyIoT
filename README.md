@@ -1,13 +1,12 @@
 # tinyIoT
 
 <div>
-	<a href = "홈페이지url" target="_blank">
 	<p align = "center">
 	  <img src = "https://github.com/seslabSJU/tinyIoT/blob/main/images/tinyIoT_logo1.png?raw=true" width = "40%" height = "50%">
-	</p></a>
+	</p>
 </div>
 
-<p align = "center"> Let's get started your oneM2M service projects by using 'oneM2M service layer platform', <a href = "홈페이지url" target="_blank"><b>tinyIoT</b></a>!🎮 </p> <br>
+<p align = "center"> Let's get started your oneM2M service projects by using 'oneM2M service layer platform', <b>tinyIoT</b>!🎮 </p> <br>
 <p align = "center"> <img src="https://img.shields.io/badge/Node-339933?style=flat-square&logo=nodedotjs&logoColor=white"/>&nbsp 
 <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=white"/>&nbsp 
 <img src="https://img.shields.io/badge/Ubuntu-E95420?style=falt-square&logo=ubuntu&logoColors=white"/>&nbsp
@@ -153,4 +152,4 @@ We are managing our development documentation through GitHub files.📂<br>
 For more information, please see below.<br> 
 You can view our development process and documentation within these files!👀
 
-<a href = "https://github.com/seslabSJU/tinyIoT/tree/main/documents" target="_blank"><b>documentation</b></a>
+<b>documentation</b>
