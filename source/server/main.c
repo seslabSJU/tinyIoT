@@ -387,7 +387,7 @@ void stop_server(int sig)
 
 	logger("MAIN", LOG_LEVEL_INFO, "Shutting down server...");
 
-	logger("MAIN", LOG_LEVEL_INFO, "De-registrating cse...");
+	logger("MAIN", LOG_LEVEL_INFO, "De-registering cse...");
 	if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
 	{
 		if (deRegister_csr() != 0)
