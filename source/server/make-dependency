@@ -1,0 +1,17 @@
+$ sudo su
+
+# apt-get install make
+
+# apt-get install build-essential
+
+# apt-get install gcc
+
+# apt-get install --reinstall make
+
+# apt-get install libexpat1-dev
+
+# apt-get install g++ 
+
+# apt-get install net-tools
+
+# apt-get install curl
