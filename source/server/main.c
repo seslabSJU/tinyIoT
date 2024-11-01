@@ -33,6 +33,8 @@ RTNode *registrar_csr = NULL;
 #if MONO_THREAD == 0
 pthread_mutex_t main_lock;
 pthread_mutex_t csr_lock;
+pthread_mutexattr_t Attr;
+
 #endif
 
 void route(oneM2MPrimitive *o2pt);
@@ -83,7 +85,9 @@ int main(int argc, char **argv)
 	logger_init();
 
 #if MONO_THREAD == 0
-	pthread_mutex_init(&main_lock, NULL);
+	pthread_mutexattr_init(&Attr);
+	pthread_mutexattr_settype(&Attr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init(&main_lock, &Attr);
 	pthread_mutex_init(&csr_lock, NULL);
 #endif
 
