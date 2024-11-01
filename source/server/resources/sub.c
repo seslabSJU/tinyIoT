@@ -174,6 +174,8 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             {
                 cJSON_Delete(noti_cjson);
 
+                cJSON_DetachItemFromObject(sub, "nu");
+                cJSON_AddItemToObject(sub, "nu", old_nu);
                 return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification error");
             }
         }
