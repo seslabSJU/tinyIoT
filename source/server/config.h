@@ -94,8 +94,6 @@
 #define LOG_BUFFER_SIZE MAX_PAYLOAD_SIZE
 #define SAVE_LOG
 
-#endif
-
 // CoAP Settings
 // #define ENABLE_COAP
 #ifdef ENABLE_COAP
@@ -107,10 +105,11 @@
 #define COAP_PORT 5683
 #endif
 
+#endif
+
 // Additional Settings
 // Add CORS headers to HTTP response
 // You may modify the context at httpd.h
 // #define CORS
-#define CORS
 
 #endif
