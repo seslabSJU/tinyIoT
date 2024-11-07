@@ -456,17 +456,13 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
 
     if ((pjson = cJSON_GetObjectItem(grp_new, "mt")))
     {
-        mt = pjson->valueint;
+        return handle_error(o2pt, RSC_BAD_REQUEST, "`mt` is not updatable");
     }
 
     if ((pjson = cJSON_GetObjectItem(grp_new, "csy")))
     {
-        csy = pjson->valueint;
-        if (csy < 0 || csy > 3)
-        {
-            handle_error(o2pt, RSC_BAD_REQUEST, "`csy` is invalid");
-            return RSC_BAD_REQUEST;
-        }
+
+        return handle_error(o2pt, RSC_BAD_REQUEST, "`csy` is not updatable");
     }
 
     cJSON *midArr = cJSON_GetObjectItem(grp_new, "mid");
