@@ -146,10 +146,3 @@ In order to run MQTT, Mosquitto MQTT broker should be installed on your machine.
 If you would like to add a new protocol binding to tinyIoT, you can follow the steps outlined in the guide below.<br>
 <a href = "https://github.com/seslabSJU/tinyIoT/blob/main/images/tinyIoT%20protocol%20binding%20guide.pdf" target="-blank"><b>protocol binding guide</b></a>
 
-# Documentation
-
-We are managing our development documentation through GitHub files.📂<br>
-For more information, please see below.<br> 
-You can view our development process and documentation within these files!👀
-
-<b>documentation</b>
