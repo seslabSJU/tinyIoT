@@ -3248,13 +3248,16 @@ int deRegister_csr()
 }
 
 /**
- * @brief update dcse of remote cse
- * @param created_rtnode created remote cse\nIt will be excluded from update
+ * @brief update dcse of remote cse in registrar csr
  * @return 0 if success, -1 if failed
  */
-int update_remote_csr_dcse(RTNode *skip_rtnode)
+int update_remote_csr_dcse()
 {
-	NodeList *node = rt->csr_list;
+	RTNode *rtnode = rt->registrar_csr;
+	if (!rtnode)
+	{
+		return 0;
+	}
 	cJSON *root = NULL;
 	cJSON *dcse = cJSON_GetObjectItem(rt->cb->obj, "dcse");
 	if (!dcse)
@@ -3268,28 +3271,20 @@ int update_remote_csr_dcse(RTNode *skip_rtnode)
 	cJSON_AddItemToObject(root, get_resource_key(RT_CSR), csr);
 	cJSON_AddItemToObject(csr, "dcse", dcse);
 
-	RTNode *rtnode = NULL;
 	oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
 	o2pt->op = OP_UPDATE;
 	o2pt->fr = strdup("/" CSE_BASE_RI);
 	o2pt->rqi = strdup("update-csr");
 	o2pt->rvi = CSE_RVI;
 	o2pt->request_pc = root;
-	logger("UTIL", LOG_LEVEL_DEBUG, "skip_rtnode: %s", skip_rtnode->uri);
-	while (node)
-	{
-		rtnode = node->rtnode;
-		node = node->next;
-		char buf[1024] = {0};
-		logger("UTIL", LOG_LEVEL_DEBUG, "rtnode: %s", rtnode->uri);
-		if (rtnode == skip_rtnode)
-			continue;
 
-		sprintf(buf, "%s/%s", cJSON_GetObjectItem(rtnode->obj, "csi")->valuestring, CSE_BASE_RI);
-		o2pt->to = strdup(buf);
+	char buf[1024] = {0};
+	logger("UTIL", LOG_LEVEL_DEBUG, "rtnode: %s", rtnode->uri);
 
-		forwarding_onem2m_resource(o2pt, rtnode);
-	}
+	sprintf(buf, "%s/%s", cJSON_GetObjectItem(rtnode->obj, "csi")->valuestring, CSE_BASE_RI);
+	o2pt->to = strdup(buf);
+
+	forwarding_onem2m_resource(o2pt, rtnode);
 
 	free_o2pt(o2pt);
 	return 0;

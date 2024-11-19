@@ -32,7 +32,7 @@ bool isSpRelativeLocal(char *address);
 // Remote-CSE
 int register_remote_cse();
 int create_local_csr();
-int update_remote_csr_dcse(RTNode *created_rtnode);
+int update_remote_csr_dcse();
 int deRegister_csr();
 void add_csrlist(RTNode *csr_rtnode);
 void detach_csrlist(RTNode *csr_rtnode);

@@ -383,7 +383,7 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		idx = cJSON_getArrayIdx(dcse, cJSON_GetObjectItem(csr, "csi")->valuestring);
 		if (idx != -1)
 			cJSON_DeleteItemFromArray(dcse, idx);
-		update_remote_csr_dcse(rtnode);
+		update_remote_csr_dcse();
 		detach_csrlist(rtnode);
 		break;
 	case RT_GRP:
