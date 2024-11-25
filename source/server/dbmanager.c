@@ -179,6 +179,32 @@ int init_dbp()
         return 0;
     }
 
+    strcpy(sql, "CREATE TABLE IF NOT EXISTS cntA ( id INTEGER, \
+        lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, \
+        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
+
+    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    if (rc != SQLITE_OK)
+    {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cntA]: %s", err_msg);
+        sqlite3_close(db);
+        free(sql);
+        return 0;
+    }
+
+    strcpy(sql, "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, \
+        lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), ast INT, \
+        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
+
+    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    if (rc != SQLITE_OK)
+    {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cinA]: %s", err_msg);
+        sqlite3_close(db);
+        free(sql);
+        return 0;
+    }
+
     free(sql);
     return 1;
 }

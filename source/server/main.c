@@ -90,6 +90,13 @@ int main(int argc, char **argv)
 	pthread_mutex_init(&main_lock, &Attr);
 	pthread_mutex_init(&csr_lock, NULL);
 #endif
+	// Attributes for resources
+	// all attributes are verified in validate_sub_attr in util.c
+	// if you want to add new attributes, you should add it to here
+	// Request with null value will be regarded as valid because update request can have null value
+	// So you should check it each resource validation
+	// Attributes not added here will be regarded as invalid
+	// Attributes with null value will be ignored
 
 	ATTRIBUTES = cJSON_Parse(
 		"{ \
@@ -103,7 +110,9 @@ int main(int argc, char **argv)
 		\"m2m:csr\": {\"cst\":0, \"poa\":[\"\"], \"cb\":\"\", \"dcse\":[\"\"], \"csi\":\"\", \"mei\":\"\", \"tri\":\"\", \"csz\":[\"\"], \"rr\":true, \"nl\":\"\", \"srv\":[\"\"]},\
 		\"m2m:cb\": {\"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[0], \"rr\":true, \"at\":[], \"aa\":[],\"ast\":0}, \
 		\"m2m:cbA\": {\"lnk\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[\"\"], \"rr\":true, \"ast\":0}, \
-		\"m2m:aeA\": {\"lnk\":\"\", \"api\":\"\", \"aei\":\"\", \"rr\":true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"], \"ast\":0} \
+		\"m2m:aeA\": {\"lnk\":\"\", \"api\":\"\", \"aei\":\"\", \"rr\":true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"], \"ast\":0}, \
+		\"m2m:cntA\": {\"lnk\":\"\", \"cr\":\"\", \"mni\":0, \"mbs\":0, \"st\":0, \"cni\":0, \"cbs\":0, \"ast\":0}, \
+		\"m2m:cinA\": {\"lnk\":\"\", \"cs\":0, \"cr\":\"\", \"con\":\"\", \"cnf\":\"\", \"st\":\"\", \"ast\":0} \
 	 }");
 
 	if (ATTRIBUTES == NULL)
