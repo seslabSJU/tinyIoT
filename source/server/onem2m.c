@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cJSON.h"
 #include "coap.h"
+#include "jsonparser.h"
 
 extern ResourceTree *rt;
 extern pthread_mutex_t main_lock;
@@ -99,6 +100,11 @@ void init_acp(cJSON *acp)
 	cJSON_AddItemToArray(acr, obj);
 
 	obj = cJSON_CreateObject();
+	cJSON_AddItemToObject(obj, "acor", string_to_cjson_string_list_item(ALLOWED_REMOTE_CSE_ID));
+	cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(ALL_ACOP));
+	cJSON_AddItemToArray(acr, obj);
+
+	obj = cJSON_CreateObject();
 	acr = cJSON_CreateArray();
 	acor = cJSON_CreateArray();
 
@@ -142,6 +148,7 @@ void init_csr(cJSON *csr)
 	cJSON_DeleteItemFromObject(csr, "pi");
 	cJSON_DeleteItemFromObject(csr, "at");
 	cJSON_DeleteItemFromObject(csr, "aa");
+	cJSON_DeleteItemFromObject(csr, "acpi");
 }
 
 void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty)

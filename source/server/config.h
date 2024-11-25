@@ -25,6 +25,8 @@
 #define ADMIN_AE_ID "CAdmin"
 #define DEFAULT_ACOP ACOP_CREATE
 
+#define ALLOWED_REMOTE_CSE_ID "/id-in,/id-mn"
+
 #define MONO_THREAD 0 // 0 → multi-thread, 1 → mono-thread
 
 #define UPPERTESTER 1 // 0 → disable, 1 → enable
