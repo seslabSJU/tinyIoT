@@ -126,7 +126,7 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *acpi_obj = NULL;
     bool acpi_flag = false;
 
-    result = validate_cnt(o2pt, m2m_cnt, OP_UPDATE); // TODO - add UPDATE validation
+    result = validate_cnt(o2pt, m2m_cnt, OP_UPDATE);
 
     // update acpi
     if (cJSON_GetObjectItem(m2m_cnt, "acpi"))
