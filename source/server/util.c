@@ -444,7 +444,7 @@ void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 	{
 		if (child->ty != RT_CIN)
 		{
-			build_child_structure(o2pt, child, target, &ofst, &lim, level - 1);
+			build_child_structure(o2pt, child, target, &ofst, &lim, level - 1, RCN_CHILD_RESOURCES);
 		}
 		child = child->sibling_right;
 	}
@@ -459,7 +459,7 @@ void build_rcn6(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 {
 	cJSON *root = cJSON_AddObjectToObject(result_obj, "m2m:rrl");
 	cJSON *target = cJSON_AddArrayToObject(root, "rrf");
-	get_child_references(o2pt, rtnode, target, &ofst, &lim, level);
+	get_child_references(o2pt, rtnode, target, &ofst, &lim, level, RCN_CHILD_RESOURCE_REFERENCES);
 }
 
 /**
@@ -476,7 +476,7 @@ void build_rcn5(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 	cJSON_AddItemToObject(result_obj, get_resource_key(rtnode->ty), cJSON_Duplicate(rtnode->obj, true));
 	cJSON *target = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty));
 	target = cJSON_AddArrayToObject(target, "ch");
-	get_child_references(o2pt, rtnode, target, &ofst, &lim, level - 1);
+	get_child_references(o2pt, rtnode, target, &ofst, &lim, level - 1, RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES);
 }
 
 /**
@@ -491,7 +491,23 @@ void build_rcn5(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level)
 {
 	cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), cJSON_Duplicate(rtnode->obj, true));
-	build_rcn8(o2pt, rtnode, result_obj, ofst, lim, level - 1);
+	RTNode *child = rtnode->child;
+	cJSON *target = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty));
+	if (!target)
+		target = cJSON_AddObjectToObject(result_obj, get_resource_key(rtnode->ty));
+	while (child)
+	{
+		if (child->ty != RT_CIN)
+		{
+			build_child_structure(o2pt, child, target, &ofst, &lim, level - 1, RCN_ATTRIBUTES_AND_CHILD_RESOURCES);
+		}
+		child = child->sibling_right;
+	}
+	logger("UTIL", LOG_LEVEL_DEBUG, "ofst : %d, lim : %d", ofst, lim);
+	if (lim < 0)
+	{
+		o2pt->cnst = CS_PARTIAL_CONTENT;
+	}
 }
 
 /**
@@ -503,19 +519,22 @@ void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
  * @param limit limit
  * @param level level
  */
-void get_child_references(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level)
+void get_child_references(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level, int rcn)
 {
 	RTNode *child = rtnode->child;
 	cJSON *root = NULL;
+	bool apt;
 	logger("UTIL", LOG_LEVEL_DEBUG, "get_child_references %s", rtnode->uri);
 	while (child)
 	{
+		apt = false;
 		if (child->ty != RT_CIN)
 		{
 			if (*ofst <= 0 && *lim > 0)
 			{
 				if (isResourceAptFC(o2pt, child, o2pt->fc))
 				{
+					apt = true;
 					root = cJSON_CreateObject();
 					cJSON_AddStringToObject(root, "nm", child->rn);
 					cJSON_AddNumberToObject(root, "typ", child->ty);
@@ -569,12 +588,22 @@ void get_child_references(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_o
 			}
 			free_rtnode_list(cin_list_head);
 		}
-		get_child_references(o2pt, child, result_obj, ofst, lim, level - 1);
+		if (rcn == RCN_CHILD_RESOURCES || RCN_CHILD_RESOURCE_REFERENCES)
+		{
+			get_child_references(o2pt, child, result_obj, ofst, lim, level - 1, rcn);
+		}
+		else if (rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCES || RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES)
+		{
+			if (apt)
+			{
+				get_child_references(o2pt, child, result_obj, ofst, lim, level - 1, rcn);
+			}
+		}
 		child = child->sibling_right;
 	}
 }
 
-void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level)
+void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int *ofst, int *lim, int level, int rcn)
 {
 	// logger("UTIL", LOG_LEVEL_DEBUG, "build_child_structure %s", rtnode->uri);
 	cJSON *pjson = NULL, *target = NULL;
@@ -656,13 +685,15 @@ void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_
 			child = child->sibling_right;
 			continue;
 		}
+
 		if (target)
 		{
-			build_child_structure(o2pt, child, target, ofst, lim, level - 1);
+			build_child_structure(o2pt, child, target, ofst, lim, level - 1, rcn);
 		}
 		else
 		{
-			build_child_structure(o2pt, child, result_obj, ofst, lim, level - 1);
+			if (rcn == RCN_CHILD_RESOURCES || rcn == RCN_CHILD_RESOURCE_REFERENCES)
+				build_child_structure(o2pt, child, result_obj, ofst, lim, level - 1, rcn);
 		}
 		child = child->sibling_right;
 	}
