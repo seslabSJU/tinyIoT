@@ -401,6 +401,7 @@ void stop_server(int sig)
 	logger("MAIN", LOG_LEVEL_INFO, "Shutting down server...");
 
 	logger("MAIN", LOG_LEVEL_INFO, "De-registering cse...");
+#ifdef DEREGISTER_AT_SHUTDOWN
 	if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
 	{
 		if (deRegister_csr() != 0)
@@ -408,6 +409,7 @@ void stop_server(int sig)
 			logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE de-registration failed");
 		}
 	}
+#endif
 #ifdef ENABLE_MQTT
 	if (mqtt)
 	{
