@@ -2979,10 +2979,6 @@ bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg)
 	pjson = pjson->child;
 	while (pjson)
 	{
-		// if (!strcmp(pjson->string, "memberOf"))
-		// {
-		// 	return false;
-		// }
 		if (validate_sub_attr(attrs, pjson, err_msg))
 		{
 			flag = true;
@@ -3130,6 +3126,22 @@ int validate_acr(oneM2MPrimitive *o2pt, cJSON *acr_attr)
 	}
 
 	return RSC_OK;
+}
+
+/**
+ * @brief check if the expiration time is valid
+ * @param et expiration time
+ * @return true if valid, false if invalid
+ */
+bool isETvalid(char *et)
+{
+	char *now = get_local_time(0);
+	if (strcmp(et, now) < 0)
+	{
+		free(now);
+		return false;
+	}
+	return true;
 }
 
 int register_remote_cse()
@@ -3982,5 +3994,26 @@ bool isValidChildType(ResourceType parent, ResourceType child)
 			return true;
 		break;
 	}
+	return false;
+}
+
+bool isExpired(RTNode *rtnode)
+{
+	if (!rtnode)
+	{
+		return false;
+	}
+	cJSON *et = cJSON_GetObjectItem(rtnode->obj, "et");
+	if (!et)
+	{
+		return false;
+	}
+	char *now = get_local_time(0);
+	if (strcmp(now, et->valuestring) > 0)
+	{
+		free(now);
+		return true;
+	}
+	free(now);
 	return false;
 }

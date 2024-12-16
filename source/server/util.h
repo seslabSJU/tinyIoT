@@ -8,14 +8,14 @@
 
 bool init_server();
 
-void set_o2pt_pc(oneM2MPrimitive *o2pt, char *pc, ...);
 void set_o2pt_rsc(oneM2MPrimitive *o2pt, int rsc);
 void o2ptcpy(oneM2MPrimitive **dest, oneM2MPrimitive *src);
 void free_o2pt(oneM2MPrimitive *o2pt);
 void free_all_resource(RTNode *rtnode);
 void log_runtime(double start);
+bool isExpired(RTNode *rtnode);
 
-void update_resource(cJSON *old, cJSON *new);
+void update_resource(cJSON *old_obj, cJSON *new_obj);
 int parsePoa(char *poa_str, Protocol *prot, char **host, int *port, char **path);
 RTNode *get_rtnode(oneM2MPrimitive *o2pt);
 RTNode *parse_uri(oneM2MPrimitive *o2pt, RTNode *cb);
@@ -108,6 +108,7 @@ int validate_acpi(oneM2MPrimitive *o2pt, cJSON *acpiAttr, Operation op);
 int validate_acr(oneM2MPrimitive *o2pt, cJSON *acr_attr);
 bool checkResourceCseID(char *resourceUri, char *cseID);
 bool isValidChildType(ResourceType parent, ResourceType child);
+bool isETvalid(char *et);
 
 // error
 int check_mandatory_attributes(oneM2MPrimitive *o2pt);

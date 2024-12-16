@@ -173,10 +173,12 @@ void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty)
 
 	cJSON *pi = cJSON_GetObjectItem(parent_rtnode->obj, "ri");
 	cJSON_AddStringToObject(root, "pi", pi->valuestring);
-
-	ptr = get_local_time(DEFAULT_EXPIRE_TIME);
-	cJSON_AddStringToObject(root, "et", ptr);
-	free(ptr);
+	if (!cJSON_GetObjectItem(root, "et"))
+	{
+		ptr = get_local_time(DEFAULT_EXPIRE_TIME);
+		cJSON_AddStringToObject(root, "et", ptr);
+		free(ptr);
+	}
 	ptr = NULL;
 	free(ct);
 }
@@ -580,6 +582,12 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		}
 		return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type error");
 	}
+	cJSON *pjson = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(o2pt->ty));
+	pjson = cJSON_GetObjectItem(pjson, "et");
+	if (pjson && !isETvalid(pjson->valuestring))
+	{
+		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
+	}
 
 	switch (o2pt->ty)
 	{
@@ -668,6 +676,13 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
 	{
 		return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+	}
+
+	cJSON *pjson = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(o2pt->ty));
+	pjson = cJSON_GetObjectItem(pjson, "et");
+	if (pjson && !isETvalid(pjson->valuestring))
+	{
+		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
 	}
 
 	switch (ty)
