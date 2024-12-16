@@ -252,6 +252,18 @@ RTNode *find_rtnode(char *addr)
     {
         foptPtr[0] = '/';
     }
+    if (isExpired(rtnode))
+    {
+#if MONO_THREAD == 0
+        pthread_mutex_lock(&main_lock);
+#endif
+        db_delete_onem2m_resource(rtnode);
+        free_rtnode(rtnode);
+#if MONO_THREAD == 0
+        pthread_mutex_unlock(&main_lock);
+#endif
+        rtnode = NULL;
+    }
     return rtnode;
 }
 
