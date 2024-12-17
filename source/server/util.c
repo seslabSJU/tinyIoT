@@ -3141,6 +3141,7 @@ bool isETvalid(char *et)
 		free(now);
 		return false;
 	}
+	free(now);
 	return true;
 }
 
