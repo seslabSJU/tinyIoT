@@ -1526,6 +1526,16 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
     {
         sql[strlen(sql) - 3] = '\0';
     }
+
+    if (DEFAULT_DISCOVERY_SORT == SORT_DESC)
+    {
+        strcat(sql, " ORDER BY general.id DESC ");
+    }
+    else
+    {
+        strcat(sql, " ORDER BY general.id ASC ");
+    }
+
     if ((pjson = cJSON_GetObjectItem(fc, "lim")))
     {
         sprintf(buf, " LIMIT %d", pjson->valueint > DEFAULT_DISCOVERY_LIMIT ? DEFAULT_DISCOVERY_LIMIT + 1 : pjson->valueint + 1);

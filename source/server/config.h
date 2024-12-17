@@ -60,7 +60,7 @@
 #define ALLOW_AE_ORIGIN "C*,S*,/*"
 
 // CNT Settings
-#define DEFAULT_MAX_NR_INSTANCES 10
+#define DEFAULT_MAX_NR_INSTANCES 1000
 #define DEFAULT_MAX_BYTE_SIZE 65536
 
 // CIN Settings
@@ -133,5 +133,8 @@
 // De-Register remoteCSE on shutdown
 // To make server delete all remote remoteCSE resource decomment following line.
 // #define DEREGISTER_AT_SHUTDOWN
+
+// Default Discovery Result Sort
+#define DEFAULT_DISCOVERY_SORT SORT_DESC
 
 #endif
