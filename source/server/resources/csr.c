@@ -67,7 +67,7 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     }
     logger("UTIL", LOG_LEVEL_INFO, "add dcse %s", cJSON_GetObjectItem(csr, "csi")->valuestring);
     cJSON_AddItemToArray(dcse, cJSON_CreateString(cJSON_GetObjectItem(csr, "csi")->valuestring));
-    update_remote_csr_dcse(rtnode);
+    update_remote_csr_dcse();
 
     cJSON_DetachItemFromObject(root, "m2m:csr");
     cJSON_Delete(root);
@@ -105,7 +105,7 @@ int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     result = db_update_resource(m2m_csr, cJSON_GetStringValue(cJSON_GetObjectItem(csr, "ri")), RT_CSR);
 
-    update_remote_csr_dcse(target_rtnode);
+    update_remote_csr_dcse();
 
     for (int i = 0; i < updateAttrCnt; i++)
     {

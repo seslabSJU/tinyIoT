@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cJSON.h"
 #include "coap.h"
+#include "jsonparser.h"
 
 extern ResourceTree *rt;
 extern pthread_mutex_t main_lock;
@@ -99,6 +100,11 @@ void init_acp(cJSON *acp)
 	cJSON_AddItemToArray(acr, obj);
 
 	obj = cJSON_CreateObject();
+	cJSON_AddItemToObject(obj, "acor", string_to_cjson_string_list_item(ALLOWED_REMOTE_CSE_ID));
+	cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(ALL_ACOP));
+	cJSON_AddItemToArray(acr, obj);
+
+	obj = cJSON_CreateObject();
 	acr = cJSON_CreateArray();
 	acor = cJSON_CreateArray();
 
@@ -142,6 +148,7 @@ void init_csr(cJSON *csr)
 	cJSON_DeleteItemFromObject(csr, "pi");
 	cJSON_DeleteItemFromObject(csr, "at");
 	cJSON_DeleteItemFromObject(csr, "aa");
+	cJSON_DeleteItemFromObject(csr, "acpi");
 }
 
 void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty)
@@ -166,10 +173,12 @@ void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty)
 
 	cJSON *pi = cJSON_GetObjectItem(parent_rtnode->obj, "ri");
 	cJSON_AddStringToObject(root, "pi", pi->valuestring);
-
-	ptr = get_local_time(DEFAULT_EXPIRE_TIME);
-	cJSON_AddStringToObject(root, "et", ptr);
-	free(ptr);
+	if (!cJSON_GetObjectItem(root, "et"))
+	{
+		ptr = get_local_time(DEFAULT_EXPIRE_TIME);
+		cJSON_AddStringToObject(root, "et", ptr);
+		free(ptr);
+	}
 	ptr = NULL;
 	free(ct);
 }
@@ -383,7 +392,7 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		idx = cJSON_getArrayIdx(dcse, cJSON_GetObjectItem(csr, "csi")->valuestring);
 		if (idx != -1)
 			cJSON_DeleteItemFromArray(dcse, idx);
-		update_remote_csr_dcse(rtnode);
+		update_remote_csr_dcse();
 		detach_csrlist(rtnode);
 		break;
 	case RT_GRP:
@@ -573,6 +582,12 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		}
 		return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type error");
 	}
+	cJSON *pjson = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(o2pt->ty));
+	pjson = cJSON_GetObjectItem(pjson, "et");
+	if (pjson && !isETvalid(pjson->valuestring))
+	{
+		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
+	}
 
 	switch (o2pt->ty)
 	{
@@ -661,6 +676,13 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
 	{
 		return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+	}
+
+	cJSON *pjson = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(o2pt->ty));
+	pjson = cJSON_GetObjectItem(pjson, "et");
+	if (pjson && !isETvalid(pjson->valuestring))
+	{
+		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
 	}
 
 	switch (ty)
@@ -939,7 +961,7 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (lSize > lim)
 	{
 		logger("O2M", LOG_LEVEL_DEBUG, "limit exceeded");
-		cJSON_DeleteItemFromArray(list, lSize);
+		cJSON_DeleteItemFromArray(list, lSize - 1);
 		o2pt->cnst = CS_PARTIAL_CONTENT;
 		o2pt->cnot = ofst + lim;
 	}

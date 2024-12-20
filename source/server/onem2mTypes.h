@@ -45,6 +45,12 @@ typedef enum
 
 typedef enum
 {
+	SORT_DESC = 1,
+	SORT_ASC = 2
+} SORT;
+
+typedef enum
+{
 	RVI_NONE,
 	RVI_1,
 	RVI_2,

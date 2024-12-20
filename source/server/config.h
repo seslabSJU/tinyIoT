@@ -22,14 +22,27 @@
 #endif
 
 // Security
+
+// To disable ADMIN_AE_ID, comment the following line
 #define ADMIN_AE_ID "CAdmin"
+
+// To enable multiple ACOP, add each ACOP
+// Supported ACOP
+// ACOP_CREATE | ACOP_RETRIEVE | ACOP_UPDATE | ACOP_DELETE | ACOP_DISCOVERY | ACOP_NOTIFY
 #define DEFAULT_ACOP ACOP_CREATE
 
-#define MONO_THREAD 0 // 0 → multi-thread, 1 → mono-thread
+// Set allowed remote CSE ID
+// To allow all remote CSE ID, set to "/*"
+#define ALLOWED_REMOTE_CSE_ID "/id-in,/id-mn"
 
-#define UPPERTESTER 1 // 0 → disable, 1 → enable
+// Run server in mono Thread
+// 0 → multi-thread, 1 → mono-thread
+#define MONO_THREAD 0
 
-#if UPPERTESTER == 1 // under development (Not supported yet)
+// Upper Tester : under development
+// #define UPPERTESTER
+
+#ifdef UPPERTESTER
 #define UPPERTESTER_URI "__ut__"
 #endif
 
@@ -37,7 +50,6 @@
 #define MAX_URI_SIZE 1024
 #define MAX_ATTRIBUTE_SIZE 4096
 
-#define MAX_TREE_VIEWER_SIZE 65536
 #define DEFAULT_EXPIRE_TIME -3600 * 24 * 365 * 2
 
 #define SOCKET_TIMEOUT 3 // seconds
@@ -48,7 +60,7 @@
 #define ALLOW_AE_ORIGIN "C*,S*,/*"
 
 // CNT Settings
-#define DEFAULT_MAX_NR_INSTANCES 10
+#define DEFAULT_MAX_NR_INSTANCES 1000
 #define DEFAULT_MAX_BYTE_SIZE 65536
 
 // CIN Settings
@@ -58,9 +70,12 @@
 #define DEFAULT_CONSISTENCY_POLICY CSY_ABANDON_MEMBER
 
 // Discovery Settings
+// Limitation of discovery result
 #define DEFAULT_DISCOVERY_LIMIT 150
 
 // MQTT Settings
+
+// To enable MQTT, de-comment the following line
 // #define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
@@ -95,6 +110,8 @@
 #define SAVE_LOG
 
 // CoAP Settings
+
+// To enable CoAP, de-comment the following line
 // #define ENABLE_COAP
 #ifdef ENABLE_COAP
 
@@ -108,8 +125,16 @@
 #endif
 
 // Additional Settings
-// Add CORS headers to HTTP response
-// You may modify the context at httpd.h
+
+// For browser access, CORS should be enabled
+// To add CORS headers to HTTP response decomment following line.
 // #define CORS
+
+// De-Register remoteCSE on shutdown
+// To make server delete all remote remoteCSE resource decomment following line.
+// #define DEREGISTER_AT_SHUTDOWN
+
+// Default Discovery Result Sort
+#define DEFAULT_DISCOVERY_SORT SORT_DESC
 
 #endif
