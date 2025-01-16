@@ -61,7 +61,7 @@ tinyIoT is committed to maintaining high standards in technology implementation
 - CRUD operations
 - Subscription and Notification
 - Discovery
-- Bindings: HTTP, MQTT, CoAP (Websocket will be added)
+- Bindings: HTTP, MQTT (CoAP & Websocket will be added)
 - Group management 
 <br>
 
