@@ -366,6 +366,13 @@ int check_aei_invalid(oneM2MPrimitive *o2pt)
         free(origin);
         origin = NULL;
     }
+    
+    if (strcmp(aei, CSE_BASE_RI) == 0) {
+        logger("AE", LOG_LEVEL_DEBUG, "originator is CSE-ID without security association");
+        handle_error(o2pt, RSC_SECURITY_ASSOCIATION_REQUIRED, "originator is CSE-ID without secure context");
+        return -1;
+    }
+
     handle_error(o2pt, RSC_APP_RULE_VALIDATION_FAILED, "originator is invalid");
     return -1;
 }
