@@ -62,7 +62,7 @@ void init_cse(cJSON *cse)
 	cJSON_AddNumberToObject(cse, "ty", RT_CSE);
 	cJSON_AddStringToObject(cse, "uri", CSE_BASE_NAME);
 	cJSON_AddStringToObject(cse, "csi", csi);
-	cJSON_AddBoolToObject(cse, "rr", true);
+	//cJSON_AddBoolToObject(cse, "rr", true);
 
 	// TODO - add acpi, poa
 
@@ -663,7 +663,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "CSE cannot be updated");
 	    return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "CSE cannot be updated");
     }
-	
+
 	int rsc = 0;
 	char err_msg[256] = {0};
 	o2pt->ty = target_rtnode->ty;
