@@ -149,7 +149,7 @@ char *search_header(header_t *h, const char *name)
     while (ptr)
     {
         // logger("HTTP", LOG_LEVEL_DEBUG, "hit: %s", ptr->name);
-        if (strcmp(ptr->name, name) == 0)
+        if (strcasecmp(ptr->name, name) == 0)
             return ptr->value;
         ptr = ptr->next;
     }
@@ -518,10 +518,12 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
     req->uri = strdup(o2pt->to);
     req->headers = calloc(1, sizeof(header_t));
     add_header("X-M2M-Origin", "/" CSE_BASE_RI, req->headers);
+    add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
     add_header("Content-Type", "application/json", req->headers);
+    add_header("X-M2M-RI", o2pt->rqi, req->headers);
     send_http_request(host, port, req, res);
     logger("HTTP", LOG_LEVEL_DEBUG, "http_notify response: %d", res->status_code);
-    char *ptr = search_header(res->headers, "X-M2M-RSC");
+    char *ptr = search_header(res->headers, "x-m2m-rsc");
     if (ptr)
     {
         rsc = atoi(ptr);
@@ -532,6 +534,7 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
     }
     free_HTTPRequest(req);
     free_HTTPResponse(res);
+    logger("HTTP", LOG_LEVEL_DEBUG, "http_notify vrq response: %d", rsc);
     return rsc;
 }
 
