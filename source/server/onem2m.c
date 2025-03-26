@@ -659,6 +659,11 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
+	if(target_rtnode->ty == RT_CSE) {
+		logger("O2M", LOG_LEVEL_INFO, "CSE cannot be updated");
+	    return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "CSE cannot be updated");
+    }
+	
 	int rsc = 0;
 	char err_msg[256] = {0};
 	o2pt->ty = target_rtnode->ty;
