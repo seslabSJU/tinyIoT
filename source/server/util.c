@@ -100,6 +100,12 @@ ResourceType http_parse_object_type(header_t *headers)
 	case 10002:
 		ty = RT_AEA;
 		break;
+	case 10003:
+		ty = RT_CNTA;
+		break;
+	case 10004:
+		ty = RT_CINA;
+		break;
 	case 10005:
 		ty = RT_CBA;
 		break;
@@ -280,6 +286,10 @@ ResourceType parse_object_type_cjson(cJSON *cjson)
 		ty = RT_CBA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:aea"))
 		ty = RT_AEA;
+	else if (cJSON_GetObjectItem(cjson, "m2m:cnta"))
+		ty = RT_CNTA;
+	else if (cJSON_GetObjectItem(cjson, "m2m:cina"))
+		ty = RT_CINA;
 	else
 		ty = RT_MIXED;
 

@@ -252,6 +252,12 @@ char *get_table_name(ResourceType ty)
     case RT_CBA:
         tableName = "cbA";
         break;
+    case RT_CNTA:
+        tableName = "cntA";
+        break;
+    case RT_CINA:
+        tableName = "cinA";
+        break;
     }
     return tableName;
 }
