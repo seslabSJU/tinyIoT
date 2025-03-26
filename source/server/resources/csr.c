@@ -22,6 +22,11 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *csr = cJSON_GetObjectItem(root, "m2m:csr");
 
+    add_general_attribute(csr, parent_rtnode, RT_CSR);
+    cJSON_AddStringToObject(csr, "csi", o2pt->fr);
+    cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
+    cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));
+
     int rsc = validate_csr(o2pt, parent_rtnode, csr, OP_CREATE);
     if (rsc != 0)
     {
@@ -29,10 +34,10 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return rsc;
     }
 
-    add_general_attribute(csr, parent_rtnode, RT_CSR);
+    /*add_general_attribute(csr, parent_rtnode, RT_CSR);
     cJSON_AddStringToObject(csr, "csi", o2pt->fr);
     cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
-    cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));
+    cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));*/
 
     o2pt->rsc = RSC_CREATED;
 
@@ -143,21 +148,21 @@ int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Opera
     }
 
     // check np attribute
-    if (cJSON_GetObjectItem(csr, "ri"))
+    /*if (cJSON_GetObjectItem(csr, "ri"))
     {
         return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `ri` is not allowed");
-    }
-    if (cJSON_GetObjectItem(csr, "pi"))
+    }*/
+    /*if (cJSON_GetObjectItem(csr, "pi"))
     {
         return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `pi` is not allowed");
-    }
+    }*/
 
     if (op == OP_UPDATE)
     {
-        if (cJSON_GetObjectItem(csr, "csi"))
+        /*if (cJSON_GetObjectItem(csr, "csi"))
         {
             return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `csi` is not allowed");
-        }
+        }*/
         if (cJSON_GetObjectItem(csr, "cb"))
         {
             return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `cb` is not allowed");
