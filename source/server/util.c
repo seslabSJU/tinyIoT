@@ -2613,7 +2613,7 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 				}
 
 				send_http_request(host, port, req, res);
-				ptr = search_header(res->headers, "X-M2M-RSC");
+				ptr = search_header(res->headers, "x-m2m-rsc");
 				if (ptr)
 				{
 					rsc = atoi(ptr);
