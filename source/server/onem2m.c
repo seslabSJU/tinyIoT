@@ -62,7 +62,7 @@ void init_cse(cJSON *cse)
 	cJSON_AddNumberToObject(cse, "ty", RT_CSE);
 	cJSON_AddStringToObject(cse, "uri", CSE_BASE_NAME);
 	cJSON_AddStringToObject(cse, "csi", csi);
-	//cJSON_AddBoolToObject(cse, "rr", true);
+	cJSON_AddBoolToObject(cse, "rr", true);
 
 	// TODO - add acpi, poa
 
