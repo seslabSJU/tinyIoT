@@ -282,6 +282,10 @@ void handle_http_request(HTTPRequest *req, int slotno)
     {
         o2pt->rqi = strdup(header);
     }
+    if ((header = search_header(req->headers, "x-m2m-rsc")))
+    {
+        o2pt->rsc = strdup(header);
+    }
 
     if ((header = search_header(req->headers, "x-m2m-rvi")))
     {
@@ -672,6 +676,7 @@ void parse_http_response(HTTPResponse *res, char *packet)
     res->protocol = strdup(strtok_r(packet, " ", &savePtr));
     res->status_code = atoi(strtok_r(NULL, " ", &savePtr));
     res->status_msg = strdup(strtok_r(NULL, "\r\n", &savePtr));
+    //logger("HTTP", LOG_LEVEL_DEBUG, "response status message %s", res->status_msg);
 
     res->headers = (header_t *)calloc(sizeof(header_t), 1);
     header_t *h = res->headers;
@@ -690,6 +695,8 @@ void parse_http_response(HTTPResponse *res, char *packet)
         h->value = strdup(val);
 
         headerToLowercase(h->name);
+        //logger("HTTP", LOG_LEVEL_ERROR, "h->name value: %s", h->name);
+        //logger("HTTP", LOG_LEVEL_ERROR, "h->value: %s", h->value);
 
         t = val + 1 + strlen(val);
         if (t[1] == '\r' && t[2] == '\n')
