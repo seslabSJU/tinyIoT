@@ -106,20 +106,24 @@ int update_annc(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             }
             else
             {
+                if (req_src->child == NULL){
+                    logger("UTIL", LOG_LEVEL_DEBUG, "Empty update payload, skipping forwarding");
+                }
+                else {
+                    char *lnk = cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring;
 
-                char *lnk = cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring;
+                    oneM2MPrimitive *req = calloc(1, sizeof(oneM2MPrimitive));
+                    o2ptcpy(&req, o2pt);
+                    req->to = strdup(lnk);
+                    cJSON_Delete(req->request_pc);
+                    req->request_pc = cJSON_CreateObject();
+                    cJSON_AddItemReferenceToObject(req->request_pc, get_resource_key(o2pt->ty - 10000), req_src);
 
-                oneM2MPrimitive *req = calloc(1, sizeof(oneM2MPrimitive));
-                o2ptcpy(&req, o2pt);
-                req->to = strdup(lnk);
-                cJSON_Delete(req->request_pc);
-                req->request_pc = cJSON_CreateObject();
-                cJSON_AddItemReferenceToObject(req->request_pc, get_resource_key(o2pt->ty - 10000), req_src);
-
-                rsc = forwarding_onem2m_resource(req, find_csr_rtnode_by_uri(lnk));
-                if (rsc != RSC_UPDATED)
-                {
-                    return handle_error(o2pt, RSC_BAD_REQUEST, "failed to update original resource");
+                    rsc = forwarding_onem2m_resource(req, find_csr_rtnode_by_uri(lnk));
+                    if (rsc != RSC_UPDATED)
+                    {
+                        return handle_error(o2pt, RSC_BAD_REQUEST, "failed to update original resource");
+                    }
                 }
             }
         }
