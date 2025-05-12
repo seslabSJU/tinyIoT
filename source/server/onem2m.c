@@ -801,7 +801,7 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		return o2pt->rsc = RSC_NO_MEMBERS;
 	}
 
-	o2ptcpy(&req_o2pt, o2pt);
+	//o2ptcpy(&req_o2pt, o2pt);
 
 	new_pc = cJSON_CreateObject();
 	cJSON_AddItemToObject(new_pc, "m2m:agr", agr = cJSON_CreateObject());
@@ -810,93 +810,112 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	cJSON *mid_obj = NULL;
 	cJSON_ArrayForEach(mid_obj, mid_arr)
 	{
-		rsc = 0;
-		char *mid = cJSON_GetStringValue(mid_obj);
-		if (mid == NULL || strlen(mid) == 0)
-			continue;
-		if (req_o2pt->to)
-			free(req_o2pt->to);
-		if (o2pt->fopt)
-		{
-			if (strncmp(mid, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) != 0)
-			{
-				mid = ri_to_uri(mid);
-			}
-			req_o2pt->to = malloc(strlen(mid) + strlen(o2pt->fopt) + 2);
-			sprintf(req_o2pt->to, "%s%s", mid, o2pt->fopt);
-		}
-		else
-		{
-			req_o2pt->to = malloc(strlen(mid) + 2);
-			sprintf(req_o2pt->to, "%s", mid);
-		}
-		req_o2pt->isFopt = false;
-		ResourceAddressingType RAT = checkResourceAddressingType(mid);
-		if (RAT == CSE_RELATIVE)
-		{
-			target_rtnode = find_rtnode(req_o2pt->to);
-		}
-		else if (RAT == SP_RELATIVE)
-		{
-			if (isSpRelativeLocal(req_o2pt->to))
-			{
-				target_rtnode = find_rtnode(req_o2pt->to);
+        rsc = 0;
+        char *mid = cJSON_GetStringValue(mid_obj);
+        if (mid == NULL || strlen(mid) == 0)
+            continue;
+		logger("O2M", LOG_LEVEL_DEBUG, "Processing member: %s", mid);
+
+		oneM2MPrimitive *memberReq = NULL;
+		o2ptcpy(&memberReq, o2pt);
+
+		
+		if (memberReq->to)
+			free(memberReq->to);
+        if (o2pt->fopt)
+        {
+            if (strncmp(mid, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) != 0)
+            {
+				char *temp = ri_to_uri(mid);
+            	memberReq->to = malloc(strlen(temp) + strlen(o2pt->fopt) + 2);
+            	sprintf(memberReq->to, "%s%s", temp, o2pt->fopt);
+            	//free(temp);
 			}
 			else
-			{
-				target_rtnode = get_remote_resource(req_o2pt->to, &rsc);
-				if (!target_rtnode)
-				{
-					req_o2pt->rsc = rsc;
-				}
-			}
-		}
-		if (target_rtnode)
-		{
-			if (o2pt->op == OP_CREATE && mt == RT_MIXED && !isValidChildType(target_rtnode->ty, req_o2pt->ty))
-			{
-				cJSON_Delete(mid_arr);
-				free_o2pt(req_o2pt);
-				cJSON_Delete(new_pc);
-				return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "invalid child resource type");
-			}
+        	{
+				memberReq->to = malloc(strlen(mid) + strlen(o2pt->fopt) + 2);
+				sprintf(memberReq->to, "%s%s", mid, o2pt->fopt);
+        	}
+			logger("O2M", LOG_LEVEL_DEBUG, "Request to: %s", memberReq->to);
+        }
+        else
+        {
+			memberReq->to = malloc(strlen(mid) + 2);
+			sprintf(memberReq->to, "%s", mid);
+        }
+		memberReq->isFopt = false;
 
-			rsc = handle_onem2m_request(req_o2pt, target_rtnode);
-			json = o2pt_to_json(req_o2pt);
-			if (json)
-			{
-				cJSON_AddItemToArray(rsp, json);
-			}
-			if (req_o2pt->op != OP_DELETE && target_rtnode->ty == RT_CIN)
-			{
+
+        ResourceAddressingType RAT = checkResourceAddressingType(mid);
+        if (RAT == CSE_RELATIVE)
+        {
+			target_rtnode = find_rtnode(memberReq->to);
+        }
+        else if (RAT == SP_RELATIVE)
+        {
+			if (isSpRelativeLocal(memberReq->to))
+            {
+				target_rtnode = find_rtnode(memberReq->to);
+            }
+            else
+            {
+				target_rtnode = get_remote_resource(memberReq->to, &rsc);
+                if (!target_rtnode)
+                {
+					memberReq->rsc = rsc;
+					logger("O2M", LOG_LEVEL_DEBUG, "Response code: %d", rsc);
+                }
+            }
+        }
+        if (target_rtnode)
+        {
+			if (o2pt->op == OP_CREATE && mt == RT_MIXED && !isValidChildType(target_rtnode->ty, memberReq->ty))
+            {
+                cJSON_Delete(mid_arr);
+				free_o2pt(memberReq);
+                cJSON_Delete(new_pc);
+                return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "invalid child resource type");
+            }
+        
+			rsc = handle_onem2m_request(memberReq, target_rtnode);
+			json = o2pt_to_json(memberReq);
+            if (json)
+            {
+                cJSON_AddItemToArray(rsp, json);
+            }
+			if (memberReq->op != OP_DELETE && target_rtnode->ty == RT_CIN)
+            {
 				if (strcmp(target_rtnode->rn, "la"))
-				{
-					logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
-					free_rtnode(target_rtnode);
-					target_rtnode = NULL;
-				}
-			}
-			if (RAT == SP_RELATIVE && !isSpRelativeLocal(mid))
-			{
-				free_rtnode(target_rtnode);
-				target_rtnode = NULL;
-			}
+                {
+                    logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
+                    free_rtnode(target_rtnode);
+                    target_rtnode = NULL;
+                }
+            }
+            if (RAT == SP_RELATIVE && !isSpRelativeLocal(mid))
+            {
+                free_rtnode(target_rtnode);
+                target_rtnode = NULL;
+            }
+        
+            logger("O2M", LOG_LEVEL_DEBUG, "rsc : %d", rsc);
+        }
+        else
+        {
+            logger("O2M", LOG_LEVEL_DEBUG, "rtnode not found");
+            if (RAT == SP_RELATIVE && !isSpRelativeLocal(mid))
+            {
+				cJSON_AddItemToArray(rsp, o2pt_to_json(memberReq));
+            }
+        }
+        if (rsc == RSC_DELETED)
+        {
+            updated = true;
+        }
 
-			logger("O2M", LOG_LEVEL_DEBUG, "rsc : %d", rsc);
-		}
-		else
-		{
-			logger("O2M", LOG_LEVEL_DEBUG, "rtnode not found");
-			if (RAT == SP_RELATIVE && !isSpRelativeLocal(mid))
-			{
-				cJSON_AddItemToArray(rsp, o2pt_to_json(req_o2pt));
-			}
-		}
-		if (rsc == RSC_DELETED)
-		{
-			updated = true;
-		}
-	}
+		free_o2pt(memberReq);
+    	memberReq = NULL;
+    }
 	if (updated && cJSON_IsObject(grp))
 	{
 		db_update_resource(grp, cJSON_GetObjectItem(grp, "ri")->valuestring, RT_GRP);
@@ -908,8 +927,8 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 	o2pt->rsc = RSC_OK;
 
-	free_o2pt(req_o2pt);
-	req_o2pt = NULL;
+	//free_o2pt(req_o2pt);
+	//req_o2pt = NULL;
 	return RSC_OK;
 }
 
