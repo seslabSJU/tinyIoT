@@ -205,7 +205,7 @@ void respond(int slot)
     }
     else if (rcvd == 0)
     { // receive socket closed
-        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
+        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected unexpectedly");
         return;
     }
     if (rcvd > BUF_SIZE)
@@ -531,6 +531,7 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
     if (ptr)
     {
         rsc = atoi(ptr);
+        logger("HTTP", LOG_LEVEL_DEBUG, "value of http_notify rsc: %d", rsc);
     }
     else
     {
@@ -554,7 +555,8 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
 
     ResourceAddressingType rat = checkResourceAddressingType(o2pt->to);
 
-    req->method = op_to_method(o2pt->op);
+    req->method = strdup(op_to_method(o2pt->op)); 
+    logger("HTTP", LOG_LEVEL_DEBUG, "http_forwarding method: %s", req->method);
     req->uri = calloc(1, sizeof(char) * (strlen(o2pt->to) + 5));
     req->uri[0] = '/';
     if (rat == SP_RELATIVE)
@@ -564,10 +566,7 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     strcat(req->uri, o2pt->to);
     req->headers = (header_t *)calloc(sizeof(header_t), 1);
     add_header("X-M2M-Origin", o2pt->fr, req->headers);
-    if (o2pt->rvi != RVI_NONE)
-    {
-        add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
-    }
+    add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
     add_header("X-M2M-RI", o2pt->rqi, req->headers);
 
     if (o2pt->fc)
@@ -674,8 +673,8 @@ void parse_http_response(HTTPResponse *res, char *packet)
     char *ptr = NULL;
     char *savePtr = NULL;
     res->protocol = strdup(strtok_r(packet, " ", &savePtr));
-    res->status_code = atoi(strtok_r(NULL, " ", &savePtr));
-    res->status_msg = strdup(strtok_r(NULL, "\r\n", &savePtr));
+    res->status_code = atoi(strtok_r(NULL, "\r\n", &savePtr));
+    //res->status_msg = strdup(strtok_r(NULL, "\r\n", &savePtr));
     //logger("HTTP", LOG_LEVEL_DEBUG, "response status message %s", res->status_msg);
 
     res->headers = (header_t *)calloc(sizeof(header_t), 1);
@@ -775,7 +774,7 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
     if (req->payload)
     {
         strcat(buffer, req->payload);
-        strcat(buffer, "\r\n");
+        // strcat(buffer, "\r\n");
     }
 
     if (req->qs == bs)
@@ -798,7 +797,7 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
     }
     else if (rcvd == 0)
     { // receive socket closed
-        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected upexpectedly");
+        logger("HTTP", LOG_LEVEL_ERROR, "Client disconnected unexpectedly");
         res->status_code = 500;
     }
     else
