@@ -2607,16 +2607,15 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 				add_header("X-M2M-Origin", o2pt->fr, req->headers);
 				add_header("X-M2M-RI", o2pt->rqi, req->headers);
 				add_header("Content-Type", "application/json", req->headers);
-				if (o2pt->rvi != RVI_NONE)
-				{
-					add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
-				}
+				add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
+				
 
 				send_http_request(host, port, req, res);
 				ptr = search_header(res->headers, "x-m2m-rsc");
 				if (ptr)
 				{
 					rsc = atoi(ptr);
+					logger("UTIL", LOG_LEVEL_DEBUG, "requestToresource RSC %d", rsc);
 				}
 				else
 				{
@@ -2664,6 +2663,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		if (!rtnode)
 			return RSC_NOT_FOUND;
 		rsc = requestToResource(o2pt, rtnode);
+		logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource result value: %d", rsc);
 	}
 	else if (rat == SP_RELATIVE)
 	{
@@ -3265,7 +3265,7 @@ int create_local_csr()
 	add_header("X-M2M-RI", "retrieve-cb", req->headers);
 	add_header("Accept", "application/json", req->headers);
 	// add_header("Content-Type", "application/json", req->headers);
-	add_header("X-M2M-RVI", "2a", req->headers);
+	add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
 
 	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
 
@@ -3762,6 +3762,21 @@ void announce_to_annc(RTNode *target_rtnode)
 			cJSON_AddItemToObject(resource, "lbl", cJSON_Duplicate(pjson, 1));
 		}
 		oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+
+		int count = 0;
+        cJSON *child = resource->child;
+        while (child)
+        {
+            count++;
+            child = child->next;
+        }
+        if (count == 0)
+        {
+            logger("UTIL", LOG_LEVEL_DEBUG, "Empty announcement update payload, skipping update");
+            cJSON_Delete(root);
+            return;
+        }
+
 		o2pt->op = OP_UPDATE;
 		o2pt->fr = strdup("/" CSE_BASE_RI);
 		o2pt->ty = target_rtnode->ty + 10000;
