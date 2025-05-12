@@ -1262,6 +1262,14 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 		sprintf(buf, "/%s/%s/%s", CSE_BASE_RI, get_uri_rtnode(parent_rtnode), cJSON_GetObjectItem(obj, "rn")->valuestring);
 		cJSON_AddItemToObject(annc, "lnk", cJSON_CreateString(buf));
 
+		//TO-DO  acpi original에서 갖고 오거나 local policy에 따라 추가하는 것 필요)
+		/*cJSON *acpi = cJSON_CreateArray();  // 현재는  넣은 상태임
+		cJSON_AddItemToArray(acpi, cJSON_CreateString("/defaultACP"));
+		cJSON_AddItemToObject(annc, "acpi", acpi);*/
+
+
+		char *et = get_local_time(DEFAULT_EXPIRE_TIME);
+
 		switch (ty)
 		{
 		case RT_ACP:
@@ -1269,18 +1277,32 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 				cJSON_AddItemToObject(annc, "pv", pjson);
 			if ((pjson = cJSON_Duplicate(cJSON_GetObjectItem(obj, "pvs"), true)))
 				cJSON_AddItemToObject(annc, "pvs", pjson);
+
+			cJSON_AddStringToObject(annc, "et", et);
+			free(et);
 			break;
 		case RT_AE:
 			pjson = cJSON_Duplicate(cJSON_GetObjectItem(obj, "srv"), true);
 			cJSON_AddItemToObject(annc, "srv", pjson);
+
+			cJSON_AddStringToObject(annc, "et", et);
+			free(et);
 			break;
 		case RT_CNT:
+			cJSON_AddStringToObject(annc, "et", et);
+			free(et);
 			break;
 		case RT_CIN:
+			cJSON_AddStringToObject(annc, "et", et);
+			free(et);
 			break;
 		case RT_SUB:
+			cJSON_AddStringToObject(annc, "et", et);
+			free(et);
 			break;
 		case RT_GRP:
+			cJSON_AddStringToObject(annc, "et", et);
+			free(et);
 			break;
 		}
 
