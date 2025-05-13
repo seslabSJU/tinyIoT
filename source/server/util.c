@@ -435,6 +435,11 @@ void delete_cin_under_cnt_mni_mbs(RTNode *rtnode)
 	{
 		cJSON_SetIntValue(cbs_obj, cbs);
 	}
+
+	cJSON *st = cJSON_GetObjectItem(rtnode->obj, "st");
+    cJSON_SetIntValue(st, st->valueint + 1);
+	db_update_resource(rtnode->obj, get_ri_rtnode(rtnode), RT_CNT);
+	
 }
 
 /**
