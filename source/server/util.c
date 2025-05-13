@@ -988,7 +988,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if (!strcmp(origin, get_ri_rtnode(target_rtnode)))
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
-			return 0;
+			//return 0;
 		}
 	}
 	// if target is CSR, check csi of resource
@@ -997,7 +997,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if (!strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
-			//return 0;
+			///return 0;
 		}
 	}
 
