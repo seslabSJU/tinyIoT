@@ -997,7 +997,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if (!strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
-			return 0;
+			//return 0;
 		}
 	}
 
@@ -1015,7 +1015,17 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		}
 	}
 
-	if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop)
+	if (target_rtnode->ty == RT_ACP)
++   {
++       // ACP 관리 동작: PVS 먼저, 실패 시 PV
++       int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
++       int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
++       if ( ((pvs_acop & acop) == acop) || (( pv_acop & acop) == acop) )
++       {
++           deny = false;
++       }
++   }
+	else ((get_acop(o2pt, origin, target_rtnode) & acop) == acop)
 	{
 		deny = false;
 	}
