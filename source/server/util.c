@@ -1793,8 +1793,14 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			pjson2 = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(target_rtnode->ty));
 			pjson3 = cJSON_GetObjectItem(root, get_resource_key(target_rtnode->ty));
 			cJSON_ArrayForEach(pjson, pjson2)
-			{
+			/*{
 				cJSON_DeleteItemFromObject(pjson3, pjson->string);
+			}*/
+
+			if (pjson2 && pjson3) {
+				cJSON_ArrayForEach(pjson2, pjson3){
+					cJSON_DeleteItemFromObject(pjson3, pjson->string);
+				}
 			}
 		}
 		else
