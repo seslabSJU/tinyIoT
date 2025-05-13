@@ -182,7 +182,7 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
 
         if (pjson->valueint < cJSON_GetArraySize(midArr))
         {
-            return handle_error(o2pt, RSC_MAX_NUMBER_OF_MEMBER_EXCEEDED, "`mnm` is less than `mid` size");
+            return handle_error(o2pt, RSC_BAD_REQUEST, "`mnm` is less than `mid` size");
         }
     }
 
