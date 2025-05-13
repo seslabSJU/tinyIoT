@@ -283,6 +283,34 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 	cJSON *cni = cJSON_GetObjectItem(cnt, "cni");
 	cJSON *cbs = cJSON_GetObjectItem(cnt, "cbs");
 	cJSON *st = cJSON_GetObjectItem(cnt, "st");
+	cJSON *mia = cJSON_GetObjectItem(cnt, "mia");
+
+	if (mia && mia->valueint > 0 && sign == 1) {
+        time_t now = time(NULL);
+       
+        RTNode *expired[128];
+        int exp_cnt = 0;
+        RTNode *child = cnt_rtnode->child;
+        while (child) {
+             if (child->ty == RT_CIN) {
+                cJSON *ct = cJSON_GetObjectItem(child->obj, "ct");
+                struct tm tmv = {0};
+                strptime(ct->valuestring, "%Y%m%dT%H%M%S", &tmv);
+                time_t created = mktime(&tmv);
+                if (difftime(now, created) > mia->valueint) {
+                    expired[exp_cnt++] = child;
+                }
+            }
+            child = child->sibling_right;
+        }
+
+        for (int i = 0; i < exp_cnt; i++) {
+            RTNode *n = expired[i];
+            update_cnt_cin(cnt_rtnode, n, -1);
+            db_delete_onem2m_resource(n);
+            free_rtnode(n);
+        }
+    }
 
 	cJSON_SetIntValue(cni, cni->valueint + sign);
 	cJSON_SetIntValue(cbs, cbs->valueint + (sign * cJSON_GetObjectItem(cin, "cs")->valueint));

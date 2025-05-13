@@ -245,6 +245,13 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op)
         }
     }
 
+    pjson = cJSON_GetObjectItem(cnt, "mia");
+    if (pjson && pjson->valueint < 0)
+    {
+        handle_error(o2pt, RSC_BAD_REQUEST, "attribute `mia` is invalid");
+        return RSC_BAD_REQUEST;
+    }
+
     pjson = cJSON_GetObjectItem(cnt, "mni");
     if (pjson && pjson->valueint < 0)
     {
