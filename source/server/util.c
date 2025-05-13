@@ -1016,18 +1016,19 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	}
 
 	if (target_rtnode->ty == RT_ACP)
-+   {
-+       // ACP 관리 동작: PVS 먼저, 실패 시 PV
-+       int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
-+       int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
-+       if ( ((pvs_acop & acop) == acop) || (( pv_acop & acop) == acop) )
-+       {
-+           deny = false;
-+       }
-+   }
-	else ((get_acop(o2pt, origin, target_rtnode) & acop) == acop)
 	{
-		deny = false;
+		// ACP 관리 동작: PVS 먼저, 실패 시 PV
+		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
+		int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
+		if ( ((pvs_acop & acop) == acop) || (( pv_acop & acop) == acop) )
+		{
+			deny = false;
+		}
+	}
+	else{
+		if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop){
+			deny = false;
+		}
 	}
 
 	if (deny)
@@ -2776,8 +2777,15 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 			logger("UTIL", LOG_LEVEL_DEBUG, "CSE_RELATIVE");
 			cJSON_DeleteItemFromObject(o2pt->request_pc, "vrq");
 			rtnode = find_rtnode(noti_uri);
-			requestToResource(o2pt, rtnode);
-			rsc = RSC_OK;
+			if (!rtnode) {
+				logger("UTIL", LOG_LEVEL_ERROR, "CSE_RELATIVE: find_rtnode(%s) failed", nu);
+				return RSC_NOT_FOUND;
+			}
+			rsc = requestToResource(o2pt, rtnode);
+			if (rsc != RSC_OK) {
+				logger("UTIL", LOG_LEVEL_ERROR, "CSE_RELATIVE: requestToResource failed (%d)", rsc);
+				return rsc;
+			}
 		}
 		else if (rat == SP_RELATIVE)
 		{
