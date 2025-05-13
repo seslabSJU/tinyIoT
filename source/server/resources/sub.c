@@ -112,6 +112,13 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return o2pt->rsc;
     }
 
+    if (parent_rtnode->ty == RT_CIN) {
+        handle_error(o2pt,
+                     RSC_TARGET_NOT_SUBSCRIBABLE,
+                     "TARGET_NOT_SUBSCRIPBABLE");
+        return o2pt->rsc;
+    }
+
     RTNode *child_rtnode = create_rtnode(sub, RT_SUB);
     add_child_resource_tree(parent_rtnode, child_rtnode);
     make_response_body(o2pt, child_rtnode);
