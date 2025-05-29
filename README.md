@@ -85,43 +85,45 @@ Default IP address and port number are 127.0.0.1 and 3000.
 
 3. Configuration
 	
- 	You can set up configuration through `./autogen.sh` that makes `config.h` and `Makefile`.
-	This will ask you the following and it will be automatically forwarded as an option through `./configure`.
+ 	You can configure the server by editing `config.h` file directly. Open `config.h` and modify the following settings:
 
+	```c
+	// Server Type (IN_CSE or MN_CSE)
+	#define SERVER_TYPE IN_CSE
+
+	// Basic Server Configuration
+	#define SERVER_IP "127.0.0.1"      // Server IP address
+	#define SERVER_PORT "3000"         // Server port number
+	#define CSE_BASE_NAME "TinyIoT"    // CSE base name
+	#define CSE_BASE_RI "tinyiot"      // CSE base resource identifier
+	#define CSE_BASE_SP_ID "tinyiot.example.com"  // CSE base SP ID
+
+	// Remote CSE Configuration (for MN-CSE only)
+	#if SERVER_TYPE == MN_CSE
+	#define REMOTE_CSE_ID ""           // Remote CSE ID
+	#define REMOTE_CSE_NAME ""         // Remote CSE name
+	#define REMOTE_CSE_HOST ""         // Remote CSE host
+	#define REMOTE_CSE_SP_ID ""        // Remote CSE SP ID
+	#define REMOTE_CSE_PORT 0          // Remote CSE port
+	#endif
+
+	// Protocol Support
+	// To enable MQTT, uncomment the following line
+	// #define ENABLE_MQTT
+
+	// To enable CoAP, uncomment the following line
+	// #define ENABLE_COAP
 	```
- 	./autogen.sh 
-	Enter server type [mn/in]: in
-	Enter server IP (default: lo)): 127.0.0.1
-	Enter server port (default: 3000): 3000
-	Enter CSE base name (default: TinyIoT): TinyIoT
-	Enter CSE base RI (default: tinyiot): tinyiot
-	Do you want to enable MQTT support? [yes/no] (default: no): no
-	Do you want to enable COAP support? [yes/no] (default: no): no
- 	```
- 
-	- You can input CSE information:
-		- `--with-server-type select` selects the server type.
-		- `--with-server-ip` sets the IP address of the server.
-		- `--with-server-port` sets the port of the server
-		- `--with-cse-base-name` sets the base name of the CSE.
-		- `--with-cse-base-ri` sets the base resource identifier of the CSE.
-	- If tinyIoT is MN-CSE, you can input RemoteCSE information:
-		- `--with-remote-cse-id` sets the ID of the remote CSE.
-		- `--with-remote-cse-name` sets the name of the remote CSE.
-		- `--with-remote-cse-host` sets the host of the remote CSE.
-		- `--with-remote-cse-port` sets the port of the remote CSE.
-	- For binding protocols, tinyIoT supports HTTP basically. You can choose more protocols:
-		- `--enable-mqtt` enables the MQTT protocol.
-		- `--enable-coap` enables the CoAP protocol.
-		- `--enable-coaps` enables the secure CoAP protocol.
+
+	For more detailed configuration options, please refer to the comments in `config.h` file.
 
 
- 5. To make an excutable tinyIoT server, simply execute the make file.       
+ 4. To make an excutable tinyIoT server, simply execute the make file.       
 	```
 	$ make
 	```   
         
- 6. Use the following command to run tinyIoT server:
+ 5. Use the following command to run tinyIoT server:
 	```	
 	./server
 	```
