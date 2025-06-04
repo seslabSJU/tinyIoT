@@ -1,7 +1,15 @@
-CC=gcc
-RELCFLAGS = -g
+UNAME := $(shell uname)
 
-LIBS = -lpthread -lm -ldl -lssl -lcrypto
+# macOS (Homebrew OpenSSL)
+ifeq ($(UNAME), Darwin)
+    RELCFLAGS = -g -I/opt/homebrew/opt/openssl@3/include
+    LIBS = -lpthread -lm -ldl -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto
+else
+    RELCFLAGS = -g
+    LIBS = -lpthread -lm -ldl -lssl -lcrypto
+endif
+
+CC=gcc
 
 SRCS = main.c onem2m.c cJSON.c httpd.c dbmanager.c jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
 
