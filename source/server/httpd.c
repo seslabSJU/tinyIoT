@@ -284,7 +284,8 @@ void handle_http_request(HTTPRequest *req, int slotno)
     }
     if ((header = search_header(req->headers, "x-m2m-rsc")))
     {
-        o2pt->rsc = strdup(header);
+        // httpd.c:287:19: error: incompatible pointer to integer conversion assigning to 'int' from 'char *' [-Wint-conversion]
+        o2pt->rsc = atoi(header);
     }
 
     if ((header = search_header(req->headers, "x-m2m-rvi")))
