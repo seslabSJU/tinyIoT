@@ -331,7 +331,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
         logger("HTTP", LOG_LEVEL_DEBUG, "to: %s", o2pt->to);
     }
 
-#if UPPERTESTER
+#ifdef UPPERTESTER
     if (!strcmp(o2pt->to, UPPERTESTER_URI))
     {
         o2pt->op = OP_UPPERTESTER;

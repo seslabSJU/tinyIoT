@@ -21,7 +21,7 @@
 #include "mqttClient.h"
 #endif
 
-#if UPPERTESTER
+#ifdef UPPERTESTER
 #include "upperTester.h"
 #endif
 
