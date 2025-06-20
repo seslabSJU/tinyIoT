@@ -24,7 +24,9 @@
 #ifdef UPPERTESTER
 #include "upperTester.h"
 #endif
-
+#ifdef ENABLE_MEC
+#include "mecClient.h"
+#endif
 #include "coap.h"
 
 ResourceTree *rt;
@@ -46,7 +48,9 @@ int call_stop = 0;
 
 #ifdef ENABLE_MQTT
 pthread_t mqtt;
+pthread_t mecClient;
 int mqtt_thread_id;
+int mecClient_thread_id;
 #endif
 
 #ifdef ENABLE_COAP
@@ -196,6 +200,19 @@ int main(int argc, char **argv)
 		fprintf(stderr, "MQTT thread create error\n");
 		return 0;
 	}
+#endif
+#ifdef ENABLE_MEC
+	// Initialize MEC Client
+	logger("MAIN", LOG_LEVEL_DEBUG, "Initializing MEC Client");
+	if (!mec_client_init())
+	{
+		logger("MAIN", LOG_LEVEL_ERROR, "MEC Client initialization failed");
+		return 0;
+	}
+	MECResult *result = mec_client_register();
+	logger("MAIN", LOG_LEVEL_DEBUG, "MEC Client registration result: %d", result->status_code);
+
+
 #endif
 
 #ifdef ENABLE_COAP
@@ -424,6 +441,11 @@ void stop_server(int sig)
 		pthread_kill(coap, SIGINT);
 		pthread_detach(coap);
 	}
+#endif
+#ifdef ENABLE_MEC
+	logger("MAIN", LOG_LEVEL_INFO, "Closing MEC Client...");
+	MECResult *result = mec_client_deregister();
+	logger("MAIN", LOG_LEVEL_DEBUG, "MEC Client de-registration result: %d", result->status_code);
 #endif
 	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
 	close_dbp();

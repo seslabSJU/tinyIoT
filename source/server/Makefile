@@ -6,12 +6,12 @@ ifeq ($(UNAME), Darwin)
     LIBS = -lpthread -lm -ldl -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto
 else
     RELCFLAGS = -g
-    LIBS = -lpthread -lm -ldl -lssl -lcrypto
+    LIBS = -lpthread -lm -ldl -lssl -lcrypto -lcurl
 endif
 
 CC=gcc
 
-SRCS = main.c onem2m.c cJSON.c httpd.c dbmanager.c jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
+SRCS = main.c onem2m.c cJSON.c httpd.c dbmanager.c jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c mecClient.c
 
 RSCSRC = $(wildcard resources/*.c)
 

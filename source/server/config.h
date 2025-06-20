@@ -76,10 +76,10 @@
 // MQTT Settings
 
 // To enable MQTT, de-comment the following line
-// #define ENABLE_MQTT
+#define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
-#define MQTT_HOST "127.0.0.1"
+#define MQTT_HOST "192.168.40.57"
 #define MQTT_QOS MQTT_QOS_0
 #define MQTT_KEEP_ALIVE_SEC 60
 #define MQTT_CMD_TIMEOUT_MS 30000
@@ -136,5 +136,14 @@
 
 // Default Discovery Result Sort
 #define DEFAULT_DISCOVERY_SORT SORT_DESC
+
+#define ENABLE_MEC
+#ifdef ENABLE_MEC
+#define MEC_ENABLE 1
+#define MEC_HOST "192.168.40.57"
+#define MEC_PROTOCOL "https"
+#define MEC_PLATFORM "mep1"
+#define MEC_SANDBOX_ID "sbx997zjf1"
+#endif
 
 #endif
