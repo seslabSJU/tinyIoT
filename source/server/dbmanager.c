@@ -10,6 +10,7 @@
 #include "jsonparser.h"
 #include "util.h"
 
+#include <libpq-fe.h>
 #include "sqlite/sqlite3.h"
 sqlite3 *db;
 extern cJSON *ATTRIBUTES;

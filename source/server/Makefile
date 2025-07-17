@@ -2,11 +2,11 @@ UNAME := $(shell uname)
 
 # macOS (Homebrew OpenSSL)
 ifeq ($(UNAME), Darwin)
-    RELCFLAGS = -g -I/opt/homebrew/opt/openssl@3/include
-    LIBS = -lpthread -lm -ldl -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto
+    RELCFLAGS = -g -I/opt/homebrew/opt/openssl@3/include -I$(shell brew --prefix libpq)/include
+    LIBS = -lpthread -lm -ldl -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto -L$(shell brew --prefix libpq)/lib -lpq
 else
     RELCFLAGS = -g
-    LIBS = -lpthread -lm -ldl -lssl -lcrypto
+    LIBS = -lpthread -lm -ldl -lssl -lcrypto -lpq
 endif
 
 CC=gcc
