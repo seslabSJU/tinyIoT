@@ -193,7 +193,7 @@ int init_dbp()
     }
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, \
-        lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), ast INT, \
+        lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, \
         CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
 
     rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
@@ -251,6 +251,12 @@ char *get_table_name(ResourceType ty)
         break;
     case RT_CBA:
         tableName = "cbA";
+        break;
+    case RT_CNTA:
+        tableName = "cntA";
+        break;
+    case RT_CINA:
+        tableName = "cinA";
         break;
     }
     return tableName;

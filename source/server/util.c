@@ -100,6 +100,12 @@ ResourceType http_parse_object_type(header_t *headers)
 	case 10002:
 		ty = RT_AEA;
 		break;
+	case 10003:
+		ty = RT_CNTA;
+		break;
+	case 10004:
+		ty = RT_CINA;
+		break;
 	case 10005:
 		ty = RT_CBA;
 		break;
@@ -280,6 +286,10 @@ ResourceType parse_object_type_cjson(cJSON *cjson)
 		ty = RT_CBA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:aea"))
 		ty = RT_AEA;
+	else if (cJSON_GetObjectItem(cjson, "m2m:cnta"))
+		ty = RT_CNTA;
+	else if (cJSON_GetObjectItem(cjson, "m2m:cina"))
+		ty = RT_CINA;
 	else
 		ty = RT_MIXED;
 
@@ -425,6 +435,11 @@ void delete_cin_under_cnt_mni_mbs(RTNode *rtnode)
 	{
 		cJSON_SetIntValue(cbs_obj, cbs);
 	}
+
+	cJSON *st = cJSON_GetObjectItem(rtnode->obj, "st");
+    cJSON_SetIntValue(st, st->valueint + 1);
+	db_update_resource(rtnode->obj, get_ri_rtnode(rtnode), RT_CNT);
+	
 }
 
 /**
@@ -973,7 +988,7 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if (!strcmp(origin, get_ri_rtnode(target_rtnode)))
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
-			return 0;
+			//return 0;
 		}
 	}
 	// if target is CSR, check csi of resource
@@ -982,10 +997,9 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if (!strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
-			return 0;
 		}
 	}
-
+ 
 	// if resource is not an AE|CSR, find acpi for all parent nodes
 	while (target_rtnode->parent && cJSON_GetObjectItem(target_rtnode->obj, "acpi") == NULL)
 	{
@@ -1000,9 +1014,19 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		}
 	}
 
-	if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop)
+	if (target_rtnode->ty == RT_ACP)
 	{
-		deny = false;
+		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
+		int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
+		if ( ((pvs_acop & acop) == acop) || (( pv_acop & acop) == acop) )
+		{
+			deny = false;
+		}
+	}
+	else{
+		if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop){
+			deny = false;
+		}
 	}
 
 	if (deny)
@@ -1767,8 +1791,14 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			pjson2 = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(target_rtnode->ty));
 			pjson3 = cJSON_GetObjectItem(root, get_resource_key(target_rtnode->ty));
 			cJSON_ArrayForEach(pjson, pjson2)
-			{
+			/*{
 				cJSON_DeleteItemFromObject(pjson3, pjson->string);
+			}*/
+
+			if (pjson2 && pjson3) {
+				cJSON_ArrayForEach(pjson2, pjson3){
+					cJSON_DeleteItemFromObject(pjson3, pjson->string);
+				}
 			}
 		}
 		else
@@ -2597,16 +2627,15 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 				add_header("X-M2M-Origin", o2pt->fr, req->headers);
 				add_header("X-M2M-RI", o2pt->rqi, req->headers);
 				add_header("Content-Type", "application/json", req->headers);
-				if (o2pt->rvi != RVI_NONE)
-				{
-					add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
-				}
+				add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
+				
 
 				send_http_request(host, port, req, res);
-				ptr = search_header(res->headers, "X-M2M-RSC");
+				ptr = search_header(res->headers, "x-m2m-rsc");
 				if (ptr)
 				{
 					rsc = atoi(ptr);
+					logger("UTIL", LOG_LEVEL_DEBUG, "requestToresource RSC %d", rsc);
 				}
 				else
 				{
@@ -2654,6 +2683,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		if (!rtnode)
 			return RSC_NOT_FOUND;
 		rsc = requestToResource(o2pt, rtnode);
+		logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource result value: %d", rsc);
 	}
 	else if (rat == SP_RELATIVE)
 	{
@@ -2751,8 +2781,15 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 			logger("UTIL", LOG_LEVEL_DEBUG, "CSE_RELATIVE");
 			cJSON_DeleteItemFromObject(o2pt->request_pc, "vrq");
 			rtnode = find_rtnode(noti_uri);
-			requestToResource(o2pt, rtnode);
-			rsc = RSC_OK;
+			if (!rtnode) {
+				logger("UTIL", LOG_LEVEL_ERROR, "CSE_RELATIVE: find_rtnode(%s) failed", nu);
+				return RSC_NOT_FOUND;
+			}
+			rsc = requestToResource(o2pt, rtnode);
+			if (rsc != RSC_OK) {
+				logger("UTIL", LOG_LEVEL_ERROR, "CSE_RELATIVE: requestToResource failed (%d)", rsc);
+				return rsc;
+			}
 		}
 		else if (rat == SP_RELATIVE)
 		{
@@ -3255,7 +3292,7 @@ int create_local_csr()
 	add_header("X-M2M-RI", "retrieve-cb", req->headers);
 	add_header("Accept", "application/json", req->headers);
 	// add_header("Content-Type", "application/json", req->headers);
-	add_header("X-M2M-RVI", "2a", req->headers);
+	add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
 
 	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
 
@@ -3752,6 +3789,21 @@ void announce_to_annc(RTNode *target_rtnode)
 			cJSON_AddItemToObject(resource, "lbl", cJSON_Duplicate(pjson, 1));
 		}
 		oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+
+		int count = 0;
+        cJSON *child = resource->child;
+        while (child)
+        {
+            count++;
+            child = child->next;
+        }
+        if (count == 0)
+        {
+            logger("UTIL", LOG_LEVEL_DEBUG, "Empty announcement update payload, skipping update");
+            cJSON_Delete(root);
+            return;
+        }
+
 		o2pt->op = OP_UPDATE;
 		o2pt->fr = strdup("/" CSE_BASE_RI);
 		o2pt->ty = target_rtnode->ty + 10000;

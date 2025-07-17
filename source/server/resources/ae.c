@@ -338,34 +338,16 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
 int check_aei_invalid(oneM2MPrimitive *o2pt)
 {
     char *aei = o2pt->fr;
-    if (!aei || strlen(aei) == 0)
-        return 0;
-    cJSON *cjson = string_to_cjson_string_list_item(ALLOW_AE_ORIGIN);
-
-    int size = cJSON_GetArraySize(cjson);
-    for (int i = 0; i < size; i++)
-    {
-        cJSON *item = cJSON_GetArrayItem(cjson, i);
-        char *origin = strdup(item->valuestring);
-        if (origin[strlen(origin) - 1] == '*')
-        {
-            if (!strncmp(aei, origin, strlen(origin) - 1))
-            {
-                cJSON_Delete(cjson);
-                free(origin);
-                return 0;
-            }
-        }
-        else if (!strcmp(origin, aei))
-        {
-            cJSON_Delete(cjson);
-            free(origin);
-            return 0;
-        }
-
-        free(origin);
-        origin = NULL;
+    if (!aei || strlen(aei) == 0) {
+        handle_error(o2pt, RSC_BAD_REQUEST, "originator is mandatory");
+        return -1;
     }
-    handle_error(o2pt, RSC_APP_RULE_VALIDATION_FAILED, "originator is invalid");
-    return -1;
+    
+    if (strcmp(aei, CSE_BASE_RI) == 0) {
+        logger("AE", LOG_LEVEL_DEBUG, "originator is CSE-ID without security association");
+        handle_error(o2pt, RSC_SECURITY_ASSOCIATION_REQUIRED, "originator is CSE-ID without secure context");
+        return -1;
+    }
+
+    return 0;
 }

@@ -56,8 +56,8 @@
 #define MAX_URI_LENGTH 1024
 
 // AE Settings
-// #define ALLOW_AE_ORIGIN "C*,S*" , no blankspace allowed
-#define ALLOW_AE_ORIGIN "C*,S*,/*"
+// According to oneM2M standard, AE originator ID should be freely settable
+// #define ALLOW_AE_ORIGIN "C*,S*,/*"
 
 // CNT Settings
 #define DEFAULT_MAX_NR_INSTANCES 1000

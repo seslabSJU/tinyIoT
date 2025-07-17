@@ -44,22 +44,55 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_AddNumberToObject(cnt, "cni", 0);
     cJSON_AddNumberToObject(cnt, "cbs", 0);
 #if CSE_RVI >= RVI_3
+    bool parent_was_announced = false; 
     cJSON *final_at = cJSON_CreateArray();
-    if (handle_annc_create(parent_rtnode, cnt, cJSON_GetObjectItem(cnt, "at"), final_at) == -1)
+
+    if (parent_rtnode->ty == RT_AE) //check parent resource(AE) was announced 
     {
-        cJSON_Delete(root);
-        cJSON_Delete(final_at);
-        return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute in `aa`");
+        cJSON *parent_at = cJSON_GetObjectItem(parent_rtnode->obj, "at");
+        if(parent_at && cJSON_GetArraySize(parent_at) > 0)
+        {
+            parent_was_announced = true;
+        }
     }
 
-    if (cJSON_GetArraySize(final_at) > 0)
+    if (parent_was_announced)//when aeA is announced, cnt is also announced under aeA as cntA 
     {
-        cJSON_DeleteItemFromObject(cnt, "at");
-        cJSON_AddItemToObject(cnt, "at", final_at);
+        if (handle_annc_create(parent_rtnode, cnt, cJSON_GetObjectItem(cnt, "at"), final_at) == -1)
+        {
+            cJSON_Delete(root);
+            cJSON_Delete(final_at);
+            return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute in `aa`");
+        }
+
+        if (cJSON_GetArraySize(final_at) > 0)
+        {
+            cJSON_DeleteItemFromObject(cnt, "at");
+            cJSON_AddItemToObject(cnt, "at", final_at);
+        }
+        else
+        {
+            cJSON_Delete(final_at);
+        }
     }
-    else
+    else//when ae is not announced, cnt is announced under cbA as cntA 
     {
-        cJSON_Delete(final_at);
+        if (handle_annc_create(parent_rtnode->parent, cnt, cJSON_GetObjectItem(cnt, "at"), final_at) == -1)
+        {
+            cJSON_Delete(root);
+            cJSON_Delete(final_at);
+            return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute in `aa`");
+        }
+
+        if (cJSON_GetArraySize(final_at) > 0)
+        {
+            cJSON_DeleteItemFromObject(cnt, "at");
+            cJSON_AddItemToObject(cnt, "at", final_at);
+        }
+        else
+        {
+            cJSON_Delete(final_at);
+        }
     }
 #endif
     if (rsc != RSC_OK)
@@ -243,6 +276,13 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op)
             handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
             return RSC_BAD_REQUEST;
         }
+    }
+
+    pjson = cJSON_GetObjectItem(cnt, "mia");
+    if (pjson && pjson->valueint < 0)
+    {
+        handle_error(o2pt, RSC_BAD_REQUEST, "attribute `mia` is invalid");
+        return RSC_BAD_REQUEST;
     }
 
     pjson = cJSON_GetObjectItem(cnt, "mni");
