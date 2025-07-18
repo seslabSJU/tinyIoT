@@ -16,197 +16,150 @@ sqlite3 *db;
 extern cJSON *ATTRIBUTES;
 extern ResourceTree *rt;
 
+/* Table definition structure */
+typedef struct {
+    const char *name;
+    const char *sql;
+} table_def_t;
+
+/* Static table definitions */
+static const table_def_t table_definitions[] = {
+    {"general", 
+     "CREATE TABLE IF NOT EXISTS general ( id INTEGER PRIMARY KEY AUTOINCREMENT, "
+     "rn VARCHAR(60), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), "
+     "uri VARCHAR(255), acpi VARCHAR(255), lbl VARCHAR(255), ty INT, memberOf VARCHAR(255) );"
+    },
+    {"csr", 
+     "CREATE TABLE IF NOT EXISTS csr ( id INTEGER, "
+     "cst INT, poa VARCHAR(200), cb VARCHAR(200), csi VARCHAR(200), mei VARCHAR(45), "
+     "tri VARCHAR(45), rr INT, nl VARCHAR(45), srv VARCHAR(45), dcse VARCHAR(200), csz VARCHAR(100), "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"ae", 
+     "CREATE TABLE IF NOT EXISTS ae ( id INTEGER, "
+     "api VARCHAR(45), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cnt", 
+     "CREATE TABLE IF NOT EXISTS cnt ( id INTEGER, "
+     "cr VARCHAR(40), mni INT, mbs INT, mia INT, st INT, cni INT, cbs INT, li VARCHAR(45), oref VARCHAR(45), disr VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cin", 
+     "CREATE TABLE IF NOT EXISTS cin ( id INTEGER, "
+     "cs INT, cr VARCHAR(45), cnf VARCHAR(45), oref VARCHAR(45), con TEXT, st INT, at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"acp", 
+     "CREATE TABLE IF NOT EXISTS acp ( id INTEGER, pv VARCHAR(60), pvs VARCHAR(100), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"sub", 
+     "CREATE TABLE IF NOT EXISTS sub ( id INTEGER, "
+     "enc VARCHAR(45), exc INT, nu VARCHAR(200), gpi VARCHAR(45), nfu VARCHAR(45), bn VARCHAR(45), rl VARCHAR(45), "
+     "sur VARCHAR(200), nct VARCHAR(45), net VARCHAR(45), cr VARCHAR(45), su VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"grp", 
+     "CREATE TABLE IF NOT EXISTS grp ( id INTEGER, "
+     "cr VARCHAR(45), mt INT, cnm INT, mnm INT, mid TEXT, macp TEXT, mtv INT, csy INT, gn VARCHAR(30), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cb", 
+     "CREATE TABLE IF NOT EXISTS cb ( id INTEGER, "
+     "cst INT, csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cbA", 
+     "CREATE TABLE IF NOT EXISTS cbA ( id INTEGER, "
+     "cst INT, lnk VARCHAR(100), csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, "
+     "at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"aeA", 
+     "CREATE TABLE IF NOT EXISTS aeA ( id INTEGER, "
+     "api VARCHAR(45), lnk VARCHAR(100), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cntA", 
+     "CREATE TABLE IF NOT EXISTS cntA ( id INTEGER, "
+     "lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cinA", 
+     "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, "
+     "lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    }
+};
+
+#define TABLE_COUNT (sizeof(table_definitions) / sizeof(table_def_t))
+
+/* Helper function to execute SQL and handle errors */
+static int execute_sql_with_error_handling(const char *sql, const char *context, char **err_msg)
+{
+    int rc = sqlite3_exec(db, sql, NULL, NULL, err_msg);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "%s error: %s", context, *err_msg ? *err_msg : "Unknown error");
+        return 0;
+    }
+    return 1;
+}
+
+/* Helper function to create a single table */
+static int create_table(const table_def_t *table_def, char **err_msg)
+{
+    if (!execute_sql_with_error_handling(table_def->sql, table_def->name, err_msg)) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[%s]: %s", table_def->name, *err_msg ? *err_msg : "Unknown error");
+        return 0;
+    }
+    return 1;
+}
+
 /* DB init */
 int init_dbp()
 {
-    sqlite3_stmt *res;
-    char *sql = NULL, *err_msg = NULL;
+    char *err_msg = NULL;
+    int rc = 0;
 
     // Open (or create) DB File
-    int rc = sqlite3_open("data.db", &db);
-
-    if (rc != SQLITE_OK)
-    {
+    rc = sqlite3_open("data.db", &db);
+    if (rc != SQLITE_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Cannot open database: %s", sqlite3_errmsg(db));
         sqlite3_close(db);
         return 0;
     }
 
-    // Setup Tables
-    sql = calloc(1, 1024);
-
-    strcpy(sql, "PRAGMA foreign_keys = ON;");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "foreign_keys error: %s", err_msg);
+    // Begin transaction for atomic table creation
+    if (!execute_sql_with_error_handling("BEGIN TRANSACTION;", "Begin Transaction", &err_msg)) {
         sqlite3_close(db);
-        free(sql);
         return 0;
     }
 
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS general ( id INTEGER PRIMARY KEY AUTOINCREMENT, \
-        rn VARCHAR(60), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), \
-        uri VARCHAR(255), acpi VARCHAR(255), lbl VARCHAR(255), ty INT, memberOf VARCHAR(255) );");
-
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[general]: %s", err_msg);
+    // Enable foreign keys
+    if (!execute_sql_with_error_handling("PRAGMA foreign_keys = ON;", "foreign_keys", &err_msg)) {
+        sqlite3_exec(db, "ROLLBACK;", NULL, NULL, NULL);
         sqlite3_close(db);
-        free(sql);
         return 0;
     }
 
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS csr ( id INTEGER, \
-        cst INT, poa VARCHAR(200), cb VARCHAR(200), csi VARCHAR(200), mei VARCHAR(45), \
-        tri VARCHAR(45), rr INT, nl VARCHAR(45), srv VARCHAR(45), dcse VARCHAR(200), csz VARCHAR(100), \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[csr]: %s", err_msg);
+    // Create all tables
+    for (size_t i = 0; i < TABLE_COUNT; i++) {
+        if (!create_table(&table_definitions[i], &err_msg)) {
+            sqlite3_exec(db, "ROLLBACK;", NULL, NULL, NULL);
+            sqlite3_close(db);
+            return 0;
+        }
+    }
+
+    // Commit transaction
+    if (!execute_sql_with_error_handling("COMMIT;", "Commit Transaction", &err_msg)) {
+        sqlite3_exec(db, "ROLLBACK;", NULL, NULL, NULL);
         sqlite3_close(db);
-        free(sql);
         return 0;
     }
 
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS ae ( id INTEGER, \
-        api VARCHAR(45), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[ae]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cnt ( id INTEGER, \
-        cr VARCHAR(40), mni INT, mbs INT, mia INT, st INT, cni INT, cbs INT, li VARCHAR(45), oref VARCHAR(45), disr VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cnt]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cin ( id INTEGER, \
-        cs INT, cr VARCHAR(45), cnf VARCHAR(45), oref VARCHAR(45), con TEXT, st INT, at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cin]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS acp ( id INTEGER, pv VARCHAR(60), pvs VARCHAR(100), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-                CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[acp]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS sub ( id INTEGER, \
-        enc VARCHAR(45), exc INT, nu VARCHAR(200), gpi VARCHAR(45), nfu VARCHAR(45), bn VARCHAR(45), rl VARCHAR(45), \
-        sur VARCHAR(200), nct VARCHAR(45), net VARCHAR(45), cr VARCHAR(45), su VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[sub]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS grp ( id INTEGER, \
-        cr VARCHAR(45), mt INT, cnm INT, mnm INT, mid TEXT, macp TEXT, mtv INT, csy INT, gn VARCHAR(30), at VARCHAR(200), aa VARCHAR(100), ast INT,\
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[grp]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cb ( id INTEGER, \
-        cst INT, csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cb]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cbA ( id INTEGER, \
-        cst INT, lnk VARCHAR(100), csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, \
-        at VARCHAR(200), aa VARCHAR(100), ast INT,\
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cbA]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS aeA ( id INTEGER, \
-        api VARCHAR(45), lnk VARCHAR(100), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[aeA]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cntA ( id INTEGER, \
-        lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cntA]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, \
-        lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cinA]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    free(sql);
+    logger("DB", LOG_LEVEL_INFO, "Database initialized successfully with %zu tables", TABLE_COUNT);
     return 1;
 }
 
