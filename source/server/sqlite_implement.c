@@ -14,16 +14,6 @@
 #include "sqlite/sqlite3.h"
 sqlite3 *db;
 
-
-
-#include <libpq-fe.h>
-#if DB_TYPE == DB_SQLITE
-    #include "sqlite/sqlite3.h"
-    sqlite3 *db;
-#elif DB_TYPE == DB_POSTGRESQL
-    PGconn *pg_conn;
-#endif
-
 extern cJSON *ATTRIBUTES;
 extern ResourceTree *rt;
 
@@ -33,11 +23,7 @@ typedef struct {
     const char *sql;
 } table_def_t;
 
-#if DB_TYPE == DB_SQLITE
 #define ID_COLUMN_TYPE "INTEGER PRIMARY KEY AUTOINCREMENT"
-#elif DB_TYPE == DB_POSTGRESQL
-#define ID_COLUMN_TYPE "SERIAL PRIMARY KEY"
-#endif
 
 /* Static table definitions */
 static const table_def_t table_definitions[] = {
@@ -112,7 +98,6 @@ static const table_def_t table_definitions[] = {
 
 #define TABLE_COUNT (sizeof(table_definitions) / sizeof(table_def_t))
 
-#if DB_TYPE == DB_SQLITE
 /* Helper function to execute SQL and handle errors */
 static int execute_sql_with_error_handling(const char *sql, const char *context, char **err_msg)
 {
@@ -133,35 +118,10 @@ static int create_table(const table_def_t *table_def, char **err_msg)
     }
     return 1;
 }
-#elif DB_TYPE == DB_POSTGRESQL
-/* Helper function to execute SQL and handle errors for PostgreSQL */
-static int execute_sql_with_error_handling(const char *sql, const char *context)
-{
-    PGresult *res = PQexec(pg_conn, sql);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "%s error: %s", context, PQerrorMessage(pg_conn));
-        PQclear(res);
-        return 0;
-    }
-    PQclear(res);
-    return 1;
-}
-
-/* Helper function to create a single table for PostgreSQL */
-static int create_table(const table_def_t *table_def)
-{
-    if (!execute_sql_with_error_handling(table_def->sql, table_def->name)) {
-        /* The detailed error is already logged by execute_sql_with_error_handling */
-        return 0;
-    }
-    return 1;
-}
-#endif
 
 /* DB init */
 int init_dbp()
 {
-#if DB_TYPE == DB_SQLITE
     char *err_msg = NULL;
     int rc = 0;
 
@@ -204,59 +164,14 @@ int init_dbp()
 
     logger("DB", LOG_LEVEL_INFO, "Database initialized successfully with %zu tables", TABLE_COUNT);
     return 1;
-#elif DB_TYPE == DB_POSTGRESQL
-    char conninfo[256];
-    sprintf(conninfo, "host=%s port=%d user=%s password=%s dbname=%s",
-            PG_HOST, PG_PORT, PG_USER, PG_PASSWORD, PG_DBNAME);
-
-    pg_conn = PQconnectdb(conninfo);
-    if (PQstatus(pg_conn) != CONNECTION_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "PostgreSQL connection failed: %s", PQerrorMessage(pg_conn));
-        PQfinish(pg_conn);
-        return 0;
-    }
-    logger("DB", LOG_LEVEL_INFO, "PostgreSQL connected successfully.");
-
-    // Begin transaction
-    if (!execute_sql_with_error_handling("BEGIN", "Begin Transaction")) {
-        PQfinish(pg_conn);
-        return 0;
-    }
-
-    // Create all tables
-    for (size_t i = 0; i < TABLE_COUNT; i++) {
-        if (!create_table(&table_definitions[i])) {
-            PQexec(pg_conn, "ROLLBACK");
-            PQfinish(pg_conn);
-            return 0;
-        }
-    }
-
-    // Commit transaction
-    if (!execute_sql_with_error_handling("COMMIT", "Commit Transaction")) {
-        PQexec(pg_conn, "ROLLBACK");
-        PQfinish(pg_conn);
-        return 0;
-    }
-
-    logger("DB", LOG_LEVEL_INFO, "Database initialized successfully with %zu tables", TABLE_COUNT);
-    return 1;
-#endif
 }
 
 int close_dbp()
 {
-#if DB_TYPE == DB_SQLITE
     if (db) {
         sqlite3_close_v2(db);
         db = NULL;
     }
-#elif DB_TYPE == DB_POSTGRESQL
-    if (pg_conn) {
-        PQfinish(pg_conn);
-        pg_conn = NULL;
-    }
-#endif
     return 1;
 }
 

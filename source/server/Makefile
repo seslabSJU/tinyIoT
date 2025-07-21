@@ -11,7 +11,18 @@ endif
 
 CC=gcc
 
-SRCS = main.c onem2m.c cJSON.c httpd.c dbmanager.c jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
+# Check DB_TYPE from config.h to determine which database implementation to use
+DB_TYPE := $(shell grep -E "^\s*\#define\s+DB_TYPE\s+" config.h | grep -E "(DB_SQLITE|DB_POSTGRESQL)" | sed 's/.*DB_//')
+
+ifeq ($(DB_TYPE), SQLITE)
+    DB_IMPL = sqlite_implement.c
+    DB_LIB_SRC = sqlite/sqlite3.c
+else ifeq ($(DB_TYPE), POSTGRESQL)
+    DB_IMPL = postgresql_implement.c
+    DB_LIB_SRC = 
+endif
+
+SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
 
 RSCSRC = $(wildcard resources/*.c)
 
@@ -19,7 +30,7 @@ LIBCOAP = libcoap/coap_address.c libcoap/coap_asn1.c libcoap/coap_async.c libcoa
 # not include: libcoap/coap_io_contiki.c libcoap/coap_io_lwip.c libcoap/coap_io_riot.c coap_dtls_get_overhead() libcoap/coap_gnutls.c libcoap/coap_mbedtls.c libcoap/coap_tinydtls.c
 # oscore: libcoap/oscore/oscore_cbor.c libcoap/oscore/oscore_context.c libcoap/oscore/oscore_cose.c libcoap/oscore/oscore_crypto.c libcoap/oscore/oscore.c
 
-LSRCS = wolfmqtt/mqtt_client.c wolfmqtt/mqtt_packet.c wolfmqtt/mqtt_socket.c sqlite/sqlite3.c
+LSRCS = wolfmqtt/mqtt_client.c wolfmqtt/mqtt_packet.c wolfmqtt/mqtt_socket.c $(DB_LIB_SRC)
 
 OBJS = $(SRCS:.c=.o) $(RSCSRC:.c=.o) $(LSRCS:.c=.o) $(LIBCOAP:.c=.o)
 
