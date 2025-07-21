@@ -21,6 +21,23 @@
 #define REMOTE_CSE_PORT 0
 #endif
 
+// Database Settings
+#define DB_SQLITE 1
+#define DB_POSTGRESQL 2
+
+// Select Database Type: DB_SQLITE or DB_POSTGRESQL
+// #define DB_TYPE DB_SQLITE
+#define DB_TYPE DB_POSTGRESQL
+
+#if DB_TYPE == DB_POSTGRESQL
+// PostgreSQL connection settings
+#define PG_HOST "localhost"
+#define PG_PORT 5432
+#define PG_USER "user"
+#define PG_PASSWORD "password"
+#define PG_DBNAME "tinydb"
+#endif
+
 // Security
 
 // To disable ADMIN_AE_ID, comment the following line
