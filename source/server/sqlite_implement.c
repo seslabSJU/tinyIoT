@@ -54,7 +54,7 @@ static const table_def_t table_definitions[] = {
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"acp", 
-     "CREATE TABLE IF NOT EXISTS acp ( id INTEGER, pv VARCHAR(60), pvs VARCHAR(100), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CREATE TABLE IF NOT EXISTS acp ( id INTEGER, pv VARCHAR(255), pvs VARCHAR(100), at VARCHAR(200), aa VARCHAR(100), ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"sub", 

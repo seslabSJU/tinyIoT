@@ -58,7 +58,7 @@ static const table_def_t table_definitions[] = {
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"acp", 
-     "CREATE TABLE IF NOT EXISTS acp ( id INTEGER, pv VARCHAR(60), pvs VARCHAR(100), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CREATE TABLE IF NOT EXISTS acp ( id INTEGER, pv VARCHAR(255), pvs VARCHAR(100), at VARCHAR(200), aa VARCHAR(100), ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"sub", 
@@ -1271,6 +1271,21 @@ bool db_check_cin_rn_dup(char *rn, char *pi)
     free(escaped_pi);
     
     return result;
+}
+
+bool do_uri_exist(cJSON *list, char *uri)
+{
+    char *ptr = NULL;
+    int lsize = cJSON_GetArraySize(list);
+    for (int i = 0; i < lsize; i++)
+    {
+        ptr = cJSON_GetArrayItem(list, i)->valuestring;
+        if (!strcmp(ptr, uri))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 cJSON *getForbiddenUri(cJSON *acp_list)
