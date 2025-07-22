@@ -119,7 +119,6 @@ static int execute_sql_with_error_handling(const char *sql, const char *context)
 static int create_table(const table_def_t *table_def)
 {
     if (!execute_sql_with_error_handling(table_def->sql, table_def->name)) {
-        /* The detailed error is already logged by execute_sql_with_error_handling */
         return 0;
     }
     return 1;
@@ -502,28 +501,6 @@ int db_store_resource(cJSON *obj, char *uri)
     return 1;
 }
 
-// PostgreSQL에서는 prepared statement를 사용하지 않으므로 이 함수들은 빈 구현으로 남겨둡니다
-void db_test_and_bind_value(sqlite3_stmt *stmt, int index, cJSON *obj)
-{
-    // PostgreSQL implementation doesn't use prepared statements in this way
-    // This function is kept for interface compatibility
-}
-
-void db_test_and_set_bind_text(sqlite3_stmt *stmt, int index, char *context)
-{
-    // PostgreSQL implementation doesn't use prepared statements in this way
-    // This function is kept for interface compatibility
-}
-
-void db_test_and_set_bind_int(sqlite3_stmt *stmt, int index, int value)
-{
-    // PostgreSQL implementation doesn't use prepared statements in this way
-    // This function is kept for interface compatibility
-}
-
-// 나머지 함수들은 PostgreSQL 구현으로 계속 작성해야 합니다.
-// 여기서는 주요 함수들만 구현하고, 나머지는 필요에 따라 추가 구현합니다.
-
 int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
 {
     logger("DB", LOG_LEVEL_DEBUG, "Call db_update_resource [RI]: %s", ri);
@@ -683,44 +660,588 @@ int db_delete_onem2m_resource(RTNode *rtnode)
 
 int db_delete_one_cin_mni(RTNode *cnt)
 {
-    // TODO: PostgreSQL implementation
-    logger("DB", LOG_LEVEL_ERROR, "db_delete_one_cin_mni not implemented for PostgreSQL yet");
-    return 0;
+    char sql[1024] = {0};
+    PGresult *res;
+    char *latest_ri = NULL;
+    int latest_cs = 0;
+
+    if (!cnt) {
+        logger("DB", LOG_LEVEL_ERROR, "CNT node is NULL");
+        return -1;
+    }
+
+    char *cnt_ri = get_ri_rtnode(cnt);
+    if (!cnt_ri) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from CNT node");
+        return -1;
+    }
+
+    char *escaped_cnt_ri = pg_escape_string_value(cnt_ri);
+    
+    // Find the oldest CIN (lowest lt value) under this CNT
+    sprintf(sql, "SELECT general.ri, cin.cs FROM general, cin WHERE general.pi='%s' AND general.id = cin.id ORDER BY general.lt ASC LIMIT 1;", escaped_cnt_ri);
+    
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to select oldest CIN: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_cnt_ri);
+        return -1;
+    }
+
+    if (PQntuples(res) == 0) {
+        logger("DB", LOG_LEVEL_DEBUG, "No CIN found to delete under CNT: %s", cnt_ri);
+        PQclear(res);
+        free(escaped_cnt_ri);
+        return 0;
+    }
+
+    // Get the RI and CS of the oldest CIN
+    latest_ri = PQgetvalue(res, 0, 0);
+    latest_cs = atoi(PQgetvalue(res, 0, 1));
+
+    logger("DB", LOG_LEVEL_DEBUG, "latest_ri: %s, latest_cs: %d", latest_ri, latest_cs);
+
+    // Create a copy of latest_ri since PQclear will free the result
+    char *ri_copy = strdup(latest_ri);
+    PQclear(res);
+
+    // Delete the oldest CIN resource from general table (cascade will handle cin table)
+    char *escaped_ri = pg_escape_string_value(ri_copy);
+    sprintf(sql, "DELETE FROM general WHERE ri='%s';", escaped_ri);
+    
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from general: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_cnt_ri);
+        free(escaped_ri);
+        free(ri_copy);
+        return -1;
+    }
+    PQclear(res);
+
+    free(escaped_cnt_ri);
+    free(escaped_ri);
+    free(ri_copy);
+    
+    return latest_cs;
 }
 
 RTNode *db_get_all_resource_as_rtnode()
 {
-    // TODO: PostgreSQL implementation
-    logger("DB", LOG_LEVEL_ERROR, "db_get_all_resource_as_rtnode not implemented for PostgreSQL yet");
-    return NULL;
+    logger("DB", LOG_LEVEL_DEBUG, "Call db_get_all_resource_as_rtnode");
+
+    char sql[1024] = {0};
+    PGresult *res, *res2;
+    RTNode *head = NULL, *rtnode = NULL;
+    cJSON *json, *arr;
+
+    // Select all resources except CIN (ty=4) and Sub (ty=23) 
+    sprintf(sql, "SELECT * FROM general WHERE ty != 4 AND ty != 23;");
+    
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed select from general: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        return NULL;
+    }
+
+    int rows = PQntuples(res);
+    int cols = PQnfields(res);
+
+    for (int row = 0; row < rows; row++) {
+        json = cJSON_CreateObject();
+        
+        // Process general table columns
+        for (int col = 0; col < cols; col++) {
+            char *colname = PQfname(res, col);
+            char *value = PQgetvalue(res, row, col);
+
+            if (value && strlen(value) > 0) {
+                // Try to parse as JSON first
+                arr = cJSON_Parse(value);
+                if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                    cJSON_AddItemToObject(json, colname, arr);
+                } else {
+                    // Check if it's a number
+                    char *endptr;
+                    long num = strtol(value, &endptr, 10);
+                    if (*endptr == '\0') {
+                        cJSON_AddNumberToObject(json, colname, num);
+                    } else {
+                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(value));
+                    }
+                    cJSON_Delete(arr);
+                }
+            }
+        }
+
+        // Get resource type and fetch specific table data
+        int ty = cJSON_GetObjectItem(json, "ty")->valueint;
+        int id = cJSON_GetObjectItem(json, "id")->valueint;
+        
+        char sql2[1024] = {0};
+        sprintf(sql2, "SELECT * FROM %s WHERE id=%d;", get_table_name(ty), id);
+        
+        res2 = PQexec(pg_conn, sql2);
+        if (PQresultStatus(res2) != PGRES_TUPLES_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed select from %s: %s", get_table_name(ty), PQerrorMessage(pg_conn));
+            PQclear(res2);
+            cJSON_Delete(json);
+            continue;
+        }
+
+        if (PQntuples(res2) > 0) {
+            int cols2 = PQnfields(res2);
+            for (int col = 0; col < cols2; col++) {
+                char *colname = PQfname(res2, col);
+                char *value = PQgetvalue(res2, 0, col);
+
+                if (strcmp(colname, "id") == 0) continue;
+                
+                if (value && strlen(value) > 0) {
+                    // Try to parse as JSON first
+                    arr = cJSON_Parse(value);
+                    if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                        cJSON_AddItemToObject(json, colname, arr);
+                    } else {
+                        // Check if it's a number
+                        char *endptr;
+                        long num = strtol(value, &endptr, 10);
+                        if (*endptr == '\0') {
+                            cJSON_AddNumberToObject(json, colname, num);
+                        } else {
+                            cJSON_AddItemToObject(json, colname, cJSON_CreateString(value));
+                        }
+                        cJSON_Delete(arr);
+                    }
+                }
+            }
+        }
+        PQclear(res2);
+
+        // Remove id from JSON object
+        cJSON_DeleteItemFromObject(json, "id");
+
+        // Create RTNode and add to list
+        if (!head) {
+            head = create_rtnode(json, ty);
+            rtnode = head;
+        } else {
+            rtnode->sibling_right = create_rtnode(json, ty);
+            rtnode->sibling_right->sibling_left = rtnode;
+            rtnode = rtnode->sibling_right;
+        }
+    }
+
+    PQclear(res);
+    return head;
 }
 
 RTNode *db_get_cin_rtnode_list(RTNode *parent_rtnode)
 {
-    // TODO: PostgreSQL implementation
-    logger("DB", LOG_LEVEL_ERROR, "db_get_cin_rtnode_list not implemented for PostgreSQL yet");
-    return NULL;
+    logger("DB", LOG_LEVEL_DEBUG, "call db_get_cin_rtnode_list");
+
+    if (!parent_rtnode) {
+        logger("DB", LOG_LEVEL_ERROR, "Parent rtnode is NULL");
+        return NULL;
+    }
+
+    char *pi = get_ri_rtnode(parent_rtnode);
+    if (!pi) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from parent rtnode");
+        return NULL;
+    }
+
+    char sql[1024] = {0};
+    PGresult *res;
+    RTNode *head = NULL, *rtnode = NULL;
+    cJSON *json, *arr;
+
+    char *escaped_pi = pg_escape_string_value(pi);
+    sprintf(sql, "SELECT * FROM general, cin WHERE general.pi='%s' AND general.id=cin.id ORDER BY general.id ASC;", escaped_pi);
+
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return NULL;
+    }
+
+    int rows = PQntuples(res);
+    int cols = PQnfields(res);
+
+    for (int row = 0; row < rows; row++) {
+        json = cJSON_CreateObject();
+        
+        for (int col = 0; col < cols; col++) {
+            char *colname = PQfname(res, col);
+            char *value = PQgetvalue(res, row, col);
+
+            if (strcmp(colname, "id") == 0) continue;
+            
+            if (value && strlen(value) > 0) {
+                // Try to parse as JSON first
+                arr = cJSON_Parse(value);
+                if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                    cJSON_AddItemToObject(json, colname, arr);
+                } else {
+                    // Check if it's a number
+                    char *endptr;
+                    long num = strtol(value, &endptr, 10);
+                    if (*endptr == '\0') {
+                        cJSON_AddNumberToObject(json, colname, num);
+                    } else {
+                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(value));
+                    }
+                    cJSON_Delete(arr);
+                }
+            }
+        }
+
+        // Create RTNode and add to list
+        if (!head) {
+            head = create_rtnode(json, RT_CIN);
+            rtnode = head;
+        } else {
+            rtnode->sibling_right = create_rtnode(json, RT_CIN);
+            rtnode->sibling_right->sibling_left = rtnode;
+            rtnode = rtnode->sibling_right;
+        }
+    }
+
+    PQclear(res);
+    free(escaped_pi);
+    return head;
 }
 
 RTNode *db_get_latest_cins()
 {
-    // TODO: PostgreSQL implementation
-    logger("DB", LOG_LEVEL_ERROR, "db_get_latest_cins not implemented for PostgreSQL yet");
-    return NULL;
+    logger("DB", LOG_LEVEL_DEBUG, "call db_get_latest_cins");
+
+    char sql[1024] = {0};
+    PGresult *res;
+    RTNode *head = NULL, *rtnode = NULL;
+    cJSON *json, *arr;
+
+    // Get the latest CIN (highest id) for each CNT (grouped by pi)
+    sprintf(sql, "SELECT * FROM general, cin WHERE general.id IN (SELECT max(id) FROM general WHERE ty=4 GROUP BY pi) AND general.id=cin.id;");
+    
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        return NULL;
+    }
+
+    int rows = PQntuples(res);
+    int cols = PQnfields(res);
+
+    for (int row = 0; row < rows; row++) {
+        json = cJSON_CreateObject();
+        
+        for (int col = 0; col < cols; col++) {
+            char *colname = PQfname(res, col);
+            char *value = PQgetvalue(res, row, col);
+
+            if (strcmp(colname, "id") == 0) continue;
+            
+            if (value && strlen(value) > 0) {
+                // Try to parse as JSON first
+                arr = cJSON_Parse(value);
+                if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                    cJSON_AddItemToObject(json, colname, arr);
+                } else {
+                    // Check if it's a number
+                    char *endptr;
+                    long num = strtol(value, &endptr, 10);
+                    if (*endptr == '\0') {
+                        cJSON_AddNumberToObject(json, colname, num);
+                    } else {
+                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(value));
+                    }
+                    cJSON_Delete(arr);
+                }
+            }
+        }
+
+        // Create RTNode and add to list
+        if (!head) {
+            head = create_rtnode(json, RT_CIN);
+            rtnode = head;
+        } else {
+            rtnode->sibling_right = create_rtnode(json, RT_CIN);
+            rtnode->sibling_right->sibling_left = rtnode;
+            rtnode = rtnode->sibling_right;
+        }
+    }
+
+    PQclear(res);
+    return head;
 }
 
 cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol)
 {
-    // TODO: PostgreSQL implementation
-    logger("DB", LOG_LEVEL_ERROR, "db_get_cin_laol not implemented for PostgreSQL yet");
-    return NULL;
+    if (!parent_rtnode) {
+        logger("DB", LOG_LEVEL_ERROR, "Parent rtnode is NULL");
+        return NULL;
+    }
+
+    char sql[1024] = {0};
+    char *ord = NULL;
+    PGresult *res;
+    cJSON *json, *arr;
+
+    // Determine order (Latest: DESC, Oldest: ASC)
+    switch (laol) {
+    case 0:
+        ord = "DESC";
+        break;
+    case 1:
+        ord = "ASC";
+        break;
+    default:
+        logger("DB", LOG_LEVEL_DEBUG, "Invalid la ol flag");
+        return NULL;
+    }
+
+    char *parent_ri = get_ri_rtnode(parent_rtnode);
+    if (!parent_ri) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from parent rtnode");
+        return NULL;
+    }
+
+    char *escaped_pi = pg_escape_string_value(parent_ri);
+    sprintf(sql, "SELECT * FROM general, cin WHERE general.pi='%s' AND general.id = cin.id ORDER BY general.lt %s, general.id %s LIMIT 1;", escaped_pi, ord, ord);
+    
+    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+    
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return NULL;
+    }
+
+    if (PQntuples(res) == 0) {
+        logger("DB", LOG_LEVEL_DEBUG, "No CIN found for parent: %s", parent_ri);
+        PQclear(res);
+        free(escaped_pi);
+        return NULL;
+    }
+
+    json = cJSON_CreateObject();
+    int cols = PQnfields(res);
+    
+    for (int col = 0; col < cols; col++) {
+        char *colname = PQfname(res, col);
+        char *value = PQgetvalue(res, 0, col);
+
+        if (strcmp(colname, "id") == 0) continue;
+        
+        if (value && strlen(value) > 0) {
+            // Try to parse as JSON first
+            arr = cJSON_Parse(value);
+            if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                cJSON_AddItemToObject(json, colname, arr);
+            } else {
+                // Check if it's a number
+                char *endptr;
+                long num = strtol(value, &endptr, 10);
+                if (*endptr == '\0') {
+                    cJSON_AddNumberToObject(json, colname, num);
+                } else {
+                    cJSON_AddItemToObject(json, colname, cJSON_CreateString(value));
+                }
+                cJSON_Delete(arr);
+            }
+        }
+    }
+
+    PQclear(res);
+    free(escaped_pi);
+    return json;
 }
 
 cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 {
-    // TODO: PostgreSQL implementation
-    logger("DB", LOG_LEVEL_ERROR, "db_get_filter_criteria not implemented for PostgreSQL yet");
-    return NULL;
+    logger("DB", LOG_LEVEL_DEBUG, "call db_get_filter_criteria");
+    
+    if (!o2pt || !o2pt->fc) {
+        logger("DB", LOG_LEVEL_ERROR, "Invalid parameters for filter criteria");
+        return cJSON_CreateArray();
+    }
+
+    char sql[2048] = {0};
+    char buf[256] = {0};
+    PGresult *res;
+    cJSON *fc = o2pt->fc;
+    cJSON *pjson = NULL, *ptr = NULL;
+    cJSON *json = cJSON_CreateArray();
+    int fo = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
+
+    char *uri = o2pt->to;
+    if (strncmp(o2pt->to, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) != 0) {
+        uri = ri_to_uri(o2pt->to);
+    }
+
+    char *escaped_uri = pg_escape_string_value(uri);
+    
+    // Build base query
+    if (o2pt->drt == DRT_STRUCTURED) {
+        sprintf(sql, "SELECT rn, ty, uri FROM general WHERE uri LIKE '%s/%%'", escaped_uri);
+    } else {
+        sprintf(sql, "SELECT rn, ty, ri FROM general WHERE uri LIKE '%s/%%'", escaped_uri);
+    }
+
+    // Add level filter
+    if ((pjson = cJSON_GetObjectItem(fc, "lvl"))) {
+        sprintf(buf, " AND uri NOT LIKE '%s", escaped_uri);
+        strcat(sql, buf);
+        for (int i = 0; i < pjson->valueint; i++) {
+            strcat(sql, "/%%");
+        }
+        strcat(sql, "'");
+    }
+
+    // Add creation time filters
+    if ((pjson = cJSON_GetObjectItem(fc, "cra"))) {
+        char *escaped_cra = pg_escape_string_value(pjson->valuestring);
+        sprintf(buf, " AND ct > '%s'", escaped_cra);
+        strcat(sql, buf);
+        free(escaped_cra);
+    }
+    if ((pjson = cJSON_GetObjectItem(fc, "crb"))) {
+        char *escaped_crb = pg_escape_string_value(pjson->valuestring);
+        sprintf(buf, " AND ct <= '%s'", escaped_crb);
+        strcat(sql, buf);
+        free(escaped_crb);
+    }
+
+    // Add expiration time filters
+    if ((pjson = cJSON_GetObjectItem(fc, "exa"))) {
+        char *escaped_exa = pg_escape_string_value(pjson->valuestring);
+        sprintf(buf, " AND et > '%s'", escaped_exa);
+        strcat(sql, buf);
+        free(escaped_exa);
+    }
+    if ((pjson = cJSON_GetObjectItem(fc, "exb"))) {
+        char *escaped_exb = pg_escape_string_value(pjson->valuestring);
+        sprintf(buf, " AND et <= '%s'", escaped_exb);
+        strcat(sql, buf);
+        free(escaped_exb);
+    }
+
+    // Add modification time filters
+    if ((pjson = cJSON_GetObjectItem(fc, "ms"))) {
+        char *escaped_ms = pg_escape_string_value(pjson->valuestring);
+        sprintf(buf, " AND lt > '%s'", escaped_ms);
+        strcat(sql, buf);
+        free(escaped_ms);
+    }
+    if ((pjson = cJSON_GetObjectItem(fc, "us"))) {
+        char *escaped_us = pg_escape_string_value(pjson->valuestring);
+        sprintf(buf, " AND lt <= '%s'", escaped_us);
+        strcat(sql, buf);
+        free(escaped_us);
+    }
+
+    // Add type filter
+    if ((pjson = cJSON_GetObjectItem(fc, "ty"))) {
+        strcat(sql, " AND (");
+        if (cJSON_IsArray(pjson)) {
+            int first = 1;
+            cJSON_ArrayForEach(ptr, pjson) {
+                if (!first) strcat(sql, " OR ");
+                sprintf(buf, "ty = %d", ptr->valueint);
+                strcat(sql, buf);
+                first = 0;
+            }
+        } else if (cJSON_IsNumber(pjson)) {
+            sprintf(buf, "ty = %d", pjson->valueint);
+            strcat(sql, buf);
+        }
+        strcat(sql, ")");
+    }
+
+    // Add label filter
+    if ((pjson = cJSON_GetObjectItem(fc, "lbl"))) {
+        strcat(sql, " AND (");
+        if (cJSON_IsArray(pjson)) {
+            int first = 1;
+            cJSON_ArrayForEach(ptr, pjson) {
+                if (!first) strcat(sql, " OR ");
+                char *escaped_lbl = pg_escape_string_value(cJSON_GetStringValue(ptr));
+                sprintf(buf, "lbl LIKE '%%\"%s\"%%'", escaped_lbl);
+                strcat(sql, buf);
+                free(escaped_lbl);
+                first = 0;
+            }
+        } else if (cJSON_IsString(pjson)) {
+            char *escaped_lbl = pg_escape_string_value(cJSON_GetStringValue(pjson));
+            sprintf(buf, "lbl LIKE '%%\"%s\"%%'", escaped_lbl);
+            strcat(sql, buf);
+            free(escaped_lbl);
+        }
+        strcat(sql, ")");
+    }
+
+    // Add ordering and limit
+    if (DEFAULT_DISCOVERY_SORT == SORT_DESC) {
+        strcat(sql, " ORDER BY id DESC");
+    } else {
+        strcat(sql, " ORDER BY id ASC");
+    }
+
+    if ((pjson = cJSON_GetObjectItem(fc, "lim"))) {
+        int limit = pjson->valueint > DEFAULT_DISCOVERY_LIMIT ? DEFAULT_DISCOVERY_LIMIT + 1 : pjson->valueint + 1;
+        sprintf(buf, " LIMIT %d", limit);
+        strcat(sql, buf);
+    } else {
+        sprintf(buf, " LIMIT %d", DEFAULT_DISCOVERY_LIMIT + 1);
+        strcat(sql, buf);
+    }
+
+    if ((pjson = cJSON_GetObjectItem(fc, "ofst"))) {
+        sprintf(buf, " OFFSET %d", pjson->valueint);
+        strcat(sql, buf);
+    }
+
+    strcat(sql, ";");
+    logger("DB", LOG_LEVEL_DEBUG, "Filter SQL: %s", sql);
+    
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed filter query: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_uri);
+        return json;
+    }
+
+    int rows = PQntuples(res);
+    for (int row = 0; row < rows; row++) {
+        cJSON *pjson = cJSON_CreateObject();
+        char *rn = PQgetvalue(res, row, 0);
+        char *ty_str = PQgetvalue(res, row, 1);
+        char *val = PQgetvalue(res, row, 2);
+
+        if (rn && strlen(rn) > 0) {
+            cJSON_AddItemToObject(pjson, "name", cJSON_CreateString(rn));
+            cJSON_AddItemToObject(pjson, "type", cJSON_CreateNumber(atoi(ty_str)));
+            cJSON_AddItemToObject(pjson, "val", cJSON_CreateString(val));
+            cJSON_AddItemToArray(json, pjson);
+        } else {
+            cJSON_Delete(pjson);
+            break;
+        }
+    }
+
+    PQclear(res);
+    free(escaped_uri);
+    return json;
 }
 
 bool db_check_cin_rn_dup(char *rn, char *pi)
@@ -754,7 +1275,52 @@ bool db_check_cin_rn_dup(char *rn, char *pi)
 
 cJSON *getForbiddenUri(cJSON *acp_list)
 {
-    // TODO: PostgreSQL implementation
-    logger("DB", LOG_LEVEL_ERROR, "getForbiddenUri not implemented for PostgreSQL yet");
-    return cJSON_CreateArray();
+    cJSON *result = cJSON_CreateArray();
+    
+    if (!acp_list || cJSON_GetArraySize(acp_list) == 0) {
+        return result;
+    }
+
+    char sql[2048] = {0};
+    PGresult *res;
+    cJSON *ptr = NULL;
+
+    strcat(sql, "SELECT uri FROM general WHERE ");
+    
+    int first = 1;
+    cJSON_ArrayForEach(ptr, acp_list) {
+        if (cJSON_IsString(ptr)) {
+            if (!first) {
+                strcat(sql, " OR ");
+            }
+            
+            char *escaped_acp = pg_escape_string_value(cJSON_GetStringValue(ptr));
+            char condition[512];
+            sprintf(condition, "acpi LIKE '%%\"%s\"%%'", escaped_acp);
+            strcat(sql, condition);
+            free(escaped_acp);
+            first = 0;
+        }
+    }
+    strcat(sql, ";");
+    
+    logger("DB", LOG_LEVEL_DEBUG, "getForbiddenUri SQL: %s", sql);
+    
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed select in getForbiddenUri: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        return result;
+    }
+
+    int rows = PQntuples(res);
+    for (int row = 0; row < rows; row++) {
+        char *uri = PQgetvalue(res, row, 0);
+        if (uri && strlen(uri) > 0) {
+            cJSON_AddItemToArray(result, cJSON_CreateString(uri));
+        }
+    }
+
+    PQclear(res);
+    return result;
 }

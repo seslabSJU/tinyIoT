@@ -35,11 +35,6 @@ cJSON *getForbiddenUri(cJSON *acp_list);
     void db_test_and_bind_value(sqlite3_stmt *stmt, int index, cJSON *obj);
     void db_test_and_set_bind_text(sqlite3_stmt *stmt, int index, char *context);
     void db_test_and_set_bind_int(sqlite3_stmt *stmt, int index, int value);
-#elif DB_TYPE == DB_POSTGRESQL
-    // PostgreSQL doesn't use these binding functions in the same way
-    void db_test_and_bind_value(sqlite3_stmt *stmt, int index, cJSON *obj);
-    void db_test_and_set_bind_text(sqlite3_stmt *stmt, int index, char *context);
-    void db_test_and_set_bind_int(sqlite3_stmt *stmt, int index, int value);
 #endif
 
 #define DB_STR_MAX 65565
