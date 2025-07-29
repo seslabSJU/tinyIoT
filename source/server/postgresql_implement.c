@@ -21,6 +21,56 @@ PGconn *pg_conn;
 extern cJSON *ATTRIBUTES;
 extern ResourceTree *rt;
 
+/* Debug helper functions for cJSON */
+void debug_print_cjson(const char *label, cJSON *json) {
+    if (!json) {
+        logger("DEBUG", LOG_LEVEL_DEBUG, "%s: NULL", label);
+        return;
+    }
+    
+    char *json_string = cJSON_Print(json);
+    if (json_string) {
+        logger("DEBUG", LOG_LEVEL_DEBUG, "%s: %s", label, json_string);
+        free(json_string);
+    } else {
+        logger("DEBUG", LOG_LEVEL_DEBUG, "%s: Failed to print JSON", label);
+    }
+}
+
+void debug_print_cjson_type_and_value(const char *label, cJSON *json) {
+    if (!json) {
+        logger("DEBUG", LOG_LEVEL_DEBUG, "%s: NULL", label);
+        return;
+    }
+    
+    switch (json->type) {
+        case cJSON_String:
+            logger("DEBUG", LOG_LEVEL_DEBUG, "%s: STRING = '%s'", label, json->valuestring ? json->valuestring : "NULL");
+            break;
+        case cJSON_Number:
+            logger("DEBUG", LOG_LEVEL_DEBUG, "%s: NUMBER = %d (double: %.2f)", label, json->valueint, json->valuedouble);
+            break;
+        case cJSON_True:
+            logger("DEBUG", LOG_LEVEL_DEBUG, "%s: TRUE", label);
+            break;
+        case cJSON_False:
+            logger("DEBUG", LOG_LEVEL_DEBUG, "%s: FALSE", label);
+            break;
+        case cJSON_NULL:
+            logger("DEBUG", LOG_LEVEL_DEBUG, "%s: NULL_VALUE", label);
+            break;
+        case cJSON_Array:
+            logger("DEBUG", LOG_LEVEL_DEBUG, "%s: ARRAY (size: %d)", label, cJSON_GetArraySize(json));
+            break;
+        case cJSON_Object:
+            logger("DEBUG", LOG_LEVEL_DEBUG, "%s: OBJECT", label);
+            break;
+        default:
+            logger("DEBUG", LOG_LEVEL_DEBUG, "%s: UNKNOWN_TYPE (%d)", label, json->type);
+            break;
+    }
+}
+
 /* Table definition structure */
 typedef struct {
     const char *name;
@@ -33,7 +83,7 @@ typedef struct {
 static const table_def_t table_definitions[] = {
     {"general", 
      "CREATE TABLE IF NOT EXISTS general ( id " ID_COLUMN_TYPE ", "
-     "rn VARCHAR(60), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), "
+     "rn VARCHAR(255), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), "
      "uri VARCHAR(255), acpi VARCHAR(255), lbl VARCHAR(255), ty INT, memberOf VARCHAR(255) );"
     },
     {"csr", 
@@ -370,15 +420,38 @@ static char *pg_format_json_value(cJSON *obj)
  */
 int db_store_resource(cJSON *obj, char *uri)
 {
+    logger("DB", LOG_LEVEL_DEBUG, "Call db_store_resource with URI: %s", uri ? uri : "NULL");
+    
+    // Debug: Print the entire resource object
+    debug_print_cjson("Resource Object", obj);
+    
     char *sql = NULL;
     cJSON *pjson = NULL;
     cJSON *GENERAL_ATTR = cJSON_GetObjectItem(ATTRIBUTES, "general");
     int general_cnt = cJSON_GetArraySize(GENERAL_ATTR);
     PGresult *res;
 
-    ResourceType ty = cJSON_GetObjectItem(obj, "ty")->valueint;
+    if (!obj) {
+        logger("DB", LOG_LEVEL_ERROR, "Resource object is NULL");
+        return -1;
+    }
+
+    cJSON *ty_obj = cJSON_GetObjectItem(obj, "ty");
+    if (!ty_obj) {
+        logger("DB", LOG_LEVEL_ERROR, "Missing 'ty' field in resource object");
+        return -1;
+    }
+    ResourceType ty = ty_obj->valueint;
+    logger("DB", LOG_LEVEL_DEBUG, "Resource type: %d", ty);
+    
+    // Debug: Print key fields
+    debug_print_cjson_type_and_value("ty field", ty_obj);
+    debug_print_cjson_type_and_value("ri field", cJSON_GetObjectItem(obj, "ri"));
+    debug_print_cjson_type_and_value("rn field", cJSON_GetObjectItem(obj, "rn"));
+    debug_print_cjson_type_and_value("pi field", cJSON_GetObjectItem(obj, "pi"));
 
     // Begin transaction
+    logger("DB", LOG_LEVEL_DEBUG, "Executing: BEGIN");
     res = PQexec(pg_conn, "BEGIN");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Failed to begin transaction: %s", PQerrorMessage(pg_conn));
@@ -412,6 +485,10 @@ int db_store_resource(cJSON *obj, char *uri)
                     free(escaped);
                 } else if (cJSON_IsNumber(pjson)) {
                     sprintf(sql + strlen(sql), "%d", pjson->valueint);
+                } else if (cJSON_IsTrue(pjson)) {
+                    strcat(sql, "1");
+                } else if (cJSON_IsFalse(pjson)) {
+                    strcat(sql, "0");
                 } else if (cJSON_IsArray(pjson) || cJSON_IsObject(pjson)) {
                     char *escaped = pg_format_json_value(pjson);
                     sprintf(sql + strlen(sql), "'%s'", escaped);
@@ -427,18 +504,28 @@ int db_store_resource(cJSON *obj, char *uri)
     }
     strcat(sql, ");");
 
+    logger("DB", LOG_LEVEL_DEBUG, "Executing General Table INSERT: %s", sql);
     res = PQexec(pg_conn, sql);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Failed to insert into general table: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed SQL was: %s", sql);
         PQclear(res);
         free(sql);
         PQexec(pg_conn, "ROLLBACK");
         return -1;
     }
     PQclear(res);
+    logger("DB", LOG_LEVEL_DEBUG, "General table INSERT successful");
 
     // Insert into specific table
     cJSON *specific_attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
+    if (!specific_attr) {
+        logger("DB", LOG_LEVEL_ERROR, "No specific attributes found for resource type %d", ty);
+        free(sql);
+        PQexec(pg_conn, "ROLLBACK");
+        return -1;
+    }
+    
     sql[0] = '\0';
     sprintf(sql, "INSERT INTO %s (id, ", get_table_name(ty));
     
@@ -448,7 +535,15 @@ int db_store_resource(cJSON *obj, char *uri)
     }
     strcat(sql, ") VALUES ((SELECT id FROM general WHERE ri='");
     
-    char *ri_str = cJSON_GetObjectItem(obj, "ri")->valuestring;
+    cJSON *ri_obj = cJSON_GetObjectItem(obj, "ri");
+    if (!ri_obj || !cJSON_IsString(ri_obj)) {
+        logger("DB", LOG_LEVEL_ERROR, "Missing or invalid 'ri' field in resource object");
+        free(sql);
+        PQexec(pg_conn, "ROLLBACK");
+        return -1;
+    }
+    
+    char *ri_str = ri_obj->valuestring;
     char *escaped_ri = pg_escape_string_value(ri_str);
     strcat(sql, escaped_ri);
     free(escaped_ri);
@@ -463,6 +558,10 @@ int db_store_resource(cJSON *obj, char *uri)
                 free(escaped);
             } else if (cJSON_IsNumber(pjson)) {
                 sprintf(sql + strlen(sql), "%d", pjson->valueint);
+            } else if (cJSON_IsTrue(pjson)) {
+                strcat(sql, "1");
+            } else if (cJSON_IsFalse(pjson)) {
+                strcat(sql, "0");
             } else if (cJSON_IsArray(pjson) || cJSON_IsObject(pjson)) {
                 char *escaped = pg_format_json_value(pjson);
                 sprintf(sql + strlen(sql), "'%s'", escaped);
@@ -477,17 +576,21 @@ int db_store_resource(cJSON *obj, char *uri)
     }
     strcat(sql, ");");
 
+    logger("DB", LOG_LEVEL_DEBUG, "Executing Specific Table INSERT: %s", sql);
     res = PQexec(pg_conn, sql);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Failed to insert into %s table: %s", get_table_name(ty), PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed SQL was: %s", sql);
         PQclear(res);
         free(sql);
         PQexec(pg_conn, "ROLLBACK");
         return -1;
     }
     PQclear(res);
+    logger("DB", LOG_LEVEL_DEBUG, "Specific table INSERT successful");
 
     // Commit transaction
+    logger("DB", LOG_LEVEL_DEBUG, "Executing: COMMIT");
     res = PQexec(pg_conn, "COMMIT");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Failed to commit transaction: %s", PQerrorMessage(pg_conn));
@@ -496,8 +599,10 @@ int db_store_resource(cJSON *obj, char *uri)
         return -1;
     }
     PQclear(res);
+    logger("DB", LOG_LEVEL_DEBUG, "Transaction committed successfully");
 
     free(sql);
+    logger("DB", LOG_LEVEL_DEBUG, "db_store_resource completed successfully");
     return 1;
 }
 
@@ -538,6 +643,10 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
                 free(escaped);
             } else if (cJSON_IsNumber(pjson)) {
                 sprintf(sql + strlen(sql), "%d", pjson->valueint);
+            } else if (cJSON_IsTrue(pjson)) {
+                strcat(sql, "1");
+            } else if (cJSON_IsFalse(pjson)) {
+                strcat(sql, "0");
             } else if (cJSON_IsArray(pjson) || cJSON_IsObject(pjson)) {
                 char *escaped = pg_format_json_value(pjson);
                 sprintf(sql + strlen(sql), "'%s'", escaped);
@@ -585,6 +694,10 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
                 free(escaped);
             } else if (cJSON_IsNumber(pjson)) {
                 sprintf(sql + strlen(sql), "%d", pjson->valueint);
+            } else if (cJSON_IsTrue(pjson)) {
+                strcat(sql, "1");
+            } else if (cJSON_IsFalse(pjson)) {
+                strcat(sql, "0");
             } else if (cJSON_IsArray(pjson) || cJSON_IsObject(pjson)) {
                 char *escaped = pg_format_json_value(pjson);
                 sprintf(sql + strlen(sql), "'%s'", escaped);

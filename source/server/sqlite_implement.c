@@ -29,7 +29,7 @@ typedef struct {
 static const table_def_t table_definitions[] = {
     {"general", 
      "CREATE TABLE IF NOT EXISTS general ( id " ID_COLUMN_TYPE ", "
-     "rn VARCHAR(60), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), "
+     "rn VARCHAR(255), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), "
      "uri VARCHAR(255), acpi VARCHAR(255), lbl VARCHAR(255), ty INT, memberOf VARCHAR(255) );"
     },
     {"csr", 
@@ -383,13 +383,28 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
  */
 int db_store_resource(cJSON *obj, char *uri)
 {
+    logger("DB", LOG_LEVEL_DEBUG, "Call db_store_resource with URI: %s", uri ? uri : "NULL");
+    
     sqlite3_mutex_enter(sqlite3_db_mutex(db));
     char *sql = NULL, *err_msg = NULL;
     cJSON *pjson = NULL;
     cJSON *GENERAL_ATTR = cJSON_GetObjectItem(ATTRIBUTES, "general");
     int general_cnt = cJSON_GetArraySize(GENERAL_ATTR);
 
-    ResourceType ty = cJSON_GetObjectItem(obj, "ty")->valueint;
+    if (!obj) {
+        logger("DB", LOG_LEVEL_ERROR, "Resource object is NULL");
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return -1;
+    }
+
+    cJSON *ty_obj = cJSON_GetObjectItem(obj, "ty");
+    if (!ty_obj) {
+        logger("DB", LOG_LEVEL_ERROR, "Missing 'ty' field in resource object");
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return -1;
+    }
+    ResourceType ty = ty_obj->valueint;
+    logger("DB", LOG_LEVEL_DEBUG, "Resource type: %d", ty);
 
     sql = malloc(1024);
     sprintf(sql, "INSERT INTO general (");
@@ -410,14 +425,17 @@ int db_store_resource(cJSON *obj, char *uri)
     sql[strlen(sql) - 1] = ')';
     strcat(sql, ";");
 
+    logger("DB", LOG_LEVEL_DEBUG, "Executing General Table INSERT: %s", sql);
+    
     sqlite3_stmt *stmt;
     int rc = 0;
+    logger("DB", LOG_LEVEL_DEBUG, "Executing: BEGIN TRANSACTION");
     sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
 
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
     {
-        logger("DB", LOG_LEVEL_DEBUG, "%s", sql);
+        logger("DB", LOG_LEVEL_DEBUG, "Failed SQL was: %s", sql);
         free(sql);
         logger("DB", LOG_LEVEL_ERROR, "prepare error store_resource");
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
@@ -448,7 +466,7 @@ int db_store_resource(cJSON *obj, char *uri)
     if (rc != SQLITE_DONE)
     {
         free(sql);
-        logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
+        logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg ? err_msg : "NULL");
         sqlite3_finalize(stmt);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         sqlite3_mutex_leave(sqlite3_db_mutex(db));
@@ -456,8 +474,16 @@ int db_store_resource(cJSON *obj, char *uri)
     }
 
     sqlite3_finalize(stmt);
+    logger("DB", LOG_LEVEL_DEBUG, "General table INSERT successful");
 
     cJSON *specific_attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
+    if (!specific_attr) {
+        logger("DB", LOG_LEVEL_ERROR, "No specific attributes found for resource type %d", ty);
+        free(sql);
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return -1;
+    }
 
     sql[0] = '\0';
     sprintf(sql, "INSERT INTO %s (id, ", get_table_name(ty));
@@ -478,19 +504,29 @@ int db_store_resource(cJSON *obj, char *uri)
     sql[strlen(sql) - 1] = ')';
     strcat(sql, ";");
 
-    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+    logger("DB", LOG_LEVEL_DEBUG, "Executing Specific Table INSERT: %s", sql);
 
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
     {
         logger("DB", LOG_LEVEL_ERROR, "prepare error %d", rc);
+        logger("DB", LOG_LEVEL_ERROR, "Failed SQL was: %s", sql);
         free(sql);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         sqlite3_mutex_leave(sqlite3_db_mutex(db));
         return -1;
     }
 
-    db_test_and_bind_value(stmt, 1, cJSON_GetObjectItem(obj, "ri"));
+    cJSON *ri_obj = cJSON_GetObjectItem(obj, "ri");
+    if (!ri_obj || !cJSON_IsString(ri_obj)) {
+        logger("DB", LOG_LEVEL_ERROR, "Missing or invalid 'ri' field in resource object");
+        free(sql);
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return -1;
+    }
+
+    db_test_and_bind_value(stmt, 1, ri_obj);
 
     for (int i = 0; i < cJSON_GetArraySize(specific_attr); i++)
     {
@@ -508,22 +544,30 @@ int db_store_resource(cJSON *obj, char *uri)
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE)
     {
-        logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
+        logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg ? err_msg : "NULL");
         free(sql);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         sqlite3_finalize(stmt);
         sqlite3_mutex_leave(sqlite3_db_mutex(db));
         return -1;
     }
+    logger("DB", LOG_LEVEL_DEBUG, "Specific table INSERT successful");
+    
+    logger("DB", LOG_LEVEL_DEBUG, "Executing: END TRANSACTION");
     sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &err_msg);
     if (err_msg)
     {
         logger("DB", LOG_LEVEL_ERROR, "Error: %s", err_msg);
     }
+    else
+    {
+        logger("DB", LOG_LEVEL_DEBUG, "Transaction committed successfully");
+    }
 
     sqlite3_finalize(stmt);
     free(sql);
     sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    logger("DB", LOG_LEVEL_DEBUG, "db_store_resource completed successfully");
     return 1;
 }
 
