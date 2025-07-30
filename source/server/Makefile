@@ -1,18 +1,30 @@
 UNAME := $(shell uname)
 
-# macOS (Homebrew OpenSSL)
+# Check DB_TYPE from config.h to determine which database implementation to use
+DB_TYPE := $(shell grep -E "^\s*\#define\s+DB_TYPE\s+" config.h | grep -E "(DB_SQLITE|DB_POSTGRESQL)" | sed 's/.*DB_//')
+
+# macOS 
 ifeq ($(UNAME), Darwin)
-    RELCFLAGS = -g -I/opt/homebrew/opt/openssl@3/include -I$(shell brew --prefix libpq)/include
-    LIBS = -lpthread -lm -ldl -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto -L$(shell brew --prefix libpq)/lib -lpq
+    ifeq ($(DB_TYPE), POSTGRESQL)
+        RELCFLAGS = -g -I/opt/homebrew/opt/openssl@3/include -I$(shell brew --prefix libpq)/include
+        LIBS = -lpthread -lm -ldl -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto -L$(shell brew --prefix libpq)/lib -lpq
+    else
+        RELCFLAGS = -g -I/opt/homebrew/opt/openssl@3/include
+        LIBS = -lpthread -lm -ldl -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto
+    endif
+
+# Linux
 else
-    RELCFLAGS = -g
-    LIBS = -lpthread -lm -ldl -lssl -lcrypto -lpq
+    ifeq ($(DB_TYPE), POSTGRESQL)
+        RELCFLAGS = -g -I/usr/include/postgresql
+        LIBS = -lpthread -lm -ldl -lssl -lcrypto -lpq
+    else
+        RELCFLAGS = -g
+        LIBS = -lpthread -lm -ldl -lssl -lcrypto
+    endif
 endif
 
 CC=gcc
-
-# Check DB_TYPE from config.h to determine which database implementation to use
-DB_TYPE := $(shell grep -E "^\s*\#define\s+DB_TYPE\s+" config.h | grep -E "(DB_SQLITE|DB_POSTGRESQL)" | sed 's/.*DB_//')
 
 ifeq ($(DB_TYPE), SQLITE)
     DB_IMPL = sqlite_implement.c
