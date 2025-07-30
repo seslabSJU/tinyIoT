@@ -2,3 +2,4 @@
 server
 *.db
 *.log
+.DS_Store
