@@ -80,6 +80,8 @@ typedef struct {
 #define ID_COLUMN_TYPE "SERIAL PRIMARY KEY"
 
 /* Static table definitions for PostgreSQL */
+#if PG_SCHEMA_TYPE == PG_SCHEMA_VARCHAR
+// VARCHAR-based schema
 static const table_def_t table_definitions[] = {
     {"general", 
      "CREATE TABLE IF NOT EXISTS general ( id " ID_COLUMN_TYPE ", "
@@ -150,6 +152,82 @@ static const table_def_t table_definitions[] = {
     }
 };
 
+#elif PG_SCHEMA_TYPE == PG_SCHEMA_TEXT
+// TEXT-based schema
+static const table_def_t table_definitions[] = {
+    {"general", 
+     "CREATE TABLE IF NOT EXISTS general ( id " ID_COLUMN_TYPE ", "
+     "rn TEXT, ri TEXT, pi TEXT, ct TEXT, et TEXT, lt TEXT, "
+     "uri TEXT, acpi TEXT, lbl TEXT, ty INT, memberOf TEXT );"
+    },
+    {"csr", 
+     "CREATE TABLE IF NOT EXISTS csr ( id INTEGER, "
+     "cst INT, poa TEXT, cb TEXT, csi TEXT, mei TEXT, "
+     "tri TEXT, rr INT, nl TEXT, srv TEXT, dcse TEXT, csz TEXT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"ae", 
+     "CREATE TABLE IF NOT EXISTS ae ( id INTEGER, "
+     "api TEXT, aei TEXT, rr INT, poa TEXT, apn TEXT, srv TEXT, at TEXT, aa TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cnt", 
+     "CREATE TABLE IF NOT EXISTS cnt ( id INTEGER, "
+     "cr TEXT, mni INT, mbs INT, mia INT, st INT, cni INT, cbs INT, li TEXT, oref TEXT, disr TEXT, at TEXT, aa TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cin", 
+     "CREATE TABLE IF NOT EXISTS cin ( id INTEGER, "
+     "cs INT, cr TEXT, cnf TEXT, oref TEXT, con TEXT, st INT, at TEXT, aa TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"acp", 
+     "CREATE TABLE IF NOT EXISTS acp ( id INTEGER, pv TEXT, pvs TEXT, at TEXT, aa TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"sub", 
+     "CREATE TABLE IF NOT EXISTS sub ( id INTEGER, "
+     "enc TEXT, exc INT, nu TEXT, gpi TEXT, nfu TEXT, bn TEXT, rl TEXT, "
+     "sur TEXT, nct TEXT, net TEXT, cr TEXT, su TEXT, at TEXT, aa TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"grp", 
+     "CREATE TABLE IF NOT EXISTS grp ( id INTEGER, "
+     "cr TEXT, mt INT, cnm INT, mnm INT, mid TEXT, macp TEXT, mtv INT, csy INT, gn TEXT, at TEXT, aa TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cb", 
+     "CREATE TABLE IF NOT EXISTS cb ( id INTEGER, "
+     "cst INT, csi TEXT, srt TEXT, poa TEXT, nl TEXT, ncp TEXT, srv TEXT, rr INT, at TEXT, aa TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cbA", 
+     "CREATE TABLE IF NOT EXISTS cbA ( id INTEGER, "
+     "cst INT, lnk TEXT, csi TEXT, srt TEXT, poa TEXT, nl TEXT, ncp TEXT, srv TEXT, rr INT, "
+     "at TEXT, aa TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"aeA", 
+     "CREATE TABLE IF NOT EXISTS aeA ( id INTEGER, "
+     "api TEXT, lnk TEXT, aei TEXT, rr INT, poa TEXT, apn TEXT, srv TEXT, at TEXT, aa TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cntA", 
+     "CREATE TABLE IF NOT EXISTS cntA ( id INTEGER, "
+     "lnk TEXT, cr TEXT, mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cinA", 
+     "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, "
+     "lnk TEXT, cs INT, cr TEXT, cnf TEXT, st TEXT, con TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    }
+};
+
+#else
+#error "PG_SCHEMA_TYPE must be either PG_SCHEMA_VARCHAR or PG_SCHEMA_TEXT"
+#endif
+
 #define TABLE_COUNT (sizeof(table_definitions) / sizeof(table_def_t))
 
 /* Helper function to execute SQL and handle errors for PostgreSQL */
@@ -211,7 +289,6 @@ int init_dbp()
         return 0;
     }
 
-    logger("DB", LOG_LEVEL_INFO, "Database initialized successfully with %zu tables", TABLE_COUNT);
     return 1;
 }
 

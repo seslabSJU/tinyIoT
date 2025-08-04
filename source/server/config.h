@@ -26,8 +26,8 @@
 #define DB_POSTGRESQL 2
 
 // Select Database Type: DB_SQLITE or DB_POSTGRESQL
-#define DB_TYPE DB_SQLITE
-// #define DB_TYPE DB_POSTGRESQL
+// #define DB_TYPE DB_SQLITE
+#define DB_TYPE DB_POSTGRESQL
 
 
 #if DB_TYPE == DB_POSTGRESQL
@@ -37,6 +37,14 @@
 #define PG_USER "user"
 #define PG_PASSWORD "password"
 #define PG_DBNAME "tinydb"
+
+// PostgreSQL Schema Types
+#define PG_SCHEMA_VARCHAR 0  // Use VARCHAR for string fields
+#define PG_SCHEMA_TEXT 1     // Use TEXT for string fields
+
+// Select PostgreSQL Schema Type: PG_SCHEMA_VARCHAR or PG_SCHEMA_TEXT
+// #define PG_SCHEMA_TYPE PG_SCHEMA_VARCHAR
+#define PG_SCHEMA_TYPE PG_SCHEMA_TEXT
 #endif
 
 // Security
