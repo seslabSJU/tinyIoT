@@ -26,8 +26,8 @@
 #define DB_POSTGRESQL 2
 
 // Select Database Type: DB_SQLITE or DB_POSTGRESQL
-// #define DB_TYPE DB_SQLITE
-#define DB_TYPE DB_POSTGRESQL
+#define DB_TYPE DB_SQLITE
+// #define DB_TYPE DB_POSTGRESQL
 
 
 #if DB_TYPE == DB_POSTGRESQL
