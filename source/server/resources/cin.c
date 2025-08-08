@@ -87,7 +87,10 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     }
     else //cin can't be announced with out cnt
     {
-        handle_error(o2pt, RSC_BAD_REQUEST, "cinA can't be announced alone");
+        cJSON *at = cJSON_GetObjectItem(cin, "at");
+        if (at && cJSON_GetArraySize(at) > 0) {
+            handle_error(o2pt, RSC_BAD_REQUEST, "cinA can't be announced alone");
+        }
     }
 #endif
 

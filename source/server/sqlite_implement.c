@@ -961,8 +961,6 @@ RTNode *db_get_all_resource_as_rtnode()
 RTNode *db_get_cin_rtnode_list(RTNode *parent_rtnode)
 {
     logger("DB", LOG_LEVEL_DEBUG, "call db_get_cin_rtnode_list");
-
-    char buf[256] = {0};
     char *pi = get_ri_rtnode(parent_rtnode);
     int rc = 0;
     int cols = 0, bytes = 0, coltype = 0;
@@ -1001,24 +999,27 @@ RTNode *db_get_cin_rtnode_list(RTNode *parent_rtnode)
                 continue;
             switch (coltype)
             {
-            case SQLITE_TEXT:
-                memset(buf, 0, 256);
-                strncpy(buf, sqlite3_column_text(res, col), bytes);
-                arr = cJSON_Parse(buf);
-                if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object))
-                {
-                    cJSON_AddItemToObject(json, colname, arr);
+                case SQLITE_TEXT:
+                    const char *text = (const char*)sqlite3_column_text(res, col);
+                    int len = sqlite3_column_bytes(res, col);
+                    char *safe_str = malloc(len + 1);
+                    if (safe_str) {
+                        memcpy(safe_str, text, len);
+                        safe_str[len] = '\0'; 
+                        arr = cJSON_Parse(safe_str);
+                        if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                            cJSON_AddItemToObject(json, colname, arr);
+                        } else {
+                            cJSON_AddItemToObject(json, colname, cJSON_CreateString(safe_str));
+                            cJSON_Delete(arr);
+                        }
+                        free(safe_str);
+                    }
+                    break;
+                case SQLITE_INTEGER:
+                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
+                    break;
                 }
-                else
-                {
-                    cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
-                    cJSON_Delete(arr);
-                }
-                break;
-            case SQLITE_INTEGER:
-                cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
-                break;
-            }
         }
         if (!head)
         {

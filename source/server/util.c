@@ -1017,8 +1017,8 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 	if (target_rtnode->ty == RT_ACP)
 	{
 		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
-		int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
-		if ( ((pvs_acop & acop) == acop) || (( pv_acop & acop) == acop) )
+		//int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
+		if ( (pvs_acop & acop) == acop )
 		{
 			deny = false;
 		}
@@ -2721,7 +2721,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 			break;
 		case PROT_MQTT:
 #ifdef ENABLE_MQTT
-			mqtt_notify(o2pt, noti_cjson, nt);
+			rsc = mqtt_notify(o2pt, noti_cjson, nt);
 #endif
 			break;
 #ifdef ENABLE_COAP
@@ -2843,7 +2843,7 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 				break;
 			case PROT_MQTT:
 #ifdef ENABLE_MQTT
-				mqtt_notify(o2pt, noti_json, nt);
+				rsc = mqtt_notify(o2pt, noti_cjson, nt);
 #endif
 #ifdef ENABLE_COAP
 			case PROT_COAP:

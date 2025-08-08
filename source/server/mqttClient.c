@@ -620,6 +620,7 @@ int mqtt_notify(oneM2MPrimitive *o2pt, cJSON *noti_json, NotiTarget *nt)
 
     sprintf(topic, "/oneM2M/req/%s/%s", CSE_BASE_RI, nt->target + 1);
     logger("MQTT", LOG_LEVEL_DEBUG, "topic : %s", topic);
+    logger(LOG_TAG, LOG_LEVEL_DEBUG, "broker ip: %s", nt->host);
 
     if (!strcmp(nt->host, MQTT_HOST))
     {
@@ -671,13 +672,24 @@ int mqtt_notify(oneM2MPrimitive *o2pt, cJSON *noti_json, NotiTarget *nt)
                (MQTT_PASSWORD == NULL) ? "Null" : MQTT_PASSWORD);
     }
 
+    if (!noti_json) {
+        logger(LOG_TAG, LOG_LEVEL_ERROR, "noti_json is NULL");
+        return MQTT_CODE_ERROR_BAD_ARG;
+    }
+
     XMEMSET(&mqttPub, 0, sizeof(MqttPublish));
     mqttPub.retain = 0;
     mqttPub.qos = MQTT_QOS;
     mqttPub.topic_name = topic;
     mqttPub.packet_id = mqtt_get_packetid();
-    mqttPub.buffer = cJSON_PrintUnformatted(noti_json);
-    mqttPub.total_len = XSTRLEN(noti_json);
+    char *payload = cJSON_PrintUnformatted(noti_json);
+    mqttPub.buffer = payload;
+    if (!payload) {
+        logger(LOG_TAG, LOG_LEVEL_ERROR, "Failed to serialize notification JSON");
+        return MQTT_CODE_ERROR_BAD_ARG;
+    }
+    mqttPub.total_len = strlen(payload);
+    //logger(LOG_TAG, LOG_LEVEL_DEBUG, "dump solved?");
 
     logger(LOG_TAG, LOG_LEVEL_DEBUG, "MQTT Publish: Topic %s, Qos %d\n%s\n",
            mqttPub.topic_name, mqttPub.qos, mqttPub.buffer);
@@ -685,7 +697,9 @@ int mqtt_notify(oneM2MPrimitive *o2pt, cJSON *noti_json, NotiTarget *nt)
     do
     {
         rc = MqttClient_Publish(&notiClient, &mqttPub);
+        logger(LOG_TAG, LOG_LEVEL_DEBUG, "MQTT Publishing: rc %d", rc);
     } while (rc == MQTT_CODE_PUB_CONTINUE);
+    free(payload);
 
     if (rc != MQTT_CODE_SUCCESS)
     {
