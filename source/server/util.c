@@ -1579,7 +1579,7 @@ RVI to_rvi(char *str)
 		return RVI_NONE;
 	if (!strcmp(str, "2a"))
 	{
-		return RVI_2;
+		return RVI_2a;
 	}
 	if (!strcmp(str, "3"))
 	{
@@ -1889,42 +1889,37 @@ void remove_mid(char **mid, int idx, int cnm)
 
 bool isSPIDLocal(char *address)
 {
-	if (!address)
-		return false;
-	if (address[0] != '/' && address[1] != '/')
-		return false;
-	char *ptr = strchr(address + 2, '/');
-	if (ptr)
-		*ptr = '\0';
-	if (strcmp(address + 2, CSE_BASE_SP_ID) == 0)
-	{
-		if (ptr)
-			*ptr = '/';
-		return true;
-	}
-	if (ptr)
-		*ptr = '/';
-	return false;
+    if (!address) return false;
+    if (address[0] != '/' || address[1] != '/') return false;
+
+    // "//spid/..." 에서 spid 추출 (원본 불변)
+    const char *start = address + 2;
+    const char *slash = strchr(start, '/');
+    size_t len = slash ? (size_t)(slash - start) : strlen(start);
+
+    char spid[128];
+    if (len == 0 || len >= sizeof(spid)) return false;
+    memcpy(spid, start, len);
+    spid[len] = '\0';
+
+    return strcmp(spid, CSE_BASE_SP_ID) == 0;
 }
 
 bool isSpRelativeLocal(char *address)
 {
-	if (!address)
-		return false;
-	if (address[0] != '/')
-		return false;
-	char *ptr = strchr(address + 1, '/');
-	if (ptr)
-		*ptr = '\0';
-	if (strcmp(address + 1, CSE_BASE_RI) == 0)
-	{
-		if (ptr)
-			*ptr = '/';
-		return true;
-	}
-	if (ptr)
-		*ptr = '/';
-	return false;
+    if (!address) return false;
+    if (address[0] != '/') return false;
+
+    const char *start = address + 1;
+    const char *slash = strchr(start, '/');
+    size_t len = slash ? (size_t)(slash - start) : strlen(start);
+
+    char cseid[128];
+    if (len == 0 || len >= sizeof(cseid)) return false;
+    memcpy(cseid, start, len);
+    cseid[len] = '\0';
+
+    return strcmp(cseid, CSE_BASE_RI) == 0;
 }
 
 int rsc_to_http_status(int rsc, char **msg)

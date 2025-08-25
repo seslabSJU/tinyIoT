@@ -192,7 +192,32 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
 
     if ((pjson = cJSON_GetObjectItem(cin, "cnf")))
     {
-        // check cnf
+        // cnf 화이트리스트
+        const char *allowed_cnf[] = {
+            "text/plain:0",
+            "text/x-plain:0"
+            "application/json",
+            "application/xml",
+            "application/vnd.onem2m-res+json",
+            "application/vnd.onem2m-res+xml",
+            "application/vnd.onem2m-prsp+json",
+            "application/vnd.onem2m-prsp+xml",
+            "application/octet-stream",
+            "image/jpeg",
+            "image/png",
+            "text/csv",
+            "application/cbor"
+        };
+        bool valid = false;
+        for (int i = 0; i < sizeof(allowed_cnf)/sizeof(allowed_cnf[0]); i++) {
+            if (strcasecmp(pjson->valuestring, allowed_cnf[i]) == 0) {
+                valid = true;
+                break;
+            }
+        }
+        if (!valid) {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `cnf` is invalid");
+        }
     }
     cJSON *aa = cJSON_GetObjectItem(cin, "aa");
     if (aa && CSE_RVI < RVI_3)
