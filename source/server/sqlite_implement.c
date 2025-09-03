@@ -256,7 +256,7 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
 
     resource = cJSON_CreateObject();
     int cols = sqlite3_column_count(stmt);
-    char *colname = NULL;
+    const char *colname = NULL;
     int bytes = 0;
     int coltype = 0;
     char buf[256] = {0};
@@ -333,7 +333,7 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
 
     resource = cJSON_CreateObject();
     int cols = sqlite3_column_count(stmt);
-    char *colname = NULL;
+    const char *colname = NULL;
     int bytes = 0;
     int coltype = 0;
     char buf[256] = {0};
@@ -792,7 +792,7 @@ int db_delete_one_cin_mni(RTNode *cnt)
     sqlite3_stmt *res;
     int rc;
 
-    char *latest_ri = NULL;
+    const char *latest_ri = NULL;
     int latest_cs = 0;
 
     sprintf(sql, "SELECT general.ri, cin.cs from general, cin WHERE pi='%s' AND general.id = cin.id ORDER BY general.lt ASC LIMIT 1;", get_ri_rtnode(cnt));
@@ -842,7 +842,7 @@ RTNode *db_get_all_resource_as_rtnode()
     int ty = 0;
     cJSON *json, *root;
     sqlite3_stmt *res;
-    char *colname = NULL;
+    const char *colname = NULL;
     char sql[1024] = {0};
     char buf[256] = {0};
 
@@ -966,7 +966,7 @@ RTNode *db_get_cin_rtnode_list(RTNode *parent_rtnode)
     int cols = 0, bytes = 0, coltype = 0;
     cJSON *json, *root;
     sqlite3_stmt *res = NULL;
-    char *colname = NULL;
+    const char *colname = NULL;
     char *sql;
 
     sql = "SELECT * FROM 'general', 'cin' WHERE general.pi=? AND general.id=cin.id ORDER BY id ASC;";
@@ -1044,7 +1044,7 @@ RTNode *db_get_latest_cins()
 {
     char sql[1024] = {0};
     char buf[256] = {0};
-    char *colname;
+    const char *colname;
     int rc = 0;
     int cols, bytes, coltype;
     cJSON *json, *root;
@@ -1123,7 +1123,8 @@ RTNode *db_get_latest_cins()
 cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol)
 {
     char sql[1024] = {0}, buf[256] = {0};
-    char *ord = NULL, *colname;
+    char *ord = NULL;
+    const char *colname;
     int rc = 0;
     int cols, bytes, coltype;
     cJSON *json, *root;
@@ -1208,7 +1209,7 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
     cJSON *pjson = NULL, *ptr = NULL;
     cJSON *result = NULL, *json = NULL, *prtjson = NULL, *chjson = NULL, *tmp = NULL;
     sqlite3_stmt *res = NULL;
-    char *colname = NULL;
+    const char *colname = NULL;
     char sql[1024] = {0};
     int jsize = 0, psize = 0, chsize = 0;
     int fo = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
@@ -1600,7 +1601,7 @@ bool db_check_cin_rn_dup(char *rn, char *pi)
     int cols = 0, bytes = 0, coltype = 0;
     cJSON *json, *root;
     sqlite3_stmt *res = NULL;
-    char *colname = NULL;
+    const char *colname = NULL;
     char buf[256] = {0};
 
     sprintf(sql, "SELECT * FROM general WHERE rn='%s' AND pi='%s';", rn, pi);
@@ -1642,7 +1643,7 @@ cJSON *getForbiddenUri(cJSON *acp_list)
     int cols = 0, bytes = 0, coltype = 0;
     cJSON *json, *root;
     sqlite3_stmt *res = NULL;
-    char *colname = NULL;
+    const char *colname = NULL;
     char sql[2048] = {0};
     cJSON *ptr = NULL;
     cJSON *result = cJSON_CreateArray();

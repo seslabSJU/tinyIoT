@@ -126,7 +126,7 @@ void start_server(const char *port)
         exit(1);
     }
     // bind socket to address
-    if (bind(listenfd, &addr, sizeof(addr)) == -1)
+    if (bind(listenfd, (struct sockaddr*)&addr, sizeof(addr)) == -1)
     {
         perror("bind() error");
         exit(1);

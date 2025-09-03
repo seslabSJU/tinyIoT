@@ -91,7 +91,6 @@ RTNode *parse_abs_uri(oneM2MPrimitive *o2pt, char *target_uri)
         if (strcmp(target_uri + 2, CSE_BASE_SP_ID) == 0)
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
-            free(target_uri);
             return NULL;
         }
         ptr = target_uri + strlen(CSE_BASE_SP_ID) + 2; // for first two /
@@ -99,7 +98,6 @@ RTNode *parse_abs_uri(oneM2MPrimitive *o2pt, char *target_uri)
         {
             logger("UTIL", LOG_LEVEL_DEBUG, "addr is empty");
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
-            free(target_uri);
             return NULL;
         }
         rtnode = parse_spr_uri(o2pt, ptr);
@@ -107,13 +105,47 @@ RTNode *parse_abs_uri(oneM2MPrimitive *o2pt, char *target_uri)
     else
     {
         int rsc = 0;
-        char buffer[256];
-        char *tmp = NULL;
         o2pt->isForwarding = true;
         RTNode *csr = find_csr_rtnode_by_uri(target_uri);
+        
+        logger("RTM", LOG_LEVEL_DEBUG, "find_csr_rtnode_by_uri result: %p for URI: %s", csr, target_uri);
 
         // remote CSE not registered
-        // forwarding TS 0004
+        // forwarding TS 0004 7.3.2.6
+        if (!csr)
+        {
+            if (SERVER_TYPE == IN_CSE)
+            {
+                logger("RTM", LOG_LEVEL_ERROR, "Remote CSE not found for ABSOLUTE URI: %s", target_uri);
+                handle_error(o2pt, RSC_BAD_REQUEST, "Remote CSE not found");
+                return NULL;
+            }
+            else
+            {
+                if (rt->registrar_csr)
+                {
+                    cJSON *registrar_csr = rt->registrar_csr->obj;
+                    if (strcmp(cJSON_GetStringValue(cJSON_GetObjectItem(registrar_csr, "csi")), target_uri) != 0)
+                    {
+                        handle_error(o2pt, RSC_NOT_FOUND, "Remote CSE not found");
+                        return NULL;
+                    }
+                    csr = rt->registrar_csr;
+                }
+                else
+                {
+                    handle_error(o2pt, RSC_NOT_FOUND, "No registrar CSE configured");
+                    return NULL;
+                }
+            }
+        }
+
+        rsc = forwarding_onem2m_resource(o2pt, csr);
+        if (rsc >= 4000)
+        {
+            handle_error(o2pt, rsc, "Forwarding Failed");
+            return NULL;
+        }
     }
     return rtnode;
 }

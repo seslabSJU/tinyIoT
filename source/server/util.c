@@ -172,14 +172,14 @@ char *get_local_time(int diff)
 	// int millsec;
 	clock_gettime(0, &specific_time);
 
-	char year[5], mon[3], day[3], hour[3], minute[3], sec[3], millsec[7];
+	char year[16], mon[16], day[16], hour[16], minute[16], sec[16], millsec[16];
 
-	sprintf(year, "%d", tm.tm_year + 1900);
-	sprintf(mon, "%02d", tm.tm_mon + 1);
-	sprintf(day, "%02d", tm.tm_mday);
-	sprintf(hour, "%02d", tm.tm_hour);
-	sprintf(minute, "%02d", tm.tm_min);
-	sprintf(sec, "%02d", tm.tm_sec);
+	snprintf(year, sizeof(year), "%d", tm.tm_year + 1900);
+	snprintf(mon, sizeof(mon), "%02d", tm.tm_mon + 1);
+	snprintf(day, sizeof(day), "%02d", tm.tm_mday);
+	snprintf(hour, sizeof(hour), "%02d", tm.tm_hour);
+	snprintf(minute, sizeof(minute), "%02d", tm.tm_min);
+	snprintf(sec, sizeof(sec), "%02d", tm.tm_sec);
 	// sprintf(millsec, "%03d", (int) floor(specific_time.tv_nsec/1.0e6));
 
 	char *local_time = (char *)malloc(25 * sizeof(char));
@@ -988,7 +988,6 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if (!strcmp(origin, get_ri_rtnode(target_rtnode)))
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
-			//return 0;
 		}
 	}
 	// if target is CSR, check csi of resource
@@ -997,6 +996,15 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if (!strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
+		}
+	}
+	if (target_rtnode->ty == RT_ACP)
+	{
+		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
+		//int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
+		if ( (pvs_acop & acop) == acop )
+		{
+			deny = false;
 		}
 	}
  
@@ -1013,21 +1021,11 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 			return 0;
 		}
 	}
-
-	if (target_rtnode->ty == RT_ACP)
-	{
-		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
-		//int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
-		if ( (pvs_acop & acop) == acop )
-		{
-			deny = false;
-		}
+	
+	if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop){
+		deny = false;
 	}
-	else{
-		if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop){
-			deny = false;
-		}
-	}
+	
 
 	if (deny)
 	{

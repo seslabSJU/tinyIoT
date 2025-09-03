@@ -192,7 +192,7 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
 
     if ((pjson = cJSON_GetObjectItem(cin, "cnf")))
     {
-        // cnf 화이트리스트
+        // cnf whitelist
         const char *allowed_cnf[] = {
             "text/plain:0",
             "text/x-plain:0"
