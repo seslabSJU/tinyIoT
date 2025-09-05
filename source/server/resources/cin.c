@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <regex.h>
 #include "../onem2m.h"
 #include "../logger.h"
 #include "../util.h"
@@ -150,6 +151,20 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     return RSC_CREATED;
 }
 
+bool validate_cnf(const char *cnf) 
+{
+    regex_t regex;
+    int reti;
+    const char *pattern = "^[^:/]+/[^:/]+:[0-2](:[0-5])?$";
+    reti = regcomp(&regex, pattern, REG_EXTENDED);
+    if (reti) {
+        return false;
+    }
+    reti = regexec(&regex, cnf, 0, NULL, 0);
+    regfree(&regex);
+    return (reti == 0);
+}
+
 int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation op)
 {
     cJSON *pjson = NULL, *pjson2 = NULL;
@@ -192,30 +207,8 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
 
     if ((pjson = cJSON_GetObjectItem(cin, "cnf")))
     {
-        // cnf whitelist
-        const char *allowed_cnf[] = {
-            "text/plain:0",
-            "text/x-plain:0"
-            "application/json",
-            "application/xml",
-            "application/vnd.onem2m-res+json",
-            "application/vnd.onem2m-res+xml",
-            "application/vnd.onem2m-prsp+json",
-            "application/vnd.onem2m-prsp+xml",
-            "application/octet-stream",
-            "image/jpeg",
-            "image/png",
-            "text/csv",
-            "application/cbor"
-        };
-        bool valid = false;
-        for (int i = 0; i < sizeof(allowed_cnf)/sizeof(allowed_cnf[0]); i++) {
-            if (strcasecmp(pjson->valuestring, allowed_cnf[i]) == 0) {
-                valid = true;
-                break;
-            }
-        }
-        if (!valid) {
+        // cnf check
+        if (!validate_cnf(pjson->valuestring)) {
             return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `cnf` is invalid");
         }
     }
