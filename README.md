@@ -113,9 +113,48 @@ Default IP address and port number are 127.0.0.1 and 3000.
 
 	// To enable CoAP, uncomment the following line
 	// #define ENABLE_COAP
+
+     // Database Settings
+    #define DB_SQLITE 1
+    #define DB_POSTGRESQL 2
+
+    // Select Database Type: DB_SQLITE or DB_POSTGRESQL
+    #define DB_TYPE DB_SQLITE
+    // #define DB_TYPE DB_POSTGRESQL
+
+
+    #if DB_TYPE == DB_POSTGRESQL
+    // PostgreSQL connection settings
+    #define PG_HOST "localhost"
+    #define PG_PORT 5432
+    #define PG_USER "user"
+    #define PG_PASSWORD "password"
+    #define PG_DBNAME "tinydb"
+
+    // PostgreSQL Schema Types
+    #define PG_SCHEMA_VARCHAR 0  // Use VARCHAR for string fields
+    #define PG_SCHEMA_TEXT 1     // Use TEXT for string fields
+
+    // Select PostgreSQL Schema Type: PG_SCHEMA_VARCHAR or PG_SCHEMA_TEXT
+    // #define PG_SCHEMA_TYPE PG_SCHEMA_VARCHAR
+    #define PG_SCHEMA_TYPE PG_SCHEMA_TEXT
+    #endif
 	```
 
 	For more detailed configuration options, please refer to the comments in `config.h` file.
+
+    If you want to use PostgreSQL, follow the settings below.
+
+    ```bash
+    sudo apt update
+    sudo apt install libpq-dev
+    sudo apt install postgresql
+    sudo systemctl start postgresql
+    # You can create it with the same information as config.h. 
+    psql postgres
+    createdb [dbname]
+    createuser --interactive --pwprompt
+    ```
 
 
  4. To make an excutable tinyIoT server, simply execute the make file.       
@@ -128,7 +167,7 @@ Default IP address and port number are 127.0.0.1 and 3000.
 	./server
 	```
  
- 7. You can configure port number and ip address as parameters, for example, 
+ 6. You can configure port number and ip address as parameters, for example, 
 	```
 	$ ./server -p [port] (port = 3000 by default)
 	```
