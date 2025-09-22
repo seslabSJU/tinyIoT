@@ -7,7 +7,8 @@
 </div>
 
 <p align = "center"> Let's get started your oneM2M service projects by using 'oneM2M service layer platform', <b>tinyIoT</b>!🎮 </p> <br>
-<p align = "center"> <img src="https://img.shields.io/badge/Node-339933?&logo=nodedotjs&logoColor=white"/>&nbsp 
+<p align = "center"> <img src="https://img.shields.io/badge/License-BSD%203--Clause-blue.svg"/>&nbsp 
+<img src="https://img.shields.io/badge/Node-339933?&logo=nodedotjs&logoColor=white"/>&nbsp 
 <img src="https://img.shields.io/badge/Linux-FCC624?&logo=linux&logoColor=white"/>&nbsp 
 <img src="https://img.shields.io/badge/Ubuntu-E95420?&logo=Ubuntu&logoColor=white"/>&nbsp
 <img src="https://img.shields.io/badge/C-A8B9CC?&logo=c&logoColor=white"/>&nbsp
@@ -34,7 +35,7 @@
 <b>tinyIoT</b> also comes with a web-based dashboard implemented using Vue.
 <br>
 <p align = "center">
-<img src = "https://github.com/seslabSJU/tinyIoT/blob/main/images/tinyIoT_overview.png?raw=true" >
+<img src = "https://github.com/seslabSJU/tinyIoT/blob/main/images/tinyIoT_overview.png?raw=true&v=2" >
 </p>
 <br><br>
 
