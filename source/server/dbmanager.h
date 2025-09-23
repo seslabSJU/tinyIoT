@@ -3,7 +3,12 @@
 #include "config.h"
 #include "onem2m.h"
 #include "cJSON.h"
-#include "sqlite/sqlite3.h"
+
+#if DB_TYPE == DB_SQLITE
+    #include "sqlite/sqlite3.h"
+#elif DB_TYPE == DB_POSTGRESQL
+    #include <libpq-fe.h>
+#endif
 
 int init_dbp();
 int close_dbp();
@@ -26,9 +31,11 @@ bool db_check_cin_rn_dup(char *rn, char *pi);
 int db_delete_one_cin_mni(RTNode *cnt);
 cJSON *getForbiddenUri(cJSON *acp_list);
 
-void db_test_and_bind_value(sqlite3_stmt *stmt, int index, cJSON *obj);
-void db_test_and_set_bind_text(sqlite3_stmt *stmt, int index, char *context);
-void db_test_and_set_bind_int(sqlite3_stmt *stmt, int index, int value);
+#if DB_TYPE == DB_SQLITE
+    void db_test_and_bind_value(sqlite3_stmt *stmt, int index, cJSON *obj);
+    void db_test_and_set_bind_text(sqlite3_stmt *stmt, int index, char *context);
+    void db_test_and_set_bind_int(sqlite3_stmt *stmt, int index, int value);
+#endif
 
 #define DB_STR_MAX 65565
 #define DB_SEP ";"

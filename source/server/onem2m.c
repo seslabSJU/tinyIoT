@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -287,8 +289,8 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 
 	if (mia && mia->valueint > 0 && sign == 1) {
         time_t now = time(NULL);
-       
         RTNode *expired[128];
+		memset(expired, 0, sizeof(expired));
         int exp_cnt = 0;
         RTNode *child = cnt_rtnode->child;
         while (child) {
@@ -298,7 +300,13 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
                 strptime(ct->valuestring, "%Y%m%dT%H%M%S", &tmv);
                 time_t created = mktime(&tmv);
                 if (difftime(now, created) > mia->valueint) {
-                    expired[exp_cnt++] = child;
+					if (exp_cnt < 128){
+						expired[exp_cnt++] = child;
+					}
+					else {
+						logger("O2M", LOG_LEVEL_INFO, "Too Many Expired CIN");
+					}
+                    
                 }
             }
             child = child->sibling_right;
@@ -1156,7 +1164,7 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			{
 			case 0:
 			case NCT_ALL_ATTRIBUTES:
-				cJSON_AddItemReferenceToObject(nev, "rep", o2pt->response_pc);
+			cJSON_AddItemToObject(nev, "rep", cJSON_Duplicate(o2pt->response_pc, true));
 				break;
 			case NCT_MODIFIED_ATTRIBUTES:
 				cJSON_AddItemToObject(nev, "rep", cJSON_Duplicate(o2pt->request_pc, true));
@@ -1174,7 +1182,7 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 		if ((pjson = cJSON_GetObjectItem(node->rtnode->obj, "cr")))
 		{
-			cJSON_AddItemReferenceToObject(sgn, "cr", pjson);
+			cJSON_AddItemToObject(sgn, "cr", cJSON_Duplicate(pjson, true));
 		}
 
 		cJSON *net_obj = cJSON_GetObjectItem(cJSON_GetObjectItem(node->rtnode->obj, "enc"), "net");
@@ -1185,7 +1193,8 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			{
 				if (pjson->valueint == net)
 				{
-					// logger("O2M", LOG_LEVEL_DEBUG, "notify to nu \n%s", cJSON_Print(noti_cjson));
+					logger("O2M", LOG_LEVEL_DEBUG, "notify to nu \n%s", cJSON_Print(noti_cjson));
+					logger("O2M", LOG_LEVEL_DEBUG, "o2pt->response_pc: %p", o2pt->response_pc);
 					notify_to_nu(node->rtnode, noti_cjson, net);
 					cJSON_SetNumberValue(exc, exc->valueint - 1);
 					break;

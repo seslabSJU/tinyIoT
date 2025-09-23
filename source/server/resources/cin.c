@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <regex.h>
 #include "../onem2m.h"
 #include "../logger.h"
 #include "../util.h"
@@ -87,7 +88,10 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     }
     else //cin can't be announced with out cnt
     {
-        handle_error(o2pt, RSC_BAD_REQUEST, "cinA can't be announced alone");
+        cJSON *at = cJSON_GetObjectItem(cin, "at");
+        if (at && cJSON_GetArraySize(at) > 0) {
+            handle_error(o2pt, RSC_BAD_REQUEST, "cinA can't be announced alone");
+        }
     }
 #endif
 
@@ -147,6 +151,20 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     return RSC_CREATED;
 }
 
+bool validate_cnf(const char *cnf) 
+{
+    regex_t regex;
+    int reti;
+    const char *pattern = "^[^:/]+/[^:/]+:[0-2](:[0-5])?$";
+    reti = regcomp(&regex, pattern, REG_EXTENDED);
+    if (reti) {
+        return false;
+    }
+    reti = regexec(&regex, cnf, 0, NULL, 0);
+    regfree(&regex);
+    return (reti == 0);
+}
+
 int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation op)
 {
     cJSON *pjson = NULL, *pjson2 = NULL;
@@ -189,7 +207,10 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
 
     if ((pjson = cJSON_GetObjectItem(cin, "cnf")))
     {
-        // check cnf
+        // cnf check
+        if (!validate_cnf(pjson->valuestring)) {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `cnf` is invalid");
+        }
     }
     cJSON *aa = cJSON_GetObjectItem(cin, "aa");
     if (aa && CSE_RVI < RVI_3)

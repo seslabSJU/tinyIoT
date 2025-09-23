@@ -172,14 +172,14 @@ char *get_local_time(int diff)
 	// int millsec;
 	clock_gettime(0, &specific_time);
 
-	char year[5], mon[3], day[3], hour[3], minute[3], sec[3], millsec[7];
+	char year[16], mon[16], day[16], hour[16], minute[16], sec[16], millsec[16];
 
-	sprintf(year, "%d", tm.tm_year + 1900);
-	sprintf(mon, "%02d", tm.tm_mon + 1);
-	sprintf(day, "%02d", tm.tm_mday);
-	sprintf(hour, "%02d", tm.tm_hour);
-	sprintf(minute, "%02d", tm.tm_min);
-	sprintf(sec, "%02d", tm.tm_sec);
+	snprintf(year, sizeof(year), "%d", tm.tm_year + 1900);
+	snprintf(mon, sizeof(mon), "%02d", tm.tm_mon + 1);
+	snprintf(day, sizeof(day), "%02d", tm.tm_mday);
+	snprintf(hour, sizeof(hour), "%02d", tm.tm_hour);
+	snprintf(minute, sizeof(minute), "%02d", tm.tm_min);
+	snprintf(sec, sizeof(sec), "%02d", tm.tm_sec);
 	// sprintf(millsec, "%03d", (int) floor(specific_time.tv_nsec/1.0e6));
 
 	char *local_time = (char *)malloc(25 * sizeof(char));
@@ -988,7 +988,6 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if (!strcmp(origin, get_ri_rtnode(target_rtnode)))
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
-			//return 0;
 		}
 	}
 	// if target is CSR, check csi of resource
@@ -997,6 +996,15 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 		if (!strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
+		}
+	}
+	if (target_rtnode->ty == RT_ACP)
+	{
+		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
+		//int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
+		if ( (pvs_acop & acop) == acop )
+		{
+			deny = false;
 		}
 	}
  
@@ -1013,21 +1021,11 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 			return 0;
 		}
 	}
-
-	if (target_rtnode->ty == RT_ACP)
-	{
-		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
-		int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
-		if ( ((pvs_acop & acop) == acop) || (( pv_acop & acop) == acop) )
-		{
-			deny = false;
-		}
+	
+	if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop){
+		deny = false;
 	}
-	else{
-		if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop){
-			deny = false;
-		}
-	}
+	
 
 	if (deny)
 	{
@@ -1579,7 +1577,7 @@ RVI to_rvi(char *str)
 		return RVI_NONE;
 	if (!strcmp(str, "2a"))
 	{
-		return RVI_2;
+		return RVI_2a;
 	}
 	if (!strcmp(str, "3"))
 	{
@@ -1889,42 +1887,37 @@ void remove_mid(char **mid, int idx, int cnm)
 
 bool isSPIDLocal(char *address)
 {
-	if (!address)
-		return false;
-	if (address[0] != '/' && address[1] != '/')
-		return false;
-	char *ptr = strchr(address + 2, '/');
-	if (ptr)
-		*ptr = '\0';
-	if (strcmp(address + 2, CSE_BASE_SP_ID) == 0)
-	{
-		if (ptr)
-			*ptr = '/';
-		return true;
-	}
-	if (ptr)
-		*ptr = '/';
-	return false;
+    if (!address) return false;
+    if (address[0] != '/' || address[1] != '/') return false;
+
+    // "//spid/..." 에서 spid 추출 (원본 불변)
+    const char *start = address + 2;
+    const char *slash = strchr(start, '/');
+    size_t len = slash ? (size_t)(slash - start) : strlen(start);
+
+    char spid[128];
+    if (len == 0 || len >= sizeof(spid)) return false;
+    memcpy(spid, start, len);
+    spid[len] = '\0';
+
+    return strcmp(spid, CSE_BASE_SP_ID) == 0;
 }
 
 bool isSpRelativeLocal(char *address)
 {
-	if (!address)
-		return false;
-	if (address[0] != '/')
-		return false;
-	char *ptr = strchr(address + 1, '/');
-	if (ptr)
-		*ptr = '\0';
-	if (strcmp(address + 1, CSE_BASE_RI) == 0)
-	{
-		if (ptr)
-			*ptr = '/';
-		return true;
-	}
-	if (ptr)
-		*ptr = '/';
-	return false;
+    if (!address) return false;
+    if (address[0] != '/') return false;
+
+    const char *start = address + 1;
+    const char *slash = strchr(start, '/');
+    size_t len = slash ? (size_t)(slash - start) : strlen(start);
+
+    char cseid[128];
+    if (len == 0 || len >= sizeof(cseid)) return false;
+    memcpy(cseid, start, len);
+    cseid[len] = '\0';
+
+    return strcmp(cseid, CSE_BASE_RI) == 0;
 }
 
 int rsc_to_http_status(int rsc, char **msg)
@@ -2721,7 +2714,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 			break;
 		case PROT_MQTT:
 #ifdef ENABLE_MQTT
-			mqtt_notify(o2pt, noti_cjson, nt);
+			rsc = mqtt_notify(o2pt, noti_cjson, nt);
 #endif
 			break;
 #ifdef ENABLE_COAP
@@ -2843,7 +2836,7 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 				break;
 			case PROT_MQTT:
 #ifdef ENABLE_MQTT
-				mqtt_notify(o2pt, noti_json, nt);
+				rsc = mqtt_notify(o2pt, noti_cjson, nt);
 #endif
 #ifdef ENABLE_COAP
 			case PROT_COAP:

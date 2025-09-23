@@ -9,211 +9,169 @@
 #include "logger.h"
 #include "jsonparser.h"
 #include "util.h"
+#include "config.h"
 
 #include "sqlite/sqlite3.h"
 sqlite3 *db;
+
 extern cJSON *ATTRIBUTES;
 extern ResourceTree *rt;
+
+/* Table definition structure */
+typedef struct {
+    const char *name;
+    const char *sql;
+} table_def_t;
+
+#define ID_COLUMN_TYPE "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+/* Static table definitions */
+static const table_def_t table_definitions[] = {
+    {"general", 
+     "CREATE TABLE IF NOT EXISTS general ( id " ID_COLUMN_TYPE ", "
+     "rn VARCHAR(255), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), "
+     "uri VARCHAR(255), acpi VARCHAR(255), lbl VARCHAR(255), ty INT, memberOf VARCHAR(255) );"
+    },
+    {"csr", 
+     "CREATE TABLE IF NOT EXISTS csr ( id INTEGER, "
+     "cst INT, poa VARCHAR(200), cb VARCHAR(200), csi VARCHAR(200), mei VARCHAR(45), "
+     "tri VARCHAR(45), rr INT, nl VARCHAR(45), srv VARCHAR(45), dcse VARCHAR(200), csz VARCHAR(100), "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"ae", 
+     "CREATE TABLE IF NOT EXISTS ae ( id INTEGER, "
+     "api VARCHAR(45), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cnt", 
+     "CREATE TABLE IF NOT EXISTS cnt ( id INTEGER, "
+     "cr VARCHAR(40), mni INT, mbs INT, mia INT, st INT, cni INT, cbs INT, li VARCHAR(45), oref VARCHAR(45), disr VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cin", 
+     "CREATE TABLE IF NOT EXISTS cin ( id INTEGER, "
+     "cs INT, cr VARCHAR(45), cnf VARCHAR(45), oref VARCHAR(45), con TEXT, st INT, at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"acp", 
+     "CREATE TABLE IF NOT EXISTS acp ( id INTEGER, pv VARCHAR(255), pvs VARCHAR(100), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"sub", 
+     "CREATE TABLE IF NOT EXISTS sub ( id INTEGER, "
+     "enc VARCHAR(45), exc INT, nu VARCHAR(200), gpi VARCHAR(45), nfu VARCHAR(45), bn VARCHAR(45), rl VARCHAR(45), "
+     "sur VARCHAR(200), nct VARCHAR(45), net VARCHAR(45), cr VARCHAR(45), su VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"grp", 
+     "CREATE TABLE IF NOT EXISTS grp ( id INTEGER, "
+     "cr VARCHAR(45), mt INT, cnm INT, mnm INT, mid TEXT, macp TEXT, mtv INT, csy INT, gn VARCHAR(30), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cb", 
+     "CREATE TABLE IF NOT EXISTS cb ( id INTEGER, "
+     "cst INT, csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cbA", 
+     "CREATE TABLE IF NOT EXISTS cbA ( id INTEGER, "
+     "cst INT, lnk VARCHAR(100), csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, "
+     "at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"aeA", 
+     "CREATE TABLE IF NOT EXISTS aeA ( id INTEGER, "
+     "api VARCHAR(45), lnk VARCHAR(100), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cntA", 
+     "CREATE TABLE IF NOT EXISTS cntA ( id INTEGER, "
+     "lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"cinA", 
+     "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, "
+     "lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    }
+};
+
+#define TABLE_COUNT (sizeof(table_definitions) / sizeof(table_def_t))
+
+/* Helper function to execute SQL and handle errors */
+static int execute_sql_with_error_handling(const char *sql, const char *context, char **err_msg)
+{
+    int rc = sqlite3_exec(db, sql, NULL, NULL, err_msg);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "%s error: %s", context, *err_msg ? *err_msg : "Unknown error");
+        return 0;
+    }
+    return 1;
+}
+
+/* Helper function to create a single table */
+static int create_table(const table_def_t *table_def, char **err_msg)
+{
+    if (!execute_sql_with_error_handling(table_def->sql, table_def->name, err_msg)) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[%s]: %s", table_def->name, *err_msg ? *err_msg : "Unknown error");
+        return 0;
+    }
+    return 1;
+}
 
 /* DB init */
 int init_dbp()
 {
-    sqlite3_stmt *res;
-    char *sql = NULL, *err_msg = NULL;
+    char *err_msg = NULL;
+    int rc = 0;
 
     // Open (or create) DB File
-    int rc = sqlite3_open("data.db", &db);
-
-    if (rc != SQLITE_OK)
-    {
+    rc = sqlite3_open("data.db", &db);
+    if (rc != SQLITE_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Cannot open database: %s", sqlite3_errmsg(db));
         sqlite3_close(db);
         return 0;
     }
 
-    // Setup Tables
-    sql = calloc(1, 1024);
-
-    strcpy(sql, "PRAGMA foreign_keys = ON;");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "foreign_keys error: %s", err_msg);
+    // Begin transaction for atomic table creation
+    if (!execute_sql_with_error_handling("BEGIN TRANSACTION;", "Begin Transaction", &err_msg)) {
         sqlite3_close(db);
-        free(sql);
         return 0;
     }
 
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS general ( id INTEGER PRIMARY KEY AUTOINCREMENT, \
-        rn VARCHAR(60), ri VARCHAR(40), pi VARCHAR(40), ct VARCHAR(30), et VARCHAR(30), lt VARCHAR(30), \
-        uri VARCHAR(255), acpi VARCHAR(255), lbl VARCHAR(255), ty INT, memberOf VARCHAR(255) );");
-
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[general]: %s", err_msg);
+    // Enable foreign keys
+    if (!execute_sql_with_error_handling("PRAGMA foreign_keys = ON;", "foreign_keys", &err_msg)) {
+        sqlite3_exec(db, "ROLLBACK;", NULL, NULL, NULL);
         sqlite3_close(db);
-        free(sql);
         return 0;
     }
 
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS csr ( id INTEGER, \
-        cst INT, poa VARCHAR(200), cb VARCHAR(200), csi VARCHAR(200), mei VARCHAR(45), \
-        tri VARCHAR(45), rr INT, nl VARCHAR(45), srv VARCHAR(45), dcse VARCHAR(200), csz VARCHAR(100), \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[csr]: %s", err_msg);
+    // Create all tables
+    for (size_t i = 0; i < TABLE_COUNT; i++) {
+        if (!create_table(&table_definitions[i], &err_msg)) {
+            sqlite3_exec(db, "ROLLBACK;", NULL, NULL, NULL);
+            sqlite3_close(db);
+            return 0;
+        }
+    }
+
+    // Commit transaction
+    if (!execute_sql_with_error_handling("COMMIT;", "Commit Transaction", &err_msg)) {
+        sqlite3_exec(db, "ROLLBACK;", NULL, NULL, NULL);
         sqlite3_close(db);
-        free(sql);
         return 0;
     }
 
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS ae ( id INTEGER, \
-        api VARCHAR(45), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[ae]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cnt ( id INTEGER, \
-        cr VARCHAR(40), mni INT, mbs INT, mia INT, st INT, cni INT, cbs INT, li VARCHAR(45), oref VARCHAR(45), disr VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cnt]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cin ( id INTEGER, \
-        cs INT, cr VARCHAR(45), cnf VARCHAR(45), oref VARCHAR(45), con TEXT, st INT, at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cin]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS acp ( id INTEGER, pv VARCHAR(60), pvs VARCHAR(100), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-                CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[acp]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS sub ( id INTEGER, \
-        enc VARCHAR(45), exc INT, nu VARCHAR(200), gpi VARCHAR(45), nfu VARCHAR(45), bn VARCHAR(45), rl VARCHAR(45), \
-        sur VARCHAR(200), nct VARCHAR(45), net VARCHAR(45), cr VARCHAR(45), su VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[sub]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS grp ( id INTEGER, \
-        cr VARCHAR(45), mt INT, cnm INT, mnm INT, mid TEXT, macp TEXT, mtv INT, csy INT, gn VARCHAR(30), at VARCHAR(200), aa VARCHAR(100), ast INT,\
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[grp]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cb ( id INTEGER, \
-        cst INT, csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cb]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cbA ( id INTEGER, \
-        cst INT, lnk VARCHAR(100), csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, \
-        at VARCHAR(200), aa VARCHAR(100), ast INT,\
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cbA]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS aeA ( id INTEGER, \
-        api VARCHAR(45), lnk VARCHAR(100), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );");
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[aeA]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cntA ( id INTEGER, \
-        lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cntA]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    strcpy(sql, "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, \
-        lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, \
-        CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE  );");
-
-    rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot create table[cinA]: %s", err_msg);
-        sqlite3_close(db);
-        free(sql);
-        return 0;
-    }
-
-    free(sql);
+    logger("DB", LOG_LEVEL_INFO, "Database initialized successfully with %zu tables", TABLE_COUNT);
     return 1;
 }
 
 int close_dbp()
 {
-    if (db)
+    if (db) {
         sqlite3_close_v2(db);
-    db = NULL;
+        db = NULL;
+    }
     return 1;
 }
 
@@ -298,7 +256,7 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
 
     resource = cJSON_CreateObject();
     int cols = sqlite3_column_count(stmt);
-    char *colname = NULL;
+    const char *colname = NULL;
     int bytes = 0;
     int coltype = 0;
     char buf[256] = {0};
@@ -375,7 +333,7 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
 
     resource = cJSON_CreateObject();
     int cols = sqlite3_column_count(stmt);
-    char *colname = NULL;
+    const char *colname = NULL;
     int bytes = 0;
     int coltype = 0;
     char buf[256] = {0};
@@ -425,13 +383,28 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
  */
 int db_store_resource(cJSON *obj, char *uri)
 {
+    logger("DB", LOG_LEVEL_DEBUG, "Call db_store_resource with URI: %s", uri ? uri : "NULL");
+    
     sqlite3_mutex_enter(sqlite3_db_mutex(db));
     char *sql = NULL, *err_msg = NULL;
     cJSON *pjson = NULL;
     cJSON *GENERAL_ATTR = cJSON_GetObjectItem(ATTRIBUTES, "general");
     int general_cnt = cJSON_GetArraySize(GENERAL_ATTR);
 
-    ResourceType ty = cJSON_GetObjectItem(obj, "ty")->valueint;
+    if (!obj) {
+        logger("DB", LOG_LEVEL_ERROR, "Resource object is NULL");
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return -1;
+    }
+
+    cJSON *ty_obj = cJSON_GetObjectItem(obj, "ty");
+    if (!ty_obj) {
+        logger("DB", LOG_LEVEL_ERROR, "Missing 'ty' field in resource object");
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return -1;
+    }
+    ResourceType ty = ty_obj->valueint;
+    logger("DB", LOG_LEVEL_DEBUG, "Resource type: %d", ty);
 
     sql = malloc(1024);
     sprintf(sql, "INSERT INTO general (");
@@ -452,14 +425,17 @@ int db_store_resource(cJSON *obj, char *uri)
     sql[strlen(sql) - 1] = ')';
     strcat(sql, ";");
 
+    logger("DB", LOG_LEVEL_DEBUG, "Executing General Table INSERT: %s", sql);
+    
     sqlite3_stmt *stmt;
     int rc = 0;
+    logger("DB", LOG_LEVEL_DEBUG, "Executing: BEGIN TRANSACTION");
     sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
 
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
     {
-        logger("DB", LOG_LEVEL_DEBUG, "%s", sql);
+        logger("DB", LOG_LEVEL_DEBUG, "Failed SQL was: %s", sql);
         free(sql);
         logger("DB", LOG_LEVEL_ERROR, "prepare error store_resource");
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
@@ -490,7 +466,7 @@ int db_store_resource(cJSON *obj, char *uri)
     if (rc != SQLITE_DONE)
     {
         free(sql);
-        logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
+        logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg ? err_msg : "NULL");
         sqlite3_finalize(stmt);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         sqlite3_mutex_leave(sqlite3_db_mutex(db));
@@ -498,8 +474,16 @@ int db_store_resource(cJSON *obj, char *uri)
     }
 
     sqlite3_finalize(stmt);
+    logger("DB", LOG_LEVEL_DEBUG, "General table INSERT successful");
 
     cJSON *specific_attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
+    if (!specific_attr) {
+        logger("DB", LOG_LEVEL_ERROR, "No specific attributes found for resource type %d", ty);
+        free(sql);
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return -1;
+    }
 
     sql[0] = '\0';
     sprintf(sql, "INSERT INTO %s (id, ", get_table_name(ty));
@@ -520,19 +504,29 @@ int db_store_resource(cJSON *obj, char *uri)
     sql[strlen(sql) - 1] = ')';
     strcat(sql, ";");
 
-    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+    logger("DB", LOG_LEVEL_DEBUG, "Executing Specific Table INSERT: %s", sql);
 
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
     {
         logger("DB", LOG_LEVEL_ERROR, "prepare error %d", rc);
+        logger("DB", LOG_LEVEL_ERROR, "Failed SQL was: %s", sql);
         free(sql);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         sqlite3_mutex_leave(sqlite3_db_mutex(db));
         return -1;
     }
 
-    db_test_and_bind_value(stmt, 1, cJSON_GetObjectItem(obj, "ri"));
+    cJSON *ri_obj = cJSON_GetObjectItem(obj, "ri");
+    if (!ri_obj || !cJSON_IsString(ri_obj)) {
+        logger("DB", LOG_LEVEL_ERROR, "Missing or invalid 'ri' field in resource object");
+        free(sql);
+        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return -1;
+    }
+
+    db_test_and_bind_value(stmt, 1, ri_obj);
 
     for (int i = 0; i < cJSON_GetArraySize(specific_attr); i++)
     {
@@ -550,22 +544,30 @@ int db_store_resource(cJSON *obj, char *uri)
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE)
     {
-        logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
+        logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg ? err_msg : "NULL");
         free(sql);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
         sqlite3_finalize(stmt);
         sqlite3_mutex_leave(sqlite3_db_mutex(db));
         return -1;
     }
+    logger("DB", LOG_LEVEL_DEBUG, "Specific table INSERT successful");
+    
+    logger("DB", LOG_LEVEL_DEBUG, "Executing: END TRANSACTION");
     sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &err_msg);
     if (err_msg)
     {
         logger("DB", LOG_LEVEL_ERROR, "Error: %s", err_msg);
     }
+    else
+    {
+        logger("DB", LOG_LEVEL_DEBUG, "Transaction committed successfully");
+    }
 
     sqlite3_finalize(stmt);
     free(sql);
     sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    logger("DB", LOG_LEVEL_DEBUG, "db_store_resource completed successfully");
     return 1;
 }
 
@@ -790,7 +792,7 @@ int db_delete_one_cin_mni(RTNode *cnt)
     sqlite3_stmt *res;
     int rc;
 
-    char *latest_ri = NULL;
+    const char *latest_ri = NULL;
     int latest_cs = 0;
 
     sprintf(sql, "SELECT general.ri, cin.cs from general, cin WHERE pi='%s' AND general.id = cin.id ORDER BY general.lt ASC LIMIT 1;", get_ri_rtnode(cnt));
@@ -840,7 +842,7 @@ RTNode *db_get_all_resource_as_rtnode()
     int ty = 0;
     cJSON *json, *root;
     sqlite3_stmt *res;
-    char *colname = NULL;
+    const char *colname = NULL;
     char sql[1024] = {0};
     char buf[256] = {0};
 
@@ -959,14 +961,12 @@ RTNode *db_get_all_resource_as_rtnode()
 RTNode *db_get_cin_rtnode_list(RTNode *parent_rtnode)
 {
     logger("DB", LOG_LEVEL_DEBUG, "call db_get_cin_rtnode_list");
-
-    char buf[256] = {0};
     char *pi = get_ri_rtnode(parent_rtnode);
     int rc = 0;
     int cols = 0, bytes = 0, coltype = 0;
     cJSON *json, *root;
     sqlite3_stmt *res = NULL;
-    char *colname = NULL;
+    const char *colname = NULL;
     char *sql;
 
     sql = "SELECT * FROM 'general', 'cin' WHERE general.pi=? AND general.id=cin.id ORDER BY id ASC;";
@@ -999,24 +999,27 @@ RTNode *db_get_cin_rtnode_list(RTNode *parent_rtnode)
                 continue;
             switch (coltype)
             {
-            case SQLITE_TEXT:
-                memset(buf, 0, 256);
-                strncpy(buf, sqlite3_column_text(res, col), bytes);
-                arr = cJSON_Parse(buf);
-                if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object))
-                {
-                    cJSON_AddItemToObject(json, colname, arr);
+                case SQLITE_TEXT:
+                    const char *text = (const char*)sqlite3_column_text(res, col);
+                    int len = sqlite3_column_bytes(res, col);
+                    char *safe_str = malloc(len + 1);
+                    if (safe_str) {
+                        memcpy(safe_str, text, len);
+                        safe_str[len] = '\0'; 
+                        arr = cJSON_Parse(safe_str);
+                        if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                            cJSON_AddItemToObject(json, colname, arr);
+                        } else {
+                            cJSON_AddItemToObject(json, colname, cJSON_CreateString(safe_str));
+                            cJSON_Delete(arr);
+                        }
+                        free(safe_str);
+                    }
+                    break;
+                case SQLITE_INTEGER:
+                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
+                    break;
                 }
-                else
-                {
-                    cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf));
-                    cJSON_Delete(arr);
-                }
-                break;
-            case SQLITE_INTEGER:
-                cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
-                break;
-            }
         }
         if (!head)
         {
@@ -1041,7 +1044,7 @@ RTNode *db_get_latest_cins()
 {
     char sql[1024] = {0};
     char buf[256] = {0};
-    char *colname;
+    const char *colname;
     int rc = 0;
     int cols, bytes, coltype;
     cJSON *json, *root;
@@ -1120,7 +1123,8 @@ RTNode *db_get_latest_cins()
 cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol)
 {
     char sql[1024] = {0}, buf[256] = {0};
-    char *ord = NULL, *colname;
+    char *ord = NULL;
+    const char *colname;
     int rc = 0;
     int cols, bytes, coltype;
     cJSON *json, *root;
@@ -1205,7 +1209,7 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
     cJSON *pjson = NULL, *ptr = NULL;
     cJSON *result = NULL, *json = NULL, *prtjson = NULL, *chjson = NULL, *tmp = NULL;
     sqlite3_stmt *res = NULL;
-    char *colname = NULL;
+    const char *colname = NULL;
     char sql[1024] = {0};
     int jsize = 0, psize = 0, chsize = 0;
     int fo = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
@@ -1597,7 +1601,7 @@ bool db_check_cin_rn_dup(char *rn, char *pi)
     int cols = 0, bytes = 0, coltype = 0;
     cJSON *json, *root;
     sqlite3_stmt *res = NULL;
-    char *colname = NULL;
+    const char *colname = NULL;
     char buf[256] = {0};
 
     sprintf(sql, "SELECT * FROM general WHERE rn='%s' AND pi='%s';", rn, pi);
@@ -1639,7 +1643,7 @@ cJSON *getForbiddenUri(cJSON *acp_list)
     int cols = 0, bytes = 0, coltype = 0;
     cJSON *json, *root;
     sqlite3_stmt *res = NULL;
-    char *colname = NULL;
+    const char *colname = NULL;
     char sql[2048] = {0};
     cJSON *ptr = NULL;
     cJSON *result = cJSON_CreateArray();
