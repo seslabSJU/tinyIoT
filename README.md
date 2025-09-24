@@ -214,7 +214,7 @@ Default IP address and port number are 127.0.0.1 and 3000.
 	sudo apt-get install openssl
 	```
  
-   - mac os
+   - macOS
     ```bash
     brew install openssl@3
     ```
