@@ -21,7 +21,6 @@
 </p>
 <br><br>
 
-
 # What is the tinyIoT?
 
 <b>tinyIoT</b> is a ```Lightweight C-based oneM2M CSE``` for research & embedded deployments
@@ -57,10 +56,9 @@ tinyIoT utilizes the speed of C programming to offer fast performance which is c
 tinyIoT is committed to maintaining high standards in technology implementation
 - It is developed in compliance with the latest oneM2M standards, ensuring that it meets global criteria for IoT communications and services.
 
-<br>
+<br><br>
  
 # What features are supported in tinyIoT?
-
 - Registration of IoT 
 - Supporting Resources: cseBase, ACP, AE, CNT, CIN, SUB, GRP, CSR, cbA, acpA, aeA, cntA, cinA
 - CRUD operations for supporting resources 
@@ -72,29 +70,31 @@ tinyIoT is committed to maintaining high standards in technology implementation
 - Announcement: Uni-directional support(BI-directional is under development)
 - Protocol Bindings: HTTP, MQTT (CoAP & Websocket will be added)
 - Database: SQLite and PostgreSQL   
-<br>
-
+<br><br>
 
 # How to install and develop tinyIoT?
 Configure your running environment with the config.h file. You can configure IP address, Port number, supported binding protocols, etc. 
 Default IP address and port number are 127.0.0.1 and 3000. 
 
 ### Tested Operating System
+
   - Linux Ubuntu 22.04
+  - macOS 25.0
 
 ### Install with script
+
 1. Clone our repository!
-	```
+    ```bash
 	git clone --recursive https://github.com/seslabSJU/tinyIoT.git
 	```
     
-2. Move to the server directory      
-	```
+2. Move to the server directory
+	```bash
 	cd tinyIoT/source/server
 	```   
 
 3. Configuration
-	
+
  	You can configure the server by editing `config.h` file directly. Open `config.h` and modify the following settings:
 	
 	```c
@@ -105,9 +105,8 @@ Default IP address and port number are 127.0.0.1 and 3000.
 	#define SERVER_IP "127.0.0.1"      // Server IP address
 	#define SERVER_PORT "3000"         // Server port number
 	#define CSE_BASE_NAME "TinyIoT"    // CSE base name
-	#define CSE_BASE_RI "tinyiot"      // CSE base resource id
+	#define CSE_BASE_RI "tinyiot"      // CSE base resource identifier
 	#define CSE_BASE_SP_ID "tinyiot.example.com"  // CSE base SP ID
-	#define CSE_RVI RVI_2a             // oneM2M release version indicator (1, 2, 2a, 3 support)
 
 	// Remote CSE Configuration (for MN-CSE only)
 	#if SERVER_TYPE == MN_CSE
@@ -129,9 +128,9 @@ Default IP address and port number are 127.0.0.1 and 3000.
     #define DB_SQLITE 1
     #define DB_POSTGRESQL 2
 
-	// Select Database Type: DB_SQLITE or DB_POSTGRESQL
-	#define DB_TYPE DB_SQLITE
-	// #define DB_TYPE DB_POSTGRESQL
+    // Select Database Type: DB_SQLITE or DB_POSTGRESQL
+    #define DB_TYPE DB_SQLITE
+    // #define DB_TYPE DB_POSTGRESQL
 
 
     #if DB_TYPE == DB_POSTGRESQL
@@ -150,89 +149,92 @@ Default IP address and port number are 127.0.0.1 and 3000.
     // #define PG_SCHEMA_TYPE PG_SCHEMA_VARCHAR
     #define PG_SCHEMA_TYPE PG_SCHEMA_TEXT
     #endif
-	```
-    ### Essential Settings
-
-    1. Server Type Selection
-    Choose your CSE type based on your deployment scenario:
-
-    - **IN_CSE**: Independent CSE (default) - Standalone oneM2M service platform
-    - **MN_CSE**: Middle Node CSE - Registers to a remote CSE
-
-    **For IN_CSE**: No additional configuration required.
-
-    **For MN_CSE**: You must configure the remote CSE connection details(example):
-    ```c
-    #define REMOTE_CSE_ID "your-remote-cse-id"
-    #define REMOTE_CSE_NAME "your-remote-cse-name" 
-    #define REMOTE_CSE_HOST "remote-cse-host-ip"
-    #define REMOTE_CSE_SP_ID "remote-cse-sp-id"
-    #define REMOTE_CSE_PORT your-remote-cse-port number
     ```
 
-    #### 2. Database Type Selection
-    Choose your database backend:
+      ### Essential Settings
+      #### 1. Server Type Selection
+      Choose your CSE type based on your deployment scenario:
 
-    - **SQLite**: File-based database (default) - No additional setup required
-    - **PostgreSQL**: Server-based database - Requires separate installation and configuration
+      - **IN_CSE**: Independent CSE (default) - Standalone oneM2M service platform
+      - **MN_CSE**: Middle Node CSE - Registers to a remote CSE
 
-    #### 3. PostgreSQL Setup (Required if DB_TYPE = DB_POSTGRESQL)
+      **For IN_CSE**: No additional configuration required.
 
-    Installation:
+      **For MN_CSE**: You must configure the remote CSE connection details(example):
+      ```c
+      #define REMOTE_CSE_ID "your-remote-cse-id"
+      #define REMOTE_CSE_NAME "your-remote-cse-name" 
+      #define REMOTE_CSE_HOST "remote-cse-host-ip"
+      #define REMOTE_CSE_SP_ID "remote-cse-sp-id"
+      #define REMOTE_CSE_PORT your-remote-cse-port number
+      ```
+
+      #### 2. Database Type Selection
+      Choose your database backend:
+
+      - **SQLite**: File-based database (default) - No additional setup required
+      - **PostgreSQL**: Server-based database - Requires separate installation and configuration
+
+      #### 3. PostgreSQL Setup (Required if DB_TYPE = DB_POSTGRESQL)
+   
+      - Ubuntu
+      ```bash
+      sudo apt update
+      sudo apt install libpq-dev
+      sudo apt install postgresql
+      sudo systemctl start postgresql
+      sudo -u postgres psql
+      CREATE DATABASE tinydb;
+      CREATE USER tinyuser WITH PASSWORD 'tinypass';
+      GRANT ALL PRIVILEGES ON DATABASE tinydb TO tinyuser;
+      \q
+      ```
+
+      - macOS
+      ```bash
+      brew install postgresql
+      # You can create it with the same information as config.h. 
+      psql postgres
+      createdb [dbname]
+      createuser --interactive --pwprompt
+      ```
+	  
+      ### Additional Settings
+	  For security settings (ADMIN_AE_ID, default_ACOP, etc.), logging configuration, and other advanced options, please refer to the comments in `config.h` file
+
+4. Installation of required modules
+    - Ubuntu
     ```bash
-    sudo apt update
-    sudo apt install libpq-dev
-    sudo apt install postgresql
-    sudo systemctl start postgresql
-    sudo systemctl enable postgresql
-    ```
-    Database and User Creation:
-    ```bash
-    sudo -u postgres psql
-    CREATE DATABASE tinydb;
-    CREATE USER tinyuser WITH PASSWORD 'tinypass';
-    GRANT ALL PRIVILEGES ON DATABASE tinydb TO tinyuser;
-    \q
+	sudo apt install build-essential openssl 
+	sudo apt install libssl-dev
 	```
-
-    Update config.h with your PostgreSQL settings:
-    ```c
-    #define PG_HOST "localhost"
-    #define PG_PORT 5432
-    #define PG_USER "tinyuser"
-    #define PG_PASSWORD "tinypass"
-    #define PG_DBNAME "tinydb"
-    ```
-	### Additional Settings
-	For security settings (ADMIN_AE_ID, default_ACOP, etc.), logging configuration, and other advanced options, please refer to the comments in `config.h` file.
-
-
- 4. Installation of required modules
-	```
-	$ sudo apt install build-essential openssl 
-	$ sudo apt install libssl-dev
-	```
-	If error occurs when install openssl
-	```
-	$ sudo apt update
-	$ sudo apt-get install openssl
-	```
-
- 5. To make an excutable tinyIoT server, simply execute the make file.       
-	```
-	$ make
-	```   
-        
- 6. Use the following command to run tinyIoT server:
-	```	
-	./server
+    If error occurs when install openssl
+	```bash
+	sudo apt update
+	sudo apt-get install openssl
 	```
  
- 7. You can configure port number and ip address as parameters, for example, 
+   - macOS
+    ```bash
+    brew install openssl@3
+    ```
+    
+5. To make an excutable tinyIoT server, simply execute the make file.       
+	```bash
+	make
 	```
-	$ ./server -p [port] (port = 3000 by default)
-	```
+ 
+6. Use the following command to run tinyIoT server:
 
+    ```bash
+    ./server
+    ```
+
+7. You can configure port number and ip address as parameters, for example, 
+
+    ```bash
+    ./server -p [port] (port = 3000 by default)
+    ```
 
 ### For binding protocols
 tinyIoT supports HTTP and MQTT. CoAP bindings will be supported later.<br> 
@@ -249,5 +251,3 @@ In order to run MQTT, Mosquitto MQTT broker should be installed on your machine.
 If you would like to add a new protocol binding to tinyIoT, you can follow the steps outlined in the guide below.<br>
 <a href = "https://github.com/seslabSJU/tinyIoT/blob/main/images/tinyIoT%20protocol%20binding%20guide.pdf" target="-blank"><b>protocol binding guide</b></a>
 <br><br>
-
-
