@@ -22,7 +22,7 @@ The simulators follow the **oneM2M standard** and support both **HTTP** and **MQ
 - **Modes**  
   - `csv`: Sends data from CSV files in sequence  
   - `random`: Generates random data within configured ranges  
-- **Automatic registration**: Create oneM2M AE/CNT resources with `--Registration` option  
+- **Automatic registration**: Create oneM2M AE/CNT resources with `--registration` option  
 
 ## Environment
 - **OS**: Ubuntu 24.04.2 LTS  
