@@ -154,7 +154,7 @@
 
 // For browser access, CORS should be enabled
 // To add CORS headers to HTTP response decomment following line.
-// #define CORS
+#define CORS *
 
 // De-Register remoteCSE on shutdown
 // To make server delete all remote remoteCSE resource decomment following line.
