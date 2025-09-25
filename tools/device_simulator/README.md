@@ -92,7 +92,11 @@ pip install paho-mqtt
 3. Edit `mosquitto.conf`:
 - Add `#listener 1883`, `#protocol mqtt`
 
-<img width="2043" height="282" alt="image" src="https://github.com/user-attachments/assets/6c97477f-eb28-4d64-b71a-f249ff1336cb" />
+```conf
+# listener port-number [ip address/host name/unix socket path]
+# listener 1883
+# protocol mqtt
+```
 
 4. Run
 
@@ -101,17 +105,85 @@ sudo systemctl start mosquitto
 sudo systemctl status mosquitto
 ```
 
-<img width="2162" height="632" alt="image" src="https://github.com/user-attachments/assets/bad124a0-6891-43fe-8ed4-8a9bef79c4ea" />
+**result:**
+```bash
+● mosquitto.service - Mosquitto MQTT Broker
+     Loaded: loaded (/lib/systemd/system/mosquitto.service; enabled; vendor preset: enabled)
+     Active: active (running) since Wed 2024-01-01 12:00:00 KST; 1min 30s ago
+       Docs: man:mosquitto.conf(5)
+             man:mosquitto(8)
+   Main PID: 1234 (mosquitto)
+      Tasks: 1 (limit: 4915)
+     Memory: 1.2M
+        CPU: 50ms
+     CGroup: /system.slice/mosquitto.service
+             └─1234 /usr/sbin/mosquitto -c /etc/mosquitto/mosquitto.conf
 
-If it shows “active (running)” as in the image above, the broker setup is complete.
+Jan 01 12:00:00 ubuntu systemd[1]: Starting Mosquitto MQTT Broker...
+Jan 01 12:00:00 ubuntu systemd[1]: Started Mosquitto MQTT Broker.
+```
+
+If it shows "active (running)" as shown above, the broker setup is complete.
 
 ## Running the Device Simulator
 
 1. Setting
-- Modify the contents of config_sim.py shown in the image below to suit your needs.
-<img width="675" height="157" alt="image" src="https://github.com/user-attachments/assets/24d65372-75af-45b0-82e2-5ecf8468ba6a" /> 
-<img width="665" height="463" alt="image" src="https://github.com/user-attachments/assets/79af566b-066e-4f91-8c09-b2b434e60415" />
-<img width="827" height="777" alt="image" src="https://github.com/user-attachments/assets/2af7587c-e3d7-4402-a77f-d72329e34e32" />
+- Modify the contents of config_sim.py to suit your needs.
+
+```python
+"""Configuration for the oneM2M device simulator"""
+
+# HTTP (REST) endpoint configuration
+HTTP_HOST = "127.0.0.1"
+HTTP_PORT = 3000
+HTTP_BASE = f"http://{HTTP_HOST}:{HTTP_PORT}"
+BASE_URL_RN = f"{HTTP_BASE}/{CSE_RN}"
+
+# Baseline HTTP headers used for registration requests
+HTTP_DEFAULT_HEADERS = {
+    "Accept": "application/json",
+    "X-M2M-Origin": "CAdmin",
+    "X-M2M-RVI": "2a",
+    "X-M2M-RI": "req",
+    "Content-Type": "application/json",
+}
+
+# Headers for tree inspection calls (no payload type)
+HTTP_GET_HEADERS = {
+    "Accept": "application/json",
+    "X-M2M-Origin": "CAdmin",
+    "X-M2M-RVI": "2a",
+    "X-M2M-RI": "check",
+}
+
+# Per-sensor resource registration metadata used by build_sensor_meta
+SENSOR_RESOURCES = {
+    "temp": {
+        "ae": "CtempSensor",
+        "cnt": "temperature",
+        "api": "N.temp",
+        "origin": "CtempSensor",
+    },
+    "humid": {
+        "ae": "ChumidSensor",
+        "cnt": "humidity",
+        "api": "N.humid",
+        "origin": "ChumidSensor",
+    },
+    "co2": {
+        "ae": "Cco2Sensor",
+        "cnt": "co2",
+        "api": "N.co2",
+        "origin": "Cco2Sensor",
+    },
+    "soil": {
+        "ae": "CsoilSensor",
+        "cnt": "soil",
+        "api": "N.soil",
+        "origin": "CsoilSensor",
+    },
+}
+```
 
 
 2. Move to the device_simulator directory
