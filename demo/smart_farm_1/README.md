@@ -80,16 +80,49 @@ cd tinyIoT/script   #example path
 ```
 
 2. Setting
-  3.1 In config_coord.py, for images other than Ubuntu, set the path to simulator.py to match the user’s environment.
-   <img width="759" height="212" alt="image" src="https://github.com/user-attachments/assets/e635e4ca-203e-4902-a43b-ac1fd094a273" />
+  2.1 In config_coord.py, for images other than Ubuntu, set the path to simulator.py to match the user's environment.
 
-   3.2 Modify the contents of config_coord.py shown in the image below to suit your needs
-  <img width="681" height="100" alt="image" src="https://github.com/user-attachments/assets/817704a5-d6ce-45de-9e15-e155f9d4f32b" />
-  <img width="907" height="121" alt="image" src="https://github.com/user-attachments/assets/bf000381-91d1-47bb-af20-2f15d8dbe9e2" />
+```python
+# ----------------------- Paths -----------------------
+# Absolute or relative path to the tinyIoT server binary
+SERVER_EXEC = "/home/parks/tinyIoT/source/server/server"
+
+# Absolute or relative path to the simulator entrypoint
+# e.g., "simulator.py" or "/opt/iot-sim/bin/simulator.py"
+SIMULATOR_PATH = "/home/parks/tinyIoT/simulator/simulator.py"
+```
+
+
+  2.2 Modify the contents of config_coord.py to suit your needs
+
+```python
+"""Configuration values for the coordination launcher and child device simulators."""
+
+# ----------------------- Paths -----------------------
+# Absolute or relative path to the tinyIoT server binary
+SERVER_EXEC = "/home/parks/tinyIoT/source/server/server"
+
+# ------------------- Health Check URL -------------------
+# OneM2M CSE HTTP endpoint used for server readiness checks.
+# NOTE: CSI is lowercase ("tinyiot"). Change only if your CSE path differs.
+CSE_URL = "http://127.0.0.1:3000/tinyiot"
+```
+
+  
 
 3. option setting in coordinator.py
 - Users can add or remove sensors here to suit their setup.
-<img width="1029" height="249" alt="image" src="https://github.com/user-attachments/assets/1e821675-30fe-4b6c-9a57-e1947088ae05" />
+
+```python
+# Coordinator options. Users can add or remove sensors here to suit their setup.
+# Sensor names must not contain spaces.
+SENSORS_TO_RUN: List[SensorConfig] = [
+    SensorConfig('temp',  protocol='http', mode='random', frequency=3, registration=1),
+    SensorConfig('humid', protocol='http', mode='random', frequency=3, registration=1),
+    SensorConfig('co2',   protocol='http', mode='random', frequency=3, registration=1),
+    SensorConfig('soil',  protocol='http', mode='random', frequency=3, registration=1)
+]
+```
 
 
 4. Set the options in `coordinator.py`.  
