@@ -1,33 +1,47 @@
-"""Configuration values for the coordination launcher and child device simulators."""
+"""Coordinator configuration for the tinyIoT deployment."""
 
-# --------------- Duplicate Handling ---------------
-# Coordination runs are non-interactive, so pick an explicit policy.
-#   'yes' -> auto-reuse existing resources without prompting
-#   'no'  -> abort immediately on duplicates
-SIMULATOR_REUSE_EXISTING = "yes"
+import os
 
-# ----------------------- Paths -----------------------
-# Absolute or relative path to the tinyIoT server binary
-SERVER_EXEC = "/home/parks/tinyIoT/source/server/server"
+_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Absolute or relative path to the simulator entrypoint
-# e.g., "simulator.py" or "/opt/iot-sim/bin/simulator.py"
-SIMULATOR_PATH = "/home/parks/tinyIoT/simulator/simulator.py"
+#tinyIoT & simulator path configuration
+# IMPORTANT: SERVER_EXEC is an external dependency.
+# Please configure the absolute path to the tinyIoT server executable for your environment.
+SERVER_EXEC = "/home/parks/tinyIoT/source/server/server"  #tinyIoT
 
-# Python interpreter used to launch the simulator
+# SIMULATOR_PATH is now relative to this file's location for portability.
+SIMULATOR_PATH = os.path.join(_CURRENT_DIR, "simulator.py") 
 PYTHON_EXEC = "python3"
 
-# ------------------- Health Check URL -------------------
-# OneM2M CSE HTTP endpoint used for server readiness checks.
-# NOTE: CSI is lowercase ("tinyiot"). Change only if your CSE path differs.
+# Health-check target served by the oneM2M CSE.
 CSE_URL = "http://127.0.0.1:3000/tinyiot"
 
-# ---------------- Timeouts & Retries ----------------
-# Number of attempts for server readiness polling (1 attempt ~ 1 second)
-WAIT_SERVER_TIMEOUT = 30  # seconds
+# Sensor Configuration
+# Users can add or remove sensors here to suit their setup.
+# Sensor names must not contain spaces and only lowercase.
+# --sensor: "temp" | "humid" | "co2" | "soil" | etc
+# --protocol: "http" | "mqtt"
+# --mode: "csv" | "random"
+# --frequency: seconds
+# --registration: 0 | 1 (Select 1: Enable AE/CNT auto-registration)
+SENSORS = [
+    {"sensor": "temperature", "protocol": "http", "mode": "csv", "frequency": 3, "registration": 1},
+    {"sensor": "humidity", "protocol": "http", "mode": "csv", "frequency": 3, "registration": 1},
+    {"sensor": "co2", "protocol": "mqtt", "mode": "csv", "frequency": 3, "registration": 1},
+    {"sensor": "soil", "protocol": "mqtt", "mode": "csv", "frequency": 3, "registration": 1},
+]
 
-# Number of attempts for process detection (1 attempt ~ 1 second)
-WAIT_PROCESS_TIMEOUT = 10  # seconds
+# Headers forwarded with the health-check GET call.
+HEALTHCHECK_HEADERS = {
+    "X-M2M-Origin": "CAdmin",
+    "X-M2M-RVI": "2a",
+    "X-M2M-RI": "healthcheck",
+    "Accept": "application/json",
+}
 
-# Per-request HTTP timeout for the health check call
-REQUEST_TIMEOUT = 2  # seconds
+# Timeout knobs expressed in seconds.
+WAIT_SERVER_TIMEOUT = 30
+REQUEST_TIMEOUT = 2
+PROC_TERM_WAIT = 5.0
+SERVER_TERM_WAIT = 5.0
+JOIN_READER_TIMEOUT = 1.0
