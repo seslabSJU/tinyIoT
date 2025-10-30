@@ -21,6 +21,8 @@
 #include "mqttClient.h"
 #endif
 
+#include "websocket_server.h"
+
 #ifdef UPPERTESTER
 #include "upperTester.h"
 #endif
