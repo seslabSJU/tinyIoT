@@ -34,7 +34,7 @@ else ifeq ($(DB_TYPE), POSTGRESQL)
     DB_LIB_SRC = 
 endif
 
-SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
+SRCS = main.c websocket_server.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
 
 RSCSRC = $(wildcard resources/*.c)
 
@@ -46,15 +46,23 @@ LSRCS = wolfmqtt/mqtt_client.c wolfmqtt/mqtt_packet.c wolfmqtt/mqtt_socket.c $(D
 
 OBJS = $(SRCS:.c=.o) $(RSCSRC:.c=.o) $(LSRCS:.c=.o) $(LIBCOAP:.c=.o)
 
+#LWS추가
+LDFLAGS += $(shell pkg-config --libs libwebsockets)
+CFLAGS += $(shell pkg-config --cflags libwebsockets)
+
+
 RELEXE = server
 
 all: $(RELEXE)
 
-$(RELEXE) : $(OBJS)
-	$(CC) $(RELCFLAGS) -o $(RELEXE) $(OBJS) $(LIBS)
 
+# 빌드 타겟
+$(RELEXE) : $(OBJS)
+	$(CC) $(RELCFLAGS) $(CFLAGS) -o $(RELEXE) $(OBJS) $(LIBS) $(LDFLAGS)
+
+# 오브젝트 파일 컴파일
 %.o: %.c
-	$(CC) $(RELCFLAGS) -c $< -o $@
+	$(CC) $(RELCFLAGS) $(CFLAGS) -c $< -o $@
 
 conf: semi-clean all
 
