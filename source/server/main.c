@@ -21,16 +21,14 @@
 #include "mqttClient.h"
 #endif
 
-#include "websocket_server.h"
-
 #ifdef UPPERTESTER
 #include "upperTester.h"
 #endif
 
 #include "coap.h"
 
-ResourceTree* rt;
-RTNode* registrar_csr = NULL;
+ResourceTree *rt;
+RTNode *registrar_csr = NULL;
 
 #if MONO_THREAD == 0
 pthread_mutex_t main_lock;
@@ -39,10 +37,10 @@ pthread_mutexattr_t Attr;
 
 #endif
 
-void route(oneM2MPrimitive* o2pt);
+void route(oneM2MPrimitive *o2pt);
 void stop_server(int sig);
-cJSON* ATTRIBUTES;
-char* PORT = SERVER_PORT;
+cJSON *ATTRIBUTES;
+char *PORT = SERVER_PORT;
 int terminate = 0;
 int call_stop = 0;
 
@@ -58,20 +56,20 @@ int websocket_thread_id;
 pthread_t coap;
 int coap_thread_id;
 #ifdef ENABLE_COAP_DTLS
-extern char* cert_file;
-extern char* key_file;
-extern char* ca_file;
-extern char* root_ca_file;
-extern uint8_t* key;
+extern char *cert_file;
+extern char *key_file;
+extern char *ca_file;
+extern char *root_ca_file;
+extern uint8_t *key;
 extern ssize_t key_length;
 extern int key_defined;
 
-static ssize_t cmdline_read_key(char* arg, unsigned char** buf, size_t maxlen)
+static ssize_t cmdline_read_key(char *arg, unsigned char **buf, size_t maxlen)
 {
 	size_t len = strnlen(arg, maxlen);
 	if (len)
 	{
-		*buf = (unsigned char*)arg;
+		*buf = (unsigned char *)arg;
 		return len;
 	}
 
@@ -83,12 +81,12 @@ static ssize_t cmdline_read_key(char* arg, unsigned char** buf, size_t maxlen)
 #endif
 #endif
 
-void* websocket_server_thread(void* arg) {
-	initialize_websocket_server();
-	return NULL;
+void *websocket_server_thread(void *arg) {
+    initialize_websocket_server();
+    return NULL;
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
 	bool initialBoot = false;
 	signal(SIGINT, stop_server);
@@ -177,10 +175,10 @@ int main(int argc, char** argv)
 
 	if (initialBoot)
 	{
-		cJSON* acp = cJSON_CreateObject();
+		cJSON *acp = cJSON_CreateObject();
 		init_acp(acp);
 		db_store_resource(acp, CSE_BASE_NAME "/defaultACP");
-		RTNode* acp_rtnode = create_rtnode(acp, RT_ACP);
+		RTNode *acp_rtnode = create_rtnode(acp, RT_ACP);
 		add_child_resource_tree(rt->cb, acp_rtnode);
 	}
 
@@ -200,7 +198,7 @@ int main(int argc, char** argv)
 	}
 
 #ifdef ENABLE_MQTT
-	mqtt_thread_id = pthread_create(&mqtt, NULL, (void*)mqtt_serve, "mqtt Client");
+	mqtt_thread_id = pthread_create(&mqtt, NULL, (void *)mqtt_serve, "mqtt Client");
 	if (mqtt_thread_id < 0)
 	{
 		fprintf(stderr, "MQTT thread create error\n");
@@ -217,11 +215,11 @@ int main(int argc, char** argv)
 	}
 #endif
 	if (pthread_create(&websocket_thread, NULL, websocket_server_thread, NULL) != 0) {
-		perror("Failed to create WebSocket server thread");
-		return 1;
+    	perror("Failed to create WebSocket server thread");
+    	return 1;
 	}
 
-	// ½º·¹µå°¡ Á¾·áµÉ ¶§±îÁö ´ë±â
+// ìŠ¤ë ˆë“œê°€ ì¢…ë£Œë  ë•Œê¹Œì§€ ëŒ€ê¸°
 	pthread_join(websocket_thread, NULL);
 
 	serve_forever(PORT); // main oneM2M operation logic in void route()
@@ -241,7 +239,7 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-void route(oneM2MPrimitive* o2pt)
+void route(oneM2MPrimitive *o2pt)
 {
 	int rsc = 0;
 	double start;
@@ -255,7 +253,7 @@ void route(oneM2MPrimitive* o2pt)
 	// 	return;
 	// }
 
-	RTNode* target_rtnode = get_rtnode(o2pt);
+	RTNode *target_rtnode = get_rtnode(o2pt);
 
 	if (o2pt->rsc >= 4000)
 	{
@@ -306,7 +304,7 @@ void route(oneM2MPrimitive* o2pt)
 	log_runtime(start);
 }
 
-int handle_onem2m_request(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
+int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
 	logger("MAIN", LOG_LEVEL_DEBUG, "handle_onem2m_request");
 	int rsc = 0;
