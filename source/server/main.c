@@ -26,6 +26,7 @@
 #endif
 
 #include "coap.h"
+#include "websocket_server.h"
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;

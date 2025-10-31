@@ -30,24 +30,12 @@
 #define LOG_TAG "COAP"
 #define BUF_SIZE 65535
 
-typedef struct
-{
-    coap_pdu_type_t type;
-    coap_pdu_code_t code;
-    coap_bin_const_t token;
-    coap_mid_t message_id;
-    int option_cnt;
-} coapPacket;
-
-typedef struct {
-    coap_binary_t* token;
-} track_token;
-
 void* coap_serve();
 void coap_notify(oneM2MPrimitive* o2pt, char* noti_json, NotiTarget* nt);
 void coap_forwarding(oneM2MPrimitive* o2pt, Protocol protocol, char* host, int port);
 void response_retrieve(oneM2MPrimitive* o2pt, cJSON* resource_obj, const char* resource_key);
 extern void route(oneM2MPrimitive* o2pt);
+void initialize_websocket_server();
 
 #ifdef ENABLE_COAP_DTLS
 #define MAX_KEY 64 /* Maximum length of a pre-shared key in bytes. */
