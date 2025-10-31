@@ -25,8 +25,6 @@
 #include "upperTester.h"
 #endif
 
-#include "websocket_server.h"
-
 #include "coap.h"
 
 ResourceTree *rt;
