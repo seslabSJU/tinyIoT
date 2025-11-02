@@ -1,27 +1,10 @@
 #include "mecClient.h"
 #include "config.h"
+#ifdef ENABLE_MEC
 #include "httpd.h"
-
+#include "logger.h"
 // Global MEC client instance
 MECClient g_mec_client;
-
-// HTTP response callback for libcurl
-// size_t mec_http_callback(void *contents, size_t size, size_t nmemb, HTTPResponse *response) {
-//     size_t realsize = size * nmemb;
-//     char *ptr = realloc(response->memory, response->size + realsize + 1);
-    
-//     if (!ptr) {
-//         mec_log_error("Not enough memory (realloc returned NULL)");
-//         return 0;
-//     }
-    
-//     response->memory = ptr;
-//     memcpy(&(response->memory[response->size]), contents, realsize);
-//     response->size += realsize;
-//     response->memory[response->size] = 0;
-    
-//     return realsize;
-// }
 
 //HTTP function for payload
 size_t body_callback(void *contents, size_t size, size_t nmemb, void *userp) {
@@ -228,6 +211,7 @@ void* mec_client_thread(void* arg) {
 }
 
 // Register to MEC platform
+// FIX<E TODO: Registration should happen instantly not after alot of retries, look for new method to do this
 MECResult* mec_client_register(void) {
     if (g_mec_client.state == MEC_STATE_PAUSED) {
         MECResult* result = (MECResult*)malloc(sizeof(MECResult));
@@ -251,6 +235,13 @@ MECResult* mec_client_register(void) {
     // Store the platform ID for deregistration
     strncpy(g_mec_client.iot_platform_id, uuid_str1, MAX_ID_SIZE - 1);
     
+    printf("mec_protocol: %s\n", g_mec_client.mec_protocol);
+    fflush(stdout);
+    printf("mec_host: %s\n", g_mec_client.mec_host);
+    fflush(stdout);
+    printf("mec_sandbox_id: %s\n", g_mec_client.mec_sandbox_id);
+    fflush(stdout);
+
     // Build URL
     snprintf(url, MAX_URL_SIZE, "%s://%s/%s/%s/iots/v1/registered_iot_platforms",
              g_mec_client.mec_protocol, g_mec_client.mec_host,
@@ -315,12 +306,14 @@ MECResult* mec_client_register(void) {
     
     struct curl_slist *header_list = NULL;
     header_list = curl_slist_append(header_list, "Content-Type: application/json; charset=UTF-8");
+    header_list = curl_slist_append(header_list, "Accept: application/json");
+    // header_list = curl_slist_append(header_list, "Authorization: Basic dG");
     
     // Try registration with retries
     MECResult* result = NULL;
     for (int tries = 0; tries < MAX_RETRIES; tries++) {
         g_mec_client.registration_attempts++;
-
+        logger("MEC", LOG_LEVEL_INFO, "Attempt %d to register MEC Client", url);
         int status = mec_send_http_request(HTTP_POST, url, header_list, json_body, response, MAX_RESPONSE_SIZE);
         
         if (status == MEC_RSC_CREATED) {
@@ -329,8 +322,9 @@ MECResult* mec_client_register(void) {
             result->status_code = status;
             result->response_data = strdup(response);
             result->data_length = strlen(response);
+            result->uuid = strdup(uuid_str1); // Store the iotPlatformId
             result->error_message = NULL;
-            
+            //mec_store_registration(uuid_str1, json_body);
             mec_log_info("MEC Client registration successful");
             break;
         } else {
@@ -353,6 +347,8 @@ MECResult* mec_client_register(void) {
 
 // Deregister from MEC platform
 MECResult* mec_client_deregister(void) {
+    // Get all registrations from the database
+    //char* all_registrations_json = mec_get_all_registrations_json();
     if (strlen(g_mec_client.iot_platform_id) == 0) {
         MECResult* result = (MECResult*)malloc(sizeof(MECResult));
         result->status_code = MEC_RSC_INTERNAL_SERVER_ERROR;
@@ -366,13 +362,14 @@ MECResult* mec_client_deregister(void) {
     char response[MAX_RESPONSE_SIZE];
     
     // Build URL with platform ID
-    snprintf(url, MAX_URL_SIZE, "%s://%s:%d/%s/%s/iots/v1/registered_iot_platforms/%s",
-             g_mec_client.mec_protocol, g_mec_client.mec_host, g_mec_client.mec_port,
+    snprintf(url, MAX_URL_SIZE, "%s://%s/%s/%s/iots/v1/registered_iot_platforms/%s",
+             g_mec_client.mec_protocol, g_mec_client.mec_host,
              g_mec_client.mec_sandbox_id, g_mec_client.mec_platform, g_mec_client.iot_platform_id);
     
     //const char* headers = "Content-Type: application/json; charset=UTF-8\r\n";
     struct curl_slist *header_list = NULL;
     header_list = curl_slist_append(header_list, "Content-Type: application/json; charset=UTF-8");
+    printf("Deregistering from MEC platform at %s\n", url);
     int status = mec_send_http_request(HTTP_DELETE, url, header_list, NULL, response, MAX_RESPONSE_SIZE);
     
     // Clear registration data
@@ -384,10 +381,11 @@ MECResult* mec_client_deregister(void) {
     result->data_length = strlen(response);
     result->error_message = NULL;
     
-    if (status == MEC_RSC_OK) {
+    if (status == MEC_RSC_DELETE) {
         mec_log_info("MEC Client deregistration successful");
     } else {
         mec_log_error("MEC Client deregistration failed");
+        //printf("All registrations: %s\n", all_registrations_json);
     }
     
     return result;
@@ -418,13 +416,15 @@ void mec_generate_uuid(char* uuid_str) {
 }
 
 // Real HTTP request implementation using libcurl
+// This function sends an HTTP request using libcurl and returns the response code
 int mec_send_http_request(const char* method, const char* url, struct curl_slist* headers, const char* body, char* response, size_t response_size) {
     CURL *curl;
     CURLcode res;
-    HTTPResponse http_response = {0};  // Using httpd.h's definition
+    HTTPResponse http_response = {0}; 
     long response_code = 0;
 
     printf("Sending HTTP %s request to %s\n", method, url);
+    fflush(stdout);
     curl = curl_easy_init();
     if (!curl) {
         mec_log_error("Failed to initialize curl handle");
@@ -440,9 +440,20 @@ int mec_send_http_request(const char* method, const char* url, struct curl_slist
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &http_response);
 
+    // Enable verbose output for debugging
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+
+    // For multithreaded code
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+
+    // Keepalive options
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, 120L); // Idle time before sending keepalive probes
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, 60L); // Interval between keepalive probes
+
     // Timeouts
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 300L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 20L);
 
     // SSL options (insecure for development)
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
@@ -514,9 +525,6 @@ int mec_send_http_request(const char* method, const char* url, struct curl_slist
     return (int)response_code;
 }
 
-
-
-
 // Destroy result structure
 void mec_result_destroy(MECResult* result) {
     if (result) {
@@ -569,3 +577,5 @@ int mec_notify_resource_deleted(oneM2MPrimitive *o2pt) {
     mec_log_info("MEC: Resource deleted notification");
     return 1;
 }
+
+#endif

@@ -1,6 +1,7 @@
 #ifndef MEC_CLIENT_H
 #define MEC_CLIENT_H
-
+#ifdef ENABLE_MEC
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,9 +15,7 @@
 #include <curl/curl.h>
 
 #include "cJSON.h"
-#include "config.h"
 #include "onem2m.h"
-
 // MEC Client configuration defines
 #define MAX_URL_SIZE 512
 #define MAX_RESPONSE_SIZE 32768
@@ -38,6 +37,7 @@ typedef enum {
     MEC_RSC_CREATED = 201,
     MEC_RSC_BAD_REQUEST = 400,
     MEC_RSC_NOT_FOUND = 404,
+    MEC_RSC_DELETE = 204,
     MEC_RSC_INTERNAL_SERVER_ERROR = 500
 } MECResponseStatusCode;
 
@@ -52,6 +52,7 @@ typedef enum {
 // MEC Result structure
 typedef struct {
     int status_code;
+    char* uuid;
     char* response_data;
     size_t data_length;
     char* error_message;
@@ -122,4 +123,5 @@ int mec_notify_resource_created(oneM2MPrimitive *o2pt);
 int mec_notify_resource_updated(oneM2MPrimitive *o2pt);
 int mec_notify_resource_deleted(oneM2MPrimitive *o2pt);
 
+#endif
 #endif

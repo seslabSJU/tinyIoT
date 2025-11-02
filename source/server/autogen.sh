@@ -33,7 +33,7 @@ fi
 echo
 
 server_ip=${server_ip:-127.0.0.1}
-server_port=${server_port:-3000}
+server_port=${server_port:-31111}
 cse_base_name=${cse_base_name:-TinyIoT}
 cse_base_ri=${cse_base_ri:-tinyiot}
 

@@ -6,11 +6,11 @@
 #define SERVER_TYPE IN_CSE
 
 // #define NIC_NAME "eth0"
-#define SERVER_IP "127.0.0.1"
-#define SERVER_PORT "3000"
-#define CSE_BASE_NAME "TinyIoT"
-#define CSE_BASE_RI "tinyiot"
-#define CSE_BASE_SP_ID "tinyiot.example.com"
+#define SERVER_IP "${MEC_HOST_URL}"
+#define SERVER_PORT "${SERVER_PORT}"
+#define CSE_BASE_NAME "TinyIoT-IN-CSE"
+#define CSE_BASE_RI "tinyiot-in-cse"
+#define CSE_BASE_SP_ID ""
 #define CSE_RVI RVI_2a
 
 #if SERVER_TYPE == MN_CSE
@@ -29,11 +29,11 @@
 // To enable multiple ACOP, add each ACOP
 // Supported ACOP
 // ACOP_CREATE | ACOP_RETRIEVE | ACOP_UPDATE | ACOP_DELETE | ACOP_DISCOVERY | ACOP_NOTIFY
-#define DEFAULT_ACOP ACOP_CREATE
+#define DEFAULT_ACOP ACOP_CREATE| ACOP_RETRIEVE | ACOP_UPDATE | ACOP_DELETE | ACOP_DISCOVERY | ACOP_NOTIFY
 
 // Set allowed remote CSE ID
 // To allow all remote CSE ID, set to "/*"
-#define ALLOWED_REMOTE_CSE_ID "/id-in,/id-mn"
+#define ALLOWED_REMOTE_CSE_ID "/*"
 
 // Run server in mono Thread
 // 0 → multi-thread, 1 → mono-thread
@@ -79,7 +79,7 @@
 #define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
-#define MQTT_HOST "192.168.40.57"
+#define MQTT_HOST "${MQTT_HOST}"
 #define MQTT_QOS MQTT_QOS_0
 #define MQTT_KEEP_ALIVE_SEC 60
 #define MQTT_CMD_TIMEOUT_MS 30000
@@ -96,7 +96,7 @@
 #define MQTT_PORT 8883
 #else
 #define MQTT_USE_TLS 0
-#define MQTT_PORT 1883
+#define MQTT_PORT ${MQTT_PORT}
 #endif
 
 #define MQTT_MAX_PACKET_SZ 16384
@@ -134,16 +134,16 @@
 // To make server delete all remote remoteCSE resource decomment following line.
 // #define DEREGISTER_AT_SHUTDOWN
 
-// Default Discovery Result Sort
+// #define DEREGISTER_AT_SHUTDOWN
 #define DEFAULT_DISCOVERY_SORT SORT_DESC
 
-#define ENABLE_MEC
+// #define ENABLE_MEC
+// #define MEC_ENABLE 1
 #ifdef ENABLE_MEC
-#define MEC_ENABLE 1
-#define MEC_HOST "192.168.40.57"
+#define MEC_HOST "${MEC_HOST_URL}"
 #define MEC_PROTOCOL "https"
-#define MEC_PLATFORM "mep1"
-#define MEC_SANDBOX_ID "sbx997zjf1"
+#define MEC_PLATFORM "${MEC_PLATFORM}"
+#define MEC_SANDBOX_ID "${MEC_SANDBOX_ID}"
 #endif
 
 #endif
