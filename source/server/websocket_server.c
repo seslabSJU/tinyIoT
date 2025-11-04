@@ -468,6 +468,8 @@ void send_websocket_message(struct lws *wsi, const char *message) {
 
     lws_write(wsi, &buffer[LWS_PRE], message_length, LWS_WRITE_TEXT);
     free(buffer);
+
+    usleep(100 * 1000);
 }
 
 void response_create(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key) {

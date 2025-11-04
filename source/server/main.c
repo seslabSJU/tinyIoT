@@ -220,10 +220,9 @@ int main(int argc, char **argv)
     	return 1;
 	}
 
-// 스레드가 종료될 때까지 대기
-	pthread_join(websocket_thread, NULL);
-
 	serve_forever(PORT); // main oneM2M operation logic in void route()
+	// 스레드가 종료될 때까지 대기
+	// pthread_join(websocket_thread, NULL);
 
 #ifdef ENABLE_MQTT
 	pthread_join(mqtt, NULL);
