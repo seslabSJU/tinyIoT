@@ -21,6 +21,9 @@
 #include "mqttClient.h"
 #include "coap.h"
 
+
+#include "websocket_server.h"
+
 extern ResourceTree* rt;
 extern cJSON* ATTRIBUTES;
 extern pthread_mutex_t main_lock;
@@ -2720,6 +2723,11 @@ int send_verification_request(char* noti_uri, cJSON* noti_cjson)
 #ifdef ENABLE_COAP
 		case PROT_COAP:
 			coap_notify(o2pt, noti_cjson, nt);
+#endif
+			break;
+		case PROT_WS:
+#ifdef ENABLE_WS
+			rsc = ws_notify(o2pt, nt);
 #endif
 			break;
 		}

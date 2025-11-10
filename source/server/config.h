@@ -150,6 +150,12 @@
 
 #endif
 
+// To enable CoAP, de-comment the following line
+#define ENABLE_WS 1
+#ifdef ENABLE_WS
+#define WS_PORT 8081
+#endif
+
 // Additional Settings
 
 // For browser access, CORS should be enabled

@@ -21,7 +21,17 @@ char *find_x_m2m_origin(const char *data);
 static struct lws* clients[MAX_CLIENTS];
 static int client_count = 0;
 
+//noti
+static int interrupted = 0;
+static char *noti_json = NULL;
+static int rsc_result = 0;
+
+
 //전방 클라이언트들에게 json 발사!!
+void *websocket_server_thread(void *arg){
+    initialize_websocket_server();
+}
+
 static void broadcast_message(const char* msg)
 {
     for (int i = 0; i < client_count; i++) {
@@ -87,7 +97,7 @@ static char* make_sensor_status_json()
 }
 
 
-static void PullingRoutine() {
+void PullingRoutine() {
     char* s = make_sensor_status_json();
     broadcast_message(s);
     free(s);
@@ -367,7 +377,62 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
     }
     return 0;
 }
+//for noti
+static int callback_ws_notify(struct lws *wsi, enum lws_callback_reasons reason,
+                   void *user, void *in, size_t len)
+{
+    switch (reason) {
 
+    case LWS_CALLBACK_CLIENT_ESTABLISHED:
+        logger("WEBSOCKET", LOG_LEVEL_INFO, "WebSocket Connected");
+        lws_callback_on_writable(wsi);
+        break;
+
+    case LWS_CALLBACK_CLIENT_WRITEABLE: {
+        if (noti_json) {
+            size_t msg_len = strlen(noti_json);
+            unsigned char *msg = malloc(LWS_PRE + msg_len);
+            memcpy(msg + LWS_PRE, noti_json, msg_len);
+
+            logger("WEBSOCKET", LOG_LEVEL_INFO, "Sending notification: %s", noti_json);
+            lws_write(wsi, msg + LWS_PRE, msg_len, LWS_WRITE_TEXT);
+
+            free(msg);
+            // 전송 후 종료하도록 신호
+            lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
+            interrupted = 1;
+        }
+        break;
+    }
+
+    case LWS_CALLBACK_CLIENT_RECEIVE: {
+        logger("WEBSOCKET", LOG_LEVEL_INFO, "Received: %.*s\n", (int)len, (char *)in);
+        // 예: {"rsc":2000} 형태의 응답 파싱
+        char *ptr = strstr((char *)in, "\"rsc\":");
+        if (ptr) {
+            rsc_result = atoi(ptr + 6);
+        }
+        break;
+    }
+
+    case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+        logger("WEBSOCKET", LOG_LEVEL_ERROR, "WebSocket connection failed: %s",
+                 in ? (char *)in : "(null)");
+        rsc_result = RSC_BAD_REQUEST;
+        interrupted = 1;
+        break;
+
+    case LWS_CALLBACK_CLIENT_CLOSED:
+    logger("WEBSOCKET", LOG_LEVEL_INFO, "WebSocket Closed");
+        interrupted = 1;
+        break;
+
+    default:
+        break;
+    }
+
+    return 0;
+}
 static struct lws_protocols protocols[] = {
     {
         "oneM2M.json",
@@ -375,8 +440,23 @@ static struct lws_protocols protocols[] = {
         0,
         65536,
     },
+    {
+        "oneM2M-notify",
+        callback_ws_notify,
+        0,
+        4096,
+    },
     {NULL, NULL, 0, 0} /* end */
 };
+// static const struct lws_protocols protocols[] = {
+//     {
+//         "oneM2M-notify",
+//         callback_ws_notify,
+//         0,  // per-session data size
+//         4096,
+//     },
+//     { NULL, NULL, 0, 0 } // terminator
+// };
 
 //void initialize_websocket_server() {
 //    struct lws_context_creation_info info;
@@ -427,11 +507,12 @@ static struct lws_protocols protocols[] = {
 //    lws_context_destroy(context_wss);
 //}
 
+
 void initialize_websocket_server() {
     struct lws_context_creation_info info;
     //info.extensions = exts;
     memset(&info, 0, sizeof(info));
-    info.port = 8081;          // 일반 WS 포트
+    info.port = WS_PORT;          // 일반 WS 포트
     info.protocols = protocols; // 미리 정의된 프로토콜 배열
     //info.extensions = lws_get_internal_extensions();  // permessage-deflate 포함
     /*info.options |= LWS_SERVER_OPTION_SKIP_SERVER_PERMESSAGE_DEFLATE;*/
@@ -574,4 +655,55 @@ char *find_x_m2m_origin(const char *data) { // 요청헤더에서 X-M2M-Origin �
         }
     }
     return NULL; // 못 찾았을 경우 널값을 반환하도록 설정
+}
+
+int ws_notify(oneM2MPrimitive *o2pt, NotiTarget *nt)
+{
+    struct lws_context_creation_info info;
+    struct lws_client_connect_info ccinfo;
+    struct lws_context *context;
+    struct lws *wsi;
+
+    memset(&info, 0, sizeof(info));
+    info.port = CONTEXT_PORT_NO_LISTEN;
+    info.protocols = protocols;
+
+    context = lws_create_context(&info);
+    if (!context) {
+        logger("WEBSOCKET", LOG_LEVEL_ERROR, "Failed to create lws context\n");
+        return RSC_INTERNAL_SERVER_ERROR;
+    }
+
+    memset(&ccinfo, 0, sizeof(ccinfo));
+    ccinfo.context = context;
+    ccinfo.address = nt->host;
+    ccinfo.port = nt->port;
+    ccinfo.path = nt->target[0] ? nt->target : "/";
+    ccinfo.host = lws_canonical_hostname(context);
+    ccinfo.origin = "onem2m-cse";
+    ccinfo.protocol = protocols[1].name; //protocols[1] is for noti
+    ccinfo.ssl_connection = 0; // ws (not wss)
+    ccinfo.pwsi = &wsi;
+
+    noti_json = nt->noti_json;
+    rsc_result = 0;
+    interrupted = 0;
+
+    logger("WEBSOCKET", LOG_LEVEL_INFO, "Connecting to ws://%s:%d%s\n", nt->host, nt->port, ccinfo.path);
+    wsi = lws_client_connect_via_info(&ccinfo);
+
+    if (!wsi) {
+        logger("WEBSOCKET", LOG_LEVEL_ERROR, "WebSocket connect failed\n");
+        lws_context_destroy(context);
+        return RSC_BAD_REQUEST;
+    }
+
+    // 이벤트 루프 (block until interrupted)
+    while (!interrupted)
+        lws_service(context, 100);
+
+    lws_context_destroy(context);
+
+    logger("WEBSOCKET", LOG_LEVEL_INFO, "ws_notify done, rsc=%d\n", rsc_result);
+    return (rsc_result ? rsc_result : RSC_OK);
 }

@@ -5,6 +5,7 @@
 #include "config.h"
 #include "cJSON.h"
 #include "httpd.h"
+#include "websocket_server.h"
 
 bool init_server();
 

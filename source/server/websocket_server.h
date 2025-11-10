@@ -1,7 +1,7 @@
 #include "libcoap/coap.h"
 // #include <coap3/coap.h>
 #include "util.h"
-
+#include <libwebsockets.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +35,10 @@ void coap_notify(oneM2MPrimitive* o2pt, char* noti_json, NotiTarget* nt);
 void coap_forwarding(oneM2MPrimitive* o2pt, Protocol protocol, char* host, int port);
 void response_retrieve(oneM2MPrimitive* o2pt, cJSON* resource_obj, const char* resource_key);
 extern void route(oneM2MPrimitive* o2pt);
+void *websocket_server_thread(void *arg);
 void initialize_websocket_server();
+int ws_notify(oneM2MPrimitive *o2pt, NotiTarget *nt);
+
 
 #ifdef ENABLE_COAP_DTLS
 #define MAX_KEY 64 /* Maximum length of a pre-shared key in bytes. */

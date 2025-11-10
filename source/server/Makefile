@@ -3,6 +3,9 @@ UNAME := $(shell uname)
 # Check DB_TYPE from config.h to determine which database implementation to use
 DB_TYPE := $(shell grep -E "^\s*\#define\s+DB_TYPE\s+" config.h | grep -E "(DB_SQLITE|DB_POSTGRESQL)" | sed 's/.*DB_//')
 
+
+
+
 # macOS 
 ifeq ($(UNAME), Darwin)
     ifeq ($(DB_TYPE), POSTGRESQL)
@@ -26,6 +29,7 @@ endif
 
 CC=gcc
 
+
 ifeq ($(DB_TYPE), SQLITE)
     DB_IMPL = sqlite_implement.c
     DB_LIB_SRC = sqlite/sqlite3.c
@@ -34,7 +38,9 @@ else ifeq ($(DB_TYPE), POSTGRESQL)
     DB_LIB_SRC = 
 endif
 
-SRCS = main.c websocket_server.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
+
+
+SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket_server.c
 
 RSCSRC = $(wildcard resources/*.c)
 
@@ -51,9 +57,12 @@ LDFLAGS += $(shell pkg-config --libs libwebsockets)
 CFLAGS += $(shell pkg-config --cflags libwebsockets)
 
 
+
 RELEXE = server
 
 all: $(RELEXE)
+    find_package(PkgConfig  REQUIRED)
+    pkg_check_modules(LWS   REQUIRED    libwebsockets)
 
 
 # 빌드 타겟

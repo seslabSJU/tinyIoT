@@ -28,6 +28,9 @@
 #include "coap.h"
 #include "websocket_server.h"
 
+#ifdef ENABLE_WS
+#endif
+
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
 
@@ -49,9 +52,6 @@ int call_stop = 0;
 pthread_t mqtt;
 int mqtt_thread_id;
 #endif
-
-pthread_t websocket_thread;
-int websocket_thread_id;
 
 #ifdef ENABLE_COAP
 pthread_t coap;
@@ -82,10 +82,10 @@ static ssize_t cmdline_read_key(char *arg, unsigned char **buf, size_t maxlen)
 #endif
 #endif
 
-void *websocket_server_thread(void *arg) {
-    initialize_websocket_server();
-    return NULL;
-}
+#ifdef ENABLE_WS
+pthread_t websocket_thread;
+int websocket_thread_id;
+#endif
 
 int main(int argc, char **argv)
 {
@@ -215,10 +215,14 @@ int main(int argc, char **argv)
 		return 0;
 	}
 #endif
-	if (pthread_create(&websocket_thread, NULL, websocket_server_thread, NULL) != 0) {
-    	perror("Failed to create WebSocket server thread");
-    	return 1;
+#ifdef ENABLE_WS
+	websocket_thread_id = pthread_create(&websocket_thread, NULL, websocket_server_thread, "WS Server");
+	if(websocket_thread_id < 0) {
+		perror("Failed to create WebSocket server thread");
+		return 0;
 	}
+#endif
+	
 
 	serve_forever(PORT); // main oneM2M operation logic in void route()
 	// 스레드가 종료될 때까지 대기
@@ -234,6 +238,9 @@ int main(int argc, char **argv)
 
 #ifdef ENABLE_COAP
 	pthread_join(coap, NULL);
+#endif
+#ifdef ENABLE_WS
+	pthread_join(websocket_thread, NULL);
 #endif
 
 	return 0;
@@ -438,6 +445,14 @@ void stop_server(int sig)
 	{
 		pthread_kill(coap, SIGINT);
 		pthread_detach(coap);
+	}
+#endif
+#ifdef ENABLE_WS
+	logger("MAIN", LOG_LEVEL_INFO, "Closing WS...");
+	if (websocket_thread)
+	{
+		pthread_kill(websocket_thread, SIGINT);
+		pthread_detach(websocket_thread);
 	}
 #endif
 	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
