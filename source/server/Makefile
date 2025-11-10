@@ -55,15 +55,12 @@ OBJS = $(SRCS:.c=.o) $(RSCSRC:.c=.o) $(LSRCS:.c=.o) $(LIBCOAP:.c=.o)
 #LWS추가
 LDFLAGS += $(shell pkg-config --libs libwebsockets)
 CFLAGS += $(shell pkg-config --cflags libwebsockets)
-
+LDFLAGS += -lwebsockets #왜인지 이걸 추가해야지 링크가 됨...?
 
 
 RELEXE = server
 
 all: $(RELEXE)
-    find_package(PkgConfig  REQUIRED)
-    pkg_check_modules(LWS   REQUIRED    libwebsockets)
-
 
 # 빌드 타겟
 $(RELEXE) : $(OBJS)
