@@ -38,7 +38,7 @@ RTNode *registrar_csr = NULL;
 pthread_mutex_t main_lock;
 pthread_mutex_t csr_lock;
 pthread_mutexattr_t Attr;
-
+pthread_mutex_t ws_lock;
 #endif
 
 void route(oneM2MPrimitive *o2pt);
@@ -98,6 +98,7 @@ int main(int argc, char **argv)
 	pthread_mutexattr_settype(&Attr, PTHREAD_MUTEX_RECURSIVE);
 	pthread_mutex_init(&main_lock, &Attr);
 	pthread_mutex_init(&csr_lock, NULL);
+	pthread_mutex_init(&ws_lock, &Attr);
 #endif
 	// Attributes for resources
 	// all attributes are verified in validate_sub_attr in util.c

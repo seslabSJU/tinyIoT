@@ -15,11 +15,41 @@ void response_update(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *res
 void route(oneM2MPrimitive *o2pt);
 char *find_x_m2m_origin(const char *data);
 
+#if MONO_THREAD == 0
+#include <pthread.h>
+extern pthread_mutex_t ws_lock;
+#endif
 
+struct tuple_lws_and_wsi{
+    struct lws* wsi;
+    char* content;
+};
+struct wsi_list{
+    int count;
+    int max;
+    
+    struct tuple_lws_and_wsi* tuple_list;
+};
+
+
+//unity client
 #define MAX_CLIENTS 64
+static struct wsi_list clients;
 
-static struct lws* clients[MAX_CLIENTS];
-static int client_count = 0;
+//noti subject lws
+//servers to receive noti alert
+#define MAX_NOTI_SUBJECT 64
+static struct wsi_list noti_subjects;
+
+
+//noti obeject lws
+//servers to pass noti alert to subject
+// #define MAX_NOTI_OBJECTS 16
+// static struct wsi_list noti_objects;
+
+
+
+
 
 //noti
 static int interrupted = 0;
@@ -32,17 +62,95 @@ void *websocket_server_thread(void *arg){
     initialize_websocket_server();
 }
 
+
+static void init_wsi_List(){
+    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "wsi list init");
+    clients.tuple_list = (struct tuple_lws_and_wsi*)malloc(sizeof(struct tuple_lws_and_wsi)*MAX_CLIENTS);
+    clients.max = MAX_CLIENTS;
+    clients.count = 0;
+
+    noti_subjects.tuple_list = (struct tuple_lws_and_wsi*)malloc(sizeof(struct tuple_lws_and_wsi)*MAX_NOTI_SUBJECT);
+    noti_subjects.max = MAX_NOTI_SUBJECT;
+    noti_subjects.count = 0;
+
+    // noti_objects.list = (tuple_lws_and_wsi*)malloc(sizeof(tuple_lws_and_wsi)*MAX_NOTI_SUBJECT)
+    // noti_objects.max = MAX_NOTI_SUBJECT;
+    // noti_objects.count = 0;
+}
+
+static int remove_from_wsi_list(struct wsi_list *list, struct lws *wsi){
+#if MONO_THREAD == 0
+	pthread_mutex_lock(&ws_lock);
+#endif
+    for (int i = 0; i < list->count; i++) {
+            if (list->tuple_list[i].wsi == wsi) {
+                list->count--;
+
+                if(list->tuple_list[i].content){
+                    free(list->tuple_list[list->count].content);
+                }
+
+                list->tuple_list[i].wsi = list->tuple_list[list->count].wsi;
+                list->tuple_list[i].content = list->tuple_list[list->count].content;
+                list->tuple_list[list->count].wsi = NULL;
+                list->tuple_list[list->count].content = NULL;
+#if MONO_THREAD == 0
+	            pthread_mutex_unlock(&ws_lock);
+#endif
+                return 0;
+            }
+        }
+#if MONO_THREAD == 0
+	pthread_mutex_unlock(&ws_lock);
+#endif
+    return -1;
+    
+}
+static int add_to_wsi_list(struct wsi_list *list, struct lws* wsi, char* content){
+    // printf("list->count list->max %d, %d\n", list->count, list->max);
+#if MONO_THREAD == 0
+	pthread_mutex_lock(&ws_lock);
+#endif
+    
+    if(list->count >= list->max){
+#if MONO_THREAD == 0
+	    pthread_mutex_unlock(&ws_lock);
+#endif
+        return -1; //OverFlow
+    }
+    
+    list->tuple_list[list->count].wsi = wsi;
+    list->tuple_list[list->count].content = content;
+    
+    list->count++;
+
+#if MONO_THREAD == 0
+	pthread_mutex_unlock(&ws_lock);
+#endif
+    // printf("list->count %d\n", list->count);
+}
+//static *wsi find_wsi_from_nu
+
 static void broadcast_message(const char* msg)
 {
-    for (int i = 0; i < client_count; i++) {
-        if (clients[i]) {
-            size_t len = strlen(msg);
-            unsigned char buf[LWS_PRE + 1024];
-            unsigned char* p = &buf[LWS_PRE];
-            memcpy(p, msg, len);
-            lws_write(clients[i], p, len, LWS_WRITE_TEXT);
-        }
+    size_t len = strlen(msg);
+    unsigned char buf[LWS_PRE + 1024];
+    unsigned char* p = &buf[LWS_PRE];
+    memcpy(p, msg, len);
+    logger("WEBSOCKET", LOG_LEVEL_INFO, "BROADCAST TO  %d clients\ncontent :\n%s", clients.count, msg);
+    // printf("\n\nbroadcast\n%s\n\n\n",p);
+
+#if MONO_THREAD == 0
+	    pthread_mutex_lock(&ws_lock);
+#endif
+    for (int i = 0; i < clients.count; i++) {
+        
+        lws_write(clients.tuple_list[i].wsi, p, len, LWS_WRITE_TEXT);
+        //usleep(100 * 100);
     }
+#if MONO_THREAD == 0
+	    pthread_mutex_unlock(&ws_lock);
+#endif
 }
 
 static char* get_latest_content_instance(const char* path)
@@ -71,60 +179,20 @@ static char* get_latest_content_instance(const char* path)
     return st;
 }
 
-// JSON 조합
-static char* make_sensor_status_json()
-{
-    const char* paths[] = {
-        "TinyIoT/TinyFarm/Sensors/Temperature/la",
-        "TinyIoT/TinyFarm/Sensors/CO2/la"
-    };
-
-    /*"TinyIot/TinyFarm/Actuator/LED/la"*/
-    const char* keys[] = { "Temperature", "CO2"};
-    int count = sizeof(paths) / sizeof(paths[0]);
-
-    cJSON* root = cJSON_CreateObject();
-
-    for (int i = 0; i < count; i++) {
-        char* value = get_latest_content_instance(paths[i]);
-        cJSON_AddStringToObject(root, keys[i], value);
-        free(value);
-    }
-
-    char* json_str = cJSON_PrintUnformatted(root); // 메모리 할당됨
-    cJSON_Delete(root);
-    return json_str; // 호출 후 free() 필요
-}
-
-
-void PullingRoutine() {
-    char* s = make_sensor_status_json();
-    broadcast_message(s);
-    free(s);
-}
-
 
 static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                               void *user, void *in, size_t len) {
-
+    //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Websocket callback: %d", reason);
     switch (reason) {
         case LWS_CALLBACK_ESTABLISHED: {
             logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Connection established"); // 웹소켓 연결 수립
-            clients[client_count++] = wsi;
-            //PullingRoutine();
+            add_to_wsi_list(&clients, wsi, NULL);
             break;
         }
         case LWS_CALLBACK_CLOSED:
             logger("WEBSOCKET", LOG_LEVEL_INFO, "Connection closed");
+            remove_from_wsi_list(&clients, wsi);
             break;
-            for (int i = 0; i < client_count; i++) {
-                if (clients[i] == wsi) {
-                    clients[i] = clients[--client_count];
-                    clients[client_count] = NULL;
-                    printf("Client disconnected. Total: %d\n", client_count);
-                    break;
-                }
-            }
 
         case LWS_CALLBACK_RECEIVE: {
             // 메시지 수신 시
@@ -143,8 +211,11 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             cJSON *json = cJSON_Parse(received_data);
             if (json == NULL) { 
                 logger("WEBSOCKET", LOG_LEVEL_ERROR, "Invalid JSON format");
+                lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
                 return -1; //json 아닌 입력 차단
             }
+
+            
 
             // // JSON 구조체를 문자열로 변환하여 출력 -> 여기서 헤더 사라짐
             // char *json_string = cJSON_Print(json); 
@@ -171,6 +242,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             // Payload json 파싱
             if (!cJSON_IsObject(pc) && (op->valueint == 1 || op->valueint == 3 || op->valueint == 5)) {
                 logger("WEBSOCKET", LOG_LEVEL_ERROR, "Invalid pc format, pc is not json.");
+                lws_close_reason(wsi, LWS_CLOSE_STATUS_PROTOCOL_ERR, NULL, 0);
             }
 
             o2pt->request_pc = cJSON_Duplicate(pc, 1);
@@ -188,7 +260,8 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
                 }
                 else {
                     logger("WEBSOCKET", LOG_LEVEL_WARN, "fr 필드도 origin도 없음");
-                    return -1;
+                    // lws_close_reason(wsi, LWS_CLOSE_STATUS_PROTOCOL_ERR, NULL, 0);
+                    // return -1;
                 }
                 
             }
@@ -212,17 +285,19 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 
             switch (o2pt->op) {
                 case OP_CREATE:   // 1
+                case OP_RETRIEVE: // 2
+                case OP_UPDATE:   // 3
                     // 클라이언트가 rcn을 지정했으면 그대로 사용, 없으면 기본값 적용
                     o2pt->rcn = RCN_ATTRIBUTES; // 기본값: 생성 후 리소스 속성만 반환
                     break;
 
-                case OP_RETRIEVE: // 2
-                    o2pt->rcn = RCN_ATTRIBUTES_AND_CHILD_RESOURCES;
-                    break;
+                
+                    // o2pt->rcn = RCN_ATTRIBUTES_AND_CHILD_RESOURCES;
+                    // break;
 
-                case OP_UPDATE:   // 3
-                    o2pt->rcn = RCN_ATTRIBUTES; // 기본값: 수정된 속성만 반환
-                    break;
+                
+                    // o2pt->rcn = RCN_ATTRIBUTES; // 기본값: 수정된 속성만 반환
+                    // break;
 
                 case OP_DELETE:   // 4
                     o2pt->rcn = RCN_NOTHING; // 삭제 시 반환할 내용 없음
@@ -277,6 +352,7 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
             // 응답 생성
             if (o2pt->rsc == 2001) {  // 생성 요청
                 const char *resource_key = get_resource_key(o2pt->ty);
+                
 
                 //신 생성 요청
                 if (resource_key) {
@@ -369,9 +445,8 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 
             // cJSON_Delete(json);
             free_o2pt(o2pt);  // 프리미티브 메모리 해제
-            break;
         }
-
+        break;
         default:
             break;
     }
@@ -381,58 +456,60 @@ static int callback_websocket(struct lws *wsi, enum lws_callback_reasons reason,
 static int callback_ws_notify(struct lws *wsi, enum lws_callback_reasons reason,
                    void *user, void *in, size_t len)
 {
+    // logger("WEBSOCKET", LOG_LEVEL_INFO, "Noti callback!!!!");
     switch (reason) {
+        case LWS_CALLBACK_CLIENT_ESTABLISHED:
+            // logger("WEBSOCKET", LOG_LEVEL_INFO, "WebSocket Connected");
+            lws_callback_on_writable(wsi);
+            // //add_to_wsi_list(&noti_objects, wsi);
+            break;
 
-    case LWS_CALLBACK_CLIENT_ESTABLISHED:
-        logger("WEBSOCKET", LOG_LEVEL_INFO, "WebSocket Connected");
-        lws_callback_on_writable(wsi);
-        break;
-
-    case LWS_CALLBACK_CLIENT_WRITEABLE: {
-        if (noti_json) {
-            size_t msg_len = strlen(noti_json);
-            unsigned char *msg = malloc(LWS_PRE + msg_len);
-            memcpy(msg + LWS_PRE, noti_json, msg_len);
-
-            logger("WEBSOCKET", LOG_LEVEL_INFO, "Sending notification: %s", noti_json);
-            lws_write(wsi, msg + LWS_PRE, msg_len, LWS_WRITE_TEXT);
-
-            free(msg);
-            // 전송 후 종료하도록 신호
-            lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
+        case LWS_CALLBACK_CLIENT_WRITEABLE:
+            // interrupted = 1;
+            // lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
+            //lws_write(wsi, &buffer[LWS_PRE], message_length, LWS_WRITE_TEXT);
+            break;
+        case LWS_CALLBACK_CLIENT_RECEIVE:
             interrupted = 1;
-        }
-        break;
-    }
+            char *received_data = in;
+            *(received_data + len) = '\0';
+            cJSON *json = cJSON_Parse(received_data);
+            if (json == NULL) { 
+                logger("WEBSOCKET", LOG_LEVEL_ERROR, "Invalid JSON format");
+                lws_close_reason(wsi, LWS_CLOSE_STATUS_ABNORMAL_CLOSE, NULL, 0);
+                break;
+            }
+            // logger("WEBSOCKET", LOG_LEVEL_ERROR, "it is call Vertify fuction: %.*s\n", (int)len, (char *)in);
+            // broadcast_message((char *)in);
+            logger("WEBSOCKET", LOG_LEVEL_ERROR, "%s", json->valuestring);
+            cJSON *temp = cJSON_GetObjectItem(json, "m2m:sub");
+            if(temp){
+                lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
+                break;
+            }
+            temp = cJSON_GetObjectItem(json, "m2m:sgn");
 
-    case LWS_CALLBACK_CLIENT_RECEIVE: {
-        logger("WEBSOCKET", LOG_LEVEL_INFO, "Received: %.*s\n", (int)len, (char *)in);
-        // 예: {"rsc":2000} 형태의 응답 파싱
-        char *ptr = strstr((char *)in, "\"rsc\":");
-        if (ptr) {
-            rsc_result = atoi(ptr + 6);
-        }
+            if(temp){
+                broadcast_message(received_data);
+                break;
+            }
+            lws_close_reason(wsi, LWS_CLOSE_STATUS_ABNORMAL_CLOSE, NULL, 0);
         break;
-    }
-
-    case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-        logger("WEBSOCKET", LOG_LEVEL_ERROR, "WebSocket connection failed: %s",
-                 in ? (char *)in : "(null)");
-        rsc_result = RSC_BAD_REQUEST;
-        interrupted = 1;
+        // case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+        case LWS_CALLBACK_CLIENT_CLOSED:
+            remove_from_wsi_list(&noti_subjects, wsi);
+            logger("WEBSOCKET", LOG_LEVEL_INFO, "WebSocket Closed");
+            //remove_from_wsi_list(%noti_objects, wsi);
+            interrupted = 1;
         break;
 
-    case LWS_CALLBACK_CLIENT_CLOSED:
-    logger("WEBSOCKET", LOG_LEVEL_INFO, "WebSocket Closed");
-        interrupted = 1;
-        break;
-
-    default:
-        break;
+        default:
+            break;
     }
 
     return 0;
 }
+
 static struct lws_protocols protocols[] = {
     {
         "oneM2M.json",
@@ -527,7 +604,7 @@ void initialize_websocket_server() {
         logger("WEBSOCKET", LOG_LEVEL_ERROR, "WebSocket context creation failed");
         return;
     }
-
+    init_wsi_List();
     logger("WEBSOCKET", LOG_LEVEL_INFO, "WebSocket Server started on port 8081");
 
     // 테스트용으로 WSS/SSL 관련 코드는 제거
@@ -538,6 +615,8 @@ void initialize_websocket_server() {
 
     // 서버 종료 시 context destroy
     lws_context_destroy(context_ws);
+
+    
 }
 
 
@@ -550,8 +629,26 @@ void send_websocket_message(struct lws *wsi, const char *message) {
     lws_write(wsi, &buffer[LWS_PRE], message_length, LWS_WRITE_TEXT);
     free(buffer);
 
-    usleep(100 * 1000);
+    // usleep(100 * 100);
 }
+
+void send_alert_message(struct lws *wsi, const char *message) {
+
+    if(!wsi){
+        broadcast_message(message);
+
+    } else {
+        size_t message_length = strlen(message);
+        unsigned char *buffer = (unsigned char *)malloc(LWS_PRE + message_length);
+        memcpy(&buffer[LWS_PRE], message, message_length);
+        logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Sending message: %s", &buffer[LWS_PRE]);
+        lws_write(wsi, &buffer[LWS_PRE], message_length, LWS_WRITE_TEXT);
+        free(buffer);
+    }
+
+    //usleep(100 * 100);
+}
+
 
 void response_create(oneM2MPrimitive *o2pt, cJSON *resource_obj, const char *resource_key) {
     
@@ -656,9 +753,46 @@ char *find_x_m2m_origin(const char *data) { // 요청헤더에서 X-M2M-Origin �
     }
     return NULL; // 못 찾았을 경우 널값을 반환하도록 설정
 }
+//race
 
-int ws_notify(oneM2MPrimitive *o2pt, NotiTarget *nt)
+int ws_notify_vertify(oneM2MPrimitive* o2pt, NotiTarget *nt)
 {
+    // if(strcmp(nt->host, "localhost") && nt->port == PROT_WS){
+    //     //my self
+    //     //it is impossible to hendle this case in normal ?
+    // }
+    
+    char* identifier = (char*)malloc(128*sizeof(char));
+
+    strcpy(identifier, o2pt->to);        // 첫 번째 복사
+    strcat(identifier, "/");
+    // printf("**%s", o2pt->request_pc->valuestring);
+    //logger("WEBSOCKET", LOG_LEVEL_DEBUG, "loglog: %s", cJSON_PrintUnformatted(o2pt->request_pc));
+    // cJSON* json = cJSON_Parse();
+    strcat(identifier, cJSON_GetObjectItem(cJSON_GetObjectItem(cJSON_GetObjectItem(cJSON_GetObjectItem(cJSON_GetObjectItem(o2pt->request_pc, "m2m:sgn"), "nev"), "rep"), "m2m:sub"),"rn")->valuestring);
+    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "loglog: %s", identifier);
+    // cJSON_free(json);
+    
+    // char *last = strrchr(cJSON_GetObjectItem(o2pt->request_pc, "rn")->valuestring, '/'); // 마지막 '/'의 위치 찾기
+    // // if (last != NULL)
+    // //     printf("마지막 부분: %s\n", last + 1); // '/' 다음 문자부터 출력
+    // // else
+    // //     printf("구분자 없음: %s\n", path);
+    
+    // // int len = strlen(nt->host) + 16;  // ":포트번호" + 여유
+    // char *buffer = strdup(last+1);
+    // if (buffer) {
+    //     snprintf(buffer, len, "%s:%d", nt->host, nt->port);
+    // }
+
+    if(!strcmp("localhost", nt->host)){
+        add_to_wsi_list(&noti_subjects, NULL, identifier); //auto self sub
+        return 0;
+    }
+
+
+    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "ws_notify %s:%d", nt->host, nt->port);
+    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "identifier %s", identifier);
     struct lws_context_creation_info info;
     struct lws_client_connect_info ccinfo;
     struct lws_context *context;
@@ -697,13 +831,135 @@ int ws_notify(oneM2MPrimitive *o2pt, NotiTarget *nt)
         lws_context_destroy(context);
         return RSC_BAD_REQUEST;
     }
+    send_websocket_message(wsi, noti_json);
+    logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Sub Success");
+
+    
+    add_to_wsi_list(&noti_subjects, wsi, identifier);
 
     // 이벤트 루프 (block until interrupted)
     while (!interrupted)
         lws_service(context, 100);
 
-    lws_context_destroy(context);
 
-    logger("WEBSOCKET", LOG_LEVEL_INFO, "ws_notify done, rsc=%d\n", rsc_result);
+    // add_to_wsi_list(&noti_subjects, wsi, buffer);
+
     return (rsc_result ? rsc_result : RSC_OK);
+}
+
+int ws_notify_alert(char* noti_json, NotiTarget* nt){
+    //find subject list
+    // logger("WEBSOCKET", LOG_LEVEL_DEBUG, "noti target. tuple.content = %s", noti_to);
+    // logger("WEBSOCKET", Log, "noti alert %s", noti_json);
+    #if MONO_THREAD == 0
+	pthread_mutex_lock(&ws_lock);
+#endif
+
+// goto A;
+
+
+    cJSON* json = cJSON_Parse(noti_json);
+    if(!json){
+        logger("WEBSOCKET", LOG_LEVEL_ERROR, "unexpected json %s", noti_json);
+        goto A;
+    }
+
+    cJSON* sgn = cJSON_GetObjectItem(json,"m2m:sgn");
+    if(!sgn){
+        logger("WEBSOCKET", LOG_LEVEL_ERROR, "unexpected alert %s", cJSON_PrintUnformatted(json));
+        goto A; //에러
+    } else {
+        cJSON* sur = cJSON_GetObjectItem(sgn,"sur");
+        if(!sur){
+            sur = cJSON_GetObjectItem(sgn,"nev");
+            sur = cJSON_GetObjectItem(sur,"sur");
+        }
+
+        char* path = strdup(sur->valuestring);
+        cJSON_free(json);
+        for(int i=0; i<noti_subjects.count; i++){
+            if(!strcmp(noti_subjects.tuple_list[i].content, path)){
+                send_alert_message(noti_subjects.tuple_list[i].wsi, noti_json);
+                goto A;
+            }
+        }
+
+
+        //만약 없다면
+
+        if(!strcmp("localhost", nt->host)){
+            add_to_wsi_list(&noti_subjects, NULL, path); //auto self sub
+            for(int i=0; i<noti_subjects.count; i++){
+                if(!strcmp(noti_subjects.tuple_list[i].content, path)){
+                    send_alert_message(noti_subjects.tuple_list[i].wsi, noti_json);
+                    goto A;
+                }
+            }
+            goto A; //??? 이건 불가능함
+        }
+
+
+        logger("WEBSOCKET", LOG_LEVEL_DEBUG, "ws_notify %s:%d", nt->host, nt->port);
+        logger("WEBSOCKET", LOG_LEVEL_DEBUG, "identifier %s", path);
+        struct lws_context_creation_info info;
+        struct lws_client_connect_info ccinfo;
+        struct lws_context *context;
+        struct lws *wsi;
+
+        memset(&info, 0, sizeof(info));
+        info.port = CONTEXT_PORT_NO_LISTEN;
+        info.protocols = protocols;
+
+        context = lws_create_context(&info);
+        if (!context) {
+            logger("WEBSOCKET", LOG_LEVEL_ERROR, "Failed to create lws context\n");
+            return RSC_INTERNAL_SERVER_ERROR;
+        }
+
+        memset(&ccinfo, 0, sizeof(ccinfo));
+        ccinfo.context = context;
+        ccinfo.address = nt->host;
+        ccinfo.port = nt->port;
+        ccinfo.path = nt->target[0] ? nt->target : "/";
+        ccinfo.host = lws_canonical_hostname(context);
+        ccinfo.origin = "onem2m-cse";
+        ccinfo.protocol = protocols[1].name; //protocols[1] is for noti
+        ccinfo.ssl_connection = 0; // ws (not wss)
+        ccinfo.pwsi = &wsi;
+
+        noti_json = nt->noti_json;
+        rsc_result = 0;
+        interrupted = 0;
+
+        logger("WEBSOCKET", LOG_LEVEL_INFO, "Re Connecting to ws://%s:%d%s\n", nt->host, nt->port, ccinfo.path);
+        wsi = lws_client_connect_via_info(&ccinfo);
+
+        if (!wsi) {
+            logger("WEBSOCKET", LOG_LEVEL_ERROR, "WebSocket connect failed\n");
+            lws_context_destroy(context);
+            goto A;
+        }
+        send_websocket_message(wsi, noti_json);
+        logger("WEBSOCKET", LOG_LEVEL_DEBUG, "Sub Success");
+
+        
+        add_to_wsi_list(&noti_subjects, wsi, path);
+
+        // 이벤트 루프 (block until interrupted)
+        while (!interrupted)
+            lws_service(context, 100);
+
+        for(int i=0; i<noti_subjects.count; i++){
+            if(!strcmp(noti_subjects.tuple_list[i].content, path)){
+                send_alert_message(noti_subjects.tuple_list[i].wsi, noti_json);
+                goto A;
+            }
+        }
+    }
+
+    A:
+#if MONO_THREAD == 0
+	pthread_mutex_unlock(&ws_lock);
+#endif
+    //free(response_message);
 }

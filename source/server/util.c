@@ -2645,6 +2645,13 @@ int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode)
 				// mqtt_request(o2pt, host, port, path);
 #endif
 				break;
+				case PROT_WS:
+#ifdef ENABLE_WS // TODO
+				// mqtt_request(o2pt, host, port, path);
+				logger("WEBSOCKET", LOG_LEVEL_DEBUG, "WS SUB DEBUG CHECK IS IT?");
+#endif
+				break;
+
 			}
 			if (host)
 				free(host);
@@ -2656,7 +2663,7 @@ int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode)
 	return rsc;
 }
 
-int send_verification_request(char* noti_uri, cJSON* noti_cjson)
+int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "send_verification_request");
 	oneM2MPrimitive* o2pt = calloc(1, sizeof(oneM2MPrimitive));
@@ -2691,6 +2698,7 @@ int send_verification_request(char* noti_uri, cJSON* noti_cjson)
 	}
 	else if (rat == PROTOCOL_BINDING)
 	{
+
 		logger("UTIL", LOG_LEVEL_DEBUG, "protocol binding");
 		Protocol prot;
 		char* host, * path;
@@ -2703,7 +2711,7 @@ int send_verification_request(char* noti_uri, cJSON* noti_cjson)
 			free(nt);
 			return RSC_BAD_REQUEST;
 		}
-		o2pt->to = strdup(path);
+		o2pt->to = strdup(to);
 		strncpy(nt->host, host, 1024);
 		nt->port = port;
 		nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
@@ -2726,8 +2734,9 @@ int send_verification_request(char* noti_uri, cJSON* noti_cjson)
 #endif
 			break;
 		case PROT_WS:
+		logger("UTIL", LOG_LEVEL_DEBUG, "1111");
 #ifdef ENABLE_WS
-			rsc = ws_notify(o2pt, nt);
+			rsc = ws_notify_vertify(o2pt, nt);
 #endif
 			break;
 		}
@@ -2819,7 +2828,7 @@ int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net)
 		}
 		else if (rat == PROTOCOL_BINDING)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "protocol binding");
+			logger("UTIL", LOG_LEVEL_DEBUG, "protocol binding %s", noti_cjson->valuestring);
 			Protocol prot;
 			char* host, * path;
 			int port;
@@ -2849,6 +2858,11 @@ int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net)
 #ifdef ENABLE_COAP
 			case PROT_COAP:
 				coap_notify(o2pt, noti_json, nt);
+				break;
+#endif
+#ifdef ENABLE_WS
+			case PROT_WS:
+				ws_notify_alert(nt->noti_json, nt);
 				break;
 #endif
 				break;
@@ -3858,6 +3872,13 @@ int parsePoa(char* poa_str, Protocol* prot, char** host, int* port, char** path)
 	else if (!strncmp(poa_str, "coaps://", 8))
 	{
 		*prot = PROT_COAPS;
+	} else if (!strncmp(poa_str, "wss://", 6))
+	{
+		*prot = PROT_WSS;
+		
+	}else if (!strncmp(poa_str, "ws://", 5)) //Temporary Added WS Code
+	{
+		*prot = PROT_WS;
 	}
 	else
 	{
@@ -3876,6 +3897,18 @@ int parsePoa(char* poa_str, Protocol* prot, char** host, int* port, char** path)
 		if (ptr)
 			*ptr = ':';
 		ptr = strchr(p + 8, '/');
+	} else if (*prot == PROT_WS)
+	{
+		ptr = strchr(p + 5, ':');
+		if (ptr)
+		{
+			*ptr = '\0';
+			*port = atoi(ptr + 1);
+		}
+		*host = strdup(p + 5);
+		if (ptr)
+			*ptr = ':';
+		ptr = strchr(p + 5, '/');
 	}
 	else
 	{
@@ -3933,7 +3966,8 @@ ResourceAddressingType checkResourceAddressingType(char* uri)
 	{
 		return SP_RELATIVE;
 	}
-	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strcmp(uri, "coap://") == 0 || strcmp(uri, "coaps://") == 0)
+	//ws is temporary added
+	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strcmp(uri, "coap://") == 0 || strcmp(uri, "coaps://") == 0|| strncmp(uri, "wss://", 6) == 0|| strncmp(uri, "ws://", 5) == 0)
 	{
 		return PROTOCOL_BINDING;
 	}

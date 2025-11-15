@@ -37,8 +37,8 @@ void response_retrieve(oneM2MPrimitive* o2pt, cJSON* resource_obj, const char* r
 extern void route(oneM2MPrimitive* o2pt);
 void *websocket_server_thread(void *arg);
 void initialize_websocket_server();
-int ws_notify(oneM2MPrimitive *o2pt, NotiTarget *nt);
-
+int ws_notify_vertify(oneM2MPrimitive* o2pt, NotiTarget *nt);
+int ws_notify_alert(char* noti_json, NotiTarget* nt);
 
 #ifdef ENABLE_COAP_DTLS
 #define MAX_KEY 64 /* Maximum length of a pre-shared key in bytes. */
