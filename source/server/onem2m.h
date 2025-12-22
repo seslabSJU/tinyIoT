@@ -109,6 +109,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int create_cba(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int create_aea(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 
 int update_cse(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_ae(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
@@ -118,6 +119,7 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_acp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 
 void init_cse(cJSON *cse);
 void init_acp(cJSON *acp);

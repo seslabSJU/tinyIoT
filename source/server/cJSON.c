@@ -564,7 +564,8 @@ static cJSON_bool print_number(const cJSON * const item, printbuffer * const out
     }
 	else if(d == (double)item->valueint)
 	{
-		length = sprintf((char*)number_buffer, "%d", item->valueint);
+		/* Always use decimal format to preserve type information for FlexContainer custom attributes */
+		length = sprintf((char*)number_buffer, "%.1f", d);
 	}
     else
     {

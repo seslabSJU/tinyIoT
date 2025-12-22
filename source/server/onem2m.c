@@ -500,6 +500,11 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
 	}
 
+	if ((rtnode->ty == RT_CNT || rtnode->ty == RT_FCNT) && rtnode->parent && rtnode->parent->ty == RT_FCNT)
+	{
+		increment_parent_statetag(rtnode->parent);
+	}
+
 	return 1;
 }
 /**
@@ -605,9 +610,12 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	if (e == -1)
 		return o2pt->rsc;
 
-	if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
+	if (o2pt->ty != RT_FCNT)
 	{
-		return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+		if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
+		{
+			return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+		}
 	}
 
 	if (!isValidChildType(parent_rtnode->ty, o2pt->ty))
@@ -618,11 +626,33 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		}
 		return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type error");
 	}
+
 	cJSON *pjson = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(o2pt->ty));
-	pjson = cJSON_GetObjectItem(pjson, "et");
-	if (pjson && !isETvalid(pjson->valuestring))
+	if (!pjson && o2pt->ty == RT_FCNT)
 	{
-		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
+		cJSON *item = o2pt->request_pc->child;
+		while (item)
+		{
+			if (item->type == cJSON_Object && item->string)
+			{
+				cJSON *cnd = cJSON_GetObjectItem(item, "cnd");
+				if (cnd && cnd->type == cJSON_String && strchr(item->string, ':'))
+				{
+					pjson = item;
+					break;
+				}
+			}
+			item = item->next;
+		}
+	}
+
+	if (pjson)
+	{
+		cJSON *et_obj = cJSON_GetObjectItem(pjson, "et");
+		if (et_obj && !isETvalid(et_obj->valuestring))
+		{
+			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
+		}
 	}
 
 	switch (o2pt->ty)
@@ -663,6 +693,11 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		rsc = create_csr(o2pt, parent_rtnode);
 		break;
 
+	case RT_FCNT:
+		logger("O2M", LOG_LEVEL_INFO, "Create FCNT");
+		rsc = create_fcnt(o2pt, parent_rtnode);
+		break;
+
 	case RT_ACPA:
 	case RT_AEA:
 	case RT_CBA:
@@ -677,6 +712,12 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		handle_error(o2pt, RSC_BAD_REQUEST, "resource type error");
 		rsc = o2pt->rsc;
 	}
+
+	if (rsc == RSC_CREATED && (o2pt->ty == RT_CNT || o2pt->ty == RT_FCNT) && parent_rtnode && parent_rtnode->ty == RT_FCNT)
+	{
+		increment_parent_statetag(parent_rtnode);
+	}
+
 	return rsc;
 }
 
@@ -714,12 +755,29 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (e == -1)
 		return o2pt->rsc;
 
-	if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
+	if (o2pt->ty != RT_FCNT)
 	{
-		return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+		if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
+		{
+			return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+		}
 	}
 
 	cJSON *pjson = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(o2pt->ty));
+	// For FlexContainer, try to get the SDT shortname object if standard key doesn't exist
+	if (!pjson && o2pt->ty == RT_FCNT)
+	{
+		cJSON *item = o2pt->request_pc->child;
+		while (item)
+		{
+			if (item->type == cJSON_Object && item->string && strchr(item->string, ':'))
+			{
+				pjson = item;
+				break;
+			}
+			item = item->next;
+		}
+	}
 	pjson = cJSON_GetObjectItem(pjson, "et");
 	if (pjson && !isETvalid(pjson->valuestring))
 	{
@@ -760,6 +818,11 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	case RT_CSR:
 		logger("O2M", LOG_LEVEL_INFO, "Update CSR");
 		rsc = update_csr(o2pt, target_rtnode);
+		break;
+
+	case RT_FCNT:
+		logger("O2M", LOG_LEVEL_INFO, "Update FCNT");
+		rsc = update_fcnt(o2pt, target_rtnode);
 		break;
 
 #if CSE_RVI >= RVI_3

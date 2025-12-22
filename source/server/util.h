@@ -174,4 +174,14 @@ cJSON *qs_to_json(char *qs);
 cJSON *handle_uril(cJSON *uril, char *new_uri, FilterOperation fo);
 void filterOptionStr(FilterOperation fo, char *sql);
 ACOP op_to_acop(Operation op);
+
+// FlexContainer custom attributes (Release 2)
+bool is_standard_fcnt_attribute(const char *attrName);
+cJSON *extract_custom_attributes(cJSON *fcnt);
+int validate_shortname_cnd(const char *shortname, const char *cnd, char **error_msg);
+int validate_custom_attributes(const char *shortname, cJSON *customAttrs, const char *cnd, char **error_msg);
+int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op);
+int calculate_content_size(cJSON *customAttrs);
+void increment_parent_statetag(RTNode *parent_rtnode);
+
 #endif

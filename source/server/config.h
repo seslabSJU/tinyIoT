@@ -26,15 +26,15 @@
 #define DB_POSTGRESQL 2
 
 // Select Database Type: DB_SQLITE or DB_POSTGRESQL
-#define DB_TYPE DB_SQLITE
-// #define DB_TYPE DB_POSTGRESQL
+// #define DB_TYPE DB_SQLITE
+#define DB_TYPE DB_POSTGRESQL
 
 
 #if DB_TYPE == DB_POSTGRESQL
 // PostgreSQL connection settings
 #define PG_HOST "localhost"
 #define PG_PORT 5432
-#define PG_USER "user"
+#define PG_USER "tinyuser"
 #define PG_PASSWORD "password"
 #define PG_DBNAME "tinydb"
 
@@ -102,7 +102,7 @@
 // MQTT Settings
 
 // To enable MQTT, de-comment the following line
-// #define ENABLE_MQTT
+#define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
 #define MQTT_HOST "127.0.0.1"
@@ -154,7 +154,7 @@
 
 // For browser access, CORS should be enabled
 // To add CORS headers to HTTP response decomment following line.
-// #define CORS
+#define CORS
 
 // De-Register remoteCSE on shutdown
 // To make server delete all remote remoteCSE resource decomment following line.

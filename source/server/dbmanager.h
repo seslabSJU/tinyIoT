@@ -31,6 +31,10 @@ bool db_check_cin_rn_dup(char *rn, char *pi);
 int db_delete_one_cin_mni(RTNode *cnt);
 cJSON *getForbiddenUri(cJSON *acp_list);
 
+int db_store_fcnt_custom_attributes(const char *ri, cJSON *customAttrs);
+int db_update_fcnt_custom_attributes(const char *ri, cJSON *customAttrs);
+cJSON *db_get_fcnt_custom_attributes(const char *ri);
+
 #if DB_TYPE == DB_SQLITE
     void db_test_and_bind_value(sqlite3_stmt *stmt, int index, cJSON *obj);
     void db_test_and_set_bind_text(sqlite3_stmt *stmt, int index, char *context);
