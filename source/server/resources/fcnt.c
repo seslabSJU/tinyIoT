@@ -67,6 +67,32 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		return handle_error(o2pt, rsc, error_msg);
 	}
 
+	// Validate mandatory custom attributes on CREATE (only for attributes with "oc":"M")
+	if (shortname)
+	{
+		// m2m:gis requires 'gisn' on CREATE ("oc":"M" in genericInterworking.fcp)
+		if (strcmp(shortname, "m2m:gis") == 0)
+		{
+			if (!customAttrs || !cJSON_GetObjectItem(customAttrs, "gisn"))
+			{
+				if (customAttrs) cJSON_Delete(customAttrs);
+				cJSON_Delete(root);
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mandatory attribute 'gisn' missing for m2m:gis");
+			}
+		}
+
+		// m2m:gio requires 'gion' and 'gios' on CREATE ("oc":"M" in genericInterworking.fcp)
+		if (strcmp(shortname, "m2m:gio") == 0)
+		{
+			if (!customAttrs || !cJSON_GetObjectItem(customAttrs, "gion") || !cJSON_GetObjectItem(customAttrs, "gios"))
+			{
+				if (customAttrs) cJSON_Delete(customAttrs);
+				cJSON_Delete(root);
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mandatory attributes 'gion' and 'gios' missing for m2m:gio");
+			}
+		}
+	}
+
 	if (customAttrs)
 	{
 		rsc = validate_custom_attributes(shortname, customAttrs, pjson->valuestring, &error_msg);
