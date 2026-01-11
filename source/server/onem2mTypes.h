@@ -210,7 +210,9 @@ typedef enum
 	RT_TS = 29,		 // Time Series
 	RT_TSI = 30,	 // Time Series Instance
 	RT_CRS = 48,
-	RT_FCI = 58,
+	RT_FCIN = 58,
+	RT_FCNT_LA = 20058,  // FlexContainer Latest virtual resource
+	RT_FCNT_OL = 20059,  // FlexContainer Oldest virtual resource
 	RT_TSB = 60,
 	RT_ACTR = 63,
 	RT_ACPA = 10001,

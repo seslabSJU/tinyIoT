@@ -58,6 +58,7 @@ void init_cse(cJSON *cse)
 
 	cJSON *srv = cJSON_CreateArray();
 	cJSON_AddItemToArray(srv, cJSON_CreateString(from_rvi(CSE_RVI)));
+	cJSON_AddItemToArray(srv, cJSON_CreateString("4"));
 
 	cJSON_AddItemToObject(cse, "srv", srv);
 	cJSON_AddItemToObject(cse, "pi", cJSON_CreateString(""));
@@ -333,6 +334,71 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 	return 0;
 }
 
+/**
+ * @brief update fcnt on fcin change
+ * @param fcnt_rtnode rtnode of fcnt
+ * @param fcin_rtnode rtnode of fcin
+ * @param sign 1 for create, -1 for delete
+ * @return 0 for success, -1 for fail
+ */
+int update_fcnt_fcin(RTNode *fcnt_rtnode, RTNode *fcin_rtnode, int sign)
+{	
+	if (!fcnt_rtnode || !fcin_rtnode)
+		return -1;
+	cJSON *fcnt = fcnt_rtnode->obj;
+	cJSON *fcin = fcin_rtnode->obj;
+	if (!fcnt || !fcin)
+		return -1;
+	cJSON *cni = cJSON_GetObjectItem(fcnt, "cni");
+	cJSON *cbs = cJSON_GetObjectItem(fcnt, "cbs");
+	cJSON *st = cJSON_GetObjectItem(fcnt, "st");
+	cJSON *mia = cJSON_GetObjectItem(fcnt, "mia");
+
+	if (mia && mia->valueint > 0 && sign == 1) {
+		time_t now = time(NULL);
+		RTNode *expired[128];
+		memset(expired, 0, sizeof(expired));
+		int exp_cnt = 0;
+		RTNode *child = fcnt_rtnode->child;
+		while (child) {
+			if (child->ty == RT_FCIN) {
+				cJSON *ct = cJSON_GetObjectItem(child->obj, "ct");
+				struct tm tmv = {0};
+				strptime(ct->valuestring, "%Y%m%dT%H%M%S", &tmv);
+				time_t created = mktime(&tmv);
+				if (difftime(now, created) > mia->valueint) {
+					if (exp_cnt < 128){
+						expired[exp_cnt++] = child;
+					}
+					else {
+						logger("O2M", LOG_LEVEL_INFO, "Too Many Expired FCIN");
+					}
+				}
+			}
+			child = child->sibling_right;
+		}
+
+		for (int i = 0; i < exp_cnt; i++) {
+			RTNode *n = expired[i];
+			update_fcnt_fcin(fcnt_rtnode, n, -1);
+			db_delete_onem2m_resource(n);
+			free_rtnode(n);
+		}
+	}
+
+	cJSON_SetIntValue(cni, cni->valueint + sign);
+	cJSON_SetIntValue(cbs, cbs->valueint + (sign * cJSON_GetObjectItem(fcin, "cs")->valueint));
+	cJSON_SetIntValue(st, st->valueint + 1);
+	logger("O2", LOG_LEVEL_DEBUG, "FCIN cni: %d, cbs: %d, st: %d", cni->valueint, cbs->valueint, st->valueint);
+
+	if (sign == 1)
+		delete_fcin_under_fcnt_mni_mbs(fcnt_rtnode);
+
+	db_update_resource(fcnt, get_ri_rtnode(fcnt_rtnode), RT_FCNT);
+
+	return 0;
+}
+
 int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
 	logger("O2M", LOG_LEVEL_INFO, "Delete oneM2M resource");
@@ -366,6 +432,23 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		{
 			cJSON_Delete(target_rtnode->obj);
 			target_rtnode->obj = db_get_cin_laol(target_rtnode->parent, 0);
+			if (!target_rtnode->obj)
+			{
+				free_rtnode(target_rtnode);
+			}
+		}
+		else
+		{
+			free_rtnode(target_rtnode);
+		}
+	}
+	else if (target_rtnode->ty == RT_FCIN && o2pt->rvi >= RVI_4)
+	{
+		// Handle FCIN /la and /ol virtual resources
+		if (!strcmp(target_rtnode->rn, "la"))
+		{
+			cJSON_Delete(target_rtnode->obj);
+			target_rtnode->obj = db_get_fcin_laol(target_rtnode->parent, 0);
 			if (!target_rtnode->obj)
 			{
 				free_rtnode(target_rtnode);
@@ -416,6 +499,9 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		break;
 	case RT_CIN:
 		update_cnt_cin(rtnode->parent, rtnode, -1);
+		break;
+	case RT_FCIN:
+		update_fcnt_fcin(rtnode->parent, rtnode, -1);
 		break;
 	case RT_SUB:
 		detach_subs(rtnode->parent, rtnode);
@@ -610,7 +696,7 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	if (e == -1)
 		return o2pt->rsc;
 
-	if (o2pt->ty != RT_FCNT)
+	if (o2pt->ty != RT_FCNT && o2pt->ty != RT_FCIN)
 	{
 		if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
 		{
@@ -623,6 +709,11 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		if (o2pt->ty == RT_SUB)
 		{
 			return handle_error(o2pt, RSC_TARGET_NOT_SUBSCRIBABLE, "target not subscribable");
+		}
+		// FCIN cannot be created via API - special case
+		if (o2pt->ty == RT_FCIN)
+		{
+			return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "creating FCIN is forbidden");
 		}
 		return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type error");
 	}
@@ -698,6 +789,20 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		rsc = create_fcnt(o2pt, parent_rtnode);
 		break;
 
+	case RT_FCIN:
+		// FCIN can only be created internally by FCNT (RVI >= 4)
+		if (o2pt->rvi >= RVI_4)
+		{
+			logger("O2M", LOG_LEVEL_INFO, "Create FCIN - forbidden");
+			rsc = create_fcin(o2pt, parent_rtnode);
+		}
+		else
+		{
+			logger("O2M", LOG_LEVEL_INFO, "FCIN not supported for RVI < 4");
+			rsc = handle_error(o2pt, RSC_BAD_REQUEST, "resource type not supported");
+		}
+		break;
+
 	case RT_ACPA:
 	case RT_AEA:
 	case RT_CBA:
@@ -728,7 +833,49 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (e == -1)
 		return o2pt->rsc;
 
+	cJSON *prev_obj = NULL;
+	ResourceType prev_ty = target_rtnode->ty;
+
+	if (o2pt->rvi >= RVI_4 && target_rtnode->parent && target_rtnode->parent->ty == RT_FCNT)
+	{
+		if (target_rtnode->ty == RT_FCNT_LA)
+		{
+			cJSON *latest_fcin = db_get_fcin_laol(target_rtnode->parent, 0);
+			if (latest_fcin)
+			{
+				prev_obj = target_rtnode->obj;
+				target_rtnode->obj = latest_fcin;
+				target_rtnode->ty = RT_FCIN;
+			}
+			else
+			{
+				return handle_error(o2pt, RSC_NOT_FOUND, "no flexContainerInstances found");
+			}
+		}
+		else if (target_rtnode->ty == RT_FCNT_OL)
+		{
+			cJSON *oldest_fcin = db_get_fcin_laol(target_rtnode->parent, 1);
+			if (oldest_fcin)
+			{
+				prev_obj = target_rtnode->obj;
+				target_rtnode->obj = oldest_fcin;
+				target_rtnode->ty = RT_FCIN;
+			}
+			else
+			{
+				return handle_error(o2pt, RSC_NOT_FOUND, "no flexContainerInstances found");
+			}
+		}
+	}
+
 	make_response_body(o2pt, target_rtnode);
+
+	if (prev_obj)
+	{
+		cJSON_Delete(target_rtnode->obj);
+		target_rtnode->obj = prev_obj;
+		target_rtnode->ty = prev_ty;
+	}
 
 	o2pt->rsc = RSC_OK;
 	return RSC_OK;
@@ -739,6 +886,11 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if(target_rtnode->ty == RT_CSE) {
 		logger("O2M", LOG_LEVEL_INFO, "CSE cannot be updated");
 	    return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "CSE cannot be updated");
+    }
+
+	if(target_rtnode->ty == RT_FCIN) {
+		logger("O2M", LOG_LEVEL_INFO, "FCIN cannot be updated");
+	    return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "updating FCIN is forbidden");
     }
 
 	int rsc = 0;
@@ -755,7 +907,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (e == -1)
 		return o2pt->rsc;
 
-	if (o2pt->ty != RT_FCNT)
+	if (o2pt->ty != RT_FCNT && o2pt->ty != RT_FCIN)
 	{
 		if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
 		{
@@ -823,6 +975,20 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	case RT_FCNT:
 		logger("O2M", LOG_LEVEL_INFO, "Update FCNT");
 		rsc = update_fcnt(o2pt, target_rtnode);
+		break;
+
+	case RT_FCIN:
+		// FCIN cannot be updated directly (RVI >= 4)
+		if (o2pt->rvi >= RVI_4)
+		{
+			logger("O2M", LOG_LEVEL_INFO, "Update FCIN - forbidden");
+			rsc = update_fcin(o2pt, target_rtnode);
+		}
+		else
+		{
+			logger("O2M", LOG_LEVEL_INFO, "FCIN not supported for RVI < 4");
+			rsc = handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` is unsupported");
+		}
 		break;
 
 #if CSE_RVI >= RVI_3

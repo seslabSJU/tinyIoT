@@ -251,6 +251,9 @@ char *get_resource_key(ResourceType ty)
 	case RT_FCNT:
 		key = "m2m:fcnt";
 		break;
+	case RT_FCIN:
+		key = "m2m:fcin";
+		break;
 	default:
 		key = "general";
 		break;
@@ -392,6 +395,81 @@ char *resource_identifier(ResourceType ty, char *ct)
 	strcat(ri, buf);
 
 	return ri;
+}
+
+void delete_fcin_under_fcnt_mni_mbs(RTNode *rtnode)
+{
+	logger("UTIL", LOG_LEVEL_DEBUG, "call delete_fcin_under_fcnt_mni_mbs");
+	cJSON *fcnt = rtnode->obj;
+	cJSON *cni_obj = NULL;
+	cJSON *cbs_obj = NULL;
+	cJSON *mni_obj = NULL;
+	cJSON *mbs_obj = NULL;
+	int cni, mni, cbs, mbs, tmp = 0;
+
+	if ((cni_obj = cJSON_GetObjectItem(fcnt, "cni")))
+	{
+		cni = cni_obj->valueint;
+	}
+	if ((mni_obj = cJSON_GetObjectItem(fcnt, "mni")))
+	{
+		mni = mni_obj->valueint;
+	}
+	else
+	{
+		mni = DEFAULT_MAX_NR_INSTANCES;
+	}
+	if ((cbs_obj = cJSON_GetObjectItem(fcnt, "cbs")))
+	{
+		cbs = cbs_obj->valueint;
+	}
+	if ((mbs_obj = cJSON_GetObjectItem(fcnt, "mbs")))
+	{
+		mbs = mbs_obj->valueint;
+	}
+	else
+	{
+		mbs = DEFAULT_MAX_BYTE_SIZE;
+	}
+	if (cni <= mni && cbs <= mbs)
+		return;
+
+	if (cni == mni + 1)
+	{
+		tmp = db_delete_one_fcin_mni(rtnode);
+		if (tmp == -1)
+		{
+			logger("UTIL", LOG_LEVEL_ERROR, "delete_fcin_under_fcnt_mni_mbs error");
+		}
+		cbs -= tmp;
+		cni--;
+	}
+
+	if (cni > mni || cbs > mbs)
+	{
+		RTNode *head = db_get_fcin_rtnode_list(rtnode);
+		RTNode *right;
+
+		while ((mni >= 0 && cni > mni) || (mbs >= 0 && cbs > mbs))
+		{
+			if (head)
+			{
+				right = head->sibling_right;
+				db_delete_onem2m_resource(head);
+				cbs -= cJSON_GetObjectItem(head->obj, "cs")->valueint;
+				cni--;
+				free_rtnode(head);
+				head = right;
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+
+	cJSON_SetIntValue(cni_obj, cni);
+	cJSON_SetIntValue(cbs_obj, cbs);
 }
 
 void delete_cin_under_cnt_mni_mbs(RTNode *rtnode)
@@ -1594,6 +1672,12 @@ bool is_rn_valid_char(char c)
 
 int check_resource_type_equal(oneM2MPrimitive *o2pt)
 {
+	// Skip validation for FCIN - it will be rejected later with OPERATION_NOT_ALLOWED
+	if (o2pt->ty == RT_FCIN)
+	{
+		return 0;
+	}
+
 	if (o2pt->ty != parse_object_type_cjson(o2pt->request_pc))
 	{
 		handle_error(o2pt, RSC_BAD_REQUEST, "resource type is invalid");
@@ -1791,6 +1875,34 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			// Remove the internal _sn field from the response
 			cJSON_DeleteItemFromObject(fcnt_copy, "_sn");
 			cJSON_AddItemToObject(root, key, fcnt_copy);
+		}
+		else if (target_rtnode->ty == RT_FCIN)
+		{
+			// For FlexContainerInstance, use parent FCNT's SDT shortname
+			const char *key = get_resource_key(RT_FCNT); // Default to "m2m:fcnt"
+			if (target_rtnode->parent && target_rtnode->parent->ty == RT_FCNT)
+			{
+				cJSON *sn = cJSON_GetObjectItem(target_rtnode->parent->obj, "_sn");
+				if (sn && cJSON_IsString(sn))
+				{
+					key = sn->valuestring;
+				}
+				else
+				{
+					// Try to infer from cnd
+					cJSON *cnd = cJSON_GetObjectItem(target_rtnode->parent->obj, "cnd");
+					if (cnd && cJSON_IsString(cnd))
+					{
+						// Get shortname from ATTRIBUTES based on cnd
+						// For now, just use default key
+					}
+				}
+			}
+			char *debug_str = cJSON_PrintUnformatted(target_rtnode->obj);
+			logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body FCIN: target_rtnode->obj = %s", debug_str);
+			free(debug_str);
+			cJSON *fci_copy = cJSON_Duplicate(target_rtnode->obj, true);
+			cJSON_AddItemToObject(root, key, fci_copy);
 		}
 		else
 		{
@@ -4158,11 +4270,16 @@ bool isExpired(RTNode *rtnode)
 		return false;
 	}
 	char *now = get_local_time(0);
-	if (strcmp(now, et->valuestring) > 0)
+	int cmp_result = strcmp(now, et->valuestring);
+	if (cmp_result > 0)
 	{
+		logger("UTIL", LOG_LEVEL_INFO, "Resource EXPIRED: now=%s, et=%s, ty=%d, rn=%s",
+		       now, et->valuestring, rtnode->ty, rtnode->rn);
 		free(now);
 		return true;
 	}
+	logger("UTIL", LOG_LEVEL_DEBUG, "Resource NOT expired: now=%s, et=%s, cmp=%d, ty=%d, rn=%s",
+	       now, et->valuestring, cmp_result, rtnode->ty, rtnode->rn);
 	free(now);
 	return false;
 }
@@ -4172,12 +4289,13 @@ bool is_standard_fcnt_attribute(const char *attrName)
 	if (!attrName) return false;
 
 	const char *common_attrs[] = {
-		"rn", "ri", "pi", "ct", "lt", "ty", "acpi", "lbl",
+		"rn", "ri", "pi", "ct", "lt", "ty", "acpi", "lbl", "loc",
 		"at", "aa", "cr", "et", "nl", NULL
 	};
 
 	const char *fcnt_attrs[] = {
-		"cnd", "or", "st", "cs", "_sn", NULL
+		"cnd", "or", "st", "cs", "_sn",
+		"fcied", "mni", "mbs", "mia", "cni", "cbs", NULL
 	};
 
 	for (int i = 0; common_attrs[i] != NULL; i++) {
@@ -4215,6 +4333,7 @@ cJSON *extract_custom_attributes(cJSON *fcnt)
 static int is_known_shortname(const char *shortname) {
 	if (!shortname) return 0;
 	if (strcmp(shortname, "cod:tempe") == 0) return 1;
+	if (strcmp(shortname, "cod:aiQSr") == 0) return 1;
 	if (strcmp(shortname, "m2m:gis") == 0) return 1;
 	if (strcmp(shortname, "m2m:gio") == 0) return 1;
 	return 0;
@@ -4224,6 +4343,9 @@ static const char* get_expected_cnd(const char *shortname) {
 	if (!shortname) return NULL;
 	if (strcmp(shortname, "cod:tempe") == 0) {
 		return "org.onem2m.common.moduleclass.temperature";
+	}
+	if (strcmp(shortname, "cod:aiQSr") == 0) {
+		return "org.onem2m.common.moduleclass.airQualitySensor";
 	}
 	return NULL;
 }
@@ -4394,6 +4516,73 @@ int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
 		}
 	}
 
+	// Validate fcied, mni, mbs, mia attributes for FCIN support (only for RVI >= 4)
+	cJSON *fcied = cJSON_GetObjectItem(fcnt, "fcied");
+	cJSON *mni = cJSON_GetObjectItem(fcnt, "mni");
+	cJSON *mbs = cJSON_GetObjectItem(fcnt, "mbs");
+	cJSON *mia = cJSON_GetObjectItem(fcnt, "mia");
+	cJSON *cni = cJSON_GetObjectItem(fcnt, "cni");
+	cJSON *cbs = cJSON_GetObjectItem(fcnt, "cbs");
+
+	// RVI < 4: Reject FCIN attributes
+	if (o2pt->rvi < RVI_4)
+	{
+		if (fcied || mni || mbs || mia || cni || cbs)
+		{
+			return handle_error(o2pt, RSC_BAD_REQUEST, "fcied, mni, mbs, mia, cni, cbs are only supported in RVI 4 or higher");
+		}
+	}
+	// RVI >= 4: Validate FCIN attributes
+	else
+	{
+		if (op == OP_CREATE)
+		{
+			if ((mni || mbs || mia) && (!fcied || cJSON_IsNull(fcied)))
+			{
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mni, mbs, or mia requires fcied attribute");
+			}
+		}
+
+		// Validate mni
+		if (mni)
+		{
+			if (mni->valueint < 0)
+			{
+				return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `mni` is invalid");
+			}
+			if (op == OP_CREATE && fcied && cJSON_IsFalse(fcied) && mni->valueint == 0)
+			{
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mni cannot be 0 when fcied is false");
+			}
+		}
+
+		// Validate mbs
+		if (mbs)
+		{
+			if (mbs->valueint < 0)
+			{
+				return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `mbs` is invalid");
+			}
+			if (op == OP_CREATE && fcied && cJSON_IsFalse(fcied) && mbs->valueint == 0)
+			{
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mbs cannot be 0 when fcied is false");
+			}
+		}
+
+		// Validate mia
+		if (mia)
+		{
+			if (mia->valueint < 0)
+			{
+				return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `mia` is invalid");
+			}
+			if (op == OP_CREATE && fcied && cJSON_IsFalse(fcied) && mia->valueint == 0)
+			{
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mia cannot be 0 when fcied is false");
+			}
+		}
+	}
+
 	cJSON *aa = cJSON_GetObjectItem(fcnt, "aa");
 	cJSON *attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(RT_FCNT));
 	cJSON_ArrayForEach(pjson, aa)
@@ -4452,4 +4641,295 @@ void increment_parent_statetag(RTNode *parent_rtnode)
 
 		cJSON_Delete(update_obj);
 	}
+}
+// FlexContainerInstance (Release 4) functions
+
+int prepare_fcnt_for_instances(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
+{
+	if (!fcnt_rtnode || fcnt_rtnode->ty != RT_FCNT || o2pt->rvi < RVI_4)
+	{
+		return -1;
+	}
+
+	cJSON *fcnt = fcnt_rtnode->obj;
+	cJSON *fcied = cJSON_GetObjectItem(fcnt, "fcied");
+	
+	// Only prepare if fcied is present
+	if (!fcied)
+	{
+		return 0;
+	}
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "Preparing FCNT for instances: %s", fcnt_rtnode->uri);
+
+	// Create /la (latest) virtual resource
+	cJSON *la_obj = cJSON_CreateObject();
+	cJSON_AddStringToObject(la_obj, "rn", "la");
+	cJSON_AddNumberToObject(la_obj, "ty", RT_FCNT_LA);
+	cJSON_AddStringToObject(la_obj, "ri", "virtual-la");
+	cJSON_AddStringToObject(la_obj, "pi", get_ri_rtnode(fcnt_rtnode));
+	cJSON *et_obj = cJSON_GetObjectItem(fcnt, "et");
+	if (et_obj)
+	{
+		cJSON_AddStringToObject(la_obj, "et", et_obj->valuestring);
+	}
+
+	char *la_uri = malloc(1024);
+	sprintf(la_uri, "%s/la", fcnt_rtnode->uri);
+	RTNode *la_rtnode = create_rtnode(la_obj, RT_FCNT_LA);
+	la_rtnode->uri = la_uri;
+	add_child_resource_tree(fcnt_rtnode, la_rtnode);
+
+	// Create /ol (oldest) virtual resource
+	cJSON *ol_obj = cJSON_CreateObject();
+	cJSON_AddStringToObject(ol_obj, "rn", "ol");
+	cJSON_AddNumberToObject(ol_obj, "ty", RT_FCNT_OL);
+	cJSON_AddStringToObject(ol_obj, "ri", "virtual-ol");
+	cJSON_AddStringToObject(ol_obj, "pi", get_ri_rtnode(fcnt_rtnode));
+	if (et_obj)
+	{
+		cJSON_AddStringToObject(ol_obj, "et", et_obj->valuestring);
+	}
+
+	char *ol_uri = malloc(1024);
+	sprintf(ol_uri, "%s/ol", fcnt_rtnode->uri);
+	RTNode *ol_rtnode = create_rtnode(ol_obj, RT_FCNT_OL);
+	ol_rtnode->uri = ol_uri;
+	add_child_resource_tree(fcnt_rtnode, ol_rtnode);
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "Created /la and /ol virtual resources for FCNT");
+	
+	return 0;
+}
+
+int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
+{
+	if (!fcnt_rtnode || fcnt_rtnode->ty != RT_FCNT || o2pt->rvi < RVI_4)
+	{
+		return -1;
+	}
+
+	cJSON *fcnt = fcnt_rtnode->obj;
+	cJSON *st_obj = cJSON_GetObjectItem(fcnt, "st");
+	if (!st_obj)
+	{
+		return -1;
+	}
+
+	logger("UTIL", LOG_LEVEL_INFO, "===> CREATING FCIN: parent=%s, st=%d", fcnt_rtnode->rn, st_obj->valueint);
+
+	// Create FCIN resource
+	cJSON *fcin = cJSON_CreateObject();
+
+	// Set resource name: {fcnt_rn}_{st}
+	char rn_buf[256];
+	sprintf(rn_buf, "%s_%d", fcnt_rtnode->rn, st_obj->valueint);
+	cJSON_AddStringToObject(fcin, "rn", rn_buf);
+	logger("UTIL", LOG_LEVEL_INFO, "===> FCIN resourceName will be: %s", rn_buf);
+
+	// Copy label if present
+	cJSON *lbl = cJSON_GetObjectItem(fcnt, "lbl");
+	if (lbl)
+	{
+		cJSON_AddItemToObject(fcin, "lbl", cJSON_Duplicate(lbl, 1));
+	}
+
+	// Copy location if present
+	cJSON *loc = cJSON_GetObjectItem(fcnt, "loc");
+	if (loc)
+	{
+		cJSON_AddItemToObject(fcin, "loc", cJSON_Duplicate(loc, 1));
+	}
+
+	// Copy all custom attributes
+	cJSON *customAttrs = extract_custom_attributes(fcnt);
+	if (customAttrs)
+	{
+		cJSON *item = NULL;
+		cJSON_ArrayForEach(item, customAttrs)
+		{
+			if (item->string)
+			{
+				cJSON_AddItemToObject(fcin, item->string, cJSON_Duplicate(item, 1));
+			}
+		}
+		cJSON_Delete(customAttrs);
+	}
+
+	// Add stateTag
+	cJSON_AddNumberToObject(fcin, "st", st_obj->valueint);
+
+	// Add contentSize
+	cJSON *cs_obj = cJSON_GetObjectItem(fcnt, "cs");
+	if (cs_obj)
+	{
+		cJSON_AddNumberToObject(fcin, "cs", cs_obj->valueint);
+	}
+
+	// Add originator
+	if (o2pt->fr)
+	{
+		cJSON_AddStringToObject(fcin, "org", o2pt->fr);
+	}
+
+	// Add general attributes
+	add_general_attribute(fcin, fcnt_rtnode, RT_FCIN);
+
+	// Handle mia (maxInstanceAge) - set et if present, otherwise inherit from parent FCNT
+	cJSON *mia = cJSON_GetObjectItem(fcnt, "mia");
+	if (mia && cJSON_IsNumber(mia) && mia->valueint > 0)
+	{
+		logger("UTIL", LOG_LEVEL_INFO, "===> FCIN using mia value: %d seconds", mia->valueint);
+		char *et_str = get_local_time(-mia->valueint);
+		if (et_str)
+		{
+			cJSON_DeleteItemFromObject(fcin, "et");
+			cJSON_AddStringToObject(fcin, "et", et_str);
+			logger("UTIL", LOG_LEVEL_INFO, "===> FCIN et set from mia: %s", et_str);
+			free(et_str);
+		}
+	}
+	else
+	{
+		// Inherit parent FCNT's expirationTime when mia is not set
+		cJSON *fcnt_et = cJSON_GetObjectItem(fcnt, "et");
+		if (fcnt_et)
+		{
+			cJSON_DeleteItemFromObject(fcin, "et");
+			cJSON_AddStringToObject(fcin, "et", fcnt_et->valuestring);
+			logger("UTIL", LOG_LEVEL_INFO, "===> FCIN et inherited from FCNT: %s", fcnt_et->valuestring);
+		}
+		else
+		{
+			logger("UTIL", LOG_LEVEL_WARN, "===> FCIN: No et on parent FCNT!");
+		}
+	}
+
+	// Store FCIN in database
+	char *fci_uri = malloc(1024);
+	sprintf(fci_uri, "%s/%s", fcnt_rtnode->uri, rn_buf);
+
+	cJSON *ct_before_store = cJSON_GetObjectItem(fcin, "ct");
+	logger("UTIL", LOG_LEVEL_INFO, "===> FCIN ct before db_store: %s", ct_before_store ? ct_before_store->valuestring : "NULL");
+
+	int result = db_store_resource(fcin, fci_uri);
+	if (result != 1)
+	{
+		logger("UTIL", LOG_LEVEL_ERROR, "Failed to store FCIN in database");
+		cJSON_Delete(fcin);
+		free(fci_uri);
+		return -1;
+	}
+
+	cJSON *ct_after_store = cJSON_GetObjectItem(fcin, "ct");
+	logger("UTIL", LOG_LEVEL_INFO, "===> FCIN stored with ct=%s, uri=%s",
+	       ct_after_store ? ct_after_store->valuestring : "NULL", fci_uri);
+
+	// Add to resource tree
+	RTNode *fci_rtnode = create_rtnode(fcin, RT_FCIN);
+	fci_rtnode->uri = fci_uri;
+	add_child_resource_tree(fcnt_rtnode, fci_rtnode);
+
+	// Store custom attributes if any
+	customAttrs = extract_custom_attributes(fcin);
+	if (customAttrs)
+	{
+		cJSON *ri_obj = cJSON_GetObjectItem(fcin, "ri");
+		db_store_fcnt_custom_attributes(ri_obj->valuestring, customAttrs);
+		cJSON_Delete(customAttrs);
+	}
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "Successfully created FCIN: %s", fci_uri);
+
+	return 0;
+}
+
+int cleanup_fcnt_instances(RTNode *fcnt_rtnode, bool only_instances, bool keep_latest)
+{
+	if (!fcnt_rtnode || fcnt_rtnode->ty != RT_FCNT)
+	{
+		return -1;
+	}
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "Cleaning up FCNT instances: only_instances=%d, keep_latest=%d", 
+		   only_instances, keep_latest);
+
+	// Remove FCIN instances
+	RTNode *fci_list = db_get_fcin_rtnode_list(fcnt_rtnode);
+	if (fci_list)
+	{
+		// If keep_latest, find the FCIN with highest st (stateTag)
+		RTNode *latest = NULL;
+		int max_st = -1;
+
+		if (keep_latest)
+		{
+			RTNode *ptr = fci_list;
+			while (ptr)
+			{
+				cJSON *st_obj = cJSON_GetObjectItem(ptr->obj, "st");
+				if (st_obj && cJSON_IsNumber(st_obj))
+				{
+					int st = st_obj->valueint;
+					if (st > max_st)
+					{
+						max_st = st;
+						latest = ptr;
+					}
+				}
+				ptr = ptr->sibling_right;
+			}
+		}
+
+		// Delete all FCIs except latest (if keep_latest is true)
+		RTNode *ptr = fci_list;
+		while (ptr)
+		{
+			RTNode *next = ptr->sibling_right;
+
+			if (!keep_latest || ptr != latest)
+			{
+				db_delete_onem2m_resource(ptr);
+				free_rtnode(ptr);
+			}
+
+			ptr = next;
+		}
+	}
+
+	// Remove /la and /ol virtual resources if requested
+	if (!only_instances)
+	{
+		RTNode *child = fcnt_rtnode->child;
+		while (child)
+		{
+			RTNode *next = child->sibling_right;
+			
+			if (child->ty == RT_FCNT_LA || child->ty == RT_FCNT_OL)
+			{
+				logger("UTIL", LOG_LEVEL_DEBUG, "Removing virtual resource: %s", child->rn);
+				// Remove from tree (but don't delete from DB as they're virtual)
+				if (child->sibling_left)
+				{
+					child->sibling_left->sibling_right = child->sibling_right;
+				}
+				else
+				{
+					fcnt_rtnode->child = child->sibling_right;
+				}
+				
+				if (child->sibling_right)
+				{
+					child->sibling_right->sibling_left = child->sibling_left;
+				}
+				
+				free_rtnode(child);
+			}
+			
+			child = next;
+		}
+	}
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "Cleanup completed");
+	return 0;
 }

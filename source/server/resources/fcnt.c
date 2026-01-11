@@ -26,7 +26,7 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 				if (cnd && cnd->type == cJSON_String && strchr(item->string, ':'))
 				{
 					fcnt = item;
-					shortname = item->string; // Store the SDT shortname
+					shortname = item->string;
 					break;
 				}
 			}
@@ -40,7 +40,6 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		return handle_error(o2pt, RSC_BAD_REQUEST, "FlexContainer resource not found");
 	}
 
-	// Store the SDT shortname in the FCNT object for later use in responses
 	if (shortname)
 	{
 		cJSON_AddStringToObject(fcnt, "_sn", shortname);
@@ -67,10 +66,10 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		return handle_error(o2pt, rsc, error_msg);
 	}
 
-	// Validate mandatory custom attributes on CREATE (only for attributes with "oc":"M")
+	// Validate mandatory custom attributes on CREATE
 	if (shortname)
 	{
-		// m2m:gis requires 'gisn' on CREATE ("oc":"M" in genericInterworking.fcp)
+		// m2m:gis requires 'gisn' on CREATE
 		if (strcmp(shortname, "m2m:gis") == 0)
 		{
 			if (!customAttrs || !cJSON_GetObjectItem(customAttrs, "gisn"))
@@ -81,7 +80,7 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 			}
 		}
 
-		// m2m:gio requires 'gion' and 'gios' on CREATE ("oc":"M" in genericInterworking.fcp)
+		// m2m:gio requires 'gion' and 'gios' on CREATE
 		if (strcmp(shortname, "m2m:gio") == 0)
 		{
 			if (!customAttrs || !cJSON_GetObjectItem(customAttrs, "gion") || !cJSON_GetObjectItem(customAttrs, "gios"))
@@ -218,6 +217,34 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 	RTNode *child_rtnode = create_rtnode(fcnt, RT_FCNT);
 	add_child_resource_tree(parent_rtnode, child_rtnode);
+
+	if (o2pt->rvi >= RVI_4)
+	{
+		cJSON *fcied = cJSON_GetObjectItem(fcnt, "fcied");
+		if (fcied && cJSON_IsTrue(fcied))
+		{
+			prepare_fcnt_for_instances(child_rtnode, o2pt);
+
+			add_flexcontainer_instance(child_rtnode, o2pt);
+
+			cJSON_AddNumberToObject(fcnt, "cni", 1);
+			cJSON_AddNumberToObject(fcnt, "cbs", contentSize);
+
+			db_update_resource(fcnt, get_ri_rtnode(child_rtnode), RT_FCNT);
+		}
+		else if (fcied && cJSON_IsFalse(fcied))
+		{
+			prepare_fcnt_for_instances(child_rtnode, o2pt);
+
+			add_flexcontainer_instance(child_rtnode, o2pt);
+
+			cJSON_AddNumberToObject(fcnt, "cni", 1);
+			cJSON_AddNumberToObject(fcnt, "cbs", contentSize);
+
+			db_update_resource(fcnt, get_ri_rtnode(child_rtnode), RT_FCNT);
+		}
+	}
+
 	make_response_body(o2pt, child_rtnode);
 
 	if (fcnt->string && strcmp(fcnt->string, "m2m:fcnt") == 0)
@@ -244,8 +271,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		{
 			if (item->type == cJSON_Object && item->string)
 			{
-				// For update, accept any object with ':' in the name (SDT shortname)
-				// We don't require 'cnd' since it might not be in the update request
 				if (strchr(item->string, ':'))
 				{
 					m2m_fcnt = item;
@@ -279,6 +304,7 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	cJSON *pjson = NULL;
 	cJSON *acpi_obj = NULL;
 	bool acpi_flag = false;
+	bool needs_fci = false;
 
 	cJSON *customAttrs = extract_custom_attributes(m2m_fcnt);
 	if (customAttrs)
@@ -365,6 +391,23 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		return result;
 	}
 
+	if (o2pt->rvi >= RVI_4)
+	{
+		cJSON *mbs_update = cJSON_GetObjectItem(m2m_fcnt, "mbs");
+		if (mbs_update && cJSON_IsNumber(mbs_update))
+		{
+			cJSON *cs_current = cJSON_GetObjectItem(fcnt, "cs");
+			if (cs_current && cJSON_IsNumber(cs_current))
+			{
+				if (mbs_update->valueint < cs_current->valueint)
+				{
+					if (customAttrs) cJSON_Delete(customAttrs);
+					return handle_error(o2pt, RSC_BAD_REQUEST, "mbs cannot be smaller than cs");
+				}
+			}
+		}
+	}
+
 	cJSON *at = NULL;
 	if ((at = cJSON_GetObjectItem(m2m_fcnt, "at")))
 	{
@@ -375,6 +418,13 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 
 	cJSON_AddItemToObject(m2m_fcnt, "lt", cJSON_CreateString(get_local_time(0)));
+
+	cJSON *st_obj = cJSON_GetObjectItem(target_rtnode->obj, "st");
+	if (st_obj && cJSON_IsNumber(st_obj))
+	{
+		int current_st = st_obj->valueint;
+		cJSON_AddNumberToObject(m2m_fcnt, "st", current_st + 1);
+	}
 
 	if (customAttrs)
 	{
@@ -399,15 +449,146 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		int contentSize = calculate_content_size(existing_custom);
 		cJSON_AddNumberToObject(m2m_fcnt, "cs", contentSize);
 
-		// Increment stateTag when contentSize is modified (TS-0004 Section 7.4.37.2)
-		cJSON *st_obj = cJSON_GetObjectItem(target_rtnode->obj, "st");
-		if (st_obj && cJSON_IsNumber(st_obj))
-		{
-			int current_st = st_obj->valueint;
-			cJSON_AddNumberToObject(m2m_fcnt, "st", current_st + 1);
-		}
-
 		cJSON_Delete(existing_custom);
+	}
+
+	if (o2pt->rvi >= RVI_4)
+	{
+		cJSON *fcied_in_request = cJSON_GetObjectItem(m2m_fcnt, "fcied");
+		cJSON *fcied_current = cJSON_GetObjectItem(fcnt, "fcied");
+
+		cJSON *fcied_final = fcied_in_request ? fcied_in_request : fcied_current;
+
+		if (fcied_in_request && cJSON_IsNull(fcied_in_request))
+		{
+			logger("FCNT", LOG_LEVEL_DEBUG, "fcied is being removed");
+
+			if (cJSON_GetObjectItem(m2m_fcnt, "mni") ||
+			    cJSON_GetObjectItem(m2m_fcnt, "mbs") ||
+			    cJSON_GetObjectItem(m2m_fcnt, "mia"))
+			{
+				if (customAttrs) cJSON_Delete(customAttrs);
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mni, mbs, or mia must not be present when fcied is removed");
+			}
+
+			cJSON_DeleteItemFromObject(fcnt, "cni");
+			cJSON_DeleteItemFromObject(fcnt, "cbs");
+			cJSON_DeleteItemFromObject(fcnt, "mbs");
+			cJSON_DeleteItemFromObject(fcnt, "mni");
+			cJSON_DeleteItemFromObject(fcnt, "mia");
+
+			cleanup_fcnt_instances(target_rtnode, false, false);
+		}
+		else if (!fcied_final || cJSON_IsNull(fcied_final))
+		{
+			if (cJSON_GetObjectItem(m2m_fcnt, "mni") ||
+			    cJSON_GetObjectItem(m2m_fcnt, "mbs") ||
+			    cJSON_GetObjectItem(m2m_fcnt, "mia"))
+			{
+				if (customAttrs) cJSON_Delete(customAttrs);
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mni, mbs, or mia must not be present when fcied is not present");
+			}
+		}
+		else if (cJSON_IsFalse(fcied_final))
+		{
+			bool was_true_or_none = !fcied_current || cJSON_IsTrue(fcied_current) || cJSON_IsNull(fcied_current);
+
+			if (was_true_or_none && fcied_in_request && cJSON_IsFalse(fcied_in_request))
+			{
+				logger("FCNT", LOG_LEVEL_DEBUG, "fcied changed to false");
+
+				if (!fcied_current || cJSON_IsNull(fcied_current))
+				{
+					add_flexcontainer_instance(target_rtnode, o2pt);
+				}
+
+				cleanup_fcnt_instances(target_rtnode, true, true);
+
+				cJSON *cs_obj = cJSON_GetObjectItem(fcnt, "cs");
+				int cs_value = cs_obj ? cs_obj->valueint : 0;
+				cJSON_AddNumberToObject(m2m_fcnt, "cni", 1);
+				cJSON_AddNumberToObject(m2m_fcnt, "cbs", cs_value);
+			}
+		}
+		else if (cJSON_IsTrue(fcied_final))
+		{
+			bool was_false_or_none = !fcied_current || cJSON_IsFalse(fcied_current) || cJSON_IsNull(fcied_current);
+
+			if (was_false_or_none && fcied_in_request && cJSON_IsTrue(fcied_in_request))
+			{
+				logger("FCNT", LOG_LEVEL_DEBUG, "fcied changed to true");
+
+				prepare_fcnt_for_instances(target_rtnode, o2pt);
+			}
+
+			if (!cJSON_GetObjectItem(fcnt, "mni") && !cJSON_GetObjectItem(m2m_fcnt, "mni"))
+			{
+				cJSON_AddNumberToObject(m2m_fcnt, "mni", DEFAULT_MAX_NR_INSTANCES);
+			}
+			if (!cJSON_GetObjectItem(fcnt, "mbs") && !cJSON_GetObjectItem(m2m_fcnt, "mbs"))
+			{
+				cJSON_AddNumberToObject(m2m_fcnt, "mbs", DEFAULT_MAX_BYTE_SIZE);
+			}
+			if (!cJSON_GetObjectItem(fcnt, "mia") && !cJSON_GetObjectItem(m2m_fcnt, "mia"))
+			{
+				cJSON_AddNumberToObject(m2m_fcnt, "mia", DEFAULT_MAX_INSTANCE_AGE);
+			}
+
+			if (customAttrs || cJSON_GetObjectItem(m2m_fcnt, "lbl") || cJSON_GetObjectItem(m2m_fcnt, "loc"))
+			{
+				logger("FCNT", LOG_LEVEL_INFO, "===> Setting needs_fci=true because customAttrs=%p, lbl=%p, loc=%p",
+				       customAttrs, cJSON_GetObjectItem(m2m_fcnt, "lbl"), cJSON_GetObjectItem(m2m_fcnt, "loc"));
+				needs_fci = true;
+
+				cJSON *cbs_obj = cJSON_GetObjectItem(fcnt, "cbs");
+				cJSON *cni_obj = cJSON_GetObjectItem(fcnt, "cni");
+				cJSON *cs_obj = cJSON_GetObjectItem(fcnt, "cs");
+
+				int cbs_value = cbs_obj ? cbs_obj->valueint : 0;
+				int cni_value = cni_obj ? cni_obj->valueint : 0;
+				int cs_value = cs_obj ? cs_obj->valueint : 0;
+
+				cJSON_AddNumberToObject(m2m_fcnt, "cbs", cbs_value + cs_value);
+				cJSON_AddNumberToObject(m2m_fcnt, "cni", cni_value + 1);
+			}
+
+			cJSON *mni_final = cJSON_GetObjectItem(m2m_fcnt, "mni");
+			if (!mni_final) mni_final = cJSON_GetObjectItem(fcnt, "mni");
+
+			cJSON *mbs_final = cJSON_GetObjectItem(m2m_fcnt, "mbs");
+			if (!mbs_final) mbs_final = cJSON_GetObjectItem(fcnt, "mbs");
+
+			cJSON *cbs_final = cJSON_GetObjectItem(m2m_fcnt, "cbs");
+			if (!cbs_final) cbs_final = cJSON_GetObjectItem(fcnt, "cbs");
+
+			cJSON *cni_final = cJSON_GetObjectItem(m2m_fcnt, "cni");
+			if (!cni_final) cni_final = cJSON_GetObjectItem(fcnt, "cni");
+
+			if (mni_final && cJSON_IsNumber(mni_final))
+			{
+				int deleted_count = 0;
+				while (cni_final && cJSON_IsNumber(cni_final) &&
+				       cni_final->valueint > mni_final->valueint &&
+				       cni_final->valueint > 0)
+				{
+					int result = db_delete_one_fcin_mni(target_rtnode);
+					if (result != 0) {
+						logger("FCNT", LOG_LEVEL_ERROR, "Failed to delete FCIN for mni invariant");
+						break;
+					}
+
+					cni_final->valueint--;
+					deleted_count++;
+					logger("FCNT", LOG_LEVEL_DEBUG, "Deleted FCIN for mni, cni now: %d", cni_final->valueint);
+				}
+
+				if (deleted_count > 0) {
+					cJSON_DeleteItemFromObject(m2m_fcnt, "cni");
+					cJSON_AddNumberToObject(m2m_fcnt, "cni", cni_final->valueint);
+					logger("FCNT", LOG_LEVEL_INFO, "Updated cni in m2m_fcnt to: %d", cni_final->valueint);
+				}
+			}
+		}
 	}
 
 	update_resource(target_rtnode->obj, m2m_fcnt);
@@ -419,6 +600,13 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		cJSON *ri_obj = cJSON_GetObjectItem(target_rtnode->obj, "ri");
 		db_update_fcnt_custom_attributes(ri_obj->valuestring, customAttrs);
 		cJSON_Delete(customAttrs);
+	}
+
+	if (o2pt->rvi >= RVI_4 && needs_fci)
+	{
+		logger("FCNT", LOG_LEVEL_INFO, "===> Calling add_flexcontainer_instance (rvi=%d, needs_fci=%d)",
+		       o2pt->rvi, needs_fci);
+		add_flexcontainer_instance(target_rtnode, o2pt);
 	}
 
 	for (int i = 0; i < updateAttrCnt; i++)

@@ -89,6 +89,9 @@
 #define DEFAULT_MAX_NR_INSTANCES 1000
 #define DEFAULT_MAX_BYTE_SIZE 65536
 
+// FCIN Settings (FlexContainerInstance)
+#define DEFAULT_MAX_INSTANCE_AGE 86400  // 24 hours in seconds
+
 // CIN Settings
 #define ALLOW_CIN_RN true // true → allow, false → not allow
 
