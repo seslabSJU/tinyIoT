@@ -17,6 +17,9 @@ int db_store_resource(cJSON *obj, char *uri);
 int db_update_resource(cJSON *obj, char *ri, ResourceType ty);
 cJSON *db_get_resource(char *ri, ResourceType ty);
 cJSON *db_get_resource_by_uri(char *uri, ResourceType ty);
+int db_begin_tx();
+int db_commit_tx();
+int db_rollback_tx();
 
 int db_delete_onem2m_resource(RTNode *rtnode);
 
