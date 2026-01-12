@@ -4734,6 +4734,13 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		cJSON_AddItemToObject(fcin, "lbl", cJSON_Duplicate(lbl, 1));
 	}
 
+	// Copy fcinEnabled if present
+	cJSON *fcied = cJSON_GetObjectItem(fcnt, "fcied");
+	if (fcied)
+	{
+		cJSON_AddItemToObject(fcin, "fcied", cJSON_Duplicate(fcied, 1));
+	}
+
 	// Copy location if present
 	cJSON *loc = cJSON_GetObjectItem(fcnt, "loc");
 	if (loc)
