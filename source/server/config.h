@@ -34,15 +34,9 @@
 // PostgreSQL connection settings
 #define PG_HOST "localhost"
 #define PG_PORT 5432
-<<<<<<< HEAD
 #define PG_USER "tiny_user"
 #define PG_PASSWORD "password"
 #define PG_DBNAME "tinydb"
-=======
-#define PG_USER "tinyuser"
-#define PG_PASSWORD "tinypass"
-#define PG_DBNAME "tinydev"
->>>>>>> 3fa396a (Fix parallel processing error)
 
 // PostgreSQL Schema Types
 #define PG_SCHEMA_VARCHAR 0  // Use VARCHAR for string fields

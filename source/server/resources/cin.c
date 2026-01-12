@@ -113,8 +113,22 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         return o2pt->rsc;
     }
     struct timespec cnt_start, cnt_end;
+    if (!db_begin_tx())
+    {
+        handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB begin fail");
+        free_rtnode(cin_rtnode);
+        cJSON_Delete(root);
+        return o2pt->rsc;
+    }
     clock_gettime(CLOCK_MONOTONIC, &cnt_start);
-    update_cnt_cin(parent_rtnode, cin_rtnode, 1);
+    if (update_cnt_cin(parent_rtnode, cin_rtnode, 1) != 0)
+    {
+        db_rollback_tx();
+        handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "CNT update fail");
+        free_rtnode(cin_rtnode);
+        cJSON_Delete(root);
+        return o2pt->rsc;
+    }
     clock_gettime(CLOCK_MONOTONIC, &cnt_end);
     long update_ms = (cnt_end.tv_sec - cnt_start.tv_sec) * 1000 +
                      (cnt_end.tv_nsec - cnt_start.tv_nsec) / 1000000;
