@@ -34,7 +34,7 @@ else ifeq ($(DB_TYPE), POSTGRESQL)
     DB_LIB_SRC = 
 endif
 
-SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
+SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket/net_libwebsockets.c
 
 RSCSRC = $(wildcard resources/*.c)
 
