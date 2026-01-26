@@ -251,3 +251,46 @@ In order to run MQTT, Mosquitto MQTT broker should be installed on your machine.
 If you would like to add a new protocol binding to tinyIoT, you can follow the steps outlined in the guide below.<br>
 <a href = "https://github.com/seslabSJU/tinyIoT/blob/main/images/tinyIoT%20protocol%20binding%20guide.pdf" target="-blank"><b>protocol binding guide</b></a>
 <br><br>
+
+
+## Using MQTT over WebSocket
+
+If you want to use MQTT over WebSocket, you must enable and configure the WebSocket listener in Mosquitto and update the project configuration.
+
+### 1. Enable WebSocket listener in Mosquitto
+
+Edit the Mosquitto configuration file (e.g. `/etc/mosquitto/mosquitto.conf` or a custom config file):
+
+```conf
+# MQTT (TCP)
+listener 1883
+protocol mqtt
+
+# MQTT over WebSocket (default: 9001)
+listener 9001
+protocol websockets
+```
+
+The default WebSocket port is 9001.
+
+2. Run Mosquitto with the modified configuration file
+Start Mosquitto using your modified config file:
+
+    ```bash
+    sudo mosquitto -c /etc/mosquitto/mosquitto.conf
+    ```
+
+Or run it in the background:
+
+    ```bash
+    sudo mosquitto -c /etc/mosquitto/mosquitto.conf -d
+    ```
+
+3. Enable MQTT over WebSocket in config.h
+
+After completing these steps, the client will connect to Mosquitto using:
+
+ws://<SERVER_IP>:9001
+Example:
+
+ws://localhost:9001
