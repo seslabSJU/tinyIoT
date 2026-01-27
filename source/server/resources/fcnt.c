@@ -591,6 +591,7 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 	}
 
+
 	update_resource(target_rtnode->obj, m2m_fcnt);
 
 	result = db_update_resource(m2m_fcnt, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_FCNT);
