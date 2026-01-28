@@ -102,9 +102,14 @@
 // MQTT Settings
 
 // To enable MQTT, de-comment the following line
-// #define ENABLE_MQTT
+#define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
+// #define ENABLE_MQTT_WEBSOCKET
+#ifdef ENABLE_MQTT_WEBSOCKET
+#define MQTT_OVER_WS_PORT 9001
+#endif
+
 #define MQTT_HOST "127.0.0.1"
 #define MQTT_QOS MQTT_QOS_0
 #define MQTT_KEEP_ALIVE_SEC 60
@@ -125,15 +130,19 @@
 #define MQTT_PORT 1883
 #endif
 
+
+
 #define MQTT_MAX_PACKET_SZ 16384
 #define INVALID_SOCKET_FD -1
 #define PRINT_BUFFER_SIZE 16384
+
+
 
 #endif
 
 #define LOG_LEVEL LOG_LEVEL_DEBUG
 #define LOG_BUFFER_SIZE MAX_PAYLOAD_SIZE
-#define SAVE_LOG
+// #define SAVE_LOG
 
 // CoAP Settings
 
@@ -150,11 +159,18 @@
 
 #endif
 
+// To enable WS, de-comment the following line
+#define ENABLE_WS 1
+#ifdef ENABLE_WS
+#define WS_HOST "localhost"
+#define WS_PORT 8081
+#endif
+
 // Additional Settings
 
 // For browser access, CORS should be enabled
 // To add CORS headers to HTTP response decomment following line.
-// #define CORS
+#define CORS *
 
 // De-Register remoteCSE on shutdown
 // To make server delete all remote remoteCSE resource decomment following line.

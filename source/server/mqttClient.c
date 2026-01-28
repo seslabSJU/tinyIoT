@@ -34,8 +34,15 @@
 #include "time.h"
 #include "logger.h"
 #include "util.h"
+#include "websocket/net_libwebsockets.h"
 
 #define LOG_TAG "MQTT"
+
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
 
 /* thread signal */
 extern int terminate;
@@ -62,9 +69,9 @@ extern pthread_mutex_t mutex_lock;
 static word16 mqtt_get_packetid(void);
 int invalidRequest();
 
-static int mqtt_message_cb(MqttClient *client, MqttMessage *msg,
-                           byte msg_new, byte msg_done)
+int mqtt_message_cb(MqttClient *client, MqttMessage *msg, byte msg_new, byte msg_done)
 {
+    logger(LOG_TAG, LOG_LEVEL_DEBUG, "mqtt_message_cb 호출");
     int rsc = 0;
     byte buf[PRINT_BUFFER_SIZE + 1];
     word32 len;
@@ -349,11 +356,11 @@ int invalidRequest()
     return MQTT_CODE_SUCCESS;
 }
 
-static void setup_timeout(struct timeval *tv, int timeout_ms)
+void setup_timeout(struct timeval *tv, int timeout_ms)
 {
     tv->tv_sec = timeout_ms / 1000;
     tv->tv_usec = (timeout_ms % 1000) * 1000;
-
+    //
     /* Make sure there is a minimum value specified */
     if (tv->tv_sec < 0 || (tv->tv_sec == 0 && tv->tv_usec <= 0))
     {
@@ -437,10 +444,16 @@ static int mqtt_net_connect(void *context, const char *host, word16 port,
     setsockopt(sockFd, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv, sizeof(tv));
     /* Start connect */
     rc = connect(sockFd, (struct sockaddr *)&addr, sizeof(addr));
+
+    if (rc < 0) {
+        PRINTF("connect failed: errno=%d (%s)",
+            rc, strerror(rc));
+    }
+
     if (rc < 0)
     {
         PRINTF("NetConnect: Error %d (Sock Err %d)",
-               rc, socket_get_error(*pSockFd));
+               rc, socket_get_error(sockFd));
         close(sockFd);
         return MQTT_CODE_ERROR_NETWORK;
     }
@@ -630,11 +643,30 @@ int mqtt_notify(oneM2MPrimitive *o2pt, cJSON *noti_json, NotiTarget *nt)
     else
     {
         memset(&mNet, 0, sizeof(mNet));
+//
+#ifdef ENABLE_MQTT_WEBSOCKET
+        mNet.connect = NetWebsocket_Connect;
+        mNet.read = NetWebsocket_Read;
+        mNet.write = NetWebsocket_Write;
+        mNet.disconnect = NetWebsocket_Disconnect;
+    
+        mNet.context = (LibwebsockContext*)WOLFMQTT_MALLOC(sizeof(LibwebsockContext));
+        
+#else
         mNet.connect = mqtt_net_connect;
         mNet.read = mqtt_net_read;
         mNet.write = mqtt_net_write;
         mNet.disconnect = mqtt_net_disconnect;
         mNet.context = &sfd;
+#endif
+
+        
+        int mqtt_port;
+#ifdef ENABLE_MQTT_WEBSOCKET
+        mqtt_port = MQTT_OVER_WS_PORT;
+#else
+        mqtt_port = MQTT_PORT;
+#endif
 
         rc = MqttClient_Init(&notiClient, &mNet, mqtt_message_cb,
                              (byte *)notiSbuf, sizeof(notiSbuf), notiRbuf, sizeof(notiRbuf),
@@ -652,7 +684,7 @@ int mqtt_notify(oneM2MPrimitive *o2pt, cJSON *noti_json, NotiTarget *nt)
             goto exit;
         }
         logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT Network Connect Success: Host %s, Port %d, UseTLS %d",
-               MQTT_HOST, MQTT_PORT, MQTT_USE_TLS);
+               MQTT_HOST, mqtt_port, MQTT_USE_TLS);
 
         sprintf(buf, "%s_notify", MQTT_CLIENT_ID); // new client ID for notification
         /* Send Connect and wait for Ack */
@@ -735,6 +767,9 @@ int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, int port, cJSON *csr)
     char notiSbuf[1024], notiRbuf[1024];
     cJSON *csi = cJSON_GetObjectItem(csr, "csi");
 
+
+
+
     sprintf(topic, "/oneM2M/req/%s/%s/json", CSE_BASE_RI, cJSON_GetStringValue(csi));
     logger("MQTT", LOG_LEVEL_DEBUG, "topic : %s", topic);
 
@@ -746,11 +781,25 @@ int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, int port, cJSON *csr)
     else
     {
         memset(&mNet, 0, sizeof(mNet));
+#ifdef ENABLE_MQTT_WEBSOCKET
+        mNet.connect = NetWebsocket_Connect;
+        mNet.read = NetWebsocket_Read;
+        mNet.write = NetWebsocket_Write;
+        mNet.disconnect = NetWebsocket_Disconnect;
+        mNet.context = (LibwebsockContext*)WOLFMQTT_MALLOC(sizeof(LibwebsockContext));
+#else
         mNet.connect = mqtt_net_connect;
         mNet.read = mqtt_net_read;
         mNet.write = mqtt_net_write;
         mNet.disconnect = mqtt_net_disconnect;
         mNet.context = &sfd;
+#endif
+        int mqtt_port;
+#ifdef ENABLE_MQTT_WEBSOCKET
+        mqtt_port = MQTT_OVER_WS_PORT;
+#else
+        mqtt_port = MQTT_PORT;
+#endif
 
         rc = MqttClient_Init(&notiClient, &mNet, NULL,
                              notiSbuf, sizeof(notiSbuf), notiRbuf, sizeof(notiRbuf),
@@ -768,7 +817,7 @@ int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, int port, cJSON *csr)
             goto exit;
         }
         logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT Network Connect Success: Host %s, Port %d, UseTLS %d",
-               MQTT_HOST, MQTT_PORT, MQTT_USE_TLS);
+               MQTT_HOST, mqtt_port, MQTT_USE_TLS);
 
         sprintf(buf, "%s_forwarding", MQTT_CLIENT_ID); // new client ID for notification
         /* Send Connect and wait for Ack */
@@ -808,8 +857,8 @@ int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, int port, cJSON *csr)
     mqttPub.qos = MQTT_QOS;
     mqttPub.topic_name = topic;
     mqttPub.packet_id = mqtt_get_packetid();
-    mqttPub.buffer = strdup(o2pt->request_pc);
-    mqttPub.total_len = XSTRLEN(o2pt->request_pc);
+    mqttPub.buffer = strdup(o2pt->request_pc->valuestring);
+    mqttPub.total_len = XSTRLEN(o2pt->request_pc->valuestring);
 
     logger(LOG_TAG, LOG_LEVEL_DEBUG, "MQTT Publish: Topic %s, Qos %d\n%s\n",
            mqttPub.topic_name, mqttPub.qos, mqttPub.buffer);
@@ -862,19 +911,40 @@ exit:
 /* Public Function */
 void *mqtt_serve(void)
 {
+    int sfd = 0;
     int pingc = 0;
     int rc = 0;
     MqttObject mqttObj;
     MqttTopic topics[4];
     char *reqTopic, *respTopic, *reg_reqTopic, *reg_respTopic;
+    int mqtt_port;
+    
+#ifdef ENABLE_MQTT_WEBSOCKET
+    mqtt_port = MQTT_OVER_WS_PORT;
+    logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT OVER WEBSOCKET");
+#else
+    mqtt_port = MQTT_PORT;
+    logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT TCP");
+#endif //ENABLE_MQTT_WEBSOCKET end
 
     /* Initialize MQTT client */
     XMEMSET(&mNetwork, 0, sizeof(mNetwork));
-    mNetwork.connect = mqtt_net_connect;
-    mNetwork.read = mqtt_net_read;
-    mNetwork.write = mqtt_net_write;
-    mNetwork.disconnect = mqtt_net_disconnect;
-    mNetwork.context = &mSockFd;
+#ifdef ENABLE_MQTT_WEBSOCKET
+        mNetwork.connect = NetWebsocket_Connect;
+        mNetwork.read = NetWebsocket_Read;
+        mNetwork.write = NetWebsocket_Write;
+        mNetwork.disconnect = NetWebsocket_Disconnect;
+        mNetwork.context = (LibwebsockContext*)WOLFMQTT_MALLOC(sizeof(LibwebsockContext));
+        ((LibwebsockContext*)mNetwork.context)->status = 1;
+        
+#else
+        mNetwork.connect = mqtt_net_connect;
+        mNetwork.read = mqtt_net_read;
+        mNetwork.write = mqtt_net_write;
+        mNetwork.disconnect = mqtt_net_disconnect;
+        mNetwork.context = &sfd;
+#endif //ENABLE_MQTT_WEBSOCKET end
+
     rc = MqttClient_Init(&mClient, &mNetwork, mqtt_message_cb,
                          mSendBuf, sizeof(mSendBuf), mReadBuf, sizeof(mReadBuf),
                          MQTT_CON_TIMEOUT_MS);
@@ -883,17 +953,21 @@ void *mqtt_serve(void)
         goto exit;
     }
     logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT Init Success");
-
+    
     /* Connect to broker */
-    rc = MqttClient_NetConnect(&mClient, MQTT_HOST, MQTT_PORT,
+    rc = MqttClient_NetConnect(&mClient, MQTT_HOST, mqtt_port,
                                MQTT_CON_TIMEOUT_MS, MQTT_USE_TLS, mqtt_tls_cb);
     if (rc != MQTT_CODE_SUCCESS)
     {
         goto exit;
     }
+#ifdef ENABLE_MQTT_WEBSOCKET
+    logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT OVER WEBSOCKET Network Connect Success: Host %s, Port %d, UseTLS %d",
+           MQTT_HOST, mqtt_port, MQTT_USE_TLS);
+#else
     logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT Network Connect Success: Host %s, Port %d, UseTLS %d",
-           MQTT_HOST, MQTT_PORT, MQTT_USE_TLS);
-
+           MQTT_HOST, mqtt_port, MQTT_USE_TLS);
+#endif
     /* Send Connect and wait for Ack */
     XMEMSET(&mqttObj, 0, sizeof(mqttObj));
     mqttObj.connect.keep_alive_sec = MQTT_KEEP_ALIVE_SEC;
