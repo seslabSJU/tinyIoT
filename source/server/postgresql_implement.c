@@ -477,6 +477,12 @@ char *get_table_name(ResourceType ty)
     case RT_CSR:
         tableName = "csr";
         break;
+    case RT_TS: 
+        tableName = "ts";
+        break;
+    case RT_TSI: 
+        tableName = "tsi";
+        break;
     case RT_AEA:
         tableName = "aeA";
         break;
@@ -749,9 +755,9 @@ int db_store_resource(cJSON *obj, char *uri)
                 } else if (cJSON_IsNumber(pjson)) {
                     sprintf(sql + strlen(sql), "%d", pjson->valueint);
                 } else if (cJSON_IsTrue(pjson)) {
-                    strcat(sql, "1");
+                    strcat(sql, "'1'");
                 } else if (cJSON_IsFalse(pjson)) {
-                    strcat(sql, "0");
+                    strcat(sql, "'0'");
                 } else if (cJSON_IsArray(pjson) || cJSON_IsObject(pjson)) {
                     char *escaped = pg_format_json_value(pjson);
                     sprintf(sql + strlen(sql), "'%s'", escaped);
@@ -785,9 +791,9 @@ int db_store_resource(cJSON *obj, char *uri)
             } else if (cJSON_IsNumber(pjson)) {
                 sprintf(sql + strlen(sql), "%d", pjson->valueint);
             } else if (cJSON_IsTrue(pjson)) {
-                strcat(sql, "1");
+                strcat(sql, "'1'");
             } else if (cJSON_IsFalse(pjson)) {
-                strcat(sql, "0");
+                strcat(sql, "'0'");
             } else if (cJSON_IsArray(pjson) || cJSON_IsObject(pjson)) {
                 char *escaped = pg_format_json_value(pjson);
                 sprintf(sql + strlen(sql), "'%s'", escaped);
@@ -884,9 +890,9 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             } else if (cJSON_IsNumber(pjson)) {
                 sprintf(sql + strlen(sql), "%d", pjson->valueint);
             } else if (cJSON_IsTrue(pjson)) {
-                strcat(sql, "1");
+                strcat(sql, "'1'");
             } else if (cJSON_IsFalse(pjson)) {
-                strcat(sql, "0");
+                strcat(sql, "'0'");
             } else if (cJSON_IsArray(pjson) || cJSON_IsObject(pjson)) {
                 char *escaped = pg_format_json_value(pjson);
                 sprintf(sql + strlen(sql), "'%s'", escaped);
@@ -937,9 +943,9 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             } else if (cJSON_IsNumber(pjson)) {
                 sprintf(sql + strlen(sql), "%d", pjson->valueint);
             } else if (cJSON_IsTrue(pjson)) {
-                strcat(sql, "1");
+                strcat(sql, "'1'");
             } else if (cJSON_IsFalse(pjson)) {
-                strcat(sql, "0");
+                strcat(sql, "'0'");
             } else if (cJSON_IsArray(pjson) || cJSON_IsObject(pjson)) {
                 char *escaped = pg_format_json_value(pjson);
                 sprintf(sql + strlen(sql), "'%s'", escaped);
@@ -1777,4 +1783,77 @@ cJSON *getForbiddenUri(cJSON *acp_list)
     PQclear(res);
     pg_unlock();
     return result;
+}
+
+
+cJSON *db_get_tsi_laol(RTNode *parent_rtnode, int laol)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "[DB] db_get_tsi_laol called");
+
+    if (!parent_rtnode) return NULL;
+
+    char sql[1024] = {0};
+    char *ord = (laol == 0) ? "DESC" : "ASC";
+    PGresult *res;
+    cJSON *json = NULL;
+
+    char *parent_ri = get_ri_rtnode(parent_rtnode);
+    if (!parent_ri) {
+        logger("DB", LOG_LEVEL_ERROR, "Parent RI is NULL");
+        return NULL;
+    }
+
+    snprintf(sql, sizeof(sql), 
+        "SELECT * FROM general, tsi "
+        "WHERE general.pi='%s' AND general.id = tsi.id AND general.ty = %d "
+        "ORDER BY general.ct %s, general.id %s LIMIT 1;", 
+        parent_ri, RT_TSI, ord, ord
+    );
+
+    res = PQexec(pg_conn, sql);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "DB Select Failed: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        return NULL;
+    }
+
+    if (PQntuples(res) == 0) {
+        logger("DB", LOG_LEVEL_DEBUG, "No TimeSeriesInstance found");
+        PQclear(res);
+        return NULL;
+    }
+
+    json = cJSON_CreateObject();
+    int cols = PQnfields(res);
+
+    for (int col = 0; col < cols; col++) {
+        char *colname = PQfname(res, col);
+        char *value = PQgetvalue(res, 0, col);
+
+        if (strcmp(colname, "id") == 0) continue; 
+        if (!value || strlen(value) == 0) continue;
+
+        if (strcmp(colname, "ty")==0 || strcmp(colname, "cs")==0 || 
+            strcmp(colname, "st")==0 || strcmp(colname, "mni")==0 ||
+            strcmp(colname, "snr") == 0) {
+            cJSON_AddNumberToObject(json, colname, atoi(value));
+            continue;
+        }
+
+        if (value[0] == '{' || value[0] == '[') {
+            cJSON *obj = cJSON_Parse(value);
+            if (obj) {
+                cJSON_AddItemToObject(json, colname, obj);
+                continue;
+            }
+        }
+
+        cJSON_AddStringToObject(json, colname, value);
+    }
+
+    PQclear(res);
+    
+    logger("DB", LOG_LEVEL_DEBUG, "[DB] db_get_tsi_laol success");
+    return json;
 }

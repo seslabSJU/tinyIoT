@@ -20,6 +20,8 @@
 #include "cJSON.h"
 #include "coap.h"
 #include "jsonparser.h"
+#include "monitor.h"
+#include "resources/ts.h"
 
 extern ResourceTree *rt;
 extern pthread_mutex_t main_lock;
@@ -478,6 +480,8 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		break;
 	case RT_CBA:
 		break;
+	default: 
+		break;
 	}
 	cJSON *member;
 	RTNode *grp_rtnode = NULL;
@@ -676,6 +680,16 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		rsc = create_acp(o2pt, parent_rtnode);
 		break;
 
+	case RT_TS:
+		logger("O2M", LOG_LEVEL_INFO, "Create TS");
+        rsc = create_ts(o2pt, parent_rtnode);
+        break;
+
+    case RT_TSI:
+		logger("O2M", LOG_LEVEL_INFO, "Create TSI");
+        rsc = create_tsi(o2pt, parent_rtnode);
+        break;
+
 	case RT_GRP:
 		logger("O2M", LOG_LEVEL_INFO, "Create GRP");
 		rsc = create_grp(o2pt, parent_rtnode);
@@ -705,15 +719,77 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-	int rsc = 0;
-	int e = check_privilege(o2pt, target_rtnode, ACOP_RETRIEVE);
-	if (e == -1)
-		return o2pt->rsc;
+    int rsc = 0;
+    int e = check_privilege(o2pt, target_rtnode, ACOP_RETRIEVE);
+    if (e == -1)
+        return o2pt->rsc;
 
-	make_response_body(o2pt, target_rtnode);
+    if (endswith(o2pt->to, "/la") || endswith(o2pt->to, "/latest"))
+    {
+        if (target_rtnode->ty == RT_CNT)
+        {
+            cJSON *cin = db_get_cin_laol(target_rtnode, 0); 
+            if (!cin) return handle_error(o2pt, RSC_NOT_FOUND, "Not found");
+            o2pt->response_pc = cJSON_CreateObject();
+            cJSON_AddItemToObject(o2pt->response_pc, "m2m:cin", cin);
+            o2pt->rsc = RSC_OK;
+            return RSC_OK;
+        }
+        else if (target_rtnode->ty == RT_TS)
+        {
+            cJSON *tsi = db_get_tsi_laol(target_rtnode, 0); 
+            
+            if (!tsi) {
+                return handle_error(o2pt, RSC_NOT_FOUND, "Not found");
+            }
 
-	o2pt->rsc = RSC_OK;
-	return RSC_OK;
+            o2pt->response_pc = cJSON_CreateObject();
+            
+            if (!o2pt->response_pc) {
+                return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "Memory Error");
+            }
+
+            cJSON_AddItemToObject(o2pt->response_pc, "m2m:tsi", tsi);
+
+            o2pt->rsc = RSC_OK;
+            return RSC_OK;
+        }
+        else 
+        {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "URI is invalid for latest");
+        }
+    }
+
+    if (endswith(o2pt->to, "/ol") || endswith(o2pt->to, "/oldest"))
+    {
+        if (target_rtnode->ty == RT_CNT)
+        {
+            cJSON *cin = db_get_cin_laol(target_rtnode, 1); 
+            if (!cin) return handle_error(o2pt, RSC_NOT_FOUND, "Not found");
+            o2pt->response_pc = cJSON_CreateObject();
+            cJSON_AddItemToObject(o2pt->response_pc, "m2m:cin", cin);
+            o2pt->rsc = RSC_OK;
+            return RSC_OK;
+        }
+        else if (target_rtnode->ty == RT_TS)
+        {
+            cJSON *tsi = db_get_tsi_laol(target_rtnode, 1); 
+            if (!tsi) return handle_error(o2pt, RSC_NOT_FOUND, "Not found");
+            o2pt->response_pc = cJSON_CreateObject();
+            cJSON_AddItemToObject(o2pt->response_pc, "m2m:tsi", tsi);
+            o2pt->rsc = RSC_OK;
+            return RSC_OK;
+        }
+        else
+        {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "URI is invalid for oldest");
+        }
+    }
+
+    make_response_body(o2pt, target_rtnode);
+
+    o2pt->rsc = RSC_OK;
+    return RSC_OK;
 }
 
 int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
@@ -775,6 +851,11 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Update ACP");
 		rsc = update_acp(o2pt, target_rtnode);
 		break;
+	
+	case RT_TS:
+		logger("O2M", LOG_LEVEL_INFO, "Update TS");
+        rsc = update_ts(o2pt, target_rtnode);
+        break;
 
 	case RT_GRP:
 		logger("O2M", LOG_LEVEL_INFO, "Update GRP");
@@ -1343,8 +1424,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 		sprintf(buf, "/%s/%s/%s", CSE_BASE_RI, get_uri_rtnode(parent_rtnode), cJSON_GetObjectItem(obj, "rn")->valuestring);
 		cJSON_AddItemToObject(annc, "lnk", cJSON_CreateString(buf));
 
-		//TO-DO  acpi original에서 갖고 오거나 local policy에 따라 추가하는 것 필요)
-		/*cJSON *acpi = cJSON_CreateArray();  // 현재는  넣은 상태임
+		/*cJSON *acpi = cJSON_CreateArray();  
 		cJSON_AddItemToArray(acpi, cJSON_CreateString("/defaultACP"));
 		cJSON_AddItemToObject(annc, "acpi", acpi);*/
 

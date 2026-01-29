@@ -97,7 +97,7 @@ bool is_valid_acr(cJSON *acr);
 int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op);
 int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op);
 int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation op);
-int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op);
+int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op, RTNode *parent_rtnode);
 int validate_acp(oneM2MPrimitive *o2pt, cJSON *acp, Operation op);
 int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp);
 int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new);

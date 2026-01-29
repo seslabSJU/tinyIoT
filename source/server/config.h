@@ -26,17 +26,17 @@
 #define DB_POSTGRESQL 2
 
 // Select Database Type: DB_SQLITE or DB_POSTGRESQL
-#define DB_TYPE DB_SQLITE
-// #define DB_TYPE DB_POSTGRESQL
+// #define DB_TYPE DB_SQLITE
+#define DB_TYPE DB_POSTGRESQL
 
 
 #if DB_TYPE == DB_POSTGRESQL
 // PostgreSQL connection settings
 #define PG_HOST "localhost"
 #define PG_PORT 5432
-#define PG_USER "tinyuser"
-#define PG_PASSWORD "tinypass"
-#define PG_DBNAME "tinydev"
+#define PG_USER "tiny_user"
+#define PG_PASSWORD "password"
+#define PG_DBNAME "tinydb"
 
 // PostgreSQL Schema Types
 #define PG_SCHEMA_VARCHAR 0  // Use VARCHAR for string fields

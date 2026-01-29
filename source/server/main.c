@@ -16,6 +16,7 @@
 #include "util.h"
 #include "config.h"
 #include "onem2mTypes.h"
+#include "monitor.h"
 
 #ifdef ENABLE_MQTT
 #include "mqttClient.h"
@@ -29,6 +30,7 @@
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
+PGconn *pg_conn = NULL;
 
 #if MONO_THREAD == 0
 pthread_mutex_t main_lock;
@@ -112,7 +114,9 @@ int main(int argc, char **argv)
 		\"m2m:cbA\": {\"lnk\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[\"\"], \"rr\":true, \"ast\":0}, \
 		\"m2m:aeA\": {\"lnk\":\"\", \"api\":\"\", \"aei\":\"\", \"rr\":true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"], \"ast\":0}, \
 		\"m2m:cntA\": {\"lnk\":\"\", \"cr\":\"\", \"mni\":0, \"mbs\":0, \"st\":0, \"cni\":0, \"cbs\":0, \"ast\":0}, \
-		\"m2m:cinA\": {\"lnk\":\"\", \"cs\":0, \"cr\":\"\", \"con\":\"\", \"cnf\":\"\", \"st\":\"\", \"ast\":0} \
+		\"m2m:cinA\": {\"lnk\":\"\", \"cs\":0, \"cr\":\"\", \"con\":\"\", \"cnf\":\"\", \"st\":\"\", \"ast\":0}, \
+		\"m2m:ts\": {\"mni\":0, \"mbs\":0, \"mia\":0, \"cni\":0, \"cbs\":0, \"pei\":0, \"peid\":0, \"mdd\":true, \"mdn\":0, \"mdt\":0, \"mdc\":0, \"mdlt\":[]}, \
+		\"m2m:tsi\": {\"dgt\":\"\", \"con\":\"\", \"snr\":0, \"cs\":0} \
 	 }");
 
 	if (ATTRIBUTES == NULL)
@@ -207,6 +211,15 @@ int main(int argc, char **argv)
 	}
 #endif
 
+	pthread_t ts_monitor;
+    int ts_thread_id = pthread_create(&ts_monitor, NULL, monitor_serve, NULL);
+    if (ts_thread_id < 0)
+    {
+        logger("MAIN", LOG_LEVEL_ERROR, "TS Monitor thread create error");
+        return 0;
+    }
+    pthread_detach(ts_monitor);
+
 	serve_forever(PORT); // main oneM2M operation logic in void route()
 
 #ifdef ENABLE_MQTT
@@ -261,29 +274,64 @@ void route(oneM2MPrimitive *o2pt)
 	{
 		rsc = handle_onem2m_request(o2pt, target_rtnode);
 
-		if (o2pt->op != OP_DELETE && target_rtnode->ty == RT_CIN)
-		{
-			if (strcmp(target_rtnode->rn, "la"))
-			{
-				logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
-				free_rtnode(target_rtnode);
-				target_rtnode = NULL;
-			}
-		}
+		if (target_rtnode && o2pt->op != OP_DELETE && target_rtnode->ty == RT_CIN)
+        {
+            if (strcmp(target_rtnode->rn, "la"))
+            {
+                logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
+                free_rtnode(target_rtnode);
+                target_rtnode = NULL;
+            }
+        }
 	}
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
-		notify_via_sub(o2pt, target_rtnode);
+        notify_via_sub(o2pt, target_rtnode);
+        
+    log_runtime(start);
 }
 
 int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
 	logger("MAIN", LOG_LEVEL_DEBUG, "handle_onem2m_request");
 	int rsc = 0;
-	if (!o2pt || !target_rtnode)
-	{
-		logger("MAIN", LOG_LEVEL_ERROR, "INTERNAL SERVER ERROR");
-		return o2pt->rsc = RSC_INTERNAL_SERVER_ERROR;
-	}
+	if (!target_rtnode) {
+        logger("MAIN", LOG_LEVEL_DEBUG, "target_rtnode is NULL, trying to handle virtual resource...");
+    }
+
+    if (!target_rtnode && o2pt && o2pt->to)
+    {
+        target_rtnode = find_rtnode(o2pt->to);
+
+        if (!target_rtnode) {
+            if (endswith(o2pt->to, "/la") || endswith(o2pt->to, "/latest") ||
+                endswith(o2pt->to, "/ol") || endswith(o2pt->to, "/oldest")) 
+            {
+                logger("MAIN", LOG_LEVEL_DEBUG, "Virtual Resource detected: %s", o2pt->to);
+                
+                char *uri_copy = strdup(o2pt->to);
+                char *last_slash = strrchr(uri_copy, '/');
+                if (last_slash) {
+                    *last_slash = '\0'; 
+                    target_rtnode = find_rtnode(uri_copy); 
+                    
+                    if (target_rtnode) {
+                        logger("MAIN", LOG_LEVEL_DEBUG, "Parent Found: %s", uri_copy);
+                    }
+                }
+                free(uri_copy);
+            }
+        }
+    }
+
+    if (!o2pt || !target_rtnode)
+    {
+        if (o2pt) {
+            handle_error(o2pt, RSC_NOT_FOUND, "URI is invalid");
+            return RSC_NOT_FOUND;
+        } else {
+            return RSC_INTERNAL_SERVER_ERROR;
+        }
+    }
 
 	switch (o2pt->op)
 	{
@@ -313,7 +361,12 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for retrieve operation");
 			break;
 		}
+		logger("MAIN", LOG_LEVEL_DEBUG, "[DEBUG] Before retrieve_onem2m_resource");
+		
 		rsc = retrieve_onem2m_resource(o2pt, target_rtnode);
+		
+		logger("MAIN", LOG_LEVEL_DEBUG, "[DEBUG] After retrieve_onem2m_resource. rsc: %d", rsc);
+		
 		break;
 
 	case OP_UPDATE:
@@ -352,7 +405,6 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		rsc = RSC_OK;
 		break;
 	case OP_DISCOVERY:
-		// Note : discovery operation rcn validation is reversed with other operations
 		if (
 			o2pt->rcn != RCN_CHILD_RESOURCE_REFERENCES &&
 			o2pt->rcn != RCN_DISCOVERY_RESULT_REFERENCES)
@@ -379,7 +431,6 @@ void stop_server(int sig)
 {
 	if (call_stop)
 	{
-		// logger("MAIN", LOG_LEVEL_WARN, "Server is already shutting down...");
 		return;
 	}
 	call_stop = 1;
