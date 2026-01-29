@@ -97,7 +97,6 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 #endif
 
     RTNode *cin_rtnode = create_rtnode(cin, RT_CIN);
-    struct timespec cnt_start, cnt_end;
     if (!db_begin_tx())
     {
         handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB begin fail");
@@ -105,7 +104,6 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(root);
         return o2pt->rsc;
     }
-    clock_gettime(CLOCK_MONOTONIC, &cnt_start);
     if (update_cnt_cin(parent_rtnode, cin_rtnode, 1) != 0)
     {
         db_rollback_tx();
@@ -114,10 +112,6 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(root);
         return o2pt->rsc;
     }
-    clock_gettime(CLOCK_MONOTONIC, &cnt_end);
-    long update_ms = (cnt_end.tv_sec - cnt_start.tv_sec) * 1000 +
-                     (cnt_end.tv_nsec - cnt_start.tv_nsec) / 1000000;
-    logger("CIN", LOG_LEVEL_INFO, "update_cnt_cin time : %ld ms", update_ms);
 
     make_response_body(o2pt, cin_rtnode);
     o2pt->rsc = RSC_CREATED;
@@ -128,13 +122,7 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     sprintf(ptr, "%s/%s", get_uri_rtnode(parent_rtnode), rn->valuestring);
 
     // Store to DB
-    struct timespec db_start, db_end;
-    clock_gettime(CLOCK_MONOTONIC, &db_start);
     int result = db_store_resource(cin, ptr);
-    clock_gettime(CLOCK_MONOTONIC, &db_end);
-    long store_ms = (db_end.tv_sec - db_start.tv_sec) * 1000 +
-                    (db_end.tv_nsec - db_start.tv_nsec) / 1000000;
-    logger("CIN", LOG_LEVEL_INFO, "db_store_resource time : %ld ms", store_ms);
     if (result != 1)
     {
         db_rollback_tx();

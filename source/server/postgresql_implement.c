@@ -52,14 +52,7 @@ static PGconn *get_pg_conn(void)
         pg_conn = NULL;
     }
 
-    struct timespec conn_start;
-    struct timespec conn_end;
-    clock_gettime(CLOCK_MONOTONIC, &conn_start);
     pg_conn = PQconnectdb(pg_conninfo);
-    clock_gettime(CLOCK_MONOTONIC, &conn_end);
-    long conn_ms = (conn_end.tv_sec - conn_start.tv_sec) * 1000 +
-                   (conn_end.tv_nsec - conn_start.tv_nsec) / 1000000;
-    logger("DB", LOG_LEVEL_INFO, "PostgreSQL connect time : %ld ms", conn_ms);
     if (PQstatus(pg_conn) != CONNECTION_OK)
     {
         logger("DB", LOG_LEVEL_ERROR, "PostgreSQL connection failed: %s", PQerrorMessage(pg_conn));
@@ -852,7 +845,6 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
     PGresult *res;
     pg_lock();
     PGconn *conn = get_pg_conn();
-    struct timespec t_begin, t_after_general, t_after_specific, t_after_commit;
     int started_tx = 0;
     if (!conn) {
         pg_unlock();
@@ -860,7 +852,6 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
     }
 
     // Begin transaction
-    clock_gettime(CLOCK_MONOTONIC, &t_begin);
     if (pg_tx_depth == 0) {
         res = PQexec(conn, "BEGIN");
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
@@ -924,7 +915,6 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         }
         PQclear(res);
     }
-    clock_gettime(CLOCK_MONOTONIC, &t_after_general);
 
     // Update specific table
     cJSON *specific_attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
@@ -978,7 +968,6 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         }
         PQclear(res);
     }
-    clock_gettime(CLOCK_MONOTONIC, &t_after_specific);
 
     // Commit transaction
     if (started_tx) {
@@ -991,19 +980,9 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             return 0;
         }
         PQclear(res);
-        clock_gettime(CLOCK_MONOTONIC, &t_after_commit);
     }
 
     free(sql);
-    if (started_tx) {
-        long general_ms = (t_after_general.tv_sec - t_begin.tv_sec) * 1000 +
-                          (t_after_general.tv_nsec - t_begin.tv_nsec) / 1000000;
-        long specific_ms = (t_after_specific.tv_sec - t_after_general.tv_sec) * 1000 +
-                           (t_after_specific.tv_nsec - t_after_general.tv_nsec) / 1000000;
-        long commit_ms = (t_after_commit.tv_sec - t_after_specific.tv_sec) * 1000 +
-                         (t_after_commit.tv_nsec - t_after_specific.tv_nsec) / 1000000;
-        logger("DB", LOG_LEVEL_INFO, "db_update_resource timing: general=%ld ms, specific=%ld ms, commit=%ld ms", general_ms, specific_ms, commit_ms);
-    }
     pg_unlock();
     return 1;
 }

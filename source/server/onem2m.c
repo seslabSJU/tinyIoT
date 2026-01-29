@@ -348,13 +348,7 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 
 	if (sign == 1)
 	{
-		struct timespec mni_start, mni_end;
-		clock_gettime(CLOCK_MONOTONIC, &mni_start);
 		delete_cin_under_cnt_mni_mbs(cnt_rtnode);
-		clock_gettime(CLOCK_MONOTONIC, &mni_end);
-		long mni_ms = (mni_end.tv_sec - mni_start.tv_sec) * 1000 +
-					  (mni_end.tv_nsec - mni_start.tv_nsec) / 1000000;
-		logger("CIN", LOG_LEVEL_INFO, "delete_cin_under_cnt_mni_mbs time : %ld ms", mni_ms);
 	}
 
 	db_update_resource(cnt, get_ri_rtnode(cnt_rtnode), RT_CNT);
