@@ -1,0 +1,45 @@
+
+[
+
+    {
+        "type"      : "rad:baTMe",
+        "lname"     : "baliseTransmissionModule",
+        "cnd"       : "org.onem2m.railway.moduleclass.baliseTransmissionModule",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "baSId", "lname" : "baliseSystemId", "type" : "nonNegInteger", "car" : "01" },
+            { "sname" : "telMe", "lname" : "telegramMessage", "type" : "string", "car" : "01" }
+        ],
+		"children"  : [
+            "rad:baTMeInst"
+        ]
+    },
+
+    {
+        "type"      : "rad:baTMeAnnc",
+        "lname"     : "baliseTransmissionModuleAnnc",
+        "cnd"       : "org.onem2m.railway.moduleclass.baliseTransmissionModuleAnnc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "baSId", "lname" : "baliseSystemId", "type" : "nonNegInteger", "car" : "01" },
+            { "sname" : "telMe", "lname" : "telegramMessage", "type" : "string", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "rad:baTMeInst",
+        "lname"     : "baliseTransmissionModuleInst",
+        "cnd"       : "org.onem2m.railway.moduleclass.baliseTransmissionModuleInst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "baSId", "lname" : "baliseSystemId", "type" : "nonNegInteger", "car" : "01" },
+            { "sname" : "telMe", "lname" : "telegramMessage", "type" : "string", "car" : "01" }
+        ]
+    }
+
+
+
+]

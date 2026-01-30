@@ -1,0 +1,43 @@
+
+[
+    {
+        "type"      : "hed:suDCf",
+        "lname"     : "subDeviceCuff",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.health.subdevice.subDeviceCuff",
+        "children"  : [
+            "hod:binSh",
+            "hod:sphyr",
+            "hod:pulsr"
+            ,"hed:suDCfInst"
+        ]
+    }
+,
+
+    {
+        "type"      : "hed:suDCfAnnc",
+        "lname"     : "subDeviceCuffAnnc",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.health.subdevice.subDeviceCuffAnnc",
+        "children"  : [
+            "hod:binSh",
+            "hod:binShAnnc",
+            "hod:sphyr",
+            "hod:sphyrAnnc",
+            "hod:pulsr",
+            "hod:pulsrAnnc"
+        ]
+    }
+,
+
+    {
+        "type"      : "hed:suDCfInst",
+        "lname"     : "subDeviceCuffInst",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.health.subdevice.subDeviceCuffInst"
+    }
+
+
+
+
+]

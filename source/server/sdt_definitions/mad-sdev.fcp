@@ -1,0 +1,37 @@
+
+[
+    {
+        "type"      : "mad:dANIo",
+        "lname"     : "dmAreaNwkInfo",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.management.subdevice.dmAreaNwkInfo",
+        "children"  : [
+            "mad:dANDo"
+            ,"mad:dANIoInst"
+        ]
+    }
+,
+
+    {
+        "type"      : "mad:dANIoAnnc",
+        "lname"     : "dmAreaNwkInfoAnnc",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.management.subdevice.dmAreaNwkInfoAnnc",
+        "children"  : [
+            "mad:dANDo",
+            "mad:dANDoAnnc"
+        ]
+    }
+,
+
+    {
+        "type"      : "mad:dANIoInst",
+        "lname"     : "dmAreaNwkInfoInst",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.management.subdevice.dmAreaNwkInfoInst"
+    }
+
+
+
+
+]

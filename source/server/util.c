@@ -20,6 +20,7 @@
 #include "jsonparser.h"
 #include "mqttClient.h"
 #include "coap.h"
+#include "sdt.h"
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
@@ -4330,72 +4331,21 @@ cJSON *extract_custom_attributes(cJSON *fcnt)
 	return customAttrs;
 }
 
-static int is_known_shortname(const char *shortname) {
-	if (!shortname) return 0;
-	if (strcmp(shortname, "cod:tempe") == 0) return 1;
-	if (strcmp(shortname, "cod:aiQSr") == 0) return 1;
-	if (strcmp(shortname, "m2m:gis") == 0) return 1;
-	if (strcmp(shortname, "m2m:gio") == 0) return 1;
-	return 0;
-}
-
-static const char* get_expected_cnd(const char *shortname) {
-	if (!shortname) return NULL;
-	if (strcmp(shortname, "cod:tempe") == 0) {
-		return "org.onem2m.common.moduleclass.temperature";
-	}
-	if (strcmp(shortname, "cod:aiQSr") == 0) {
-		return "org.onem2m.common.moduleclass.airQualitySensor";
-	}
-	return NULL;
-}
-
-static int is_valid_custom_attr(const char *shortname, const char *attr_name) {
-	if (!shortname || !attr_name) return 0;
-
-	if (strcmp(shortname, "cod:tempe") == 0) {
-		if (strcmp(attr_name, "dgt") == 0) return 1;
-		if (strcmp(attr_name, "curT0") == 0) return 1;
-		if (strcmp(attr_name, "tarTe") == 0) return 1;
-		if (strcmp(attr_name, "unit") == 0) return 1;
-		if (strcmp(attr_name, "minVe") == 0) return 1;
-		if (strcmp(attr_name, "maxVe") == 0) return 1;
-		if (strcmp(attr_name, "steVe") == 0) return 1;
-		return 0;
-	}
-
-	if (strcmp(shortname, "m2m:gis") == 0) {
-		if (strcmp(attr_name, "gisn") == 0) return 1;
-		if (strcmp(attr_name, "giip") == 0) return 1;
-		if (strcmp(attr_name, "giop") == 0) return 1;
-		return 0;
-	}
-
-	if (strcmp(shortname, "m2m:gio") == 0) {
-		if (strcmp(attr_name, "gion") == 0) return 1;
-		if (strcmp(attr_name, "gios") == 0) return 1;
-		if (strcmp(attr_name, "giip") == 0) return 1;
-		if (strcmp(attr_name, "giop") == 0) return 1;
-		if (strcmp(attr_name, "giil") == 0) return 1;
-		if (strcmp(attr_name, "giol") == 0) return 1;
-		return 0;
-	}
-
-	return 0;
-}
-
 int validate_shortname_cnd(const char *shortname, const char *cnd, char **error_msg) {
+	if (!cnd) return RSC_OK;
 	if (!shortname) return RSC_OK;
 
-	if (!is_known_shortname(shortname)) {
-		if (error_msg) *error_msg = "unknown FlexContainer specialization";
+	SDTDef *def = sdt_find_by_type(shortname);
+	if (!def) {
+		*error_msg = "Unknown FlexContainer type";
 		return RSC_BAD_REQUEST;
 	}
 
-	const char *expected = get_expected_cnd(shortname);
-	if (expected && cnd && strcmp(cnd, expected) != 0) {
-		if (error_msg) *error_msg = "containerDefinition does not match specialization";
-		return RSC_BAD_REQUEST;
+	if (def->cnd && strlen(def->cnd) > 0) {
+		if (strcmp(def->cnd, cnd) != 0) {
+			*error_msg = "Mismatch between shortname and containerDefinition";
+			return RSC_BAD_REQUEST;
+		}
 	}
 
 	return RSC_OK;
@@ -4412,6 +4362,18 @@ int validate_custom_attributes(const char *shortname, cJSON *customAttrs, const 
 			*error_msg = "containerDefinition (cnd) is required when custom attributes are present";
 		}
 		return RSC_BAD_REQUEST;
+	}
+
+	SDTDef *def = sdt_find_by_type(shortname);
+	if (!def) {
+		return RSC_OK;
+	}
+
+	if (def->cnd && strlen(def->cnd) > 0) {
+		if (strcmp(def->cnd, cnd) != 0) {
+			if (error_msg) *error_msg = "Mismatch between shortname and containerDefinition";
+			return RSC_BAD_REQUEST;
+		}
 	}
 
 	cJSON *item = NULL;
@@ -4434,13 +4396,30 @@ int validate_custom_attributes(const char *shortname, cJSON *customAttrs, const 
 			return RSC_BAD_REQUEST;
 		}
 
-		if (shortname && !is_valid_custom_attr(shortname, item->string)) {
-			if (error_msg) *error_msg = "unknown custom attribute for this specialization";
-			return RSC_BAD_REQUEST;
+		// Check if attribute exists in SDT definition
+		if (def->attributes) {
+			int found = 0;
+			int attr_count = cJSON_GetArraySize(def->attributes);
+			for (int i = 0; i < attr_count; i++) {
+				cJSON *attr_def = cJSON_GetArrayItem(def->attributes, i);
+				if (attr_def) {
+					cJSON *sname_item = cJSON_GetObjectItem(attr_def, "sname");
+					if (sname_item && strcmp(sname_item->valuestring, item->string) == 0) {
+						found = 1;
+						break;
+					}
+				}
+			}
+			if (!found) {
+				if (error_msg) *error_msg = "Unknown attribute in FlexContainer";
+				return RSC_BAD_REQUEST;
+			}
 		}
 	}
 
-	return RSC_OK;
+	// For UPDATE operations, we don't check mandatory attributes (check_mandatory=0)
+	// Mandatory attributes are only checked during CREATE
+	return sdt_validate_fcnt(shortname, cnd, customAttrs, error_msg, 0);
 }
 
 int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
@@ -4716,39 +4695,29 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		return -1;
 	}
 
-	logger("UTIL", LOG_LEVEL_INFO, "===> CREATING FCIN: parent=%s, st=%d", fcnt_rtnode->rn, st_obj->valueint);
-
-	// Create FCIN resource
 	cJSON *fcin = cJSON_CreateObject();
 
-	// Set resource name: {fcnt_rn}_{st}
 	char rn_buf[256];
 	sprintf(rn_buf, "%s_%d", fcnt_rtnode->rn, st_obj->valueint);
 	cJSON_AddStringToObject(fcin, "rn", rn_buf);
-	logger("UTIL", LOG_LEVEL_INFO, "===> FCIN resourceName will be: %s", rn_buf);
-
-	// Copy label if present
 	cJSON *lbl = cJSON_GetObjectItem(fcnt, "lbl");
 	if (lbl)
 	{
 		cJSON_AddItemToObject(fcin, "lbl", cJSON_Duplicate(lbl, 1));
 	}
 
-	// Copy fcinEnabled if present
 	cJSON *fcied = cJSON_GetObjectItem(fcnt, "fcied");
 	if (fcied)
 	{
 		cJSON_AddItemToObject(fcin, "fcied", cJSON_Duplicate(fcied, 1));
 	}
 
-	// Copy location if present
 	cJSON *loc = cJSON_GetObjectItem(fcnt, "loc");
 	if (loc)
 	{
 		cJSON_AddItemToObject(fcin, "loc", cJSON_Duplicate(loc, 1));
 	}
 
-	// Copy all custom attributes
 	cJSON *customAttrs = extract_custom_attributes(fcnt);
 	if (customAttrs)
 	{
@@ -4763,61 +4732,44 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		cJSON_Delete(customAttrs);
 	}
 
-	// Add stateTag
 	cJSON_AddNumberToObject(fcin, "st", st_obj->valueint);
 
-	// Add contentSize
 	cJSON *cs_obj = cJSON_GetObjectItem(fcnt, "cs");
 	if (cs_obj)
 	{
 		cJSON_AddNumberToObject(fcin, "cs", cs_obj->valueint);
 	}
 
-	// Add originator
 	if (o2pt->fr)
 	{
 		cJSON_AddStringToObject(fcin, "org", o2pt->fr);
 	}
 
-	// Add general attributes
 	add_general_attribute(fcin, fcnt_rtnode, RT_FCIN);
 
-	// Handle mia (maxInstanceAge) - set et if present, otherwise inherit from parent FCNT
 	cJSON *mia = cJSON_GetObjectItem(fcnt, "mia");
 	if (mia && cJSON_IsNumber(mia) && mia->valueint > 0)
 	{
-		logger("UTIL", LOG_LEVEL_INFO, "===> FCIN using mia value: %d seconds", mia->valueint);
 		char *et_str = get_local_time(-mia->valueint);
 		if (et_str)
 		{
 			cJSON_DeleteItemFromObject(fcin, "et");
 			cJSON_AddStringToObject(fcin, "et", et_str);
-			logger("UTIL", LOG_LEVEL_INFO, "===> FCIN et set from mia: %s", et_str);
 			free(et_str);
 		}
 	}
 	else
 	{
-		// Inherit parent FCNT's expirationTime when mia is not set
 		cJSON *fcnt_et = cJSON_GetObjectItem(fcnt, "et");
 		if (fcnt_et)
 		{
 			cJSON_DeleteItemFromObject(fcin, "et");
 			cJSON_AddStringToObject(fcin, "et", fcnt_et->valuestring);
-			logger("UTIL", LOG_LEVEL_INFO, "===> FCIN et inherited from FCNT: %s", fcnt_et->valuestring);
-		}
-		else
-		{
-			logger("UTIL", LOG_LEVEL_WARN, "===> FCIN: No et on parent FCNT!");
 		}
 	}
 
-	// Store FCIN in database
 	char *fci_uri = malloc(1024);
 	sprintf(fci_uri, "%s/%s", fcnt_rtnode->uri, rn_buf);
-
-	cJSON *ct_before_store = cJSON_GetObjectItem(fcin, "ct");
-	logger("UTIL", LOG_LEVEL_INFO, "===> FCIN ct before db_store: %s", ct_before_store ? ct_before_store->valuestring : "NULL");
 
 	int result = db_store_resource(fcin, fci_uri);
 	if (result != 1)
@@ -4828,16 +4780,10 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		return -1;
 	}
 
-	cJSON *ct_after_store = cJSON_GetObjectItem(fcin, "ct");
-	logger("UTIL", LOG_LEVEL_INFO, "===> FCIN stored with ct=%s, uri=%s",
-	       ct_after_store ? ct_after_store->valuestring : "NULL", fci_uri);
-
-	// Add to resource tree
 	RTNode *fci_rtnode = create_rtnode(fcin, RT_FCIN);
 	fci_rtnode->uri = fci_uri;
 	add_child_resource_tree(fcnt_rtnode, fci_rtnode);
 
-	// Store custom attributes if any
 	customAttrs = extract_custom_attributes(fcin);
 	if (customAttrs)
 	{
@@ -4845,8 +4791,6 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		db_store_fcnt_custom_attributes(ri_obj->valuestring, customAttrs);
 		cJSON_Delete(customAttrs);
 	}
-
-	logger("UTIL", LOG_LEVEL_DEBUG, "Successfully created FCIN: %s", fci_uri);
 
 	return 0;
 }

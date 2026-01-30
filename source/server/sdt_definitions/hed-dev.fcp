@@ -1,0 +1,232 @@
+
+[
+
+    {
+        "type"      : "hed:dBPMr",
+        "lname"     : "deviceBloodPressureMonitor",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceBloodPressureMonitor",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:bat",
+            "cod:binSh",
+            "hed:suDCf"
+            ,"hed:dBPMrInst"
+        ]
+    },
+
+    {
+        "type"      : "hed:dBPMrAnnc",
+        "lname"     : "deviceBloodPressureMonitorAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceBloodPressureMonitorAnnc",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:bat",
+            "cod:batAnnc",
+            "cod:binSh",
+            "cod:binShAnnc",
+            "hed:suDCf",
+            "hed:suDCfAnnc"
+        ]
+    },
+    {
+        "type"      : "hed:dBPMrInst",
+        "lname"     : "deviceBloodPressureMonitorInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceBloodPressureMonitorInst",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "hed:devGr",
+        "lname"     : "deviceGlucosemeter",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceGlucosemeter",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:glucr",
+            "cod:bat"
+            ,"hed:devGrInst"
+        ]
+    },
+
+    {
+        "type"      : "hed:devGrAnnc",
+        "lname"     : "deviceGlucosemeterAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceGlucosemeterAnnc",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:glucr",
+            "cod:glucrAnnc",
+            "cod:bat",
+            "cod:batAnnc"
+        ]
+    },
+    {
+        "type"      : "hed:devGrInst",
+        "lname"     : "deviceGlucosemeterInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceGlucosemeterInst",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "hed:dHRMr",
+        "lname"     : "deviceHeartRateMonitor",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceHeartRateMonitor",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:pulsr",
+            "cod:bat"
+            ,"hed:dHRMrInst"
+        ]
+    },
+
+    {
+        "type"      : "hed:dHRMrAnnc",
+        "lname"     : "deviceHeartRateMonitorAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceHeartRateMonitorAnnc",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:pulsr",
+            "cod:pulsrAnnc",
+            "cod:bat",
+            "cod:batAnnc"
+        ]
+    },
+    {
+        "type"      : "hed:dHRMrInst",
+        "lname"     : "deviceHeartRateMonitorInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceHeartRateMonitorInst",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "hed:dePOr",
+        "lname"     : "devicePulseOximeter",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.devicePulseOximeter",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:pulsr",
+            "cod:oximr",
+            "cod:bat"
+            ,"hed:dePOrInst"
+        ]
+    },
+
+    {
+        "type"      : "hed:dePOrAnnc",
+        "lname"     : "devicePulseOximeterAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.devicePulseOximeterAnnc",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:pulsr",
+            "cod:pulsrAnnc",
+            "cod:oximr",
+            "cod:oximrAnnc",
+            "cod:bat",
+            "cod:batAnnc"
+        ]
+    },
+    {
+        "type"      : "hed:dePOrInst",
+        "lname"     : "devicePulseOximeterInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.devicePulseOximeterInst",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "hed:dWSAB",
+        "lname"     : "deviceWeightScaleAndBodyCompositionAnalyser",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceWeightScaleAndBodyCompositionAnalyser",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:weigt",
+            "cod:boCAr",
+            "cod:bEIAs",
+            "cod:bat"
+            ,"hed:dWSABInst"
+        ]
+    },
+
+    {
+        "type"      : "hed:dWSABAnnc",
+        "lname"     : "deviceWeightScaleAndBodyCompositionAnalyserAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceWeightScaleAndBodyCompositionAnalyserAnnc",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:weigt",
+            "cod:weigtAnnc",
+            "cod:boCAr",
+            "cod:boCArAnnc",
+            "cod:bEIAs",
+            "cod:bEIAsAnnc",
+            "cod:bat",
+            "cod:batAnnc"
+        ]
+    },
+    {
+        "type"      : "hed:dWSABInst",
+        "lname"     : "deviceWeightScaleAndBodyCompositionAnalyserInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.health.device.deviceWeightScaleAndBodyCompositionAnalyserInst",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    }
+
+
+]

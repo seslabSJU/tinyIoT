@@ -1,0 +1,75 @@
+
+[
+
+    {
+        "type"      : "mad:fleNe",
+        "lname"     : "flexNode",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.management.device.flexNode",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "mad:dmAgt",
+            "mad:dmDIo",
+            "mad:dDMIO",
+            "mad:dmFie",
+            "mad:dmSoe",
+            "mad:dmELg",
+            "mad:dmPae",
+            "cod:bat",
+            "mad:dmCay",
+            "mad:dmSte",
+            "mad:dANIo"
+            ,"mad:fleNeInst"
+        ]
+    },
+
+    {
+        "type"      : "mad:fleNeAnnc",
+        "lname"     : "flexNodeAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.management.device.flexNodeAnnc",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "mad:dmAgt",
+            "mad:dmAgtAnnc",
+            "mad:dmDIo",
+            "mad:dmDIoAnnc",
+            "mad:dDMIO",
+            "mad:dDMIOAnnc",
+            "mad:dmFie",
+            "mad:dmFieAnnc",
+            "mad:dmSoe",
+            "mad:dmSoeAnnc",
+            "mad:dmELg",
+            "mad:dmELgAnnc",
+            "mad:dmPae",
+            "mad:dmPaeAnnc",
+            "cod:bat",
+            "cod:batAnnc",
+            "mad:dmCay",
+            "mad:dmCayAnnc",
+            "mad:dmSte",
+            "mad:dmSteAnnc",
+            "mad:dANIo",
+            "mad:dANIoAnnc"
+        ]
+    },
+    {
+        "type"      : "mad:fleNeInst",
+        "lname"     : "flexNodeInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.management.device.flexNodeInst",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    }
+
+
+]

@@ -26,6 +26,7 @@
 #endif
 
 #include "coap.h"
+#include "sdt.h"
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
@@ -164,6 +165,13 @@ int main(int argc, char **argv)
 #endif
 
 	initialBoot = init_server();
+
+	int sdt_count = sdt_init("./sdt_definitions");
+	if (sdt_count > 0) {
+		logger("MAIN", LOG_LEVEL_INFO, "Loaded %d SDT definitions", sdt_count);
+	} else {
+		logger("MAIN", LOG_LEVEL_WARN, "No SDT definitions loaded");
+	}
 
 	init_resource_tree();
 
@@ -434,6 +442,9 @@ void stop_server(int sig)
 	free_rtnode(rt->cb);
 	free(rt);
 	cJSON_Delete(ATTRIBUTES);
+
+	logger("MAIN", LOG_LEVEL_INFO, "Cleaning SDT...");
+	sdt_cleanup();
 
 	logger("MAIN", LOG_LEVEL_INFO, "Done");
 	logger_free();

@@ -1,0 +1,54 @@
+
+[
+
+    {
+        "type"      : "agd:dCAMr",
+        "lname"     : "deviceCowActivityMonitor",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.agriculture.device.deviceCowActivityMonitor",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "agd:coAMr",
+            "cod:bat",
+            "cod:conny",
+            "cod:peRCg"
+            ,"agd:dCAMrInst"
+        ]
+    },
+
+    {
+        "type"      : "agd:dCAMrAnnc",
+        "lname"     : "deviceCowActivityMonitorAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.agriculture.device.deviceCowActivityMonitorAnnc",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "agd:coAMr",
+            "agd:coAMrAnnc",
+            "cod:bat",
+            "cod:batAnnc",
+            "cod:conny",
+            "cod:connyAnnc",
+            "cod:peRCg",
+            "cod:peRCgAnnc"
+        ]
+    },
+    {
+        "type"      : "agd:dCAMrInst",
+        "lname"     : "deviceCowActivityMonitorInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.agriculture.device.deviceCowActivityMonitorInst",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    }
+
+
+]

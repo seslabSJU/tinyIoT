@@ -4,6 +4,7 @@
 #include "../util.h"
 #include "../dbmanager.h"
 #include "../config.h"
+#include "../sdt.h"
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
@@ -66,32 +67,6 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		return handle_error(o2pt, rsc, error_msg);
 	}
 
-	// Validate mandatory custom attributes on CREATE
-	if (shortname)
-	{
-		// m2m:gis requires 'gisn' on CREATE
-		if (strcmp(shortname, "m2m:gis") == 0)
-		{
-			if (!customAttrs || !cJSON_GetObjectItem(customAttrs, "gisn"))
-			{
-				if (customAttrs) cJSON_Delete(customAttrs);
-				cJSON_Delete(root);
-				return handle_error(o2pt, RSC_BAD_REQUEST, "mandatory attribute 'gisn' missing for m2m:gis");
-			}
-		}
-
-		// m2m:gio requires 'gion' and 'gios' on CREATE
-		if (strcmp(shortname, "m2m:gio") == 0)
-		{
-			if (!customAttrs || !cJSON_GetObjectItem(customAttrs, "gion") || !cJSON_GetObjectItem(customAttrs, "gios"))
-			{
-				if (customAttrs) cJSON_Delete(customAttrs);
-				cJSON_Delete(root);
-				return handle_error(o2pt, RSC_BAD_REQUEST, "mandatory attributes 'gion' and 'gios' missing for m2m:gio");
-			}
-		}
-	}
-
 	if (customAttrs)
 	{
 		rsc = validate_custom_attributes(shortname, customAttrs, pjson->valuestring, &error_msg);
@@ -101,6 +76,14 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 			cJSON_Delete(root);
 			return handle_error(o2pt, rsc, error_msg);
 		}
+	}
+
+	rsc = sdt_validate_fcnt(shortname, pjson->valuestring, customAttrs, &error_msg, 1);
+	if (rsc != RSC_OK)
+	{
+		if (customAttrs) cJSON_Delete(customAttrs);
+		cJSON_Delete(root);
+		return handle_error(o2pt, rsc, error_msg);
 	}
 
 	add_general_attribute(fcnt, parent_rtnode, RT_FCNT);
@@ -536,8 +519,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 			if (customAttrs || cJSON_GetObjectItem(m2m_fcnt, "lbl") || cJSON_GetObjectItem(m2m_fcnt, "loc"))
 			{
-				logger("FCNT", LOG_LEVEL_INFO, "===> Setting needs_fci=true because customAttrs=%p, lbl=%p, loc=%p",
-				       customAttrs, cJSON_GetObjectItem(m2m_fcnt, "lbl"), cJSON_GetObjectItem(m2m_fcnt, "loc"));
 				needs_fci = true;
 
 				cJSON *cbs_obj = cJSON_GetObjectItem(fcnt, "cbs");
@@ -605,8 +586,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	if (o2pt->rvi >= RVI_4 && needs_fci)
 	{
-		logger("FCNT", LOG_LEVEL_INFO, "===> Calling add_flexcontainer_instance (rvi=%d, needs_fci=%d)",
-		       o2pt->rvi, needs_fci);
 		add_flexcontainer_instance(target_rtnode, o2pt);
 	}
 

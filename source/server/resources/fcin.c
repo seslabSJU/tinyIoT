@@ -10,13 +10,11 @@ extern cJSON *ATTRIBUTES;
 
 int create_fcin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
-	// FCIN cannot be created directly - it's created automatically when FCNT is updated
 	return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "creating FCIN is forbidden");
 }
 
 int update_fcin(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-	// FCIN cannot be updated
 	return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "updating FCIN is forbidden");
 }
 

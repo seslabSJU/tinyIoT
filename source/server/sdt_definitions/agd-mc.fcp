@@ -1,0 +1,48 @@
+
+[
+
+    {
+        "type"      : "agd:coAMr",
+        "lname"     : "cowActivityMonitor",
+        "cnd"       : "org.onem2m.agriculture.moduleclass.cowActivityMonitor",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "stPPd", "lname" : "stepsPerPeriod", "type" : "list", "car" : "1" },
+            { "sname" : "updTe", "lname" : "updateTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "hiSCs", "lname" : "historyStepCounts", "type" : "list", "car" : "1" }
+        ],
+		"children"  : [
+            "agd:coAMrInst"
+        ]
+    },
+
+    {
+        "type"      : "agd:coAMrAnnc",
+        "lname"     : "cowActivityMonitorAnnc",
+        "cnd"       : "org.onem2m.agriculture.moduleclass.cowActivityMonitorAnnc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "stPPd", "lname" : "stepsPerPeriod", "type" : "list", "car" : "1" },
+            { "sname" : "updTe", "lname" : "updateTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "hiSCs", "lname" : "historyStepCounts", "type" : "list", "car" : "1" }
+        ]
+    },
+
+    {
+        "type"      : "agd:coAMrInst",
+        "lname"     : "cowActivityMonitorInst",
+        "cnd"       : "org.onem2m.agriculture.moduleclass.cowActivityMonitorInst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "stPPd", "lname" : "stepsPerPeriod", "type" : "list", "car" : "1" },
+            { "sname" : "updTe", "lname" : "updateTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "hiSCs", "lname" : "historyStepCounts", "type" : "list", "car" : "1" }
+        ]
+    }
+
+
+
+]

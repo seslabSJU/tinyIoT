@@ -1,0 +1,256 @@
+
+[
+
+    {
+        "type"      : "psd:dissr",
+        "lname"     : "disseminator",
+        "cnd"       : "org.onem2m.publicsafety.moduleclass.disseminator",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "idenr", "lname" : "identifier", "type" : "string", "car" : "1" },
+            { "sname" : "sendr", "lname" : "sender", "type" : "string", "car" : "1" },
+            { "sname" : "sent", "lname" : "sent", "type" : "dateTime", "car" : "1" },
+            { "sname" : "sus", "lname" : "status", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "msgTe", "lname" : "msgType", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "refes", "lname" : "references", "type" : "list", "car" : "01" },
+            { "sname" : "urgey", "lname" : "urgency", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "sevey", "lname" : "severity", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "certy", "lname" : "certainty", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "eveCs", "lname" : "eventCodes", "type" : "list", "car" : "1" },
+            { "sname" : "effee", "lname" : "effective", "type" : "dateTime", "car" : "01" },
+            { "sname" : "onset", "lname" : "onset", "type" : "dateTime", "car" : "01" },
+            { "sname" : "expis", "lname" : "expires", "type" : "dateTime", "car" : "01" },
+            { "sname" : "areLe", "lname" : "areaLatitude", "type" : "float", "car" : "01" },
+            { "sname" : "areL0", "lname" : "areaLongitude", "type" : "float", "car" : "01" },
+            { "sname" : "areRs", "lname" : "areaRadius", "type" : "float", "car" : "01" },
+            { "sname" : "repPd", "lname" : "repetitionPeriod", "type" : "integer", "car" : "1" },
+            { "sname" : "repCt", "lname" : "repetitionCount", "type" : "integer", "car" : "1" }
+        ],
+		"children"  : [
+            "psd:cancl",
+            "psd:dissrInst"
+        ]
+    },
+
+    {
+        "type"      : "psd:cancl",
+        "lname"     : "cancel",
+        "cnd"       : "org.onem2m.publicsafety.action.cancel",
+        "sdttype"   : "action",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "warIr", "lname" : "warningIdentifier", "type" : "string", "car" : "1" }
+        ],
+		"children"  : [
+            "psd:canclInst"
+        ]
+    },
+
+    {
+        "type"      : "psd:dissrAnnc",
+        "lname"     : "disseminatorAnnc",
+        "cnd"       : "org.onem2m.publicsafety.moduleclass.disseminatorAnnc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "idenr", "lname" : "identifier", "type" : "string", "car" : "1" },
+            { "sname" : "sendr", "lname" : "sender", "type" : "string", "car" : "1" },
+            { "sname" : "sent", "lname" : "sent", "type" : "dateTime", "car" : "1" },
+            { "sname" : "sus", "lname" : "status", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "msgTe", "lname" : "msgType", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "refes", "lname" : "references", "type" : "list", "car" : "01" },
+            { "sname" : "urgey", "lname" : "urgency", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "sevey", "lname" : "severity", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "certy", "lname" : "certainty", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "eveCs", "lname" : "eventCodes", "type" : "list", "car" : "1" },
+            { "sname" : "effee", "lname" : "effective", "type" : "dateTime", "car" : "01" },
+            { "sname" : "onset", "lname" : "onset", "type" : "dateTime", "car" : "01" },
+            { "sname" : "expis", "lname" : "expires", "type" : "dateTime", "car" : "01" },
+            { "sname" : "areLe", "lname" : "areaLatitude", "type" : "float", "car" : "01" },
+            { "sname" : "areL0", "lname" : "areaLongitude", "type" : "float", "car" : "01" },
+            { "sname" : "areRs", "lname" : "areaRadius", "type" : "float", "car" : "01" },
+            { "sname" : "repPd", "lname" : "repetitionPeriod", "type" : "integer", "car" : "1" },
+            { "sname" : "repCt", "lname" : "repetitionCount", "type" : "integer", "car" : "1" }
+        ],
+        "children"  : [
+            "psd:cancl",
+            "psd:canclAnnc"
+        ]
+    },
+    {
+        "type"      : "psd:canclAnnc",
+        "lname"     : "cancelAnnc",
+        "cnd"       : "org.onem2m.publicsafety.action.cancelAnnc",
+		"sdttype"	: "action",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "warIr", "lname" : "warningIdentifier", "type" : "string", "car" : "1" }
+        ]
+    }
+,
+
+    {
+        "type"      : "psd:dissrInst",
+        "lname"     : "disseminatorInst",
+        "cnd"       : "org.onem2m.publicsafety.moduleclass.disseminatorInst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "idenr", "lname" : "identifier", "type" : "string", "car" : "1" },
+            { "sname" : "sendr", "lname" : "sender", "type" : "string", "car" : "1" },
+            { "sname" : "sent", "lname" : "sent", "type" : "dateTime", "car" : "1" },
+            { "sname" : "sus", "lname" : "status", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "msgTe", "lname" : "msgType", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "refes", "lname" : "references", "type" : "list", "car" : "01" },
+            { "sname" : "urgey", "lname" : "urgency", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "sevey", "lname" : "severity", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "certy", "lname" : "certainty", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "eveCs", "lname" : "eventCodes", "type" : "list", "car" : "1" },
+            { "sname" : "effee", "lname" : "effective", "type" : "dateTime", "car" : "01" },
+            { "sname" : "onset", "lname" : "onset", "type" : "dateTime", "car" : "01" },
+            { "sname" : "expis", "lname" : "expires", "type" : "dateTime", "car" : "01" },
+            { "sname" : "areLe", "lname" : "areaLatitude", "type" : "float", "car" : "01" },
+            { "sname" : "areL0", "lname" : "areaLongitude", "type" : "float", "car" : "01" },
+            { "sname" : "areRs", "lname" : "areaRadius", "type" : "float", "car" : "01" },
+            { "sname" : "repPd", "lname" : "repetitionPeriod", "type" : "integer", "car" : "1" },
+            { "sname" : "repCt", "lname" : "repetitionCount", "type" : "integer", "car" : "1" }
+        ]
+    },
+    {
+        "type"      : "psd:canclInst",
+        "lname"     : "cancelInst",
+        "cnd"       : "org.onem2m.publicsafety.action.cancelInst",
+		"sdttype"	: "action",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "warIr", "lname" : "warningIdentifier", "type" : "string", "car" : "1" }
+        ]
+    }
+,
+
+
+    {
+        "type"      : "psd:emeHr",
+        "lname"     : "emergencyHandler",
+        "cnd"       : "org.onem2m.publicsafety.moduleclass.emergencyHandler",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "emeMe", "lname" : "emergencyMode", "type" : "boolean", "car" : "1" },
+            { "sname" : "idenr", "lname" : "identifier", "type" : "string", "car" : "1" },
+            { "sname" : "sendr", "lname" : "sender", "type" : "string", "car" : "1" },
+            { "sname" : "sent", "lname" : "sent", "type" : "dateTime", "car" : "1" },
+            { "sname" : "sus", "lname" : "status", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "msgTe", "lname" : "msgType", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "refes", "lname" : "references", "type" : "list", "car" : "01" },
+            { "sname" : "urgey", "lname" : "urgency", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "sevey", "lname" : "severity", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "certy", "lname" : "certainty", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "eveCs", "lname" : "eventCodes", "type" : "list", "car" : "1" },
+            { "sname" : "effee", "lname" : "effective", "type" : "dateTime", "car" : "01" },
+            { "sname" : "onset", "lname" : "onset", "type" : "dateTime", "car" : "01" },
+            { "sname" : "expis", "lname" : "expires", "type" : "dateTime", "car" : "01" },
+            { "sname" : "areLe", "lname" : "areaLatitude", "type" : "float", "car" : "01" },
+            { "sname" : "areL0", "lname" : "areaLongitude", "type" : "float", "car" : "01" },
+            { "sname" : "areRs", "lname" : "areaRadius", "type" : "float", "car" : "01" }
+        ],
+		"children"  : [
+            "psd:emeHrInst"
+        ]
+    },
+
+    {
+        "type"      : "psd:emeHrAnnc",
+        "lname"     : "emergencyHandlerAnnc",
+        "cnd"       : "org.onem2m.publicsafety.moduleclass.emergencyHandlerAnnc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "emeMe", "lname" : "emergencyMode", "type" : "boolean", "car" : "1" },
+            { "sname" : "idenr", "lname" : "identifier", "type" : "string", "car" : "1" },
+            { "sname" : "sendr", "lname" : "sender", "type" : "string", "car" : "1" },
+            { "sname" : "sent", "lname" : "sent", "type" : "dateTime", "car" : "1" },
+            { "sname" : "sus", "lname" : "status", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "msgTe", "lname" : "msgType", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "refes", "lname" : "references", "type" : "list", "car" : "01" },
+            { "sname" : "urgey", "lname" : "urgency", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "sevey", "lname" : "severity", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "certy", "lname" : "certainty", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "eveCs", "lname" : "eventCodes", "type" : "list", "car" : "1" },
+            { "sname" : "effee", "lname" : "effective", "type" : "dateTime", "car" : "01" },
+            { "sname" : "onset", "lname" : "onset", "type" : "dateTime", "car" : "01" },
+            { "sname" : "expis", "lname" : "expires", "type" : "dateTime", "car" : "01" },
+            { "sname" : "areLe", "lname" : "areaLatitude", "type" : "float", "car" : "01" },
+            { "sname" : "areL0", "lname" : "areaLongitude", "type" : "float", "car" : "01" },
+            { "sname" : "areRs", "lname" : "areaRadius", "type" : "float", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "psd:emeHrInst",
+        "lname"     : "emergencyHandlerInst",
+        "cnd"       : "org.onem2m.publicsafety.moduleclass.emergencyHandlerInst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "emeMe", "lname" : "emergencyMode", "type" : "boolean", "car" : "1" },
+            { "sname" : "idenr", "lname" : "identifier", "type" : "string", "car" : "1" },
+            { "sname" : "sendr", "lname" : "sender", "type" : "string", "car" : "1" },
+            { "sname" : "sent", "lname" : "sent", "type" : "dateTime", "car" : "1" },
+            { "sname" : "sus", "lname" : "status", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "msgTe", "lname" : "msgType", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "refes", "lname" : "references", "type" : "list", "car" : "01" },
+            { "sname" : "urgey", "lname" : "urgency", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "sevey", "lname" : "severity", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "certy", "lname" : "certainty", "type" : "nonNegInteger", "car" : "1" },
+            { "sname" : "eveCs", "lname" : "eventCodes", "type" : "list", "car" : "1" },
+            { "sname" : "effee", "lname" : "effective", "type" : "dateTime", "car" : "01" },
+            { "sname" : "onset", "lname" : "onset", "type" : "dateTime", "car" : "01" },
+            { "sname" : "expis", "lname" : "expires", "type" : "dateTime", "car" : "01" },
+            { "sname" : "areLe", "lname" : "areaLatitude", "type" : "float", "car" : "01" },
+            { "sname" : "areL0", "lname" : "areaLongitude", "type" : "float", "car" : "01" },
+            { "sname" : "areRs", "lname" : "areaRadius", "type" : "float", "car" : "01" }
+        ]
+    },
+
+
+    {
+        "type"      : "psd:setts",
+        "lname"     : "settings",
+        "cnd"       : "org.onem2m.publicsafety.moduleclass.settings",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "optSs", "lname" : "optoutStatus", "type" : "boolean", "car" : "1" }
+        ],
+		"children"  : [
+            "psd:settsInst"
+        ]
+    },
+
+    {
+        "type"      : "psd:settsAnnc",
+        "lname"     : "settingsAnnc",
+        "cnd"       : "org.onem2m.publicsafety.moduleclass.settingsAnnc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "optSs", "lname" : "optoutStatus", "type" : "boolean", "car" : "1" }
+        ]
+    },
+
+    {
+        "type"      : "psd:settsInst",
+        "lname"     : "settingsInst",
+        "cnd"       : "org.onem2m.publicsafety.moduleclass.settingsInst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "optSs", "lname" : "optoutStatus", "type" : "boolean", "car" : "1" }
+        ]
+    }
+
+
+
+]

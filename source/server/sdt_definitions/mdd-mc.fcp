@@ -1,0 +1,189 @@
+
+[
+
+    {
+        "type"      : "mdd:feats",
+        "lname"     : "features",
+        "cnd"       : "org.onem2m.metadata.moduleclass.features",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "metaa", "lname" : "metadata", "type" : "list", "car" : "01" },
+            { "sname" : "precn", "lname" : "precision", "type" : "integer", "car" : "01" },
+            { "sname" : "reliy", "lname" : "reliability", "type" : "integer", "car" : "01" },
+            { "sname" : "weigt", "lname" : "weight", "type" : "float", "car" : "01" },
+            { "sname" : "size", "lname" : "size", "type" : "list", "car" : "01" }
+        ],
+		"children"  : [
+            "mdd:featsInst"
+        ]
+    },
+
+    {
+        "type"      : "mdd:featsAnnc",
+        "lname"     : "featuresAnnc",
+        "cnd"       : "org.onem2m.metadata.moduleclass.featuresAnnc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "metaa", "lname" : "metadata", "type" : "list", "car" : "01" },
+            { "sname" : "precn", "lname" : "precision", "type" : "integer", "car" : "01" },
+            { "sname" : "reliy", "lname" : "reliability", "type" : "integer", "car" : "01" },
+            { "sname" : "weigt", "lname" : "weight", "type" : "float", "car" : "01" },
+            { "sname" : "size", "lname" : "size", "type" : "list", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "mdd:featsInst",
+        "lname"     : "featuresInst",
+        "cnd"       : "org.onem2m.metadata.moduleclass.featuresInst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "metaa", "lname" : "metadata", "type" : "list", "car" : "01" },
+            { "sname" : "precn", "lname" : "precision", "type" : "integer", "car" : "01" },
+            { "sname" : "reliy", "lname" : "reliability", "type" : "integer", "car" : "01" },
+            { "sname" : "weigt", "lname" : "weight", "type" : "float", "car" : "01" },
+            { "sname" : "size", "lname" : "size", "type" : "list", "car" : "01" }
+        ]
+    },
+
+
+    {
+        "type"      : "mdd:locan",
+        "lname"     : "location",
+        "cnd"       : "org.onem2m.metadata.moduleclass.location",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "posAs", "lname" : "postalAddress", "type" : "string", "car" : "01" },
+            { "sname" : "geoJN", "lname" : "geoJSON", "type" : "string", "car" : "01" },
+            { "sname" : "friLn", "lname" : "friendlyLocation", "type" : "string", "car" : "01" },
+            { "sname" : "room", "lname" : "room", "type" : "string", "car" : "01" }
+        ],
+		"children"  : [
+            "mdd:locanInst"
+        ]
+    },
+
+    {
+        "type"      : "mdd:locanAnnc",
+        "lname"     : "locationAnnc",
+        "cnd"       : "org.onem2m.metadata.moduleclass.locationAnnc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "posAs", "lname" : "postalAddress", "type" : "string", "car" : "01" },
+            { "sname" : "geoJN", "lname" : "geoJSON", "type" : "string", "car" : "01" },
+            { "sname" : "friLn", "lname" : "friendlyLocation", "type" : "string", "car" : "01" },
+            { "sname" : "room", "lname" : "room", "type" : "string", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "mdd:locanInst",
+        "lname"     : "locationInst",
+        "cnd"       : "org.onem2m.metadata.moduleclass.locationInst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "posAs", "lname" : "postalAddress", "type" : "string", "car" : "01" },
+            { "sname" : "geoJN", "lname" : "geoJSON", "type" : "string", "car" : "01" },
+            { "sname" : "friLn", "lname" : "friendlyLocation", "type" : "string", "car" : "01" },
+            { "sname" : "room", "lname" : "room", "type" : "string", "car" : "01" }
+        ]
+    },
+
+
+    {
+        "type"      : "mdd:loca0",
+        "lname"     : "localization",
+        "cnd"       : "org.onem2m.metadata.moduleclass.localization",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "locae", "lname" : "locale", "type" : "string", "car" : "1" },
+            { "sname" : "friNe", "lname" : "friendlyName", "type" : "string", "car" : "01" },
+            { "sname" : "dc", "lname" : "description", "type" : "string", "car" : "01" },
+            { "sname" : "friLn", "lname" : "friendlyLocation", "type" : "string", "car" : "01" }
+        ],
+		"children"  : [
+            "mdd:loca0Inst"
+        ]
+    },
+
+    {
+        "type"      : "mdd:loca0Annc",
+        "lname"     : "localizationAnnc",
+        "cnd"       : "org.onem2m.metadata.moduleclass.localizationAnnc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "locae", "lname" : "locale", "type" : "string", "car" : "1" },
+            { "sname" : "friNe", "lname" : "friendlyName", "type" : "string", "car" : "01" },
+            { "sname" : "dc", "lname" : "description", "type" : "string", "car" : "01" },
+            { "sname" : "friLn", "lname" : "friendlyLocation", "type" : "string", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "mdd:loca0Inst",
+        "lname"     : "localizationInst",
+        "cnd"       : "org.onem2m.metadata.moduleclass.localizationInst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "locae", "lname" : "locale", "type" : "string", "car" : "1" },
+            { "sname" : "friNe", "lname" : "friendlyName", "type" : "string", "car" : "01" },
+            { "sname" : "dc", "lname" : "description", "type" : "string", "car" : "01" },
+            { "sname" : "friLn", "lname" : "friendlyLocation", "type" : "string", "car" : "01" }
+        ]
+    },
+
+
+    {
+        "type"      : "mdd:orign",
+        "lname"     : "origin",
+        "cnd"       : "org.onem2m.metadata.moduleclass.origin",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "oriID", "lname" : "originID", "type" : "string", "car" : "01" },
+            { "sname" : "datTe", "lname" : "dataType", "type" : "string", "car" : "01" },
+            { "sname" : "daSID", "lname" : "dataSourceID", "type" : "string", "car" : "01" }
+        ],
+		"children"  : [
+            "mdd:orignInst"
+        ]
+    },
+
+    {
+        "type"      : "mdd:orignAnnc",
+        "lname"     : "originAnnc",
+        "cnd"       : "org.onem2m.metadata.moduleclass.originAnnc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "oriID", "lname" : "originID", "type" : "string", "car" : "01" },
+            { "sname" : "datTe", "lname" : "dataType", "type" : "string", "car" : "01" },
+            { "sname" : "daSID", "lname" : "dataSourceID", "type" : "string", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "mdd:orignInst",
+        "lname"     : "originInst",
+        "cnd"       : "org.onem2m.metadata.moduleclass.originInst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+            { "sname" : "dgt", "lname" : "dataGenerationTime", "type" : "timestamp", "car" : "01" },
+            { "sname" : "oriID", "lname" : "originID", "type" : "string", "car" : "01" },
+            { "sname" : "datTe", "lname" : "dataType", "type" : "string", "car" : "01" },
+            { "sname" : "daSID", "lname" : "dataSourceID", "type" : "string", "car" : "01" }
+        ]
+    }
+
+
+
+]

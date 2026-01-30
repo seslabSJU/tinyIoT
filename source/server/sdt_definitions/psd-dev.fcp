@@ -1,0 +1,88 @@
+
+[
+
+    {
+        "type"      : "psd:dPWSC",
+        "lname"     : "devicePWSCenter",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.publicsafety.device.devicePWSCenter",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "psd:dissr"
+            ,"psd:dPWSCInst"
+        ]
+    },
+
+    {
+        "type"      : "psd:dPWSCAnnc",
+        "lname"     : "devicePWSCenterAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.publicsafety.device.devicePWSCenterAnnc",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "psd:dissr",
+            "psd:dissrAnnc"
+        ]
+    },
+    {
+        "type"      : "psd:dPWSCInst",
+        "lname"     : "devicePWSCenterInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.publicsafety.device.devicePWSCenterInst",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    },
+
+    {
+        "type"      : "psd:dPWSE",
+        "lname"     : "devicePWSEquipment",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.publicsafety.device.devicePWSEquipment",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "psd:emeHr",
+            "psd:setts"
+            ,"psd:dPWSEInst"
+        ]
+    },
+
+    {
+        "type"      : "psd:dPWSEAnnc",
+        "lname"     : "devicePWSEquipmentAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.publicsafety.device.devicePWSEquipmentAnnc",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "psd:emeHr",
+            "psd:emeHrAnnc",
+            "psd:setts",
+            "psd:settsAnnc"
+        ]
+    },
+    {
+        "type"      : "psd:dPWSEInst",
+        "lname"     : "devicePWSEquipmentInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.publicsafety.device.devicePWSEquipmentInst",
+        "attributes": [
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    }
+
+
+]
