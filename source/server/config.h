@@ -7,7 +7,7 @@
 
 // #define NIC_NAME "eth0"
 #define SERVER_IP "127.0.0.1"
-#define SERVER_PORT "3050"
+#define SERVER_PORT "3000"
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
 #define CSE_BASE_SP_ID "tinyiot.example.com"
@@ -26,8 +26,8 @@
 #define DB_POSTGRESQL 2
 
 // Select Database Type: DB_SQLITE or DB_POSTGRESQL
-// #define DB_TYPE DB_SQLITE
-#define DB_TYPE DB_POSTGRESQL
+#define DB_TYPE DB_SQLITE
+// #define DB_TYPE DB_POSTGRESQL
 
 
 #if DB_TYPE == DB_POSTGRESQL
