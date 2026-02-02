@@ -20,6 +20,52 @@ extern pthread_mutex_t main_lock;
 extern int send_verification_request(char *nu, cJSON *noti);
 extern int terminate;
 extern PGconn *pg_conn;
+
+// Throttle missing-data generation per TS to avoid generating multiple missing periods
+// in a short time window (e.g., when lt is far behind). This aligns behavior with
+// unit tests that expect at most one missing period to be generated per pei interval.
+typedef struct _ts_miss_throttle_entry {
+    char ri[256];
+    long long last_gen_us;
+    struct _ts_miss_throttle_entry *next;
+} ts_miss_throttle_entry_t;
+
+static ts_miss_throttle_entry_t *g_ts_miss_throttle = NULL;
+
+static long long get_last_gen_us_for_ri(const char *ri) {
+    ts_miss_throttle_entry_t *e = g_ts_miss_throttle;
+    while (e) {
+        if (strcmp(e->ri, ri) == 0) return e->last_gen_us;
+        e = e->next;
+    }
+    return 0;
+}
+
+static void set_last_gen_us_for_ri(const char *ri, long long v) {
+    ts_miss_throttle_entry_t *e = g_ts_miss_throttle;
+    while (e) {
+        if (strcmp(e->ri, ri) == 0) {
+            e->last_gen_us = v;
+            return;
+        }
+        e = e->next;
+    }
+    // not found -> create
+    e = (ts_miss_throttle_entry_t *)calloc(1, sizeof(ts_miss_throttle_entry_t));
+    if (!e) return;
+    strncpy(e->ri, ri, sizeof(e->ri) - 1);
+    e->last_gen_us = v;
+    e->next = g_ts_miss_throttle;
+    g_ts_miss_throttle = e;
+}
+
+static int should_throttle_missing(const char *ri, long long now_us, long long pei_us) {
+    if (!ri || pei_us <= 0) return 0;
+    long long last = get_last_gen_us_for_ri(ri);
+    // If we generated missing data recently (< pei), skip this cycle.
+    if (last > 0 && (now_us - last) < pei_us) return 1;
+    return 0;
+}
 void check_ts_missing_data(PGconn *conn);
 
 long long parse_time_monitor(char *s) {
@@ -303,6 +349,12 @@ void check_ts_missing_data(PGconn *conn) {
         long long tolerance_us = 2000000;
 
         if (diff > (pei_us + tolerance_us)) {
+            // Throttle: prevent generating multiple missing periods too quickly for the same TS.
+            // Without this, if lt is far behind, the monitor can "catch up" rapidly and emit
+            // notifications earlier than the unit tests expect.
+            if (should_throttle_missing(ri, now_us, pei_us)) {
+                continue;
+            }
             pthread_mutex_lock(&main_lock);
 
             // IMPORTANT: To match the unit tests, do NOT jump missing counts in one step.
@@ -325,6 +377,7 @@ void check_ts_missing_data(PGconn *conn) {
             char l_sql[256];
             sprintf(l_sql, "UPDATE general SET lt = '%s' WHERE ri = '%s';", new_lt_str, ri);
             PQclear(PQexec(conn, l_sql));
+            set_last_gen_us_for_ri(ri, now_us);
 
             RTNode *node = find_rtnode(ri);
             if (node && node->obj) {

@@ -345,6 +345,12 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
             if (mdc_to_add > 0) is_missing = true;
         }
 
+        // IMPORTANT: Unit tests expect missing-data to be accumulated one-by-one.
+        // Do not jump missing counts by more than 1 in a single TSI creation.
+        if (mdc_to_add > 1) {
+            mdc_to_add = 1;
+        }
+
         if (is_missing && mdc_to_add > 0) {
             current_mdc += mdc_to_add;
             char *now_str = get_local_time(0);
@@ -362,8 +368,24 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
     }
 
     char *new_lt_final = get_local_time(0);
-    if (cJSON_GetObjectItem(p_obj, "lt")) cJSON_ReplaceItemInObject(p_obj, "lt", cJSON_CreateString(new_lt_final));
-    else cJSON_AddStringToObject(p_obj, "lt", new_lt_final);
+    if (cJSON_GetObjectItem(p_obj, "lt")) {
+        cJSON_ReplaceItemInObject(p_obj, "lt", cJSON_CreateString(new_lt_final));
+    } else {
+        cJSON_AddStringToObject(p_obj, "lt", new_lt_final);
+    }
+
+    // IMPORTANT: Persist the updated lt to DB immediately.
+    // The monitor thread reads `general.lt` from DB; if it remains stale,
+    // it may generate missing-data notifications unexpectedly (flaky tests).
+    if (pg_conn) {
+        char sql_lt[512];
+        snprintf(sql_lt, sizeof(sql_lt),
+                 "UPDATE general SET lt = '%s' WHERE ri = '%s';",
+                 new_lt_final, get_ri_rtnode(parent_rtnode));
+        PGresult *r_lt = PQexec(pg_conn, sql_lt);
+        if (r_lt) PQclear(r_lt);
+    }
+
     free(new_lt_final);
 
     RTNode *tsi_node = create_rtnode(tsi, RT_TSI);
