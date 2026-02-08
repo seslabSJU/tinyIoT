@@ -1,0 +1,595 @@
+{# 
+
+onem2m-xsd.macros
+
+(c) 2015 by Andreas Kraft
+License: Apache 2. See the LICENSE file for further details.
+#}
+
+
+{##### TODO Where to put this? #####}
+{##### Define CDT version to use #####}
+{# {% set CDTVersion = '4_9_0' %} #}
+
+
+{##### Set some global variables to hold extended module classes #####}
+{% set handledSubDevices = dict() %}
+
+
+{##### Print Indention #####}
+{% macro _indent(level) %}
+{{''|indent(level*4, first=True)-}}
+{% endmacro %}
+
+
+{##### Print schema locations for actions #####}
+{% macro renderActionSchemaLocations(moduleClass) %}
+{% for action in moduleClass.actions %}
+    <xs:include schemaLocation="{{getVersionedFilename(action.name, 'xsd', outType=OutType.action, namespacePrefix=namespaceprefix)}}" />
+{% endfor %}
+{% endmacro %}
+
+
+{##### Print schema locations for module classes. Special handling for extended module classes #####}
+{% macro renderModuleClassesSchemaLocations(device) %}
+{% set schemas = [] %}
+{% for moduleClass in device.moduleClasses %}
+{% set name = componentName(moduleClass) %}
+{% if name not in schemas %}
+    <xs:include schemaLocation="{{getVersionedFilename(name, 'xsd', outType=OutType.moduleClass, namespacePrefix=getNamespacePrefix(moduleClass))}}" />
+{{- schemas.append(name) or '' }}
+{% endif %}
+{#% if moduleClass.name not in extendedModuleClasses %#}
+{#    <xs:include schemaLocation="{{getVersionedFilename(componentName(moduleClass), 'xsd', outType=OutType.moduleClass, namespacePrefix=getNamespacePrefix(moduleClass))}}" /> #}
+{#% endif %#}
+{% endfor %}
+{% endmacro %}
+
+
+{##### Print schema locations for sub-devices #####}
+{% macro renderSubDevicesSchemaLocations(device) %}
+{% for subDevice in device.subDevices %}
+{% if subDevice.extend %}
+{% set name = subDevice.extend.entity %}
+{% else %}
+{% set name = subDevice.id %}
+{% endif %}
+{% if name not in handledSubDevices %}
+    <xs:include schemaLocation="{{getVersionedFilename(name, 'xsd', outType=OutType.subDevice, namespacePrefix=getNamespacePrefix(subDevice))}}" />
+{% endif %}
+{% endfor %}
+{% for name in handledSubDevices %}
+    <xs:include schemaLocation="{{getVersionedFilename(name, 'xsd', outType=OutType.subDevice, namespacePrefix=namespaceprefix)}}" />
+{% endfor %}
+{% endmacro %}
+
+
+{##### Print schema locations for module classes #####}
+{% macro renderExtraDeviceElements(device) %}
+{% for name in extendedModuleClasses %}
+    <xs:element name="{{name}}" type="{{ getNamespacePrefix(moduleClass) }}:{{extendedModuleClasses[name]}}" />
+    <xs:element name="{{name}}Annc" type="{{ getNamespacePrefix(moduleClass) }}:{{extendedModuleClasses[name]}}Annc" />
+{% endfor %}
+{% endmacro %}
+
+{##### Print Documentation #####}
+{% macro doc(text) %}
+{% if text and text.content and text.content | length > 0 %}
+{{text.content | trim | replace("*", "\\*") -}}
+{% endif %}
+{% endmacro %}
+
+
+{##### Print Array DataType #####}
+{% macro _arrayType(arrayType) %}
+>
+{% set it = instanceType(arrayType) %}
+    <xs:simpleType>
+{% if it == 'SDT4SimpleType' %}
+        <xs:list itemType="{{ getSimpleDataType(arrayType.tpe) -}}" />
+{% else %}
+        <xs:list itemType="{{ it }}" />
+{% endif %}
+    </xs:simpleType>
+</xs:element>
+{% endmacro %}
+
+
+{##### Print General DataType #####}
+{% macro getDataType(name, type, level) %}
+{% if isString(type) %}
+ type="{{ getSimpleDataType(type) -}}" />
+{% else %}
+{% if instanceType(type) == 'SDT4ArrayType' %}
+{{ _arrayType(type.arrayType) | indent(5*level, first=False) -}}
+{% else %}
+{% if instanceType(type) == 'SDT4SimpleType' %}
+ type="{{ getSimpleDataType(type.tpe) -}}" />
+{% else %}
+{% if type.extend %}
+ type="{{ getNamespacePrefix(type) }}:{{ type.extend.entity }}" />
+{% endif %}
+{% endif %}
+{% endif %}
+{% endif %}
+{% endmacro %}
+
+
+{##### Print SimpleDataTypes #####}
+{% macro getSimpleDataType(type) -%}
+{%- if type == 'boolean' %}
+xs:boolean
+{%- elif type == 'integer' %}
+xs:integer
+{%- elif type == 'float' %}
+xs:float
+{%- elif type == 'string' %}
+xs:string
+{%- elif type == 'datetime' %}
+m2m:timestamp
+{%- elif type == 'date' %}
+m2m:timestamp
+{%- elif type == 'time' %}
+m2m:timestamp
+{%- elif type =='uri' %}
+xs:anyURI
+{%- elif type == 'blob' %}
+xs:base64Binary
+{%- elif match('.+:.+', type) %}
+{{- type }}
+{%- else %}
+unknown
+{%- endif %}
+{%- endmacro %}
+
+
+{##### Print Properties and DataPoints #####}
+{% macro renderSpecificAttributes(objs, annc, level, parentType, occursIn) %}
+{% for o in objs %}
+{{_indent(level)}}<xs:element name="{{ sanitizeName(o.name, False, annc, parentType, occursIn = occursIn) }}"
+{%- if annc %} minOccurs="0"
+{%- else %}
+{%- if o.optional == 'true' %} minOccurs="0"
+{%- endif -%}
+{%- endif -%}
+{%- set ty = instanceType(o) %}
+{%- if ty == 'SDT4Property' %}
+{{- getDataType(o.name, o.type, 5)}}
+{%- else %}
+{{- getDataType(o.name, o.dataPointType, 5)}}
+{%- endif %}
+{%- endfor %}
+{% endmacro %}
+
+
+
+{##### Print action includes #####}
+{% macro renderSpecificActions(actions, withAnnc) %}
+{% for action in actions %}
+{{_indent(7)}}<xs:element ref="{{ namespaceprefix }}:{{ action.name }}" />
+{{- addToActions(action) }}
+{% if withAnnc %}
+{{_indent(7)}}<xs:element ref="{{ namespaceprefix }}:{{ action.name }}Annc" />
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+
+{##### Print Module classes includes #####}
+{% macro renderDeviceModuleClasses(moduleClasses, withAnnc) %}
+{% set names = [] %}
+{% for moduleClass in moduleClasses %}
+{% set name = componentName(moduleClass) %}
+{% if name not in names %}
+{{_indent(8)}}<xs:element ref="{{ getNamespacePrefix(moduleClass) }}:{{ sanitizeName(name, False, annc=withAnnc, elementType = 1, occursIn = moduleClass.name) }}" />
+{% if withAnnc %}
+{{_indent(8)}}<xs:element ref="{{ getNamespacePrefix(moduleClass) }}:{{ sanitizeName(name, False, annc=withAnnc, elementType = 1, occursIn = moduleClass.name) }}Annc" />
+{% endif %}
+{{- names.append(name) or '' -}}
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+
+{##### Print sub-devices includes #####}
+{% macro renderDeviceSubDevices(subDevices, withAnnc) %}
+{% set names = [] %}
+{% for subDevice in subDevices %}
+{% set name = componentName(subDevice) %}
+{% if name not in names %}
+{{_indent(8)}}<xs:element ref="{{ getNamespacePrefix(subDevice) }}:{{ sanitizeName(name, False, annc=withAnnc, elementType = 3, occursIn = name) }}" />
+{% if withAnnc %}
+{{_indent(8)}}<xs:element ref="{{ getNamespacePrefix(subDevice) }}:{{ sanitizeName(name, False, annc=withAnnc, elementType = 3, occursIn = name) }}Annc" />
+{% endif %}
+{{- names.append(name) or '' -}}
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+
+{##### Check whether one or module classes are inherited, perhaps with a different name #####}
+{% macro checkInheritedModuleClasses(moduleClasses) -%}
+{% for moduleClass in moduleClasses %}
+{% if moduleClass.extend and moduleClass.name != moduleClass.extend.entity %}
+{{ extendedModuleClasses.__setitem__(moduleClass.name,  moduleClass.extend.entity) or '' -}}
+{{ extendedModuleClassesExtend.__setitem__(moduleClass.extend.entity, moduleClass.extend.entity) or '' -}}
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+
+{##### Check whether one or subDevices are inherited, perhaps with a different name #####}
+{% macro checkInheritedSubDevices(subDevices) -%}
+{{ handledSubDevices.clear() or '' -}}
+{% for subDevice in subDevices %}
+{% if subDevice.extend and subDevice.id != subDevice.extend.entity %}
+{{ extendedSubDevices.__setitem__(subDevice.id,  subDevice.extend.entity) or '' -}}
+{{ extendedSubDevicesExtend.__setitem__(subDevice.extend.entity, subDevice.extend.entity) or '' -}}
+{{ handledSubDevices.__setitem__(subDevice.extend.entity, subDevice.extend.entity) or '' -}}
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+
+{#############################################################################}
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+{{ license }}
+-->
+
+{% macro renderXSDHeader(object) %}
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+{{ license }}
+-->
+
+<xs:schema targetNamespace="{{ xsdtargetnamespace }}/{{ getDomainFromPrefix(namespaceprefix) }}"
+    xmlns="http://www.w3.org/2001/XMLSchema" 
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:m2m="https://git.onem2m.org/XMLSchemas/ts-0004/tree/{{ CDTVersion }}" 
+    xmlns:agd="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/agriculturedomain" 
+    xmlns:cid="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/citydomain" 
+    xmlns:cod="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/commondomain" 
+    xmlns:hed="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/healthdomain" 
+    xmlns:hod="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/homedomain" 
+    xmlns:ind="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/industrydomain"  
+    xmlns:mad="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/managementdomain" 
+    xmlns:mdd="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/metadatadomain" 
+    xmlns:psd="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/publicsafetydomain" 
+    xmlns:rad="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/railwaydomain" 
+    xmlns:ved="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/vehiculardomain" 
+    xmlns:hd="https://git.onem2m.org/XMLSchemas/ts-0023/tree/{{ modelversion }}/horizontaldomain" 
+    elementFormDefault="unqualified" 
+    attributeFormDefault="unqualified"
+    >
+
+    <xs:import namespace="https://git.onem2m.org/XMLSchemas/ts-0004/tree/{{ CDTVersion }}" schemaLocation="CDT-subscription.xsd" />
+    <xs:import namespace="https://git.onem2m.org/XMLSchemas/ts-0004/tree/{{ CDTVersion }}" schemaLocation="CDT-commonTypes.xsd" />
+
+    <xs:include schemaLocation="HD-enumerationTypes.xsd" />
+    <xs:include schemaLocation="{{ namespaceprefix | upper }}-commonTypes.xsd" />
+{% endmacro %}
+
+
+
+{##### Print the ModuleClasses. This complexType needs to be named directly, because it may be referenced when inherited #####}
+{% macro renderModuleClass(object) %}
+{{renderXSDHeader(object)}}
+
+{{ renderActionSchemaLocations(object) -}}
+
+    <xs:element name="{{ object.name }}" type="{{ namespaceprefix }}:{{ object.name }}" substitutionGroup="m2m:sg_flexContainerResource" />
+    <xs:complexType name="{{ object.name }}" >
+        <xs:complexContent>
+            <!-- Inherit Common Attributes from data type "flexContainerResource" -->
+            <xs:extension base="m2m:flexContainerResource">
+                <xs:sequence>
+
+                    <!-- Resource Specific Attributes -->
+{{ renderSpecificAttributes(object.properties, False, 6, 5, object.name) }}
+{{ renderSpecificAttributes(object.data, False, 6, 5, object.name) }}
+
+                    <!-- Child Resources -->
+
+                    <xs:choice minOccurs="0" maxOccurs="1">
+                        <xs:element name="childResource" type="m2m:childResourceRef" minOccurs="1" maxOccurs="unbounded" />
+                        <xs:choice minOccurs="1" maxOccurs="unbounded">
+{{ renderSpecificActions(object.actions) }}
+                            <xs:element ref="m2m:subscription" />
+                            <xs:element ref="{{ namespaceprefix }}:{{ object.name }}Inst" />
+                        </xs:choice>
+                    </xs:choice>
+
+                </xs:sequence>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+    <xs:element name="{{ object.name }}Annc" type="{{ namespaceprefix }}:{{ object.name }}Annc" substitutionGroup="m2m:sg_announcedFlexContainerResource" />
+    <xs:complexType name="{{ object.name }}Annc">
+        <xs:complexContent>
+            <!-- Inherit Common Attributes from data type "announcedFlexContainerResource" -->
+            <xs:extension base="m2m:announcedFlexContainerResource">
+                <xs:sequence>
+
+                    <!-- Resource Specific Attributes -->
+{{ renderSpecificAttributes(object.properties, True, 6, 5, object.name+"Annc") }}
+{{ renderSpecificAttributes(object.data, True, 6, 5, object.name+"Annc") }}
+
+                    <!-- Child Resources -->
+
+                    <xs:choice minOccurs="0" maxOccurs="1">
+                        <xs:element name="childResource" type="m2m:childResourceRef" minOccurs="1" maxOccurs="unbounded" />
+                        <xs:choice minOccurs="1" maxOccurs="unbounded">
+{{ renderSpecificActions(object.actions, True) }}
+                            <xs:element ref="m2m:subscription" />
+                        </xs:choice>
+                    </xs:choice>
+
+                </xs:sequence>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+
+    <!-- FlexContainerInstance specialization -->
+
+    <xs:element name="{{ object.name }}Inst" type="{{ namespaceprefix }}:{{ object.name }}Inst" substitutionGroup="m2m:sg_flexContainerInstanceResource" />
+    <xs:complexType name="{{ object.name }}Inst" >
+        <xs:complexContent>
+            <!-- Inherit Common Attributes from data type "flexContainerInstanceResource" -->
+            <xs:extension base="m2m:flexContainerInstanceResource">
+                <xs:sequence>
+
+                    <!-- Resource Specific Attributes -->
+{{ renderSpecificAttributes(object.properties, False, 6, 5, object.name+"Inst") }}
+{{ renderSpecificAttributes(object.data, False, 6, 5, object.name+"Inst") }}
+
+                    <!-- No Child Resources -->
+
+                </xs:sequence>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+</xs:schema>
+{% endmacro %}
+
+{#############################################################################}
+
+
+{% macro renderDeviceClass(object) %}
+{% if instanceType(object) == 'SDT4SubDevice' and object.extend %}
+{% set name = object.extend.entity %}
+{% else %}
+{% set name = object.id %}
+{% endif %}
+{% if instanceType(object) == 'SDT4SubDevice' %}
+{% set elementType = 6 %}
+{% else %}
+{% set elementType = 7 %}
+{% endif %}
+{{renderXSDHeader(object)}}
+
+{{ checkInheritedModuleClasses(object.moduleClasses) -}}
+{{ checkInheritedSubDevices(object.subDevices) -}}
+{{ renderModuleClassesSchemaLocations(object) }}
+{{ renderSubDevicesSchemaLocations(object) }}
+
+    <xs:element name="{{ name }}" type="{{ namespaceprefix }}:{{ name }}" substitutionGroup="m2m:sg_flexContainerResource" />
+    <xs:complexType name="{{ name }}">
+        <xs:complexContent>
+            <!-- Inherit Common Attributes from data type "flexContainerResource" -->
+            <xs:extension base="m2m:flexContainerResource">
+                <xs:sequence>
+                
+                    <!-- Resource Specific Attributes -->
+{{ renderSpecificAttributes(object.properties, False, 6, elementType, name) }}
+
+                    <!-- Child Resources -->
+                    
+                    <xs:choice minOccurs="0" maxOccurs="1">
+                        <xs:element name="childResource" type="m2m:childResourceRef" minOccurs="1" maxOccurs="unbounded" />
+                        <xs:choice minOccurs="1" maxOccurs="unbounded">
+{{ renderDeviceModuleClasses(object.moduleClasses, False)}}
+{{ renderDeviceSubDevices(object.subDevices, False)}}
+                            <xs:element ref="m2m:subscription"  />
+                            <xs:element ref="{{ namespaceprefix }}:{{ name }}Inst" />
+                        </xs:choice>
+                    </xs:choice>
+
+                </xs:sequence>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+    <xs:element name="{{ name }}Annc" type="{{ namespaceprefix }}:{{ name }}Annc" substitutionGroup="m2m:sg_announcedFlexContainerResource" />
+    <xs:complexType name="{{ name }}Annc">
+        <xs:complexContent>
+            <!-- Inherit Common Attributes from data type "announcedFlexContainerResource" -->
+            <xs:extension base="m2m:announcedFlexContainerResource">
+                <xs:sequence>
+
+                    <!-- Resource Specific Attributes -->
+{{ renderSpecificAttributes(object.properties, False, 6, elementType, name+"Annc") }}
+
+                    <!-- Child Resources -->
+
+                    <xs:choice minOccurs="0" maxOccurs="1">
+                        <xs:element name="childResource" type="m2m:childResourceRef" minOccurs="1" maxOccurs="unbounded" />
+                        <xs:choice minOccurs="1" maxOccurs="unbounded">
+{{ renderDeviceModuleClasses(object.moduleClasses, True) }}
+{{ renderDeviceSubDevices(object.subDevices, True) }}
+                            <xs:element ref="m2m:subscription"  />
+                        </xs:choice>
+                    </xs:choice>
+
+                </xs:sequence>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+    <xs:element name="{{ name }}Inst" type="{{ namespaceprefix }}:{{ name }}Inst" substitutionGroup="m2m:sg_flexContainerInstanceResource" />
+    <xs:complexType name="{{ name }}Inst" >
+        <xs:complexContent>
+            <!-- Inherit Common Attributes from data type "flexContainerInstanceResource" -->
+            <xs:extension base="m2m:flexContainerInstanceResource">
+                <xs:sequence>
+
+                    <!-- Resource Specific Attributes -->
+{{ renderSpecificAttributes(object.properties, False, 6, elementType, name+"Inst") }}
+
+                    <!-- No Child Resources -->
+
+                </xs:sequence>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+</xs:schema>
+{% endmacro %}
+
+{#############################################################################}
+
+{% macro renderAction(object) %}
+{{renderXSDHeader(object)}}
+
+{{ renderModuleClassesSchemaLocations(object)}}
+
+    <xs:element name="{{ object.name }}" type="{{ namespaceprefix }}:{{ object.name }}" substitutionGroup="m2m:sg_flexContainerResource" />
+    <xs:complexType name="{{ object.name }}">
+        <xs:complexContent>
+            <!-- Inherit Common Attributes from data type "flexContainerResource" -->
+            <xs:extension base="m2m:flexContainerResource">
+                <xs:sequence>
+
+                    <!-- Resource Specific Attributes -->
+{{ renderSpecificAttributes(object.args, False, 6, 8, object.name) }}
+
+                    <!-- Child Resources -->
+
+                    <xs:choice minOccurs="0" maxOccurs="1">
+                        <xs:element name="childResource" type="m2m:childResourceRef" maxOccurs="unbounded" />
+                        <xs:choice minOccurs="1" maxOccurs="unbounded">
+                            <xs:element ref="m2m:subscription" />
+                            <xs:element ref="{{ namespaceprefix }}:{{ object.name }}Inst" />
+                        </xs:choice>
+                    </xs:choice>
+                </xs:sequence>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+    <xs:element name="{{ object.name }}Annc" type="{{ namespaceprefix }}:{{ object.name }}Annc" substitutionGroup="m2m:sg_announcedFlexContainerResource" />
+    <xs:complexType name="{{ object.name }}Annc">
+        <xs:complexContent>
+            <!-- Inherit Common Attributes from data type "announcedFlexContainerResource" -->
+            <xs:extension base="m2m:announcedFlexContainerResource">
+                <xs:sequence>
+
+                    <!-- Resource Specific Attributes -->
+{{ renderSpecificAttributes(object.args, False, 6, 8, object.name+"Annc") }}
+
+                    <!-- Child Resources -->
+
+                    <xs:choice minOccurs="0" maxOccurs="1">
+                        <xs:element name="childResource" type="m2m:childResourceRef" maxOccurs="unbounded" />
+                        <xs:choice minOccurs="1" maxOccurs="unbounded">
+                            <xs:element ref="m2m:subscription" />
+                        </xs:choice>
+                    </xs:choice>    
+                </xs:sequence>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+    <xs:element name="{{ object.name }}Inst" type="{{ namespaceprefix }}:{{ object.name }}Inst" substitutionGroup="m2m:sg_flexContainerInstanceResource" />
+    <xs:complexType name="{{ object.name }}Inst" >
+        <xs:complexContent>
+            <!-- Inherit Common Attributes from data type "flexContainerInstanceResource" -->
+            <xs:extension base="m2m:flexContainerInstanceResource">
+                <xs:sequence>
+
+                    <!-- Resource Specific Attributes -->
+{{ renderSpecificAttributes(object.args, False, 6, 8, object.name+"Inst") }}
+
+                    <!-- No Child Resources -->
+
+                </xs:sequence>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+
+
+</xs:schema>
+{% endmacro %}
+
+{#############################################################################}
+
+{% macro renderDataTypes(object) %}
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+{{ license }}
+-->
+
+<xs:schema xmlns="http://www.w3.org/2001/XMLSchema" targetNamespace="{{ xsdtargetnamespace }}"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:m2m="http://www.onem2m.org/xml/protocols" 
+    elementFormDefault="unqualified"
+    {{ getXMLNameSpaces() }}
+    >
+
+{% for dataType in object.dataTypes %}
+{% if instanceType(dataType) == 'SDT4EnumType'%}
+    <xs:simpleType name="{{ dataType.name }}">
+        <xs:annotation>
+            <xs:documentation>{{doc(dataType.doc)}}</xs:documentation>
+        </xs:annotation>
+{% for value in dataType.dataType.enumValues %}
+        <xs:restriction base="xs:integer">
+            <!-- {{value.name}} -->
+            <xs:enumeration value="{{value.value}}" />
+        </xs:restriction>
+{% endfor %}
+    </xs:simpleType>
+{% endif %}
+{% endfor %}
+</xs:schema>
+{% endmacro %}
+
+
+{#############################################################################}
+
+{% macro renderCommons(object) %}
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+{{ license }}
+-->
+
+<xs:schema xmlns="http://www.w3.org/2001/XMLSchema" targetNamespace="{{ xsdtargetnamespace }}"
+    xmlns:m2m="http://www.onem2m.org/xml/protocols" xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    elementFormDefault="unqualified" attributeFormDefault="unqualified" 
+    {{ getXMLNameSpaces() }}
+    >
+
+{% for name in object.extendedSubDevicesExtend %}
+    <xs:include schemaLocation="{{ getVersionedFilename(name, 'xsd', outType=OutType.subDevice, namespacePrefix=namespaceprefix) }}" />
+{% endfor %}
+
+{% for name in object.extendedModuleClassesExtend %}
+    <xs:include schemaLocation="{{ getVersionedFilename(name, 'xsd', outType=OutType.moduleClass, namespacePrefix=namespaceprefix) }}" />
+{% endfor %}
+
+{% for name in object.extendedSubDevices %}
+    <xs:element name="{{ name }}" type="{{ namespaceprefix}}:{{object.extendedSubDevices[name]}}" />
+    <xs:element name="{{ name }}Annc" type="{{ namespaceprefix}}:{{object.extendedSubDevices[name] }}Annc" />
+{% endfor %}
+
+{% for name in object.extendedModuleClasses %}
+    <xs:element name="{{ name }}" type="{{ namespaceprefix}}:{{object.extendedModuleClasses[name] }}" />
+    <xs:element name="{{ name }}Annc" type="{{ namespaceprefix}}:{{object.extendedModuleClasses[name] }}Annc" />
+{% endfor %}
+
+
+</xs:schema>
+{% endmacro %}

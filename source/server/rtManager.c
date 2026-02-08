@@ -498,24 +498,46 @@ RTNode *find_rtnode_by_uri(char *uri)
             { // if next '/' doesn't exist
                 if (!strcmp(ptr, "la") || !strcmp(ptr, "latest"))
                 {
+                    logger("RTM", LOG_LEVEL_DEBUG, "Requested /la (latest) for FCNT: %s", parent_rtnode->uri);
                     flag = 0;
                 }
                 else if (!strcmp(ptr, "ol") || !strcmp(ptr, "oldest"))
                 {
+                    logger("RTM", LOG_LEVEL_DEBUG, "Requested /ol (oldest) for FCNT: %s", parent_rtnode->uri);
                     flag = 1;
                 }
                 if (flag == 0 || flag == 1)
                 {
+                    logger("RTM", LOG_LEVEL_DEBUG, "Querying DB for FCIN with flag=%d", flag);
                     fcin = db_get_fcin_laol(parent_rtnode, flag);
+                    if (!fcin)
+                    {
+                        logger("RTM", LOG_LEVEL_WARN, "No FCIN found in DB for flag=%d, parent=%s", flag, parent_rtnode->uri);
+                    }
+                    else
+                    {
+                        logger("RTM", LOG_LEVEL_DEBUG, "Found FCIN in DB for flag=%d", flag);
+                    }
                 }
                 else
                 {
+                    logger("RTM", LOG_LEVEL_DEBUG, "Attempting to load FCIN from DB with URI: %s", uri);
                     fcin = db_get_resource_by_uri(uri, RT_FCIN);
+                    if (!fcin)
+                    {
+                        logger("RTM", LOG_LEVEL_WARN, "FCIN not found in DB with URI: %s", uri);
+                    }
                 }
                 if (fcin)
                 {
                     rtnode = create_rtnode(fcin, RT_FCIN);
                     rtnode->parent = parent_rtnode;
+                    rtnode->uri = strdup(uri);
+                    logger("RTM", LOG_LEVEL_DEBUG, "Successfully loaded FCIN: %s", uri);
+                }
+                else
+                {
+                    logger("RTM", LOG_LEVEL_WARN, "Failed to load FCIN for path component: %s", ptr);
                 }
             }
         }

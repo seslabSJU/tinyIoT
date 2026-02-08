@@ -37,6 +37,7 @@ bool db_check_fcin_rn_dup(char *rn, char *pi);
 
 int db_delete_one_fcin_mni(RTNode *fcnt);
 int db_delete_one_fcin_mbs(RTNode *fcnt);
+int db_get_fcin_cbs_cni(RTNode *fcnt, int *out_cbs, int *out_cni);
 cJSON *getForbiddenUri(cJSON *acp_list);
 
 int db_store_fcnt_custom_attributes(const char *ri, cJSON *customAttrs);

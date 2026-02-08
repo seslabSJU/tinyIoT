@@ -4653,8 +4653,15 @@ int prepare_fcnt_for_instances(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		cJSON_AddStringToObject(la_obj, "et", et_obj->valuestring);
 	}
 
-	char *la_uri = malloc(1024);
-	sprintf(la_uri, "%s/la", fcnt_rtnode->uri);
+	size_t la_uri_len = strlen(fcnt_rtnode->uri) + 4;
+	char *la_uri = malloc(la_uri_len);
+	if (!la_uri)
+	{
+		cJSON_Delete(la_obj);
+		logger("UTIL", LOG_LEVEL_ERROR, "Failed to allocate memory for la URI");
+		return -1;
+	}
+	snprintf(la_uri, la_uri_len, "%s/la", fcnt_rtnode->uri);
 	RTNode *la_rtnode = create_rtnode(la_obj, RT_FCNT_LA);
 	la_rtnode->uri = la_uri;
 	add_child_resource_tree(fcnt_rtnode, la_rtnode);
@@ -4670,14 +4677,21 @@ int prepare_fcnt_for_instances(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		cJSON_AddStringToObject(ol_obj, "et", et_obj->valuestring);
 	}
 
-	char *ol_uri = malloc(1024);
-	sprintf(ol_uri, "%s/ol", fcnt_rtnode->uri);
+	size_t ol_uri_len = strlen(fcnt_rtnode->uri) + 4;
+	char *ol_uri = malloc(ol_uri_len);
+	if (!ol_uri)
+	{
+		cJSON_Delete(ol_obj);
+		logger("UTIL", LOG_LEVEL_ERROR, "Failed to allocate memory for ol URI");
+		return -1;
+	}
+	snprintf(ol_uri, ol_uri_len, "%s/ol", fcnt_rtnode->uri);
 	RTNode *ol_rtnode = create_rtnode(ol_obj, RT_FCNT_OL);
 	ol_rtnode->uri = ol_uri;
 	add_child_resource_tree(fcnt_rtnode, ol_rtnode);
 
 	logger("UTIL", LOG_LEVEL_DEBUG, "Created /la and /ol virtual resources for FCNT");
-	
+
 	return 0;
 }
 
@@ -4697,27 +4711,26 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 
 	cJSON *fcin = cJSON_CreateObject();
 
+	// Generate resource name: {fcnt_rn}_{st}
 	char rn_buf[256];
-	sprintf(rn_buf, "%s_%d", fcnt_rtnode->rn, st_obj->valueint);
+	snprintf(rn_buf, sizeof(rn_buf), "%s_%d", fcnt_rtnode->rn, st_obj->valueint);
 	cJSON_AddStringToObject(fcin, "rn", rn_buf);
+
+	// Copy label attribute if present (per TS-0004 standard)
 	cJSON *lbl = cJSON_GetObjectItem(fcnt, "lbl");
 	if (lbl)
 	{
 		cJSON_AddItemToObject(fcin, "lbl", cJSON_Duplicate(lbl, 1));
 	}
 
-	cJSON *fcied = cJSON_GetObjectItem(fcnt, "fcied");
-	if (fcied)
-	{
-		cJSON_AddItemToObject(fcin, "fcied", cJSON_Duplicate(fcied, 1));
-	}
-
+	// Copy location attribute if present
 	cJSON *loc = cJSON_GetObjectItem(fcnt, "loc");
 	if (loc)
 	{
 		cJSON_AddItemToObject(fcin, "loc", cJSON_Duplicate(loc, 1));
 	}
 
+	// Copy custom attributes from parent FCNT
 	cJSON *customAttrs = extract_custom_attributes(fcnt);
 	if (customAttrs)
 	{
@@ -4732,25 +4745,34 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		cJSON_Delete(customAttrs);
 	}
 
+	// Set stateTag to match parent FCNT's current stateTag
 	cJSON_AddNumberToObject(fcin, "st", st_obj->valueint);
 
+	// Set contentSize to match parent FCNT's current contentSize
 	cJSON *cs_obj = cJSON_GetObjectItem(fcnt, "cs");
-	if (cs_obj)
+	if (cs_obj && cJSON_IsNumber(cs_obj))
 	{
 		cJSON_AddNumberToObject(fcin, "cs", cs_obj->valueint);
 	}
+	else
+	{
+		cJSON_AddNumberToObject(fcin, "cs", 0);
+	}
 
+	// Set originator
 	if (o2pt->fr)
 	{
 		cJSON_AddStringToObject(fcin, "org", o2pt->fr);
 	}
 
+	// Add general attributes (ri, pi, ct, ty, etc.)
 	add_general_attribute(fcin, fcnt_rtnode, RT_FCIN);
 
+	// Handle maxInstanceAge (mia) for expirationTime
 	cJSON *mia = cJSON_GetObjectItem(fcnt, "mia");
 	if (mia && cJSON_IsNumber(mia) && mia->valueint > 0)
 	{
-		char *et_str = get_local_time(-mia->valueint);
+		char *et_str = get_local_time(mia->valueint);
 		if (et_str)
 		{
 			cJSON_DeleteItemFromObject(fcin, "et");
@@ -4760,16 +4782,25 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 	}
 	else
 	{
+		// Use parent FCNT's expirationTime if mia is not set
 		cJSON *fcnt_et = cJSON_GetObjectItem(fcnt, "et");
-		if (fcnt_et)
+		if (fcnt_et && cJSON_IsString(fcnt_et))
 		{
 			cJSON_DeleteItemFromObject(fcin, "et");
 			cJSON_AddStringToObject(fcin, "et", fcnt_et->valuestring);
 		}
 	}
 
-	char *fci_uri = malloc(1024);
-	sprintf(fci_uri, "%s/%s", fcnt_rtnode->uri, rn_buf);
+	// Generate URI for FCIN
+	size_t fci_uri_len = strlen(fcnt_rtnode->uri) + strlen(rn_buf) + 2;
+	char *fci_uri = malloc(fci_uri_len);
+	if (!fci_uri)
+	{
+		logger("UTIL", LOG_LEVEL_ERROR, "Failed to allocate memory for FCIN URI");
+		cJSON_Delete(fcin);
+		return -1;
+	}
+	snprintf(fci_uri, fci_uri_len, "%s/%s", fcnt_rtnode->uri, rn_buf);
 
 	int result = db_store_resource(fcin, fci_uri);
 	if (result != 1)

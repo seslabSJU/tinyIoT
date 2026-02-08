@@ -1739,29 +1739,84 @@ int db_delete_one_fcin_mbs(RTNode *fcnt)
 
     char *pi = get_ri_rtnode(fcnt);
     sqlite3_stmt *res = NULL;
+    int deleted_cs = 0;
 
-    // Find the oldest FCIN (smallest ct) and delete it
-    char *sql = "DELETE FROM general WHERE id IN ("
-                "SELECT id FROM general WHERE pi=? AND ty=58 "
-                "ORDER BY ct ASC LIMIT 1);";
+    char *sql_select = "SELECT general.id, fcin.cs FROM general "
+                       "LEFT JOIN fcin ON general.id = fcin.id "
+                       "WHERE general.pi=? AND general.ty=58 "
+                       "ORDER BY general.ct ASC LIMIT 1";
 
-    int rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    int rc = sqlite3_prepare_v2(db, sql_select, -1, &res, NULL);
     if (rc != SQLITE_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed to prepare delete FCIN statement");
+        logger("DB", LOG_LEVEL_ERROR, "Failed to prepare select FCIN statement");
         return -1;
     }
 
     sqlite3_bind_text(res, 1, pi, -1, NULL);
     rc = sqlite3_step(res);
-    sqlite3_finalize(res);
 
-    if (rc != SQLITE_DONE) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed to delete oldest FCIN");
+    if (rc == SQLITE_ROW) {
+        int fcin_id = sqlite3_column_int(res, 0);
+        deleted_cs = sqlite3_column_int(res, 1);
+        sqlite3_finalize(res);
+
+        char *sql_delete = "DELETE FROM general WHERE id=?";
+        rc = sqlite3_prepare_v2(db, sql_delete, -1, &res, NULL);
+        if (rc != SQLITE_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to prepare delete FCIN statement");
+            return -1;
+        }
+
+        sqlite3_bind_int(res, 1, fcin_id);
+        rc = sqlite3_step(res);
+        sqlite3_finalize(res);
+
+        if (rc != SQLITE_DONE) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to delete oldest FCIN");
+            return -1;
+        }
+
+        logger("DB", LOG_LEVEL_DEBUG, "Successfully deleted oldest FCIN with cs=%d", deleted_cs);
+        return deleted_cs;
+    } else {
+        sqlite3_finalize(res);
+        logger("DB", LOG_LEVEL_ERROR, "No FCIN found to delete");
+        return -1;
+    }
+}
+
+int db_get_fcin_cbs_cni(RTNode *fcnt, int *out_cbs, int *out_cni)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_cbs_cni called");
+    if (!fcnt || !out_cbs || !out_cni) return -1;
+
+    char *pi = get_ri_rtnode(fcnt);
+    sqlite3_stmt *res = NULL;
+
+    char *sql = "SELECT COUNT(*), COALESCE(SUM(fcin.cs), 0) FROM general "
+                "LEFT JOIN fcin ON general.id = fcin.id "
+                "WHERE general.pi=? AND general.ty=58";
+
+    int rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to prepare FCIN count statement");
         return -1;
     }
 
-    logger("DB", LOG_LEVEL_DEBUG, "Successfully deleted oldest FCIN");
-    return 0;
+    sqlite3_bind_text(res, 1, pi, -1, NULL);
+    rc = sqlite3_step(res);
+
+    if (rc == SQLITE_ROW) {
+        *out_cni = sqlite3_column_int(res, 0);
+        *out_cbs = sqlite3_column_int(res, 1);
+        sqlite3_finalize(res);
+        logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_cbs_cni: cni=%d, cbs=%d", *out_cni, *out_cbs);
+        return 0;
+    } else {
+        sqlite3_finalize(res);
+        logger("DB", LOG_LEVEL_ERROR, "Failed to get FCIN count/sum");
+        return -1;
+    }
 }
 
 RTNode *db_get_fcin_rtnode_list(RTNode *rtnode)

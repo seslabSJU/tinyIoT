@@ -100,6 +100,7 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	{
 		if (pjson->type == cJSON_NULL)
 		{
+			cJSON_DeleteItemFromObject(fcnt, "cr");
 			cJSON_AddStringToObject(fcnt, "cr", o2pt->fr);
 		}
 		else
@@ -173,9 +174,16 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 	o2pt->rsc = RSC_CREATED;
 
-	char *ptr = malloc(1024);
 	cJSON *rn = cJSON_GetObjectItem(fcnt, "rn");
-	sprintf(ptr, "%s/%s", get_uri_rtnode(parent_rtnode), rn->valuestring);
+	char *parent_uri = get_uri_rtnode(parent_rtnode);
+	size_t uri_len = strlen(parent_uri) + strlen(rn->valuestring) + 2;
+	char *ptr = malloc(uri_len);
+	if (!ptr) {
+		if (customAttrs) cJSON_Delete(customAttrs);
+		cJSON_Delete(root);
+		return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+	}
+	snprintf(ptr, uri_len, "%s/%s", parent_uri, rn->valuestring);
 
 	int result = db_store_resource(fcnt, ptr);
 	if (result != 1)
@@ -349,7 +357,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			}
 			if (!acpi_flag)
 			{
-				logger("UTIL", LOG_LEVEL_INFO, "acpi %s", acpi_obj->valuestring);
 				if (!has_acpi_update_privilege(o2pt, acpi_obj->valuestring))
 				{
 					if (customAttrs) cJSON_Delete(customAttrs);
@@ -504,26 +511,25 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				prepare_fcnt_for_instances(target_rtnode, o2pt);
 			}
 
-			if (!cJSON_GetObjectItem(fcnt, "mni") && !cJSON_GetObjectItem(m2m_fcnt, "mni"))
+			if (!cJSON_GetObjectItem(fcnt, "mni") && !cJSON_GetObjectItem(m2m_fcnt, "mni") &&
+			    !cJSON_GetObjectItem(fcnt, "mbs") && !cJSON_GetObjectItem(m2m_fcnt, "mbs") &&
+			    !cJSON_GetObjectItem(fcnt, "mia") && !cJSON_GetObjectItem(m2m_fcnt, "mia"))
 			{
 				cJSON_AddNumberToObject(m2m_fcnt, "mni", DEFAULT_MAX_NR_INSTANCES);
-			}
-			if (!cJSON_GetObjectItem(fcnt, "mbs") && !cJSON_GetObjectItem(m2m_fcnt, "mbs"))
-			{
 				cJSON_AddNumberToObject(m2m_fcnt, "mbs", DEFAULT_MAX_BYTE_SIZE);
-			}
-			if (!cJSON_GetObjectItem(fcnt, "mia") && !cJSON_GetObjectItem(m2m_fcnt, "mia"))
-			{
 				cJSON_AddNumberToObject(m2m_fcnt, "mia", DEFAULT_MAX_INSTANCE_AGE);
 			}
 
-			if (customAttrs || cJSON_GetObjectItem(m2m_fcnt, "lbl") || cJSON_GetObjectItem(m2m_fcnt, "loc"))
+			if (customAttrs ||
+			    cJSON_GetObjectItem(m2m_fcnt, "lbl") ||
+			    cJSON_GetObjectItem(m2m_fcnt, "loc"))
 			{
 				needs_fci = true;
 
 				cJSON *cbs_obj = cJSON_GetObjectItem(fcnt, "cbs");
 				cJSON *cni_obj = cJSON_GetObjectItem(fcnt, "cni");
-				cJSON *cs_obj = cJSON_GetObjectItem(fcnt, "cs");
+				cJSON *cs_obj = cJSON_GetObjectItem(m2m_fcnt, "cs");
+				if (!cs_obj) cs_obj = cJSON_GetObjectItem(fcnt, "cs");
 
 				int cbs_value = cbs_obj ? cbs_obj->valueint : 0;
 				int cni_value = cni_obj ? cni_obj->valueint : 0;
@@ -545,6 +551,71 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			cJSON *cni_final = cJSON_GetObjectItem(m2m_fcnt, "cni");
 			if (!cni_final) cni_final = cJSON_GetObjectItem(fcnt, "cni");
 
+			cJSON *cs_final = cJSON_GetObjectItem(m2m_fcnt, "cs");
+			if (!cs_final) cs_final = cJSON_GetObjectItem(fcnt, "cs");
+
+			// Before MBS enforcement, sync cbs/cni with actual DB values
+			if (mbs_final && cJSON_IsNumber(mbs_final)) {
+				int actual_cbs = 0, actual_cni = 0;
+				if (db_get_fcin_cbs_cni(target_rtnode, &actual_cbs, &actual_cni) == 0) {
+					if (cbs_final) cbs_final->valueint = actual_cbs;
+					if (cni_final) cni_final->valueint = actual_cni;
+				}
+			}
+
+			if (mbs_final && cJSON_IsNumber(mbs_final))
+			{
+				if (cs_final && cJSON_IsNumber(cs_final) && mbs_final->valueint < cs_final->valueint)
+				{
+					if (customAttrs) cJSON_Delete(customAttrs);
+					return handle_error(o2pt, RSC_BAD_REQUEST,
+						"mbs must be greater or equal to contentSize");
+				}
+
+				int total_deleted_bytes = 0;
+				int deleted_count = 0;
+				while (cbs_final && cJSON_IsNumber(cbs_final) &&
+				       cbs_final->valueint > mbs_final->valueint &&
+				       cbs_final->valueint > 0)
+				{
+					int deleted_cs = db_delete_one_fcin_mbs(target_rtnode);
+					if (deleted_cs < 0) {
+						// No more FCINs in DB - get actual cbs/cni from DB
+						int actual_cbs = 0, actual_cni = 0;
+						if (db_get_fcin_cbs_cni(target_rtnode, &actual_cbs, &actual_cni) == 0) {
+							cbs_final->valueint = actual_cbs;
+							if (cni_final && cJSON_IsNumber(cni_final)) {
+								cni_final->valueint = actual_cni;
+							}
+						} else {
+							// Failed to query, set to 0 as fallback
+							cbs_final->valueint = 0;
+							if (cni_final && cJSON_IsNumber(cni_final)) {
+								cni_final->valueint = 0;
+							}
+						}
+						break;
+					}
+
+					cbs_final->valueint -= deleted_cs;
+					total_deleted_bytes += deleted_cs;
+					deleted_count++;
+					if (cni_final && cJSON_IsNumber(cni_final)) {
+						cni_final->valueint--;
+					}
+				}
+
+				if (deleted_count > 0) {
+					int final_cbs_value = cbs_final->valueint;
+					int final_cni_value = cni_final ? cni_final->valueint : 0;
+					cJSON_DeleteItemFromObject(m2m_fcnt, "cbs");
+					cJSON_AddNumberToObject(m2m_fcnt, "cbs", final_cbs_value);
+					cJSON_DeleteItemFromObject(m2m_fcnt, "cni");
+					cJSON_AddNumberToObject(m2m_fcnt, "cni", final_cni_value);
+					logger("FCNT", LOG_LEVEL_INFO, "Deleted %d FCINs for mbs enforcement, updated cbs=%d, cni=%d", deleted_count, final_cbs_value, final_cni_value);
+				}
+			}
+
 			if (mni_final && cJSON_IsNumber(mni_final))
 			{
 				int deleted_count = 0;
@@ -554,19 +625,18 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				{
 					int result = db_delete_one_fcin_mni(target_rtnode);
 					if (result != 0) {
-						logger("FCNT", LOG_LEVEL_ERROR, "Failed to delete FCIN for mni invariant");
+						logger("FCNT", LOG_LEVEL_ERROR, "Failed to delete FCIN for mni enforcement after %d deletions", deleted_count);
 						break;
 					}
 
 					cni_final->valueint--;
 					deleted_count++;
-					logger("FCNT", LOG_LEVEL_DEBUG, "Deleted FCIN for mni, cni now: %d", cni_final->valueint);
 				}
 
 				if (deleted_count > 0) {
 					cJSON_DeleteItemFromObject(m2m_fcnt, "cni");
 					cJSON_AddNumberToObject(m2m_fcnt, "cni", cni_final->valueint);
-					logger("FCNT", LOG_LEVEL_INFO, "Updated cni in m2m_fcnt to: %d", cni_final->valueint);
+					logger("FCNT", LOG_LEVEL_INFO, "Deleted %d FCINs for mni enforcement, updated cni=%d", deleted_count, cni_final->valueint);
 				}
 			}
 		}
