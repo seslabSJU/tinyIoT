@@ -1,51 +1,63 @@
 
+// Created by SDTTool
+// oneM2M Release: 5.6.0
+// Domain:         org.onem2m.agriculture
 [
 
+    // DeviceClass: deviceCowActivityMonitor
     {
         "type"      : "agd:dCAMr",
         "lname"     : "deviceCowActivityMonitor",
         "sdttype"   : "device",
         "cnd"       : "org.onem2m.agriculture.device.deviceCowActivityMonitor",
         "attributes": [
-            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
             { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
         ],
         "children"  : [
-            "agd:coAMr",
-            "cod:bat",
-            "cod:conny",
+            "agd:coAMr", 
+            "cod:bat", 
+            "cod:conny", 
             "cod:peRCg"
             ,"agd:dCAMrInst"
         ]
-    },
+    },        
 
+    // DeviceClass Announced: deviceCowActivityMonitorAnnc
     {
         "type"      : "agd:dCAMrAnnc",
         "lname"     : "deviceCowActivityMonitorAnnc",
         "sdttype"   : "device",
         "cnd"       : "org.onem2m.agriculture.device.deviceCowActivityMonitorAnnc",
         "attributes": [
-            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
             { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
         ],
         "children"  : [
-            "agd:coAMr",
-            "agd:coAMrAnnc",
-            "cod:bat",
-            "cod:batAnnc",
-            "cod:conny",
-            "cod:connyAnnc",
-            "cod:peRCg",
+            "agd:coAMr", 
+            "agd:coAMrAnnc", 
+            "cod:bat", 
+            "cod:batAnnc", 
+            "cod:conny", 
+            "cod:connyAnnc", 
+            "cod:peRCg", 
             "cod:peRCgAnnc"
         ]
     },
+    // DeviceClass Instance: deviceCowActivityMonitorInst
     {
         "type"      : "agd:dCAMrInst",
         "lname"     : "deviceCowActivityMonitorInst",
         "sdttype"   : "device",
         "cnd"       : "org.onem2m.agriculture.device.deviceCowActivityMonitorInst",
         "attributes": [
-            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" },
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
             { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
         ]
     }
