@@ -1707,13 +1707,39 @@ int db_delete_one_fcin_mni(RTNode *fcnt)
     char sql[512] = {0};
     char *escaped_pi = pg_escape_string_value(pi);
 
-    sprintf(sql, "DELETE FROM general WHERE id IN ("
-                 "SELECT id FROM general WHERE pi='%s' AND ty=58 "
-                 "ORDER BY ct ASC LIMIT 1);", escaped_pi);
+    sprintf(sql, "SELECT general.id, fcin.cs FROM general "
+                 "LEFT JOIN fcin ON general.id = fcin.id "
+                 "WHERE general.pi='%s' AND general.ty=58 "
+                 "ORDER BY general.ct ASC LIMIT 1", escaped_pi);
 
     logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
 
     PGresult *res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to select oldest FCIN: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return -1;
+    }
+
+    if (PQntuples(res) == 0) {
+        logger("DB", LOG_LEVEL_ERROR, "No FCIN found to delete");
+        PQclear(res);
+        free(escaped_pi);
+        return -1;
+    }
+
+    char *fcin_id = PQgetvalue(res, 0, 0);
+    int deleted_cs = atoi(PQgetvalue(res, 0, 1));
+    char fcin_id_copy[64];
+    strncpy(fcin_id_copy, fcin_id, sizeof(fcin_id_copy) - 1);
+    fcin_id_copy[sizeof(fcin_id_copy) - 1] = '\0';
+    PQclear(res);
+
+    sprintf(sql, "DELETE FROM general WHERE id=%s", fcin_id_copy);
+    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+
+    res = PQexec(pg_conn, sql);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Failed to delete oldest FCIN: %s", PQerrorMessage(pg_conn));
         PQclear(res);
@@ -1723,8 +1749,8 @@ int db_delete_one_fcin_mni(RTNode *fcnt)
 
     PQclear(res);
     free(escaped_pi);
-    logger("DB", LOG_LEVEL_DEBUG, "Successfully deleted oldest FCIN");
-    return 0;
+    logger("DB", LOG_LEVEL_DEBUG, "Successfully deleted oldest FCIN with cs=%d", deleted_cs);
+    return deleted_cs;
 }
 
 int db_delete_one_fcin_mbs(RTNode *fcnt)
