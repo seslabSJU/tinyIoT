@@ -5,7 +5,7 @@
 #include "config.h"
 #include "cJSON.h"
 #include "httpd.h"
-#include "websocket_server.h"
+#include "websocket/websocket_server.h"
 
 bool init_server();
 
@@ -80,7 +80,7 @@ cJSON* getResource(cJSON* root, ResourceType ty);
 
 // Notification
 int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode);
-int send_verification_request(char* noti_uri, cJSON* noti_cjson);
+int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson);
 bool isAptEnc(oneM2MPrimitive* o2pt, RTNode* target_rtnode, RTNode* sub_rtnode);
 int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net);
 

@@ -16,7 +16,8 @@ typedef enum
 	PROT_MQTT,
 	PROT_COAP = 3,
 	PROT_COAPS = 4,
-	PROT_WS = 5
+	PROT_WS = 5,
+	PROT_WSS = 6
 } Protocol;
 
 typedef enum
