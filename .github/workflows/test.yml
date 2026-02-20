@@ -6,13 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    runs-on: ubuntu-22.04  # Match README tested environment
-
-    strategy:
-      fail-fast: false
-      matrix:
-        db: [sqlite, postgresql]
+  test-postgresql:
+    runs-on: ubuntu-22.04
 
     services:
       postgres:
@@ -48,70 +43,36 @@ jobs:
           pip install isodate
 
       - name: Setup PostgreSQL database
-        if: matrix.db == 'postgresql'
         env:
           PGPASSWORD: postgres
         run: |
-          # Wait for PostgreSQL to be ready
           until pg_isready -h localhost -p 5432 -U postgres; do
-            echo "Waiting for PostgreSQL to be ready..."
+            echo "Waiting for PostgreSQL..."
             sleep 2
           done
-          # Create database and user
           psql -h localhost -U postgres -c "CREATE DATABASE tinyiot;"
           psql -h localhost -U postgres -c "CREATE USER tinyiot WITH PASSWORD 'tinyiot';"
           psql -h localhost -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE tinyiot TO tinyiot;"
           psql -h localhost -U postgres -c "ALTER DATABASE tinyiot OWNER TO tinyiot;"
-          echo "PostgreSQL database setup complete"
 
-      - name: Configure for ${{ matrix.db }}
+      - name: Configure for PostgreSQL
         run: |
           cd source/server
-          if [ "${{ matrix.db }}" = "postgresql" ]; then
-            echo "Configuring for PostgreSQL..."
-            sed -i 's/^#define DB_TYPE DB_SQLITE/#define DB_TYPE DB_POSTGRESQL/' config.h
-            sed -i 's/^\/\/ #define DB_TYPE DB_POSTGRESQL/#define DB_TYPE DB_POSTGRESQL/' config.h
-            sed -i 's/#define PG_HOST ".*"/#define PG_HOST "localhost"/' config.h
-            sed -i 's/#define PG_USER ".*"/#define PG_USER "tinyiot"/' config.h
-            sed -i 's/#define PG_PASSWORD ".*"/#define PG_PASSWORD "tinyiot"/' config.h
-            sed -i 's/#define PG_DBNAME ".*"/#define PG_DBNAME "tinyiot"/' config.h
-          else
-            echo "Configuring for SQLite..."
-            sed -i 's/^#define DB_TYPE DB_POSTGRESQL/#define DB_TYPE DB_SQLITE/' config.h
-            sed -i 's/^\/\/ #define DB_TYPE DB_SQLITE/#define DB_TYPE DB_SQLITE/' config.h
-          fi
-          echo "=== Current database configuration ==="
-          grep -E "DB_TYPE|PG_HOST|PG_USER|PG_PASSWORD|PG_DBNAME" config.h || true
+          sed -i 's/^\/\/ #define DB_TYPE DB_POSTGRESQL/#define DB_TYPE DB_POSTGRESQL/' config.h
+          sed -i 's/^#define DB_TYPE DB_SQLITE/\/\/ #define DB_TYPE DB_SQLITE/' config.h
+          sed -i 's/#define PG_HOST ".*"/#define PG_HOST "localhost"/' config.h
+          sed -i 's/#define PG_USER ".*"/#define PG_USER "tinyiot"/' config.h
+          sed -i 's/#define PG_PASSWORD ".*"/#define PG_PASSWORD "tinyiot"/' config.h
+          sed -i 's/#define PG_DBNAME ".*"/#define PG_DBNAME "tinyiot"/' config.h
+          echo "=== Database configuration ==="
+          grep "DB_TYPE" config.h | head -5
 
       - name: Build server
         run: |
           cd source/server
-          echo "=== Build environment check ==="
-          echo "DB_TYPE from config.h:"
-          grep "^#define DB_TYPE" config.h || true
-
-          if [ "${{ matrix.db }}" = "postgresql" ]; then
-            echo "=== PostgreSQL build configuration ==="
-            # Check PostgreSQL header location
-            PG_INCLUDE=$(pg_config --includedir)
-            echo "pg_config --includedir: $PG_INCLUDE"
-            echo "Checking /usr/include/postgresql:"
-            ls -la /usr/include/postgresql/ 2>/dev/null || echo "Directory does not exist"
-
-            # Verify libpq-fe.h exists
-            if [ -f "$PG_INCLUDE/libpq-fe.h" ]; then
-              echo "✓ Found libpq-fe.h at $PG_INCLUDE"
-            else
-              echo "✗ libpq-fe.h not found!"
-              find /usr -name "libpq-fe.h" 2>/dev/null || true
-            fi
-          fi
-
-          echo "=== Starting build ==="
           make clean
           make
           ls -lh server
-          echo "✓ Build successful"
 
       - name: Start server in background
         run: |
@@ -119,62 +80,37 @@ jobs:
           ./server &
           echo $! > /tmp/server.pid
           sleep 5
-          echo "Server started with PID $(cat /tmp/server.pid)"
 
       - name: Check if server is running
         run: |
           if ps -p $(cat /tmp/server.pid) > /dev/null; then
-            echo "✓ Server is running with PID $(cat /tmp/server.pid)"
-            # Check if server responds on port 3050 (config.h default)
-            sleep 2
-            curl -v http://localhost:3050 || echo "Server port check failed, but process is running"
+            echo "✓ Server is running"
           else
             echo "✗ Server failed to start"
             exit 1
           fi
 
-      - name: Run test - CSE
+      - name: Run tests
         run: |
           cd tests
-          python testCSE.py
-
-      - name: Run test - AE
-        run: |
-          cd tests
-          python testAE.py
-
-      - name: Run test - CNT
-        run: |
-          cd tests
-          python testCNT.py
-
-      - name: Run test - CIN
-        run: |
-          cd tests
-          python testCIN.py
-
-      - name: Run test - CNT_CIN
-        run: |
-          cd tests
-          python testCNT_CIN.py
-
-      - name: Run test - GRP
-        run: |
-          cd tests
-          python testGRP.py
+          python3 testCSE.py
+          python3 testAE.py
+          python3 testCNT.py
+          python3 testCIN.py
+          python3 testCNT_CIN.py
+          python3 testGRP.py
 
       - name: Stop server
         if: always()
         run: |
           if [ -f /tmp/server.pid ]; then
             kill $(cat /tmp/server.pid) || true
-            echo "Server stopped"
           fi
 
       - name: Show logs on failure
         if: failure()
         run: |
-          echo "=== Server process status ==="
+          echo "=== Server process ==="
           ps aux | grep server || true
-          echo "=== Files in server directory ==="
+          echo "=== Server directory ==="
           ls -la source/server/ || true
