@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Match README tested environment
 
     strategy:
       fail-fast: false
@@ -36,7 +36,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev libpq-dev sqlite3 libwebsockets-dev pkg-config
+          sudo apt-get install -y build-essential libssl-dev libpq-dev postgresql-client sqlite3 libwebsockets-dev pkg-config
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -86,20 +86,32 @@ jobs:
       - name: Build server
         run: |
           cd source/server
-          # PostgreSQL인 경우 include 경로 설정
+          echo "=== Build environment check ==="
+          echo "DB_TYPE from config.h:"
+          grep "^#define DB_TYPE" config.h || true
+
           if [ "${{ matrix.db }}" = "postgresql" ]; then
-            echo "=== PostgreSQL configuration ==="
-            PG_INCLUDE_DIR=$(pg_config --includedir)
-            echo "PostgreSQL include dir: $PG_INCLUDE_DIR"
-            # /usr/include/postgresql로 심볼릭 링크 생성 (Makefile 경로와 맞춤)
-            if [ ! -d /usr/include/postgresql ]; then
-              sudo ln -s "$PG_INCLUDE_DIR" /usr/include/postgresql
+            echo "=== PostgreSQL build configuration ==="
+            # Check PostgreSQL header location
+            PG_INCLUDE=$(pg_config --includedir)
+            echo "pg_config --includedir: $PG_INCLUDE"
+            echo "Checking /usr/include/postgresql:"
+            ls -la /usr/include/postgresql/ 2>/dev/null || echo "Directory does not exist"
+
+            # Verify libpq-fe.h exists
+            if [ -f "$PG_INCLUDE/libpq-fe.h" ]; then
+              echo "✓ Found libpq-fe.h at $PG_INCLUDE"
+            else
+              echo "✗ libpq-fe.h not found!"
+              find /usr -name "libpq-fe.h" 2>/dev/null || true
             fi
-            ls -la /usr/include/postgresql/ || true
           fi
+
+          echo "=== Starting build ==="
           make clean
           make
           ls -lh server
+          echo "✓ Build successful"
 
       - name: Start server in background
         run: |
@@ -113,6 +125,9 @@ jobs:
         run: |
           if ps -p $(cat /tmp/server.pid) > /dev/null; then
             echo "✓ Server is running with PID $(cat /tmp/server.pid)"
+            # Check if server responds on port 3050 (config.h default)
+            sleep 2
+            curl -v http://localhost:3050 || echo "Server port check failed, but process is running"
           else
             echo "✗ Server failed to start"
             exit 1
