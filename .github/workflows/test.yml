@@ -1,0 +1,139 @@
+name: Test tinyIoT Server
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [sqlite, postgresql]
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: tinyiot
+          POSTGRES_PASSWORD: tinyiot
+          POSTGRES_DB: tinyiot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev libpq-dev sqlite3 libwebsockets-dev pkg-config
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python dependencies
+        run: |
+          pip install isodate
+
+      - name: Configure for ${{ matrix.db }}
+        run: |
+          cd source/server
+          if [ "${{ matrix.db }}" = "postgresql" ]; then
+            echo "Configuring for PostgreSQL..."
+            sed -i 's/^#define DB_TYPE DB_SQLITE/#define DB_TYPE DB_POSTGRESQL/' config.h
+            sed -i 's/^\/\/ #define DB_TYPE DB_POSTGRESQL/#define DB_TYPE DB_POSTGRESQL/' config.h
+            sed -i 's/#define PG_HOST ".*"/#define PG_HOST "localhost"/' config.h
+            sed -i 's/#define PG_USER ".*"/#define PG_USER "tinyiot"/' config.h
+            sed -i 's/#define PG_PASSWORD ".*"/#define PG_PASSWORD "tinyiot"/' config.h
+            sed -i 's/#define PG_DBNAME ".*"/#define PG_DBNAME "tinyiot"/' config.h
+          else
+            echo "Configuring for SQLite..."
+            sed -i 's/^#define DB_TYPE DB_POSTGRESQL/#define DB_TYPE DB_SQLITE/' config.h
+            sed -i 's/^\/\/ #define DB_TYPE DB_SQLITE/#define DB_TYPE DB_SQLITE/' config.h
+          fi
+          echo "=== Current database configuration ==="
+          grep -E "DB_TYPE|PG_HOST|PG_USER|PG_PASSWORD|PG_DBNAME" config.h || true
+
+      - name: Build server
+        run: |
+          cd source/server
+          make clean
+          make
+          ls -lh server
+
+      - name: Start server in background
+        run: |
+          cd source/server
+          ./server &
+          echo $! > /tmp/server.pid
+          sleep 5
+          echo "Server started with PID $(cat /tmp/server.pid)"
+
+      - name: Check if server is running
+        run: |
+          if ps -p $(cat /tmp/server.pid) > /dev/null; then
+            echo "✓ Server is running with PID $(cat /tmp/server.pid)"
+          else
+            echo "✗ Server failed to start"
+            exit 1
+          fi
+
+      - name: Run test - CSE
+        run: |
+          cd tests
+          python testCSE.py
+
+      - name: Run test - AE
+        run: |
+          cd tests
+          python testAE.py
+
+      - name: Run test - CNT
+        run: |
+          cd tests
+          python testCNT.py
+
+      - name: Run test - CIN
+        run: |
+          cd tests
+          python testCIN.py
+
+      - name: Run test - CNT_CIN
+        run: |
+          cd tests
+          python testCNT_CIN.py
+
+      - name: Run test - GRP
+        run: |
+          cd tests
+          python testGRP.py
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/server.pid ]; then
+            kill $(cat /tmp/server.pid) || true
+            echo "Server stopped"
+          fi
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== Server process status ==="
+          ps aux | grep server || true
+          echo "=== Files in server directory ==="
+          ls -la source/server/ || true
