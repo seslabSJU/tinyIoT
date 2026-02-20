@@ -18,9 +18,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: tinyiot
-          POSTGRES_PASSWORD: tinyiot
-          POSTGRES_DB: tinyiot
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
         ports:
           - 5432:5432
         options: >-
@@ -47,6 +47,23 @@ jobs:
         run: |
           pip install isodate
 
+      - name: Setup PostgreSQL database
+        if: matrix.db == 'postgresql'
+        env:
+          PGPASSWORD: postgres
+        run: |
+          # Wait for PostgreSQL to be ready
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 2
+          done
+          # Create database and user
+          psql -h localhost -U postgres -c "CREATE DATABASE tinyiot;"
+          psql -h localhost -U postgres -c "CREATE USER tinyiot WITH PASSWORD 'tinyiot';"
+          psql -h localhost -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE tinyiot TO tinyiot;"
+          psql -h localhost -U postgres -c "ALTER DATABASE tinyiot OWNER TO tinyiot;"
+          echo "PostgreSQL database setup complete"
+
       - name: Configure for ${{ matrix.db }}
         run: |
           cd source/server
@@ -69,6 +86,17 @@ jobs:
       - name: Build server
         run: |
           cd source/server
+          # PostgreSQL인 경우 include 경로 설정
+          if [ "${{ matrix.db }}" = "postgresql" ]; then
+            echo "=== PostgreSQL configuration ==="
+            PG_INCLUDE_DIR=$(pg_config --includedir)
+            echo "PostgreSQL include dir: $PG_INCLUDE_DIR"
+            # /usr/include/postgresql로 심볼릭 링크 생성 (Makefile 경로와 맞춤)
+            if [ ! -d /usr/include/postgresql ]; then
+              sudo ln -s "$PG_INCLUDE_DIR" /usr/include/postgresql
+            fi
+            ls -la /usr/include/postgresql/ || true
+          fi
           make clean
           make
           ls -lh server
