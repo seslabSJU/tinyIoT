@@ -41,6 +41,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install isodate
+          python -m pip install acmecse
 
       - name: Setup PostgreSQL database
         env:
