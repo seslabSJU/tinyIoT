@@ -4529,9 +4529,9 @@ int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
 			{
 				return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `mni` is invalid");
 			}
-			if (op == OP_CREATE && fcied && cJSON_IsFalse(fcied) && mni->valueint == 0)
+			if (fcied && !cJSON_IsNull(fcied) && mni->valueint == 0)
 			{
-				return handle_error(o2pt, RSC_BAD_REQUEST, "mni cannot be 0 when fcied is false");
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mni cannot be 0 when fcied is present");
 			}
 		}
 
@@ -4542,9 +4542,9 @@ int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
 			{
 				return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `mbs` is invalid");
 			}
-			if (op == OP_CREATE && fcied && cJSON_IsFalse(fcied) && mbs->valueint == 0)
+			if (fcied && !cJSON_IsNull(fcied) && mbs->valueint == 0)
 			{
-				return handle_error(o2pt, RSC_BAD_REQUEST, "mbs cannot be 0 when fcied is false");
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mbs cannot be 0 when fcied is present");
 			}
 		}
 
@@ -4555,9 +4555,9 @@ int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
 			{
 				return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `mia` is invalid");
 			}
-			if (op == OP_CREATE && fcied && cJSON_IsFalse(fcied) && mia->valueint == 0)
+			if (fcied && !cJSON_IsNull(fcied) && mia->valueint == 0)
 			{
-				return handle_error(o2pt, RSC_BAD_REQUEST, "mia cannot be 0 when fcied is false");
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mia cannot be 0 when fcied is present");
 			}
 		}
 	}
@@ -4715,6 +4715,13 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 	char rn_buf[256];
 	snprintf(rn_buf, sizeof(rn_buf), "%s_%d", fcnt_rtnode->rn, st_obj->valueint);
 	cJSON_AddStringToObject(fcin, "rn", rn_buf);
+
+	// Copy containerDefinition from parent FCNT
+	cJSON *cnd = cJSON_GetObjectItem(fcnt, "cnd");
+	if (cnd && cJSON_IsString(cnd))
+	{
+		cJSON_AddStringToObject(fcin, "cnd", cnd->valuestring);
+	}
 
 	// Copy label attribute if present (per TS-0004 standard)
 	cJSON *lbl = cJSON_GetObjectItem(fcnt, "lbl");
