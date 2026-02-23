@@ -9,10 +9,10 @@ DB_TYPE := $(shell grep -E "^\s*\#define\s+DB_TYPE\s+" config.h | grep -E "(DB_S
 # macOS 
 ifeq ($(UNAME), Darwin)
     ifeq ($(DB_TYPE), POSTGRESQL)
-        RELCFLAGS = -g -Wall -I/opt/homebrew/opt/openssl@3/include -I$(shell brew --prefix libpq)/include
+        RELCFLAGS = -g -I/opt/homebrew/opt/openssl@3/include -I$(shell brew --prefix libpq)/include
         LIBS = -lpthread -lm -ldl -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto -L$(shell brew --prefix libpq)/lib -lpq
     else
-        RELCFLAGS = -g -Wall -I/opt/homebrew/opt/openssl@3/include
+        RELCFLAGS = -g -I/opt/homebrew/opt/openssl@3/include
         LIBS = -lpthread -lm -ldl -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto
     endif
 
@@ -38,7 +38,9 @@ else ifeq ($(DB_TYPE), POSTGRESQL)
     DB_LIB_SRC = 
 endif
 
-SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c monitor.c filterCriteria.c coap.c rtManager.c websocket/net_libwebsockets.c
+
+
+SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket/net_libwebsockets.c
 
 RSCSRC = $(wildcard resources/*.c)
 

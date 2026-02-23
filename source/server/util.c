@@ -50,22 +50,7 @@ int net_to_bit(cJSON *net)
 
 	cJSON_ArrayForEach(pjson, net)
 	{
-		int exp = 0;
-
-		// oneM2M spec uses integers, but some clients/tests may send strings.
-		if (cJSON_IsNumber(pjson))
-		{
-			exp = pjson->valueint;
-		}
-		else if (cJSON_IsString(pjson) && pjson->valuestring)
-		{
-			exp = atoi(pjson->valuestring);
-		}
-		else
-		{
-			continue; // ignore unexpected element types
-		}
-
+		int exp = atoi(pjson->valuestring);
 		if (exp > 0)
 			ret = (ret | (int)pow(2, exp - 1));
 	}
@@ -111,12 +96,6 @@ ResourceType http_parse_object_type(header_t *headers)
 		break;
 	case 23:
 		ty = RT_SUB;
-		break;
-	case 29: 
-		ty = RT_TS; 
-		break;
-    case 30: 
-		ty = RT_TSI; 
 		break;
 	case 10002:
 		ty = RT_AEA;
@@ -177,12 +156,6 @@ ResourceType coap_parse_object_type(int object_type)
 	case 71:
 		ty = RT_SUB;
 		break;
-	case 29:
-        ty = RT_TS;
-        break;
-    case 30:
-        ty = RT_TSI;
-        break;
 	default:
 		ty = RT_MIXED;
 		break;
@@ -254,12 +227,6 @@ char *get_resource_key(ResourceType ty)
 	case RT_CSR:
 		key = "m2m:csr";
 		break;
-	case RT_TS:  
-		key = "m2m:ts"; 
-		break;
-    case RT_TSI: 
-		key = "m2m:tsi"; 
-		break;
 	case RT_ACPA:
 		key = "m2m:acpA";
 		break;
@@ -315,10 +282,6 @@ ResourceType parse_object_type_cjson(cJSON *cjson)
 		ty = RT_ACP;
 	else if (cJSON_GetObjectItem(cjson, "m2m:csr"))
 		ty = RT_CSR;
-	else if (cJSON_GetObjectItem(cjson, "m2m:ts"))
-        ty = RT_TS;
-    else if (cJSON_GetObjectItem(cjson, "m2m:tsi"))
-        ty = RT_TSI;
 	else if (cJSON_GetObjectItem(cjson, "m2m:cba"))
 		ty = RT_CBA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:aea"))
@@ -360,12 +323,6 @@ char *resource_identifier(ResourceType ty, char *ct)
 	case RT_CSR:
 		strcpy(ri, "16-");
 		break;
-	case RT_TS:
-        strcpy(ri, "29-");
-        break;
-    case RT_TSI:
-        strcpy(ri, "30-");
-        break;
 	case RT_CBA:
 		strcpy(ri, "10005-");
 		break;
@@ -961,23 +918,15 @@ bool init_server()
 
 int result_parse_uri(oneM2MPrimitive *o2pt, RTNode *rtnode)
 {
-    if (!rtnode)
-    {
-        // ▼▼▼ [추가] 리소스가 없어도(NULL), 가상 리소스(/la, /ol) 주소라면 에러 아님! 통과! ▼▼▼
-        if (endswith(o2pt->to, "/la") || endswith(o2pt->to, "/latest") || 
-            endswith(o2pt->to, "/ol") || endswith(o2pt->to, "/oldest")) 
-        {
-            return 0; // 에러 아님 (0 반환) -> handle_onem2m_request로 넘겨줌
-        }
-        // ▲▲▲ -------------------------------------------------------------------- ▲▲▲
-
-        handle_error(o2pt, RSC_NOT_FOUND, "URI is invalid");
-        return -1;
-    }
-    else
-    {
-        return 0;
-    }
+	if (!rtnode)
+	{
+		handle_error(o2pt, RSC_NOT_FOUND, "URI is invalid");
+		return -1;
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 int check_mandatory_attributes(oneM2MPrimitive *o2pt)
@@ -1019,34 +968,31 @@ int check_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop)
 #endif
 
 	if (isSPIDLocal(o2pt->fr))
-    {
-        origin = get_ri_rtnode(find_rtnode(o2pt->fr));
-        if (!origin)
-            origin = o2pt->fr;
-    }
-    else
-    {
-        origin = o2pt->fr;
-    }
-
-	RTNode *curr = rtnode;
-    while (curr) {
-        if (curr->ty == RT_AE) {
-            if (!strcmp(origin, get_ri_rtnode(curr))) {
-                logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner (AE)");
-                return 0; // 소유자면 바로 통과
-            }
-        }
-        else if (curr->ty == RT_CSR) {
-            cJSON *csi = cJSON_GetObjectItem(curr->obj, "csi");
-            if (csi && !strcmp(origin, csi->valuestring)) {
-                logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner (CSR)");
-                return 0; // 소유자면 바로 통과
-            }
-        }
-        curr = curr->parent;
-    }
-
+	{
+		origin = get_ri_rtnode(find_rtnode(o2pt->fr));
+		if (!origin)
+			origin = o2pt->fr;
+	}
+	else
+	{
+		origin = o2pt->fr;
+	}
+	// if target is AE, check ri of resource
+	if (rtnode->ty == RT_AE)
+	{
+		if (!strcmp(origin, get_ri_rtnode(target_rtnode)))
+		{
+			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
+		}
+	}
+	// if target is CSR, check csi of resource
+	if (rtnode->ty == RT_CSR)
+	{
+		if (!strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
+		{
+			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
+		}
+	}
 	if (target_rtnode->ty == RT_ACP)
 	{
 		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
@@ -1708,20 +1654,16 @@ bool endswith(char *str, char *match)
 {
 	size_t str_len = 0;
 	size_t match_len = 0;
-
 	if (!str || !match)
 		return false;
 
 	str_len = strlen(str);
 	match_len = strlen(match);
 
-	if (match_len > str_len)
-        return false;
-
 	if (!str_len || !match_len)
 		return false;
 
-	return (strncmp(str + str_len - match_len, match, match_len) == 0);
+	return strncmp(str + str_len - match_len, match, match_len);
 }
 
 /**
@@ -2410,10 +2352,6 @@ cJSON *getResource(cJSON *root, ResourceType ty)
 		return cJSON_GetObjectItem(root, "m2m:grp");
 	case RT_CSR:
 		return cJSON_GetObjectItem(root, "m2m:csr");
-	case RT_TS:  
-		return cJSON_GetObjectItem(root, "m2m:ts");
-    case RT_TSI: 
-		return cJSON_GetObjectItem(root, "m2m:tsi");
 	case RT_ACPA:
 		return cJSON_GetObjectItem(root, "m2m:acpA");
 	case RT_AEA:
@@ -3044,63 +2982,6 @@ bool validate_sub_attr(cJSON *obj, cJSON *attr, char *err_msg)
  * @param err_msg buffer for error message
  * @return true if valid, false if invalid
  */
-
-static bool is_valid_cnf_value(const char *cnf)
-{
-    if (cnf == NULL)
-        return false;
-
-    /* Trim leading whitespace */
-    while (*cnf != '\0' && isspace((unsigned char)*cnf))
-        cnf++;
-
-    if (*cnf == '\0')
-        return false;
-
-    /* Extract the media-type portion (before ';' or ':') */
-    char base[128];
-    size_t i = 0;
-    while (cnf[i] != '\0' && cnf[i] != ';' && cnf[i] != ':' && i < sizeof(base) - 1)
-    {
-        base[i] = (char)tolower((unsigned char)cnf[i]);
-        i++;
-    }
-    base[i] = '\0';
-
-    /* Trim trailing whitespace of the extracted base */
-    while (i > 0 && isspace((unsigned char)base[i - 1]))
-    {
-        base[i - 1] = '\0';
-        i--;
-    }
-
-    if (base[0] == '\0')
-        return false;
-
-    /*
-     * oneM2M tests expect cnf/contentInfo to accept a common set of media types.
-     * Allow the typical ones used by the ACME testsuite and oneM2M examples.
-     */
-    static const char *valid_media_types[] = {
-        "application/json",
-        "application/xml",
-        "application/cbor",
-        "application/octet-stream",
-        "text/plain",
-        "application/vnd.onem2m-res+json",
-        "application/vnd.onem2m-res+xml",
-        "application/vnd.onem2m-res+cbor"
-    };
-
-    for (size_t j = 0; j < sizeof(valid_media_types) / sizeof(valid_media_types[0]); j++)
-    {
-        if (strcmp(base, valid_media_types[j]) == 0)
-            return true;
-    }
-
-    return false;
-}
-
 bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg)
 {
 	extern cJSON *ATTRIBUTES;
@@ -3123,63 +3004,6 @@ bool is_attr_valid(cJSON *obj, ResourceType ty, char *err_msg)
 	pjson = pjson->child;
 	while (pjson)
 	{
-		// Special-case: allow SUB.enc (eventNotificationCriteria) even if ATTRIBUTES schema is missing it.
-		// The content of enc will be semantically validated in sub.c.
-		if (ty == RT_SUB && pjson->string && !strcmp(pjson->string, "enc"))
-		{
-			// Allow deletion on update
-			if (pjson->type == cJSON_NULL)
-			{
-				pjson = pjson->next;
-				continue;
-			}
-			// enc must be an object
-			if (pjson->type != cJSON_Object)
-			{
-				if (err_msg)
-				{
-					sprintf(err_msg, "invalid attribute type : %s", pjson->string);
-				}
-				return false;
-			}
-
-			// Do not validate enc sub-attributes here; sub.c will validate semantics.
-			pjson = pjson->next;
-			continue;
-		}
-		// Special-case: allow TS.cnf even if ATTRIBUTES schema is missing it.
-		// But still validate the *value* to match expected ContentInfo media types.
-		if (ty == RT_TS && pjson->string && !strcmp(pjson->string, "cnf"))
-		{
-			// Allow deletion on update
-			if (pjson->type == cJSON_NULL)
-			{
-				pjson = pjson->next;
-				continue;
-			}
-			// cnf must be a string
-			if (pjson->type != cJSON_String)
-			{
-				if (err_msg)
-				{
-					sprintf(err_msg, "invalid attribute type : %s", pjson->string);
-				}
-				return false;
-			}
-
-			// Validate cnf value
-			if (!is_valid_cnf_value(pjson->valuestring))
-			{
-				if (err_msg)
-				{
-					sprintf(err_msg, "invalid attribute value : %s", pjson->string);
-				}
-				return false;
-			}
-
-			pjson = pjson->next;
-			continue;
-		}
 		if (validate_sub_attr(attrs, pjson, err_msg))
 		{
 			flag = true;
@@ -4188,10 +4012,6 @@ bool isValidChildType(ResourceType parent, ResourceType child)
 			child == RT_ACPA || child == RT_AE || child == RT_SUB || child == RT_AEA)
 			return true;
 		break;
-	case RT_TS:
-        if (child == RT_TSI || child == RT_SUB)
-            return true;
-        break;
 	case RT_SUB:
 		break;
 	case RT_ACPA:

@@ -453,20 +453,13 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
 {
     char *status_msg = NULL;
     int status_code = rsc_to_http_status(o2pt->rsc, &status_msg);
-
-    if (status_msg == NULL) {
-        status_msg = "Unknown Status";  
-    }
-
     char content_length[64];
     char rsc[64];
     char cnst[32], ot[32];
     char response_headers[2048] = {'\0'};
-    
-    char buf[BUF_SIZE]; 
+    char buf[BUF_SIZE];
     char *pc = NULL;
     memset(buf, 0, BUF_SIZE);
-
     if (o2pt->response_pc)
     {
         pc = cJSON_PrintUnformatted(o2pt->response_pc);
@@ -479,7 +472,6 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
 
     sprintf(content_length, "%ld", pc ? strlen(pc) : 0);
     sprintf(rsc, "%d", o2pt->rsc);
-    
     if (o2pt->response_pc)
         set_header("Content-Length", content_length, response_headers);
 
@@ -501,16 +493,14 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         sprintf(ot, "%d", o2pt->cnot);
         set_header("X-M2M-CTO", ot, response_headers);
     }
-    
-    sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
-    
 
+    sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
     if (pc)
     {
         strncat(buf, pc, BUF_SIZE - strlen(buf) - 1);
         strncat(buf, "\r\n", BUF_SIZE - strlen(buf) - 1);
     }
-    
+    logger("HTTP", LOG_LEVEL_DEBUG, "Response: \n%s", buf);
 
     write(clients[slotno], buf, strlen(buf));
 
