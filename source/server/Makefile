@@ -53,6 +53,7 @@ OBJS = $(SRCS:.c=.o) $(RSCSRC:.c=.o) $(LSRCS:.c=.o) $(LIBCOAP:.c=.o)
 #LWS추가
 LDFLAGS += $(shell pkg-config --libs libwebsockets)
 CFLAGS += $(shell pkg-config --cflags libwebsockets)
+LDFLAGS += -lwebsockets
 
 
 RELEXE = server

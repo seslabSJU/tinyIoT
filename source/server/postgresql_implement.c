@@ -16,17 +16,16 @@
 // Forward declaration for compatibility
 typedef struct sqlite3_stmt sqlite3_stmt;
 
-// Thread-local PostgreSQL connection
-static __thread PGconn *pg_conn = NULL;
-static char pg_conninfo[256] = {0};
-
-// Lock for transaction management
+<<<<<<< HEAD
+// PostgreSQL connection and guard for multi-thread access
+static PGconn *pg_conn = NULL;
 static pthread_mutex_t pg_conn_lock;
 static pthread_mutexattr_t pg_conn_lock_attr;
 static int pg_lock_initialized = 0;
 static int pg_tx_depth = 0;
 static pthread_t pg_tx_owner;
 static int pg_tx_owner_valid = 0;
+static char pg_conninfo[256] = {0};
 
 static void pg_lock(void)
 {
@@ -40,7 +39,14 @@ static void pg_unlock(void)
         pthread_mutex_unlock(&pg_conn_lock);
 }
 
+// Get or create a PG connection (caller should hold lock if needed)
+=======
+// Thread-local PostgreSQL connection and connection info
+static __thread PGconn *pg_conn = NULL;
+static char pg_conninfo[256] = {0};
+
 // Get or create a thread-local PG connection
+>>>>>>> c49c49b (Fix parallel processing error)
 static PGconn *get_pg_conn(void)
 {
     if (pg_conn && PQstatus(pg_conn) == CONNECTION_OK)
@@ -65,8 +71,8 @@ static PGconn *get_pg_conn(void)
 
     return pg_conn;
 }
+<<<<<<< HEAD
 
-// Transaction management functions
 int db_begin_tx()
 {
     if (pg_tx_owner_valid && pthread_equal(pg_tx_owner, pthread_self())) {
@@ -149,6 +155,8 @@ int db_rollback_tx()
     pg_unlock();
     return 1;
 }
+=======
+>>>>>>> c49c49b (Fix parallel processing error)
 
 extern cJSON *ATTRIBUTES;
 extern ResourceTree *rt;
@@ -392,17 +400,38 @@ static int create_table(const table_def_t *table_def)
 /* DB init */
 int init_dbp()
 {
+<<<<<<< HEAD
+    if (!pg_lock_initialized) {
+        pthread_mutexattr_init(&pg_conn_lock_attr);
+        pthread_mutexattr_settype(&pg_conn_lock_attr, PTHREAD_MUTEX_RECURSIVE);
+        pthread_mutex_init(&pg_conn_lock, &pg_conn_lock_attr);
+        pg_lock_initialized = 1;
+    }
+
+    pg_lock();
     snprintf(pg_conninfo, sizeof(pg_conninfo), "host=%s port=%d user=%s password=%s dbname=%s",
              PG_HOST, PG_PORT, PG_USER, PG_PASSWORD, PG_DBNAME);
 
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    snprintf(pg_conninfo, sizeof(pg_conninfo), "host=%s port=%d user=%s password=%s dbname=%s",
+             PG_HOST, PG_PORT, PG_USER, PG_PASSWORD, PG_DBNAME);
+
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return 0;
     }
     logger("DB", LOG_LEVEL_INFO, "PostgreSQL connected successfully.");
 
     // Begin transaction
     if (!execute_sql_with_error_handling("BEGIN", "Begin Transaction")) {
+<<<<<<< HEAD
+        pg_unlock();
+=======
+>>>>>>> c49c49b (Fix parallel processing error)
         return 0;
     }
 
@@ -412,6 +441,10 @@ int init_dbp()
             PQexec(conn, "ROLLBACK");
             PQfinish(conn);
             pg_conn = NULL;
+<<<<<<< HEAD
+            pg_unlock();
+=======
+>>>>>>> c49c49b (Fix parallel processing error)
             return 0;
         }
     }
@@ -421,6 +454,10 @@ int init_dbp()
         PQexec(conn, "ROLLBACK");
         PQfinish(conn);
         pg_conn = NULL;
+<<<<<<< HEAD
+        pg_unlock();
+=======
+>>>>>>> c49c49b (Fix parallel processing error)
         return 0;
     }
 
@@ -501,8 +538,15 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
     char sql[1024];
     cJSON *resource = NULL;
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return NULL;
     }
 
@@ -570,8 +614,15 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
     char sql[1024];
     cJSON *resource = NULL;
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return NULL;
     }
 
@@ -668,9 +719,16 @@ int db_store_resource(cJSON *obj, char *uri)
     cJSON *GENERAL_ATTR = cJSON_GetObjectItem(ATTRIBUTES, "general");
     int general_cnt = cJSON_GetArraySize(GENERAL_ATTR);
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
+    PGconn *conn = get_pg_conn();
     int started_tx = 0;
+    if (!conn) {
+        pg_unlock();
+=======
     PGconn *conn = get_pg_conn();
     if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return -1;
     }
 
@@ -695,12 +753,20 @@ int db_store_resource(cJSON *obj, char *uri)
     debug_print_cjson_type_and_value("rn field", cJSON_GetObjectItem(obj, "rn"));
     debug_print_cjson_type_and_value("pi field", cJSON_GetObjectItem(obj, "pi"));
 
+<<<<<<< HEAD
+    // Build INSERT statement with CTE (single round-trip)
+    cJSON *specific_attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
+    if (!specific_attr) {
+        logger("DB", LOG_LEVEL_ERROR, "No specific attributes found for resource type %d", ty);
+        pg_unlock();
+=======
     // Begin transaction
     logger("DB", LOG_LEVEL_DEBUG, "Executing: BEGIN");
     res = PQexec(conn, "BEGIN");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Failed to begin transaction: %s", PQerrorMessage(conn));
         PQclear(res);
+>>>>>>> c49c49b (Fix parallel processing error)
         return -1;
     }
 
@@ -761,6 +827,8 @@ int db_store_resource(cJSON *obj, char *uri)
     strcat(sql, get_table_name(ty));
     strcat(sql, " (id, ");
 
+<<<<<<< HEAD
+=======
     logger("DB", LOG_LEVEL_DEBUG, "Executing General Table INSERT: %s", sql);
     res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
@@ -786,10 +854,14 @@ int db_store_resource(cJSON *obj, char *uri)
     sql[0] = '\0';
     sprintf(sql, "INSERT INTO %s (id, ", get_table_name(ty));
     
+>>>>>>> c49c49b (Fix parallel processing error)
     for (int i = 0; i < cJSON_GetArraySize(specific_attr); i++) {
         strcat(sql, cJSON_GetArrayItem(specific_attr, i)->string);
         if (i < cJSON_GetArraySize(specific_attr) - 1) strcat(sql, ",");
     }
+<<<<<<< HEAD
+    strcat(sql, ") SELECT id, ");
+=======
     strcat(sql, ") VALUES ((SELECT id FROM general WHERE ri='");
     
     cJSON *ri_obj = cJSON_GetObjectItem(obj, "ri");
@@ -805,6 +877,7 @@ int db_store_resource(cJSON *obj, char *uri)
     strcat(sql, escaped_ri);
     free(escaped_ri);
     strcat(sql, "'),");
+>>>>>>> c49c49b (Fix parallel processing error)
 
     for (int i = 0; i < cJSON_GetArraySize(specific_attr); i++) {
         pjson = cJSON_GetObjectItem(obj, cJSON_GetArrayItem(specific_attr, i)->string);
@@ -833,6 +906,18 @@ int db_store_resource(cJSON *obj, char *uri)
     }
     strcat(sql, " FROM ins;");
 
+<<<<<<< HEAD
+    logger("DB", LOG_LEVEL_DEBUG, "Executing General+Specific INSERT: %s", sql);
+    res = PQexec(conn, sql);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to insert resource: %s", PQerrorMessage(conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed SQL was: %s", sql);
+        PQclear(res);
+        free(sql);
+        if (started_tx)
+            PQexec(conn, "ROLLBACK");
+        pg_unlock();
+=======
     logger("DB", LOG_LEVEL_DEBUG, "Executing Specific Table INSERT: %s", sql);
     res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
@@ -841,16 +926,29 @@ int db_store_resource(cJSON *obj, char *uri)
         PQclear(res);
         free(sql);
         PQexec(conn, "ROLLBACK");
+>>>>>>> c49c49b (Fix parallel processing error)
         return -1;
     }
     PQclear(res);
     logger("DB", LOG_LEVEL_DEBUG, "General+Specific INSERT successful");
 
+<<<<<<< HEAD
+    if (started_tx) {
+        res = PQexec(conn, "COMMIT");
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to commit transaction: %s", PQerrorMessage(conn));
+            PQclear(res);
+            free(sql);
+            pg_unlock();
+            return -1;
+        }
+=======
     // Commit transaction
     logger("DB", LOG_LEVEL_DEBUG, "Executing: COMMIT");
     res = PQexec(conn, "COMMIT");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Failed to commit transaction: %s", PQerrorMessage(conn));
+>>>>>>> c49c49b (Fix parallel processing error)
         PQclear(res);
     }
 
@@ -868,7 +966,13 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
     cJSON *GENERAL_ATTR = cJSON_GetObjectItem(ATTRIBUTES, "general");
     int general_cnt = cJSON_GetArraySize(GENERAL_ATTR);
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
+    PGconn *conn = get_pg_conn();
     int started_tx = 0;
+    if (!conn) {
+        pg_unlock();
+=======
     PGconn *conn = get_pg_conn();
     if (!conn) {
         return 0;
@@ -879,6 +983,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Failed to begin transaction: %s", PQerrorMessage(conn));
         PQclear(res);
+>>>>>>> c49c49b (Fix parallel processing error)
         return 0;
     }
 
@@ -939,7 +1044,13 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             logger("DB", LOG_LEVEL_ERROR, "Failed to update general table: %s", PQerrorMessage(conn));
             PQclear(res);
             free(sql);
+<<<<<<< HEAD
+            if (started_tx)
+                PQexec(conn, "ROLLBACK");
+            pg_unlock();
+=======
             PQexec(conn, "ROLLBACK");
+>>>>>>> c49c49b (Fix parallel processing error)
             return 0;
         }
         PQclear(res);
@@ -990,16 +1101,34 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             logger("DB", LOG_LEVEL_ERROR, "Failed to update %s table: %s", get_table_name(ty), PQerrorMessage(conn));
             PQclear(res);
             free(sql);
+<<<<<<< HEAD
+            if (started_tx)
+                PQexec(conn, "ROLLBACK");
+            pg_unlock();
+=======
             PQexec(conn, "ROLLBACK");
+>>>>>>> c49c49b (Fix parallel processing error)
             return 0;
         }
         PQclear(res);
     }
 
     // Commit transaction
+<<<<<<< HEAD
+    if (started_tx) {
+        res = PQexec(conn, "COMMIT");
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to commit transaction: %s", PQerrorMessage(conn));
+            PQclear(res);
+            free(sql);
+            pg_unlock();
+            return 0;
+        }
+=======
     res = PQexec(conn, "COMMIT");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         logger("DB", LOG_LEVEL_ERROR, "Failed to commit transaction: %s", PQerrorMessage(conn));
+>>>>>>> c49c49b (Fix parallel processing error)
         PQclear(res);
     }
 
@@ -1014,8 +1143,15 @@ int db_delete_onem2m_resource(RTNode *rtnode)
     logger("DB", LOG_LEVEL_DEBUG, "Delete [RI] %s", ri);
     char sql[1024] = {0};
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return 0;
     }
     
@@ -1051,8 +1187,15 @@ int db_delete_one_cin_mni(RTNode *cnt)
 {
     char sql[1024] = {0};
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return -1;
     }
     char *latest_ri = NULL;
@@ -1132,8 +1275,15 @@ RTNode *db_get_all_resource_as_rtnode()
 
     char sql[1024] = {0};
     PGresult *res, *res2;
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return NULL;
     }
     RTNode *head = NULL, *rtnode = NULL;
@@ -1260,8 +1410,15 @@ RTNode *db_get_cin_rtnode_list(RTNode *parent_rtnode)
 
     char sql[1024] = {0};
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return NULL;
     }
     RTNode *head = NULL, *rtnode = NULL;
@@ -1333,8 +1490,15 @@ RTNode *db_get_latest_cins()
 
     char sql[1024] = {0};
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return NULL;
     }
     RTNode *head = NULL, *rtnode = NULL;
@@ -1508,8 +1672,15 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
     cJSON *fc = o2pt->fc;
     cJSON *pjson = NULL, *ptr = NULL;
     cJSON *json = cJSON_CreateArray();
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return json;
     }
     int fo = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
@@ -1683,8 +1854,15 @@ bool db_check_cin_rn_dup(char *rn, char *pi)
     
     char sql[1024] = {0};
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return false;
     }
     
@@ -1736,8 +1914,15 @@ cJSON *getForbiddenUri(cJSON *acp_list)
 
     char sql[2048] = {0};
     PGresult *res;
+<<<<<<< HEAD
+    pg_lock();
     PGconn *conn = get_pg_conn();
     if (!conn) {
+        pg_unlock();
+=======
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+>>>>>>> c49c49b (Fix parallel processing error)
         return result;
     }
     cJSON *ptr = NULL;
