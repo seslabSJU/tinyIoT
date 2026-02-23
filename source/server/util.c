@@ -843,6 +843,11 @@ RTNode *latest_cin_list(RTNode *cinList, int num)
 	return head;
 }
 
+void log_runtime(double start)
+{
+	double end = (((double)clock()) / CLOCKS_PER_SEC); // runtime check - end
+	logger("UTIL", LOG_LEVEL_INFO, "Run time : %lf", end - start);
+}
 
 bool init_server()
 {
