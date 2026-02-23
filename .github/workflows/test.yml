@@ -117,10 +117,10 @@ jobs:
             echo "Waiting for PostgreSQL..."
             sleep 2
           done
-          psql -h localhost -U postgres -c "CREATE DATABASE tinyiot;"
-          psql -h localhost -U postgres -c "CREATE USER tinyiot WITH PASSWORD 'tinyiot';"
-          psql -h localhost -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE tinyiot TO tinyiot;"
-          psql -h localhost -U postgres -c "ALTER DATABASE tinyiot OWNER TO tinyiot;"
+          psql -h localhost -U postgres -c "CREATE DATABASE tinydb;"
+          psql -h localhost -U postgres -c "CREATE USER \"user\" WITH PASSWORD 'password';"
+          psql -h localhost -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE tinydb TO \"user\";"
+          psql -h localhost -U postgres -c "ALTER DATABASE tinydb OWNER TO \"user\";"
 
       - name: Configure for PostgreSQL
         run: |
