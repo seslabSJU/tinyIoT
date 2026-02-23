@@ -1,0 +1,68 @@
+[
+  {
+    "test_name": "(setup)",
+    "method": "POST",
+    "url": "http://localhost:3000/TinyIoT",
+    "originator": "CAdmin",
+    "rvi": "3",
+    "ty": "1",
+    "req_body": "{\"m2m:acp\": {\"rn\": \"testACP\", \"pv\": {\"acr\": [{\"acor\": [\"CTester1\", \"CTester2\"], \"acop\": 63}]}, \"pvs\": {\"acr\": [{\"acor\": [\"CAdmin\"], \"acop\": 63}]}}}",
+    "resp_status": 201,
+    "rsc": "2001",
+    "resp_body": "{\"m2m:acp\":{\"rn\":\"testACP\",\"pv\":{\"acr\":[{\"acor\":[\"CTester1\",\"CTester2\"],\"acop\":63}]},\"pvs\":{\"acr\":[{\"acor\":[\"CAdmin\"],\"acop\":63}]},\"ty\":1,\"ct\":\"20260223T120339\",\"ri\":\"1-20260223T1203390146\",\"lt\":\"20260223T120339\",\"pi\":\"tinyiot\",\"et\":\"20280223T120339\"}}",
+    "resp_headers": {
+      "Connection": "Close",
+      "Server": "tinyIoT v0.1",
+      "Accept": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": "252",
+      "X-M2M-RSC": "2001",
+      "X-M2M-RVI": "3",
+      "X-M2M-RI": "005d769d-9b4f-477f-8c96-585a04a30b2c"
+    }
+  },
+  {
+    "test_name": "(setup)",
+    "method": "POST",
+    "url": "http://localhost:3000/TinyIoT",
+    "originator": "CTester1",
+    "rvi": "3",
+    "ty": "2",
+    "req_body": "{\"m2m:ae\": {\"rn\": \"testAE\", \"api\": \"NMyapp3\", \"rr\": false, \"srv\": [\"3\"], \"acpi\": [\"TinyIoT/testACP\"]}}",
+    "resp_status": 201,
+    "rsc": "2001",
+    "resp_body": "{\"m2m:ae\":{\"rn\":\"testAE\",\"api\":\"NMyapp3\",\"rr\":false,\"srv\":[\"3\"],\"acpi\":[\"TinyIoT/testACP\"],\"ty\":2,\"ct\":\"20260223T120339\",\"ri\":\"CTester1\",\"lt\":\"20260223T120339\",\"pi\":\"tinyiot\",\"et\":\"20280223T120339\",\"aei\":\"CTester1\"}}",
+    "resp_headers": {
+      "Connection": "Close",
+      "Server": "tinyIoT v0.1",
+      "Accept": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": "216",
+      "X-M2M-RSC": "2001",
+      "X-M2M-RVI": "3",
+      "X-M2M-RI": "bfb918ea-ebd0-4b0d-b43b-a9280c696b6b"
+    }
+  },
+  {
+    "test_name": "(setup)",
+    "method": "POST",
+    "url": "http://localhost:3000/TinyIoT/testAE",
+    "originator": "CTester1",
+    "rvi": "3",
+    "ty": "3",
+    "req_body": "{\"m2m:cnt\": {\"rn\": \"testCNT\", \"mni\": 3}}",
+    "resp_status": 201,
+    "rsc": "2001",
+    "resp_body": "{\"m2m:cnt\":{\"rn\":\"testCNT\",\"mni\":3,\"ty\":3,\"ct\":\"20260223T120339\",\"ri\":\"3-20260223T1203390148\",\"lt\":\"20260223T120339\",\"pi\":\"CTester1\",\"et\":\"20280223T120339\",\"st\":0,\"cni\":0,\"cbs\":0}}",
+    "resp_headers": {
+      "Connection": "Close",
+      "Server": "tinyIoT v0.1",
+      "Accept": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": "180",
+      "X-M2M-RSC": "2001",
+      "X-M2M-RVI": "3",
+      "X-M2M-RI": "3ace1faf-31ce-4310-9e1e-1f0b44984acc"
+    }
+  }
+]

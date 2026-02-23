@@ -6,6 +6,73 @@ on:
   workflow_dispatch:
 
 jobs:
+  test-sqlite:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev libpq-dev sqlite3 libwebsockets-dev pkg-config
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install requests
+
+      - name: Build server (SQLite)
+        run: |
+          cd source/server
+          make clean
+          make
+          ls -lh server
+
+      - name: Start server in background
+        run: |
+          cd source/server
+          ./server &
+          echo $! > /tmp/server.pid
+          sleep 5
+
+      - name: Check if server is running
+        run: |
+          if ps -p $(cat /tmp/server.pid) > /dev/null; then
+            echo "✓ Server is running (SQLite)"
+          else
+            echo "✗ Server failed to start"
+            exit 1
+          fi
+
+      - name: Run tests
+        run: |
+          cd tests
+          for f in testCSE.sh testAE.sh testCNT.sh testCIN.sh testGRP.sh; do
+            echo "=== Running $f ==="
+            bash "$f"
+          done
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/server.pid ]; then
+            kill $(cat /tmp/server.pid) || true
+          fi
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== Server process ==="
+          ps aux | grep server || true
+          echo "=== Server directory ==="
+          ls -la source/server/ || true
+
   test-postgresql:
     runs-on: ubuntu-22.04
 
@@ -40,8 +107,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install isodate
-          python -m pip install acmecse
+          pip install requests
 
       - name: Setup PostgreSQL database
         env:
@@ -61,10 +127,6 @@ jobs:
           cd source/server
           sed -i 's/^\/\/ #define DB_TYPE DB_POSTGRESQL/#define DB_TYPE DB_POSTGRESQL/' config.h
           sed -i 's/^#define DB_TYPE DB_SQLITE/\/\/ #define DB_TYPE DB_SQLITE/' config.h
-          sed -i 's/#define PG_HOST ".*"/#define PG_HOST "localhost"/' config.h
-          sed -i 's/#define PG_USER ".*"/#define PG_USER "tinyiot"/' config.h
-          sed -i 's/#define PG_PASSWORD ".*"/#define PG_PASSWORD "tinyiot"/' config.h
-          sed -i 's/#define PG_DBNAME ".*"/#define PG_DBNAME "tinyiot"/' config.h
           echo "=== Database configuration ==="
           grep "DB_TYPE" config.h | head -5
 
@@ -94,12 +156,10 @@ jobs:
       - name: Run tests
         run: |
           cd tests
-          python3 testCSE.py
-          python3 testAE.py
-          python3 testCNT.py
-          python3 testCIN.py
-          python3 testCNT_CIN.py
-          python3 testGRP.py
+          for f in testCSE.sh testAE.sh testCNT.sh testCIN.sh testGRP.sh; do
+            echo "=== Running $f ==="
+            bash "$f"
+          done
 
       - name: Stop server
         if: always()
