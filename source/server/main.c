@@ -285,8 +285,7 @@ void route(oneM2MPrimitive *o2pt)
 		}
 	}
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
-		notify_via_sub(o2pt, target_rtnode);
-	log_runtime(start);
+        notify_via_sub(o2pt, target_rtnode);
 }
 
 int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)

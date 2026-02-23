@@ -1073,8 +1073,12 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	o2pt->rsc = RSC_OK;
 }
 
+
+// Helper forward declaration (definition is below)
+static int sub_has_net(cJSON *subContainer, int event_net);
 int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
+	logger("O2M", LOG_LEVEL_DEBUG, "Target OBJ = %s", target_rtnode && target_rtnode->obj ? cJSON_PrintUnformatted(target_rtnode->obj) : "(null)");
 	logger("O2M", LOG_LEVEL_DEBUG, "Notify via SUB [%s]", target_rtnode->uri);
 	cJSON *pjson = NULL;
 	NodeList *del = NULL;
@@ -1119,8 +1123,11 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			net = NET_DELETE_OF_RESOURCE;
 		} else {
 			if (target_rtnode->parent && target_rtnode->parent->sub_cnt != 0)
-			net = NET_DELETE_OF_DIRECT_CHILD_RESOURCE;
+				net = NET_DELETE_OF_DIRECT_CHILD_RESOURCE;
 		}
+		break;
+	default:
+		net = NET_NONE;
 		break;
 	}
 	logger("O2M", LOG_LEVEL_DEBUG, "Net : %d", net);
@@ -1145,6 +1152,7 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	while (node)
 	{
+		logger("O2M", LOG_LEVEL_DEBUG, "SUB OBJ = %s", node->rtnode && node->rtnode->obj ? cJSON_PrintUnformatted(node->rtnode->obj) : "(null)");
 		if (!isAptEnc(o2pt, target_rtnode, node->rtnode))
 		{
 			logger("O2M", LOG_LEVEL_DEBUG, "skip notification");
@@ -1152,7 +1160,20 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			continue;
 		}
 
-		cJSON *enc = cJSON_GetObjectItem(node->rtnode->obj, "enc");
+        // IMPORTANT: Do not send notifications for events that are not subscribed via enc.net.
+        // This prevents unrelated net=3 notifications from overwriting net=8 missing-data notifications.
+        if (!sub_has_net(node->rtnode->obj, net)) {
+            logger("O2M", LOG_LEVEL_DEBUG, "skip sub notification (net=%d not subscribed)", net);
+            node = node->next;
+            continue;
+        }
+
+        cJSON *subContainer = node->rtnode->obj;
+        cJSON *subWrapped = cJSON_GetObjectItem(subContainer, "m2m:sub");
+        if (subWrapped && cJSON_IsObject(subWrapped)) {
+            subContainer = subWrapped;
+        }
+        cJSON *enc = cJSON_GetObjectItem(subContainer, "enc");
 		exc = cJSON_GetObjectItem(node->rtnode->obj, "exc");
 		cJSON_AddStringToObject(sgn, "sur", node->rtnode->uri);
 
@@ -1185,7 +1206,10 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			cJSON_AddItemToObject(sgn, "cr", cJSON_Duplicate(pjson, true));
 		}
 
-		cJSON *net_obj = cJSON_GetObjectItem(cJSON_GetObjectItem(node->rtnode->obj, "enc"), "net");
+        cJSON *net_obj = NULL;
+        if (enc) {
+            net_obj = cJSON_GetObjectItem(enc, "net");
+        }
 
 		if (net_obj)
 		{
@@ -1442,7 +1466,6 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	char *host = NULL;
 	int port = 0;
 	char *path = NULL;
-	int rsc = 0;
 	char buf[256] = {0};
 
 	logger("O2M", LOG_LEVEL_DEBUG, "Forwarding Resource");
@@ -1518,4 +1541,30 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 
 	return o2pt->rsc;
+}
+
+// Helper: SUB objects may be stored either as a plain object or wrapped in {"m2m:sub":{...}}.
+// Return true if sub's enc.net contains `event_net`.
+static int sub_has_net(cJSON *subContainer, int event_net) {
+    if (!subContainer) return 0;
+
+    cJSON *subObj = cJSON_GetObjectItem(subContainer, "m2m:sub");
+    if (subObj && cJSON_IsObject(subObj)) {
+        subContainer = subObj;
+    }
+
+    cJSON *enc = cJSON_GetObjectItem(subContainer, "enc");
+    if (!enc) return 0;
+
+    cJSON *netArr = cJSON_GetObjectItem(enc, "net");
+    if (!netArr || !cJSON_IsArray(netArr)) return 0;
+
+    cJSON *v = NULL;
+    cJSON_ArrayForEach(v, netArr) {
+        if (v && cJSON_IsNumber(v) && (int)v->valuedouble == event_net) {
+            return 1;
+        }
+    }
+
+    return 0;
 }
