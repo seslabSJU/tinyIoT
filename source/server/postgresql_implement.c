@@ -1778,3 +1778,408 @@ cJSON *getForbiddenUri(cJSON *acp_list)
     pg_unlock();
     return result;
 }
+
+
+cJSON *db_get_tsi_laol(RTNode *parent_rtnode, int laol)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "[DB] db_get_tsi_laol called");
+
+    if (!parent_rtnode) return NULL;
+
+    char sql[1024] = {0};
+    const char *ord = (laol == 0) ? "DESC" : "ASC";
+    PGresult *res;
+    cJSON *json = NULL;
+
+    char *parent_ri = get_ri_rtnode(parent_rtnode);
+    if (!parent_ri) {
+        logger("DB", LOG_LEVEL_ERROR, "Parent RI is NULL");
+        return NULL;
+    }
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return NULL;
+    }
+
+    char *escaped_parent_ri = pg_escape_string_value(parent_ri);
+    snprintf(sql, sizeof(sql),
+        "SELECT * FROM general, tsi "
+        "WHERE general.pi='%s' AND general.id = tsi.id AND general.ty = %d "
+        "ORDER BY general.ct %s, general.id %s LIMIT 1;",
+        escaped_parent_ri, RT_TSI, ord, ord
+    );
+    free(escaped_parent_ri);
+
+    res = PQexec(conn, sql);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "DB Select Failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        pg_unlock();
+        return NULL;
+    }
+
+    if (PQntuples(res) == 0) {
+        logger("DB", LOG_LEVEL_DEBUG, "No TimeSeriesInstance found");
+        PQclear(res);
+        pg_unlock();
+        return NULL;
+    }
+
+    json = cJSON_CreateObject();
+    int cols = PQnfields(res);
+
+    for (int col = 0; col < cols; col++) {
+        char *colname = PQfname(res, col);
+        char *value = PQgetvalue(res, 0, col);
+
+        if (strcmp(colname, "id") == 0) continue;
+        if (!value || strlen(value) == 0) continue;
+
+        if (strcmp(colname, "ty") == 0 || strcmp(colname, "cs") == 0 ||
+            strcmp(colname, "st") == 0 || strcmp(colname, "mni") == 0 ||
+            strcmp(colname, "snr") == 0 || strcmp(colname, "cni") == 0 ||
+            strcmp(colname, "cbs") == 0 || strcmp(colname, "mbs") == 0 ||
+            strcmp(colname, "pei") == 0 || strcmp(colname, "peid") == 0 ||
+            strcmp(colname, "mdd") == 0 || strcmp(colname, "mdc") == 0 ) {
+            // Note: PostgreSQL stores booleans as 't'/'f' sometimes; handle that for mdd.
+            if (strcmp(colname, "mdd") == 0) {
+                if (value[0] == 't' || value[0] == '1') cJSON_AddBoolToObject(json, colname, 1);
+                else cJSON_AddBoolToObject(json, colname, 0);
+            } else {
+                cJSON_AddNumberToObject(json, colname, atoi(value));
+            }
+            continue;
+        }
+
+        if (value[0] == '{' || value[0] == '[') {
+            cJSON *obj = cJSON_Parse(value);
+            if (obj) {
+                cJSON_AddItemToObject(json, colname, obj);
+                continue;
+            }
+        }
+
+        cJSON_AddStringToObject(json, colname, value);
+    }
+
+    PQclear(res);
+    pg_unlock();
+
+    logger("DB", LOG_LEVEL_DEBUG, "[DB] db_get_tsi_laol success");
+    return json;
+}
+
+// ---------------------------------------------------------------------------
+// TimeSeries / TimeSeriesInstance helper APIs (PostgreSQL)
+// These are used by tsi.c / monitor.c to avoid embedding raw SQL there.
+// ---------------------------------------------------------------------------
+
+int db_tsi_get_count(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    int count = 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "SELECT COUNT(*) FROM tsi JOIN general ON tsi.id = general.id WHERE general.pi = '%s';",
+             escaped_ts_ri);
+    free(escaped_ts_ri);
+
+    PGresult *r = PQexec(conn, sql);
+    if (r && PQresultStatus(r) == PGRES_TUPLES_OK && PQntuples(r) > 0) {
+        count = atoi(PQgetvalue(r, 0, 0));
+    }
+    if (r) PQclear(r);
+    pg_unlock();
+    return count;
+}
+
+int db_tsi_get_max_snr(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    int max_snr = 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "SELECT COALESCE(MAX(tsi.snr),0) FROM tsi JOIN general ON tsi.id = general.id WHERE general.pi = '%s';",
+             escaped_ts_ri);
+    free(escaped_ts_ri);
+
+    PGresult *r = PQexec(conn, sql);
+    if (r && PQresultStatus(r) == PGRES_TUPLES_OK && PQntuples(r) > 0) {
+        max_snr = atoi(PQgetvalue(r, 0, 0));
+    }
+    if (r) PQclear(r);
+    pg_unlock();
+    return max_snr;
+}
+
+int db_tsi_get_min_snr(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    int min_snr = 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "SELECT COALESCE(MIN(tsi.snr),0) FROM tsi JOIN general ON tsi.id = general.id WHERE general.pi = '%s';",
+             escaped_ts_ri);
+    free(escaped_ts_ri);
+
+    PGresult *r = PQexec(conn, sql);
+    if (r && PQresultStatus(r) == PGRES_TUPLES_OK && PQntuples(r) > 0) {
+        min_snr = atoi(PQgetvalue(r, 0, 0));
+    }
+    if (r) PQclear(r);
+    pg_unlock();
+    return min_snr;
+}
+
+int db_tsi_check_snr_dup(const char *ts_ri, int snr)
+{
+    if (!ts_ri) return 0;
+    int exists = 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "SELECT 1 FROM tsi JOIN general ON tsi.id = general.id WHERE general.pi = '%s' AND tsi.snr = %d LIMIT 1;",
+             escaped_ts_ri, snr);
+    free(escaped_ts_ri);
+
+    PGresult *r = PQexec(conn, sql);
+    if (r && PQresultStatus(r) == PGRES_TUPLES_OK && PQntuples(r) > 0) {
+        exists = 1;
+    }
+    if (r) PQclear(r);
+    pg_unlock();
+    return exists;
+}
+
+int db_ts_get_mdc(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    int v = 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char sql[256];
+    snprintf(sql, sizeof(sql),
+             "SELECT COALESCE(mdc,0) FROM ts WHERE id = (SELECT id FROM general WHERE ri = '%s');",
+             escaped_ts_ri);
+    free(escaped_ts_ri);
+
+    PGresult *r = PQexec(conn, sql);
+    if (r && PQresultStatus(r) == PGRES_TUPLES_OK && PQntuples(r) > 0) {
+        v = atoi(PQgetvalue(r, 0, 0));
+    }
+    if (r) PQclear(r);
+    pg_unlock();
+    return v;
+}
+
+int db_ts_update_mdc(const char *ts_ri, int val)
+{
+    if (!ts_ri) return 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "UPDATE ts SET mdc = %d WHERE id = (SELECT id FROM general WHERE ri = '%s');",
+             val, escaped_ts_ri);
+    free(escaped_ts_ri);
+
+    PGresult *r = PQexec(conn, sql);
+    int ok = (r && PQresultStatus(r) == PGRES_COMMAND_OK);
+    if (r) PQclear(r);
+    pg_unlock();
+    return ok;
+}
+
+int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str)
+{
+    if (!ts_ri || !time_str) return 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char *escaped_time = pg_escape_string_value(time_str);
+
+    char sql[2048];
+    snprintf(sql, sizeof(sql),
+             "UPDATE ts SET mdc = %d, "
+             "mdlt = COALESCE(mdlt::jsonb, '[]'::jsonb) || jsonb_build_array('%s') "
+             "WHERE id = (SELECT id FROM general WHERE ri = '%s');",
+             val, escaped_time, escaped_ts_ri);
+
+    free(escaped_ts_ri);
+    free(escaped_time);
+
+    PGresult *r = PQexec(conn, sql);
+    int ok = (r && PQresultStatus(r) == PGRES_COMMAND_OK);
+    if (r) PQclear(r);
+    pg_unlock();
+    return ok;
+}
+
+int db_general_update_lt(const char *ri, const char *lt)
+{
+    if (!ri || !lt) return 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ri = pg_escape_string_value(ri);
+    char *escaped_lt = pg_escape_string_value(lt);
+
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "UPDATE general SET lt = '%s' WHERE ri = '%s';",
+             escaped_lt, escaped_ri);
+
+    free(escaped_ri);
+    free(escaped_lt);
+
+    PGresult *r = PQexec(conn, sql);
+    int ok = (r && PQresultStatus(r) == PGRES_COMMAND_OK);
+    if (r) PQclear(r);
+    pg_unlock();
+    return ok;
+}
+
+// Returns a newly-allocated string with the TS.mdlt JSON text (e.g., "[]" or "[...]")
+// Caller must free(). Returns NULL on error.
+char *db_ts_get_mdlt_json(const char *ts_ri)
+{
+    if (!ts_ri) return NULL;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return NULL;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "SELECT COALESCE(mdlt::text, '[]') FROM ts WHERE id = (SELECT id FROM general WHERE ri = '%s');",
+             escaped_ts_ri);
+    free(escaped_ts_ri);
+
+    PGresult *r = PQexec(conn, sql);
+    char *out = NULL;
+    if (r && PQresultStatus(r) == PGRES_TUPLES_OK && PQntuples(r) > 0) {
+        const char *v = PQgetvalue(r, 0, 0);
+        if (v) out = strdup(v);
+    }
+    if (r) PQclear(r);
+    pg_unlock();
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// Backward-compatible wrappers expected by tsi.c / older dbmanager.h
+// The linker errors indicated these symbols were declared but not defined.
+// Implement them here by delegating to the newer helper APIs above.
+// ---------------------------------------------------------------------------
+
+int db_general_set_lt(const char *ri, const char *lt)
+{
+    return db_general_update_lt(ri, lt);
+}
+
+int db_ts_set_mdc_and_append_mdlt(const char *ts_ri, int mdc, const char *time_str)
+{
+    return db_ts_update_mdc_with_mdlt(ts_ri, mdc, time_str);
+}
+
+int db_tsi_check_dgt_dup(const char *ts_ri, const char *dgt)
+{
+    if (!ts_ri || !dgt) return 0;
+    int exists = 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char *escaped_dgt   = pg_escape_string_value(dgt);
+
+    char sql[1024];
+    snprintf(sql, sizeof(sql),
+             "SELECT 1 FROM tsi JOIN general ON tsi.id = general.id "
+             "WHERE general.pi = '%s' AND tsi.dgt = '%s' LIMIT 1;",
+             escaped_ts_ri, escaped_dgt);
+
+    free(escaped_ts_ri);
+    free(escaped_dgt);
+
+    PGresult *r = PQexec(conn, sql);
+    if (r && PQresultStatus(r) == PGRES_TUPLES_OK && PQntuples(r) > 0) {
+        exists = 1;
+    }
+    if (r) PQclear(r);
+
+    pg_unlock();
+    return exists;
+}
