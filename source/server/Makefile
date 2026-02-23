@@ -3,9 +3,6 @@ UNAME := $(shell uname)
 # Check DB_TYPE from config.h to determine which database implementation to use
 DB_TYPE := $(shell grep -E "^\s*\#define\s+DB_TYPE\s+" config.h | grep -E "(DB_SQLITE|DB_POSTGRESQL)" | sed 's/.*DB_//')
 
-
-
-
 # macOS 
 ifeq ($(UNAME), Darwin)
     ifeq ($(DB_TYPE), POSTGRESQL)
@@ -29,7 +26,6 @@ endif
 
 CC=gcc
 
-
 ifeq ($(DB_TYPE), SQLITE)
     DB_IMPL = sqlite_implement.c
     DB_LIB_SRC = sqlite/sqlite3.c
@@ -38,9 +34,7 @@ else ifeq ($(DB_TYPE), POSTGRESQL)
     DB_LIB_SRC = 
 endif
 
-
-
-SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket/net_libwebsockets.c
+SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c
 
 RSCSRC = $(wildcard resources/*.c)
 
@@ -52,23 +46,15 @@ LSRCS = wolfmqtt/mqtt_client.c wolfmqtt/mqtt_packet.c wolfmqtt/mqtt_socket.c $(D
 
 OBJS = $(SRCS:.c=.o) $(RSCSRC:.c=.o) $(LSRCS:.c=.o) $(LIBCOAP:.c=.o)
 
-#LWS추가
-LDFLAGS += $(shell pkg-config --libs libwebsockets)
-CFLAGS += $(shell pkg-config --cflags libwebsockets)
-LDFLAGS += -lwebsockets
-
-
 RELEXE = server
 
 all: $(RELEXE)
 
-# 빌드 타겟
 $(RELEXE) : $(OBJS)
-	$(CC) $(RELCFLAGS) $(CFLAGS) -o $(RELEXE) $(OBJS) $(LIBS) $(LDFLAGS)
+	$(CC) $(RELCFLAGS) -o $(RELEXE) $(OBJS) $(LIBS)
 
-# 오브젝트 파일 컴파일
 %.o: %.c
-	$(CC) $(RELCFLAGS) $(CFLAGS) -c $< -o $@
+	$(CC) $(RELCFLAGS) -c $< -o $@
 
 conf: semi-clean all
 
