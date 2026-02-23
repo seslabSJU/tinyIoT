@@ -44,6 +44,8 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CNTA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CINA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CBA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_FCNT));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_FCIN));
 
 	cJSON_AddStringToObject(cse, "ct", ct);
 	cJSON_AddStringToObject(cse, "ri", CSE_BASE_RI);
@@ -214,7 +216,7 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 	}
 	if ((pjson = cJSON_GetObjectItem(obj, "rr")))
 	{
-		if (pjson->type != cJSON_True || pjson->type != cJSON_False)
+		if (pjson->type != cJSON_True && pjson->type != cJSON_False)
 		{
 			if (pjson->valueint == 1)
 			{
@@ -228,7 +230,7 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 	}
 	if ((pjson = cJSON_GetObjectItem(obj, "mtv")))
 	{
-		if (pjson->type != cJSON_True || pjson->type != cJSON_False)
+		if (pjson->type != cJSON_True && pjson->type != cJSON_False)
 		{
 			if (cJSON_IsTrue(pjson) || pjson->valueint == 1)
 			{
@@ -334,15 +336,8 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 	return 0;
 }
 
-/**
- * @brief update fcnt on fcin change
- * @param fcnt_rtnode rtnode of fcnt
- * @param fcin_rtnode rtnode of fcin
- * @param sign 1 for create, -1 for delete
- * @return 0 for success, -1 for fail
- */
 int update_fcnt_fcin(RTNode *fcnt_rtnode, RTNode *fcin_rtnode, int sign)
-{	
+{
 	if (!fcnt_rtnode || !fcin_rtnode)
 		return -1;
 	cJSON *fcnt = fcnt_rtnode->obj;
@@ -352,47 +347,15 @@ int update_fcnt_fcin(RTNode *fcnt_rtnode, RTNode *fcin_rtnode, int sign)
 	cJSON *cni = cJSON_GetObjectItem(fcnt, "cni");
 	cJSON *cbs = cJSON_GetObjectItem(fcnt, "cbs");
 	cJSON *st = cJSON_GetObjectItem(fcnt, "st");
-	cJSON *mia = cJSON_GetObjectItem(fcnt, "mia");
+	cJSON *fcin_cs = cJSON_GetObjectItem(fcin, "cs");
 
-	if (mia && mia->valueint > 0 && sign == 1) {
-		time_t now = time(NULL);
-		RTNode *expired[128];
-		memset(expired, 0, sizeof(expired));
-		int exp_cnt = 0;
-		RTNode *child = fcnt_rtnode->child;
-		while (child) {
-			if (child->ty == RT_FCIN) {
-				cJSON *ct = cJSON_GetObjectItem(child->obj, "ct");
-				struct tm tmv = {0};
-				strptime(ct->valuestring, "%Y%m%dT%H%M%S", &tmv);
-				time_t created = mktime(&tmv);
-				if (difftime(now, created) > mia->valueint) {
-					if (exp_cnt < 128){
-						expired[exp_cnt++] = child;
-					}
-					else {
-						logger("O2M", LOG_LEVEL_INFO, "Too Many Expired FCIN");
-					}
-				}
-			}
-			child = child->sibling_right;
-		}
-
-		for (int i = 0; i < exp_cnt; i++) {
-			RTNode *n = expired[i];
-			update_fcnt_fcin(fcnt_rtnode, n, -1);
-			db_delete_onem2m_resource(n);
-			free_rtnode(n);
-		}
-	}
+	if (!cni || !cbs || !st || !fcin_cs)
+		return -1;
 
 	cJSON_SetIntValue(cni, cni->valueint + sign);
-	cJSON_SetIntValue(cbs, cbs->valueint + (sign * cJSON_GetObjectItem(fcin, "cs")->valueint));
+	cJSON_SetIntValue(cbs, cbs->valueint + (sign * fcin_cs->valueint));
 	cJSON_SetIntValue(st, st->valueint + 1);
 	logger("O2", LOG_LEVEL_DEBUG, "FCIN cni: %d, cbs: %d, st: %d", cni->valueint, cbs->valueint, st->valueint);
-
-	if (sign == 1)
-		delete_fcin_under_fcnt_mni_mbs(fcnt_rtnode);
 
 	db_update_resource(fcnt, get_ri_rtnode(fcnt_rtnode), RT_FCNT);
 
@@ -500,6 +463,8 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	case RT_CIN:
 		update_cnt_cin(rtnode->parent, rtnode, -1);
 		break;
+	case RT_FCNT:
+		break;
 	case RT_FCIN:
 		update_fcnt_fcin(rtnode->parent, rtnode, -1);
 		break;
@@ -548,12 +513,12 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	cJSON_ArrayForEach(member, rtnode->memberOf)
 	{
 		grp_rtnode = find_rtnode(member->valuestring);
-		logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", grp_rtnode->uri, member->valuestring);
 		if (!grp_rtnode)
 		{
 			logger("O2M", LOG_LEVEL_ERROR, "Node of MemberOf missing - INTERNAL SERVER ERROR");
 			continue;
 		}
+		logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", grp_rtnode->uri, member->valuestring);
 		pjson = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
 		idx = cJSON_getArrayIdx(pjson, rtnode->uri);
 		if (idx >= 0)
@@ -833,49 +798,7 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (e == -1)
 		return o2pt->rsc;
 
-	cJSON *prev_obj = NULL;
-	ResourceType prev_ty = target_rtnode->ty;
-
-	if (o2pt->rvi >= RVI_4 && target_rtnode->parent && target_rtnode->parent->ty == RT_FCNT)
-	{
-		if (target_rtnode->ty == RT_FCNT_LA)
-		{
-			cJSON *latest_fcin = db_get_fcin_laol(target_rtnode->parent, 0);
-			if (latest_fcin)
-			{
-				prev_obj = target_rtnode->obj;
-				target_rtnode->obj = latest_fcin;
-				target_rtnode->ty = RT_FCIN;
-			}
-			else
-			{
-				return handle_error(o2pt, RSC_NOT_FOUND, "no flexContainerInstances found");
-			}
-		}
-		else if (target_rtnode->ty == RT_FCNT_OL)
-		{
-			cJSON *oldest_fcin = db_get_fcin_laol(target_rtnode->parent, 1);
-			if (oldest_fcin)
-			{
-				prev_obj = target_rtnode->obj;
-				target_rtnode->obj = oldest_fcin;
-				target_rtnode->ty = RT_FCIN;
-			}
-			else
-			{
-				return handle_error(o2pt, RSC_NOT_FOUND, "no flexContainerInstances found");
-			}
-		}
-	}
-
 	make_response_body(o2pt, target_rtnode);
-
-	if (prev_obj)
-	{
-		cJSON_Delete(target_rtnode->obj);
-		target_rtnode->obj = prev_obj;
-		target_rtnode->ty = prev_ty;
-	}
 
 	o2pt->rsc = RSC_OK;
 	return RSC_OK;
@@ -1588,6 +1511,10 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 			free(et);
 			break;
 		case RT_GRP:
+			cJSON_AddStringToObject(annc, "et", et);
+			free(et);
+			break;
+		case RT_FCNT:
 			cJSON_AddStringToObject(annc, "et", et);
 			free(et);
 			break;

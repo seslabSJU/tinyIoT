@@ -76,7 +76,7 @@
 #define MAX_URI_SIZE 1024
 #define MAX_ATTRIBUTE_SIZE 4096
 
-#define DEFAULT_EXPIRE_TIME -3600 * 24 * 365 * 2
+#define DEFAULT_EXPIRE_TIME (-3600 * 24 * 365 * 2)
 
 #define SOCKET_TIMEOUT 3 // seconds
 #define MAX_URI_LENGTH 1024
@@ -90,7 +90,7 @@
 #define DEFAULT_MAX_BYTE_SIZE 65536
 
 // FCIN Settings
-#define DEFAULT_MAX_INSTANCE_AGE 86400
+#define DEFAULT_MAX_INSTANCE_AGE 157680000 // 5 years in seconds
 
 // CIN Settings
 #define ALLOW_CIN_RN true // true → allow, false → not allow

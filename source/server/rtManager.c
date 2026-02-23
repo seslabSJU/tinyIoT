@@ -289,6 +289,11 @@ RTNode *find_rtnode(char *addr)
 #if MONO_THREAD == 0
         pthread_mutex_lock(&main_lock);
 #endif
+        // Update parent FCNT's cni/cbs when FCIN expires
+        if (rtnode->ty == RT_FCIN && rtnode->parent)
+        {
+            update_fcnt_fcin(rtnode->parent, rtnode, -1);
+        }
         db_delete_onem2m_resource(rtnode);
         free_rtnode(rtnode);
 #if MONO_THREAD == 0
@@ -433,111 +438,28 @@ RTNode *find_rtnode_by_uri(char *uri)
         {
             cJSON *fcin = NULL;
 
-            // Check all children in the resource tree
-            if (parent_rtnode->child)
-            {
-                logger("RTM", LOG_LEVEL_DEBUG, "Searching for child '%s' in FCNT", ptr);
-                RTNode *current_child = parent_rtnode->child;
-                // Check the first child
-                cJSON *rn_obj = cJSON_GetObjectItem(current_child->obj, "rn");
-                if (rn_obj)
-                {
-                    logger("RTM", LOG_LEVEL_DEBUG, "First child rn='%s', looking for '%s'", rn_obj->valuestring, ptr);
-                    if (strcmp(rn_obj->valuestring, ptr) == 0)
-                    {
-                        logger("RTM", LOG_LEVEL_DEBUG, "resource found in tree: %s", ptr);
-                        rtnode = current_child;
-                    }
-                }
-                // Check sibling_right
-                if (!rtnode && current_child->sibling_right)
-                {
-                    current_child = current_child->sibling_right;
-                    while (current_child && !rtnode)
-                    {
-                        rn_obj = cJSON_GetObjectItem(current_child->obj, "rn");
-                        if (rn_obj)
-                        {
-                            logger("RTM", LOG_LEVEL_DEBUG, "Sibling rn='%s', looking for '%s'", rn_obj->valuestring, ptr);
-                            if (strcmp(rn_obj->valuestring, ptr) == 0)
-                            {
-                                logger("RTM", LOG_LEVEL_DEBUG, "resource found in siblings: %s", ptr);
-                                rtnode = current_child;
-                                break;
-                            }
-                        }
-                        current_child = current_child->sibling_right;
-                    }
-                }
-                // Check sibling_left if still not found
-                if (!rtnode && parent_rtnode->child->sibling_left)
-                {
-                    current_child = parent_rtnode->child->sibling_left;
-                    while (current_child && !rtnode)
-                    {
-                        rn_obj = cJSON_GetObjectItem(current_child->obj, "rn");
-                        if (rn_obj)
-                        {
-                            logger("RTM", LOG_LEVEL_DEBUG, "Left sibling rn='%s', looking for '%s'", rn_obj->valuestring, ptr);
-                            if (strcmp(rn_obj->valuestring, ptr) == 0)
-                            {
-                                logger("RTM", LOG_LEVEL_DEBUG, "resource found in left siblings: %s", ptr);
-                                rtnode = current_child;
-                                break;
-                            }
-                        }
-                        current_child = current_child->sibling_left;
-                    }
-                }
-                if (!rtnode)
-                {
-                    logger("RTM", LOG_LEVEL_DEBUG, "Child '%s' NOT found in FCNT children", ptr);
-                }
-            }
-            if (!rtnode && !strtok_r(NULL, "/", &target_ptr))
+            if (!strtok_r(NULL, "/", &target_ptr))
             { // if next '/' doesn't exist
                 if (!strcmp(ptr, "la") || !strcmp(ptr, "latest"))
                 {
-                    logger("RTM", LOG_LEVEL_DEBUG, "Requested /la (latest) for FCNT: %s", parent_rtnode->uri);
                     flag = 0;
                 }
                 else if (!strcmp(ptr, "ol") || !strcmp(ptr, "oldest"))
                 {
-                    logger("RTM", LOG_LEVEL_DEBUG, "Requested /ol (oldest) for FCNT: %s", parent_rtnode->uri);
                     flag = 1;
                 }
                 if (flag == 0 || flag == 1)
                 {
-                    logger("RTM", LOG_LEVEL_DEBUG, "Querying DB for FCIN with flag=%d", flag);
                     fcin = db_get_fcin_laol(parent_rtnode, flag);
-                    if (!fcin)
-                    {
-                        logger("RTM", LOG_LEVEL_WARN, "No FCIN found in DB for flag=%d, parent=%s", flag, parent_rtnode->uri);
-                    }
-                    else
-                    {
-                        logger("RTM", LOG_LEVEL_DEBUG, "Found FCIN in DB for flag=%d", flag);
-                    }
                 }
                 else
                 {
-                    logger("RTM", LOG_LEVEL_DEBUG, "Attempting to load FCIN from DB with URI: %s", uri);
                     fcin = db_get_resource_by_uri(uri, RT_FCIN);
-                    if (!fcin)
-                    {
-                        logger("RTM", LOG_LEVEL_WARN, "FCIN not found in DB with URI: %s", uri);
-                    }
                 }
                 if (fcin)
                 {
                     rtnode = create_rtnode(fcin, RT_FCIN);
                     rtnode->parent = parent_rtnode;
-                    rtnode->uri = strdup(uri);
-                    logger("RTM", LOG_LEVEL_DEBUG, "Successfully loaded FCIN: %s", uri);
-                }
-                else
-                {
-                    logger("RTM", LOG_LEVEL_WARN, "Failed to load FCIN for path component: %s", ptr);
                 }
             }
         }

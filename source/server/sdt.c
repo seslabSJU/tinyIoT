@@ -291,6 +291,111 @@ SDTDef* sdt_find_by_cnd(const char *cnd) {
     return NULL;
 }
 
+static int is_valid_timestamp(const char *s) {
+    if (!s || strlen(s) < 15) return 0;
+    // yyyyMMddTHHmmss (basic) or yyyy-MM-ddTHH:mm:ss (extended)
+    for (int i = 0; i < 8 && s[i]; i++) {
+        if (s[i] == '-') continue;
+        if (s[i] < '0' || s[i] > '9') return 0;
+    }
+    return 1;
+}
+
+static int is_valid_date(const char *s) {
+    if (!s || strlen(s) < 8) return 0;
+    for (int i = 0; i < 8 && s[i]; i++) {
+        if (s[i] == '-') continue;
+        if (s[i] < '0' || s[i] > '9') return 0;
+    }
+    return 1;
+}
+
+static int is_valid_time(const char *s) {
+    if (!s || strlen(s) < 6) return 0;
+    for (int i = 0; i < 6 && s[i]; i++) {
+        if (s[i] == ':') continue;
+        if (s[i] < '0' || s[i] > '9') return 0;
+    }
+    return 1;
+}
+
+int sdt_validate_attr_type(const char *sdt_type, cJSON *value, char **error) {
+    if (!sdt_type || !value) return RSC_OK;
+
+    if (strcmp(sdt_type, "string") == 0 || strcmp(sdt_type, "anyuri") == 0) {
+        if (!cJSON_IsString(value)) {
+            if (error) *error = "Expected string value";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "integer") == 0) {
+        if (!cJSON_IsNumber(value)) {
+            if (error) *error = "Expected integer value";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "nonNegInteger") == 0) {
+        if (!cJSON_IsNumber(value)) {
+            if (error) *error = "Expected non-negative integer value";
+            return RSC_BAD_REQUEST;
+        }
+        if (value->valuedouble < 0) {
+            if (error) *error = "Value must be non-negative";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "float") == 0) {
+        if (!cJSON_IsNumber(value)) {
+            if (error) *error = "Expected float value";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "boolean") == 0) {
+        if (!cJSON_IsBool(value)) {
+            if (error) *error = "Expected boolean value";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "timestamp") == 0 || strcmp(sdt_type, "dateTime") == 0) {
+        if (!cJSON_IsString(value)) {
+            if (error) *error = "Expected timestamp string";
+            return RSC_BAD_REQUEST;
+        }
+        if (!is_valid_timestamp(value->valuestring)) {
+            if (error) *error = "Invalid timestamp format";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "date") == 0) {
+        if (!cJSON_IsString(value)) {
+            if (error) *error = "Expected date string";
+            return RSC_BAD_REQUEST;
+        }
+        if (!is_valid_date(value->valuestring)) {
+            if (error) *error = "Invalid date format";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "time") == 0) {
+        if (!cJSON_IsString(value)) {
+            if (error) *error = "Expected time string";
+            return RSC_BAD_REQUEST;
+        }
+        if (!is_valid_time(value->valuestring)) {
+            if (error) *error = "Invalid time format";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "list") == 0) {
+        if (!cJSON_IsArray(value)) {
+            if (error) *error = "Expected array value";
+            return RSC_BAD_REQUEST;
+        }
+    }
+
+    return RSC_OK;
+}
+
 int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attrs, char **error, int check_mandatory) {
     if (!shortname || !cnd) {
         *error = "Missing shortname or containerDefinition";

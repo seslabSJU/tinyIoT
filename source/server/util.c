@@ -5,6 +5,7 @@
 #include <time.h>
 #include <math.h>
 #include <ctype.h>
+#include <limits.h>
 #include <sys/timeb.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
@@ -101,6 +102,9 @@ ResourceType http_parse_object_type(header_t *headers)
 	case 28:
 		ty = RT_FCNT;
 		break;
+	case 58:
+		ty = RT_FCIN;
+		break;
 	case 10002:
 		ty = RT_AEA;
 		break;
@@ -163,6 +167,10 @@ ResourceType coap_parse_object_type(int object_type)
 	case 28:
 	case 76:
 		ty = RT_FCNT;
+		break;
+	case 58:
+	case 106:
+		ty = RT_FCIN;
 		break;
 	default:
 		ty = RT_MIXED;
@@ -248,6 +256,9 @@ char *get_resource_key(ResourceType ty)
 		break;
 	case RT_CBA:
 		key = "m2m:cbA";
+		break;
+	case RT_FCNTA:
+		key = "m2m:fcntA";
 		break;
 	case RT_FCNT:
 		key = "m2m:fcnt";
@@ -379,6 +390,15 @@ char *resource_identifier(ResourceType ty, char *ct)
 	case RT_CINA:
 		strcpy(ri, "10004-");
 		break;
+	case RT_FCNTA:
+		strcpy(ri, "10028-");
+		break;
+	case RT_FCNT:
+		strcpy(ri, "28-");
+		break;
+	case RT_FCIN:
+		strcpy(ri, "58-");
+		break;
 	}
 
 	// struct timespec specific_time;
@@ -398,6 +418,58 @@ char *resource_identifier(ResourceType ty, char *ct)
 	return ri;
 }
 
+int delete_oldest_fcin_rtnode(RTNode *fcnt_rtnode)
+{
+	if (!fcnt_rtnode) return -1;
+
+	RTNode *oldest = NULL;
+	int min_st = INT_MAX;
+
+	// Walk children to find oldest FCIN by lowest st (stateTag)
+	RTNode *child = fcnt_rtnode->child;
+	while (child)
+	{
+		if (child->ty == RT_FCIN)
+		{
+			cJSON *st_obj = cJSON_GetObjectItem(child->obj, "st");
+			if (st_obj && cJSON_IsNumber(st_obj))
+			{
+				if (st_obj->valueint < min_st)
+				{
+					min_st = st_obj->valueint;
+					oldest = child;
+				}
+			}
+			else if (!oldest)
+			{
+				// FCIN without st - treat as oldest candidate
+				oldest = child;
+			}
+		}
+		child = child->sibling_right;
+	}
+
+	if (!oldest)
+	{
+		logger("UTIL", LOG_LEVEL_DEBUG, "No FCIN child found to delete");
+		return -1;
+	}
+
+	// Get cs before deletion
+	cJSON *cs_obj = cJSON_GetObjectItem(oldest->obj, "cs");
+	int deleted_cs = (cs_obj && cJSON_IsNumber(cs_obj)) ? cs_obj->valueint : 0;
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "Deleting oldest FCIN (st=%d, cs=%d) - no notification", min_st, deleted_cs);
+
+	// Delete from DB (no notification - per standard requirement)
+	db_delete_onem2m_resource(oldest);
+
+	// Free RTNode (properly unlinks from sibling chain)
+	free_rtnode(oldest);
+
+	return deleted_cs;
+}
+
 void delete_fcin_under_fcnt_mni_mbs(RTNode *rtnode)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "call delete_fcin_under_fcnt_mni_mbs");
@@ -406,13 +478,15 @@ void delete_fcin_under_fcnt_mni_mbs(RTNode *rtnode)
 	cJSON *cbs_obj = NULL;
 	cJSON *mni_obj = NULL;
 	cJSON *mbs_obj = NULL;
-	int cni, mni, cbs, mbs, tmp = 0;
+	int cni = 0, mni = 0, cbs = 0, mbs = 0, tmp = 0;
 
-	if ((cni_obj = cJSON_GetObjectItem(fcnt, "cni")))
+	cni_obj = cJSON_GetObjectItem(fcnt, "cni");
+	if (cni_obj && cJSON_IsNumber(cni_obj))
 	{
 		cni = cni_obj->valueint;
 	}
-	if ((mni_obj = cJSON_GetObjectItem(fcnt, "mni")))
+	mni_obj = cJSON_GetObjectItem(fcnt, "mni");
+	if (mni_obj && cJSON_IsNumber(mni_obj))
 	{
 		mni = mni_obj->valueint;
 	}
@@ -420,11 +494,13 @@ void delete_fcin_under_fcnt_mni_mbs(RTNode *rtnode)
 	{
 		mni = DEFAULT_MAX_NR_INSTANCES;
 	}
-	if ((cbs_obj = cJSON_GetObjectItem(fcnt, "cbs")))
+	cbs_obj = cJSON_GetObjectItem(fcnt, "cbs");
+	if (cbs_obj && cJSON_IsNumber(cbs_obj))
 	{
 		cbs = cbs_obj->valueint;
 	}
-	if ((mbs_obj = cJSON_GetObjectItem(fcnt, "mbs")))
+	mbs_obj = cJSON_GetObjectItem(fcnt, "mbs");
+	if (mbs_obj && cJSON_IsNumber(mbs_obj))
 	{
 		mbs = mbs_obj->valueint;
 	}
@@ -435,42 +511,20 @@ void delete_fcin_under_fcnt_mni_mbs(RTNode *rtnode)
 	if (cni <= mni && cbs <= mbs)
 		return;
 
-	if (cni == mni + 1)
+	while ((mni >= 0 && cni > mni) || (mbs >= 0 && cbs > mbs))
 	{
-		tmp = db_delete_one_fcin_mni(rtnode);
-		if (tmp == -1)
+		tmp = delete_oldest_fcin_rtnode(rtnode);
+		if (tmp < 0)
 		{
-			logger("UTIL", LOG_LEVEL_ERROR, "delete_fcin_under_fcnt_mni_mbs error");
+			logger("UTIL", LOG_LEVEL_ERROR, "delete_fcin_under_fcnt_mni_mbs: no more FCINs to delete");
+			break;
 		}
 		cbs -= tmp;
 		cni--;
 	}
 
-	if (cni > mni || cbs > mbs)
-	{
-		RTNode *head = db_get_fcin_rtnode_list(rtnode);
-		RTNode *right;
-
-		while ((mni >= 0 && cni > mni) || (mbs >= 0 && cbs > mbs))
-		{
-			if (head)
-			{
-				right = head->sibling_right;
-				db_delete_onem2m_resource(head);
-				cbs -= cJSON_GetObjectItem(head->obj, "cs")->valueint;
-				cni--;
-				free_rtnode(head);
-				head = right;
-			}
-			else
-			{
-				break;
-			}
-		}
-	}
-
-	cJSON_SetIntValue(cni_obj, cni);
-	cJSON_SetIntValue(cbs_obj, cbs);
+	if (cni_obj) cJSON_SetIntValue(cni_obj, cni);
+	if (cbs_obj) cJSON_SetIntValue(cbs_obj, cbs);
 }
 
 void delete_cin_under_cnt_mni_mbs(RTNode *rtnode)
@@ -576,7 +630,7 @@ void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 		target = cJSON_AddObjectToObject(result_obj, get_resource_key(rtnode->ty));
 	while (child)
 	{
-		if (child->ty != RT_CIN)
+		if (child->ty != RT_CIN && child->ty != RT_FCIN)
 		{
 			build_child_structure(o2pt, child, target, &ofst, &lim, level - 1, RCN_CHILD_RESOURCES);
 		}
@@ -618,6 +672,43 @@ void build_rcn8(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 			cin = cin->sibling_right;
 		}
 		free_rtnode_list(cin_list_head);
+	}
+	if (rtnode->ty == RT_FCNT)
+	{
+		cJSON *pjson;
+		RTNode *fcin_list_head = db_get_fcin_rtnode_list(rtnode);
+
+		RTNode *fcin = fcin_list_head;
+
+		while (fcin)
+		{
+			if (ofst <= 0 && lim > 0)
+			{
+				if (isResourceAptFC(o2pt, fcin, o2pt->fc))
+				{
+					if (ofst > 0)
+					{
+						ofst -= 1;
+					}
+					else
+					{
+						if (pjson = cJSON_GetObjectItem(target ? target : result_obj, get_resource_key(RT_FCIN)))
+						{
+							cJSON_AddItemToArray(pjson, cJSON_Duplicate(fcin->obj, true));
+						}
+						else
+						{
+							pjson = cJSON_CreateArray();
+							cJSON_AddItemToArray(pjson, cJSON_Duplicate(fcin->obj, true));
+							cJSON_AddItemToObject(target ? target : result_obj, get_resource_key(fcin->ty), pjson);
+						}
+						lim -= 1;
+					}
+				}
+			}
+			fcin = fcin->sibling_right;
+		}
+		free_rtnode_list(fcin_list_head);
 	}
 	logger("UTIL", LOG_LEVEL_DEBUG, "ofst : %d, lim : %d", ofst, lim);
 	if (lim < 0)
@@ -668,7 +759,7 @@ void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 		target = cJSON_AddObjectToObject(result_obj, get_resource_key(rtnode->ty));
 	while (child)
 	{
-		if (child->ty != RT_CIN)
+		if (child->ty != RT_CIN && child->ty != RT_FCIN)
 		{
 			build_child_structure(o2pt, child, target, &ofst, &lim, level - 1, RCN_ATTRIBUTES_AND_CHILD_RESOURCES);
 		}
@@ -711,6 +802,43 @@ void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
 		}
 		free_rtnode_list(cin_list_head);
 	}
+	if (rtnode->ty == RT_FCNT)
+	{
+		cJSON *pjson;
+		RTNode *fcin_list_head = db_get_fcin_rtnode_list(rtnode);
+
+		RTNode *fcin = fcin_list_head;
+
+		while (fcin)
+		{
+			if (ofst <= 0 && lim > 0)
+			{
+				if (isResourceAptFC(o2pt, fcin, o2pt->fc))
+				{
+					if (ofst > 0)
+					{
+						ofst -= 1;
+					}
+					else
+					{
+						if (pjson = cJSON_GetObjectItem(target ? target : result_obj, get_resource_key(RT_FCIN)))
+						{
+							cJSON_AddItemToArray(pjson, cJSON_Duplicate(fcin->obj, true));
+						}
+						else
+						{
+							pjson = cJSON_CreateArray();
+							cJSON_AddItemToArray(pjson, cJSON_Duplicate(fcin->obj, true));
+							cJSON_AddItemToObject(target ? target : result_obj, get_resource_key(fcin->ty), pjson);
+						}
+						lim -= 1;
+					}
+				}
+			}
+			fcin = fcin->sibling_right;
+		}
+		free_rtnode_list(fcin_list_head);
+	}
 	logger("UTIL", LOG_LEVEL_DEBUG, "ofst : %d, lim : %d", ofst, lim);
 	if (lim < 0)
 	{
@@ -736,7 +864,7 @@ void get_child_references(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_o
 	while (child)
 	{
 		apt = false;
-		if (child->ty != RT_CIN)
+		if (child->ty != RT_CIN && child->ty != RT_FCIN)
 		{
 			if (*ofst <= 0 && *lim > 0)
 			{
@@ -796,6 +924,40 @@ void get_child_references(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_o
 			}
 			free_rtnode_list(cin_list_head);
 		}
+		if (child->ty == RT_FCNT)
+		{
+			RTNode *fcin_list_head = db_get_fcin_rtnode_list(child);
+
+			RTNode *fcin = fcin_list_head;
+
+			while (fcin)
+			{
+				if (*ofst <= 0 && *lim > 0)
+				{
+					if (isResourceAptFC(o2pt, fcin, o2pt->fc))
+					{
+						root = cJSON_CreateObject();
+						cJSON_AddStringToObject(root, "nm", fcin->rn);
+						cJSON_AddNumberToObject(root, "typ", fcin->ty);
+						if (o2pt->drt == DRT_STRUCTURED)
+						{
+							cJSON_AddStringToObject(root, "val", child->uri);
+						}
+						else
+						{
+							cJSON_AddStringToObject(root, "val", cJSON_GetObjectItem(child->obj, "ri")->valuestring);
+						}
+						cJSON_AddItemToArray(result_obj, root);
+					}
+					else
+					{
+						*ofst -= 1;
+					}
+				}
+				fcin = fcin->sibling_right;
+			}
+			free_rtnode_list(fcin_list_head);
+		}
 		if (rcn == RCN_CHILD_RESOURCES || RCN_CHILD_RESOURCE_REFERENCES)
 		{
 			get_child_references(o2pt, child, result_obj, ofst, lim, level - 1, rcn);
@@ -842,6 +1004,40 @@ void get_child_references(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_o
 			cin = cin->sibling_right;
 		}
 		free_rtnode_list(cin_list_head);
+	}
+	if (rtnode->ty == RT_FCNT)
+	{
+		RTNode *fcin_list_head = db_get_fcin_rtnode_list(rtnode);
+
+		RTNode *fcin = fcin_list_head;
+
+		while (fcin)
+		{
+			if (*ofst <= 0 && *lim > 0)
+			{
+				if (isResourceAptFC(o2pt, fcin, o2pt->fc))
+				{
+					root = cJSON_CreateObject();
+					cJSON_AddStringToObject(root, "nm", fcin->rn);
+					cJSON_AddNumberToObject(root, "typ", fcin->ty);
+					if (o2pt->drt == DRT_STRUCTURED)
+					{
+						cJSON_AddStringToObject(root, "val", rtnode->uri);
+					}
+					else
+					{
+						cJSON_AddStringToObject(root, "val", cJSON_GetObjectItem(rtnode->obj, "ri")->valuestring);
+					}
+					cJSON_AddItemToArray(result_obj, root);
+				}
+				else
+				{
+					*ofst -= 1;
+				}
+			}
+			fcin = fcin->sibling_right;
+		}
+		free_rtnode_list(fcin_list_head);
 	}
 }
 
@@ -917,11 +1113,47 @@ void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_
 		}
 		free_rtnode_list(cin_list_head);
 	}
+	if (*lim > 0 && level > 0 && rtnode->ty == RT_FCNT)
+	{
+		RTNode *fcin_list_head = db_get_fcin_rtnode_list(rtnode);
+
+		RTNode *fcin = fcin_list_head;
+
+		while (fcin)
+		{
+			if (*ofst <= 0 && *lim > 0)
+			{
+				if (isResourceAptFC(o2pt, fcin, o2pt->fc))
+				{
+					if (*ofst > 0)
+					{
+						*ofst -= 1;
+					}
+					else
+					{
+						if (pjson = cJSON_GetObjectItem(target ? target : result_obj, get_resource_key(RT_FCIN)))
+						{
+							cJSON_AddItemToArray(pjson, cJSON_Duplicate(fcin->obj, true));
+						}
+						else
+						{
+							pjson = cJSON_CreateArray();
+							cJSON_AddItemToArray(pjson, cJSON_Duplicate(fcin->obj, true));
+							cJSON_AddItemToObject(target ? target : result_obj, get_resource_key(fcin->ty), pjson);
+						}
+						*lim -= 1;
+					}
+				}
+			}
+			fcin = fcin->sibling_right;
+		}
+		free_rtnode_list(fcin_list_head);
+	}
 
 	RTNode *child = rtnode->child;
 	while (child)
 	{
-		if (child->ty == RT_CIN)
+		if (child->ty == RT_CIN || child->ty == RT_FCIN)
 		{
 			child = child->sibling_right;
 			continue;
@@ -1879,8 +2111,8 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 		else if (target_rtnode->ty == RT_FCIN)
 		{
-			// For FlexContainerInstance, use parent FCNT's SDT shortname
-			const char *key = get_resource_key(RT_FCNT); // Default to "m2m:fcnt"
+			// For FlexContainerInstance, use parent FCNT's SDT shortname or default to "m2m:fcin"
+			const char *key = get_resource_key(RT_FCIN);
 			if (target_rtnode->parent && target_rtnode->parent->ty == RT_FCNT)
 			{
 				cJSON *sn = cJSON_GetObjectItem(target_rtnode->parent->obj, "_sn");
@@ -2579,6 +2811,8 @@ cJSON *getResource(cJSON *root, ResourceType ty)
 		return cJSON_GetObjectItem(root, "m2m:cinA");
 	case RT_CNTA:
 		return cJSON_GetObjectItem(root, "m2m:cntA");
+	case RT_FCNTA:
+		return cJSON_GetObjectItem(root, "m2m:fcntA");
 	}
 	return NULL;
 }
@@ -4252,7 +4486,8 @@ bool isValidChildType(ResourceType parent, ResourceType child)
 			return true;
 		break;
 	case RT_FCNT:
-		if (child == RT_SUB || child == RT_FCNT || child == RT_SMD || child == RT_CNT)
+		if (child == RT_SUB || child == RT_FCNT || child == RT_SMD || child == RT_CNT
+			|| child == RT_FCIN || child == RT_FCNT_LA || child == RT_FCNT_OL)
 			return true;
 		break;
 	}
@@ -4295,8 +4530,8 @@ bool is_standard_fcnt_attribute(const char *attrName)
 	};
 
 	const char *fcnt_attrs[] = {
-		"cnd", "or", "st", "cs", "_sn",
-		"fcied", "mni", "mbs", "mia", "cni", "cbs", NULL
+		"cnd", "oref", "st", "cs", "_sn",
+		"fcied", "mni", "mbs", "mia", "cni", "cbs", "daci", "ast", NULL
 	};
 
 	for (int i = 0; common_attrs[i] != NULL; i++) {
@@ -4396,7 +4631,6 @@ int validate_custom_attributes(const char *shortname, cJSON *customAttrs, const 
 			return RSC_BAD_REQUEST;
 		}
 
-		// Check if attribute exists in SDT definition
 		if (def->attributes) {
 			int found = 0;
 			int attr_count = cJSON_GetArraySize(def->attributes);
@@ -4406,6 +4640,11 @@ int validate_custom_attributes(const char *shortname, cJSON *customAttrs, const 
 					cJSON *sname_item = cJSON_GetObjectItem(attr_def, "sname");
 					if (sname_item && strcmp(sname_item->valuestring, item->string) == 0) {
 						found = 1;
+						cJSON *type_item = cJSON_GetObjectItem(attr_def, "type");
+						if (type_item && cJSON_IsString(type_item)) {
+							int rsc = sdt_validate_attr_type(type_item->valuestring, item, error_msg);
+							if (rsc != RSC_OK) return rsc;
+						}
 						break;
 					}
 				}
@@ -4611,7 +4850,9 @@ void increment_parent_statetag(RTNode *parent_rtnode)
 
 		cJSON *update_obj = cJSON_CreateObject();
 		cJSON_AddNumberToObject(update_obj, "st", current_st + 1);
-		cJSON_AddStringToObject(update_obj, "lt", get_local_time(0));
+		char *lt = get_local_time(0);
+		cJSON_AddStringToObject(update_obj, "lt", lt);
+		free(lt);
 
 		char *ri = get_ri_rtnode(parent_rtnode);
 		if (ri) {
@@ -4639,63 +4880,12 @@ int prepare_fcnt_for_instances(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		return 0;
 	}
 
-	logger("UTIL", LOG_LEVEL_DEBUG, "Preparing FCNT for instances: %s", fcnt_rtnode->uri);
-
-	// Create /la (latest) virtual resource
-	cJSON *la_obj = cJSON_CreateObject();
-	cJSON_AddStringToObject(la_obj, "rn", "la");
-	cJSON_AddNumberToObject(la_obj, "ty", RT_FCNT_LA);
-	cJSON_AddStringToObject(la_obj, "ri", "virtual-la");
-	cJSON_AddStringToObject(la_obj, "pi", get_ri_rtnode(fcnt_rtnode));
-	cJSON *et_obj = cJSON_GetObjectItem(fcnt, "et");
-	if (et_obj)
-	{
-		cJSON_AddStringToObject(la_obj, "et", et_obj->valuestring);
-	}
-
-	size_t la_uri_len = strlen(fcnt_rtnode->uri) + 4;
-	char *la_uri = malloc(la_uri_len);
-	if (!la_uri)
-	{
-		cJSON_Delete(la_obj);
-		logger("UTIL", LOG_LEVEL_ERROR, "Failed to allocate memory for la URI");
-		return -1;
-	}
-	snprintf(la_uri, la_uri_len, "%s/la", fcnt_rtnode->uri);
-	RTNode *la_rtnode = create_rtnode(la_obj, RT_FCNT_LA);
-	la_rtnode->uri = la_uri;
-	add_child_resource_tree(fcnt_rtnode, la_rtnode);
-
-	// Create /ol (oldest) virtual resource
-	cJSON *ol_obj = cJSON_CreateObject();
-	cJSON_AddStringToObject(ol_obj, "rn", "ol");
-	cJSON_AddNumberToObject(ol_obj, "ty", RT_FCNT_OL);
-	cJSON_AddStringToObject(ol_obj, "ri", "virtual-ol");
-	cJSON_AddStringToObject(ol_obj, "pi", get_ri_rtnode(fcnt_rtnode));
-	if (et_obj)
-	{
-		cJSON_AddStringToObject(ol_obj, "et", et_obj->valuestring);
-	}
-
-	size_t ol_uri_len = strlen(fcnt_rtnode->uri) + 4;
-	char *ol_uri = malloc(ol_uri_len);
-	if (!ol_uri)
-	{
-		cJSON_Delete(ol_obj);
-		logger("UTIL", LOG_LEVEL_ERROR, "Failed to allocate memory for ol URI");
-		return -1;
-	}
-	snprintf(ol_uri, ol_uri_len, "%s/ol", fcnt_rtnode->uri);
-	RTNode *ol_rtnode = create_rtnode(ol_obj, RT_FCNT_OL);
-	ol_rtnode->uri = ol_uri;
-	add_child_resource_tree(fcnt_rtnode, ol_rtnode);
-
-	logger("UTIL", LOG_LEVEL_DEBUG, "Created /la and /ol virtual resources for FCNT");
+	logger("UTIL", LOG_LEVEL_DEBUG, "FCNT has fcied, ready for instances: %s", fcnt_rtnode->uri);
 
 	return 0;
 }
 
-int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
+int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool is_create)
 {
 	if (!fcnt_rtnode || fcnt_rtnode->ty != RT_FCNT || o2pt->rvi < RVI_4)
 	{
@@ -4712,8 +4902,14 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 	cJSON *fcin = cJSON_CreateObject();
 
 	// Generate resource name: {fcnt_rn}_{st}
-	char rn_buf[256];
-	snprintf(rn_buf, sizeof(rn_buf), "%s_%d", fcnt_rtnode->rn, st_obj->valueint);
+	int rn_len = snprintf(NULL, 0, "%s_%d", fcnt_rtnode->rn, st_obj->valueint) + 1;
+	char *rn_buf = malloc(rn_len);
+	if (!rn_buf)
+	{
+		cJSON_Delete(fcin);
+		return -1;
+	}
+	snprintf(rn_buf, rn_len, "%s_%d", fcnt_rtnode->rn, st_obj->valueint);
 	cJSON_AddStringToObject(fcin, "rn", rn_buf);
 
 	// Copy containerDefinition from parent FCNT
@@ -4723,7 +4919,7 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		cJSON_AddStringToObject(fcin, "cnd", cnd->valuestring);
 	}
 
-	// Copy label attribute if present (per TS-0004 standard)
+	// Copy label attribute if present
 	cJSON *lbl = cJSON_GetObjectItem(fcnt, "lbl");
 	if (lbl)
 	{
@@ -4752,8 +4948,8 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 		cJSON_Delete(customAttrs);
 	}
 
-	// Set stateTag to match parent FCNT's current stateTag
-	cJSON_AddNumberToObject(fcin, "st", st_obj->valueint);
+	// Set stateTag: CREATE=0, UPDATE=parent's stateTag
+	cJSON_AddNumberToObject(fcin, "st", is_create ? 0 : st_obj->valueint);
 
 	// Set contentSize to match parent FCNT's current contentSize
 	cJSON *cs_obj = cJSON_GetObjectItem(fcnt, "cs");
@@ -4775,11 +4971,13 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 	// Add general attributes (ri, pi, ct, ty, etc.)
 	add_general_attribute(fcin, fcnt_rtnode, RT_FCIN);
 
+	cJSON_DeleteItemFromObject(fcin, "lt");
+
 	// Handle maxInstanceAge (mia) for expirationTime
 	cJSON *mia = cJSON_GetObjectItem(fcnt, "mia");
 	if (mia && cJSON_IsNumber(mia) && mia->valueint > 0)
 	{
-		char *et_str = get_local_time(mia->valueint);
+		char *et_str = get_local_time(-(mia->valueint));
 		if (et_str)
 		{
 			cJSON_DeleteItemFromObject(fcin, "et");
@@ -4805,9 +5003,11 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
 	{
 		logger("UTIL", LOG_LEVEL_ERROR, "Failed to allocate memory for FCIN URI");
 		cJSON_Delete(fcin);
+		free(rn_buf);
 		return -1;
 	}
 	snprintf(fci_uri, fci_uri_len, "%s/%s", fcnt_rtnode->uri, rn_buf);
+	free(rn_buf);
 
 	int result = db_store_resource(fcin, fci_uri);
 	if (result != 1)
@@ -4883,39 +5083,6 @@ int cleanup_fcnt_instances(RTNode *fcnt_rtnode, bool only_instances, bool keep_l
 			}
 
 			ptr = next;
-		}
-	}
-
-	// Remove /la and /ol virtual resources if requested
-	if (!only_instances)
-	{
-		RTNode *child = fcnt_rtnode->child;
-		while (child)
-		{
-			RTNode *next = child->sibling_right;
-			
-			if (child->ty == RT_FCNT_LA || child->ty == RT_FCNT_OL)
-			{
-				logger("UTIL", LOG_LEVEL_DEBUG, "Removing virtual resource: %s", child->rn);
-				// Remove from tree (but don't delete from DB as they're virtual)
-				if (child->sibling_left)
-				{
-					child->sibling_left->sibling_right = child->sibling_right;
-				}
-				else
-				{
-					fcnt_rtnode->child = child->sibling_right;
-				}
-				
-				if (child->sibling_right)
-				{
-					child->sibling_right->sibling_left = child->sibling_left;
-				}
-				
-				free_rtnode(child);
-			}
-			
-			child = next;
 		}
 	}
 

@@ -7,7 +7,6 @@
 #include "../sdt.h"
 
 extern ResourceTree *rt;
-extern cJSON *ATTRIBUTES;
 
 int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
@@ -182,6 +181,8 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 				cJSON_AddNumberToObject(fcnt, "mni", DEFAULT_MAX_NR_INSTANCES);
 			if (!cJSON_GetObjectItem(fcnt, "mbs"))
 				cJSON_AddNumberToObject(fcnt, "mbs", DEFAULT_MAX_BYTE_SIZE);
+			if (!cJSON_GetObjectItem(fcnt, "mia"))
+				cJSON_AddNumberToObject(fcnt, "mia", DEFAULT_MAX_INSTANCE_AGE);
 
 			// Validate mbs >= cs
 			cJSON *mbs_obj = cJSON_GetObjectItem(fcnt, "mbs");
@@ -238,7 +239,7 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		{
 			prepare_fcnt_for_instances(child_rtnode, o2pt);
 
-			add_flexcontainer_instance(child_rtnode, o2pt);
+			add_flexcontainer_instance(child_rtnode, o2pt, true);
 
 			cJSON_AddNumberToObject(fcnt, "cni", 1);
 			cJSON_AddNumberToObject(fcnt, "cbs", contentSize);
@@ -264,7 +265,7 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-	char invalid_key[][9] = {"ty", "pi", "ri", "rn", "ct", "cr", "cnd"};
+	char invalid_key[][9] = {"ty", "pi", "ri", "rn", "ct", "cr", "cnd", "cs", "st", "cni", "cbs"};
 	cJSON *m2m_fcnt = cJSON_GetObjectItem(o2pt->request_pc, "m2m:fcnt");
 	if (!m2m_fcnt)
 	{
@@ -392,23 +393,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		return result;
 	}
 
-	if (o2pt->rvi >= RVI_4)
-	{
-		cJSON *mbs_update = cJSON_GetObjectItem(m2m_fcnt, "mbs");
-		if (mbs_update && cJSON_IsNumber(mbs_update))
-		{
-			cJSON *cs_current = cJSON_GetObjectItem(fcnt, "cs");
-			if (cs_current && cJSON_IsNumber(cs_current))
-			{
-				if (mbs_update->valueint < cs_current->valueint)
-				{
-					if (customAttrs) cJSON_Delete(customAttrs);
-					return handle_error(o2pt, RSC_BAD_REQUEST, "mbs cannot be smaller than cs");
-				}
-			}
-		}
-	}
-
 	cJSON *at = NULL;
 	if ((at = cJSON_GetObjectItem(m2m_fcnt, "at")))
 	{
@@ -418,7 +402,9 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		cJSON_AddItemToObject(m2m_fcnt, "at", final_at);
 	}
 
-	cJSON_AddItemToObject(m2m_fcnt, "lt", cJSON_CreateString(get_local_time(0)));
+	char *lt = get_local_time(0);
+	cJSON_AddItemToObject(m2m_fcnt, "lt", cJSON_CreateString(lt));
+	free(lt);
 
 	cJSON *st_obj = cJSON_GetObjectItem(target_rtnode->obj, "st");
 	if (st_obj && cJSON_IsNumber(st_obj))
@@ -452,6 +438,13 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 		cJSON_Delete(existing_custom);
 	}
+	else
+	{
+		cJSON *existing_custom = extract_custom_attributes(target_rtnode->obj);
+		int contentSize = calculate_content_size(existing_custom);
+		cJSON_AddNumberToObject(m2m_fcnt, "cs", contentSize);
+		if (existing_custom) cJSON_Delete(existing_custom);
+	}
 
 	if (o2pt->rvi >= RVI_4)
 	{
@@ -462,9 +455,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 		if (fcied_in_request && cJSON_IsNull(fcied_in_request))
 		{
-			logger("FCNT", LOG_LEVEL_DEBUG, "fcied is being removed");
-
-			// Issue #8: only reject m* with non-null values
 			cJSON *mni_req = cJSON_GetObjectItem(m2m_fcnt, "mni");
 			cJSON *mbs_req = cJSON_GetObjectItem(m2m_fcnt, "mbs");
 			cJSON *mia_req = cJSON_GetObjectItem(m2m_fcnt, "mia");
@@ -476,7 +466,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				return handle_error(o2pt, RSC_BAD_REQUEST, "mni, mbs, or mia must not be present when fcied is removed");
 			}
 
-			// Issue #7: also delete fcied itself
 			cJSON_DeleteItemFromObject(fcnt, "fcied");
 			cJSON_DeleteItemFromObject(fcnt, "cni");
 			cJSON_DeleteItemFromObject(fcnt, "cbs");
@@ -488,7 +477,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 		else if (!fcied_final || cJSON_IsNull(fcied_final))
 		{
-			// Issue #9: only reject m* with non-null values
 			cJSON *mni_req = cJSON_GetObjectItem(m2m_fcnt, "mni");
 			cJSON *mbs_req = cJSON_GetObjectItem(m2m_fcnt, "mbs");
 			cJSON *mia_req = cJSON_GetObjectItem(m2m_fcnt, "mia");
@@ -500,24 +488,35 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				return handle_error(o2pt, RSC_BAD_REQUEST, "mni, mbs, or mia must not be present when fcied is not present");
 			}
 		}
-		else if (cJSON_IsFalse(fcied_final))
+
+		if (fcied_final && !cJSON_IsNull(fcied_final))
+		{
+			cJSON *mni_req = cJSON_GetObjectItem(m2m_fcnt, "mni");
+			cJSON *mbs_req = cJSON_GetObjectItem(m2m_fcnt, "mbs");
+			cJSON *mia_req = cJSON_GetObjectItem(m2m_fcnt, "mia");
+			if ((mni_req && cJSON_IsNumber(mni_req) && mni_req->valueint == 0) ||
+			    (mbs_req && cJSON_IsNumber(mbs_req) && mbs_req->valueint == 0) ||
+			    (mia_req && cJSON_IsNumber(mia_req) && mia_req->valueint == 0))
+			{
+				if (customAttrs) cJSON_Delete(customAttrs);
+				return handle_error(o2pt, RSC_BAD_REQUEST, "mni, mbs, or mia cannot be 0");
+			}
+		}
+
+		if (cJSON_IsFalse(fcied_final))
 		{
 			bool was_true_or_none = !fcied_current || cJSON_IsTrue(fcied_current) || cJSON_IsNull(fcied_current);
 
 			if (was_true_or_none && fcied_in_request && cJSON_IsFalse(fcied_in_request))
 			{
-				logger("FCNT", LOG_LEVEL_DEBUG, "fcied changed to false");
-
-				// Issue #10: prepare before adding instance when transitioning from null
 				if (!fcied_current || cJSON_IsNull(fcied_current))
 				{
 					prepare_fcnt_for_instances(target_rtnode, o2pt);
-					add_flexcontainer_instance(target_rtnode, o2pt);
+					add_flexcontainer_instance(target_rtnode, o2pt, false);
 				}
 
 				cleanup_fcnt_instances(target_rtnode, true, true);
 
-				// Issue #11: use updated cs from m2m_fcnt if available
 				cJSON *cs_obj = cJSON_GetObjectItem(m2m_fcnt, "cs");
 				if (!cs_obj) cs_obj = cJSON_GetObjectItem(fcnt, "cs");
 				int cs_value = cs_obj ? cs_obj->valueint : 0;
@@ -531,11 +530,8 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 			if (was_false_or_none && fcied_in_request && cJSON_IsTrue(fcied_in_request))
 			{
-				logger("FCNT", LOG_LEVEL_DEBUG, "fcied changed to true");
-
 				prepare_fcnt_for_instances(target_rtnode, o2pt);
 
-				// Issue #12: initialize cni=0, cbs=0 when transitioning to true
 				cJSON_AddNumberToObject(m2m_fcnt, "cni", 0);
 				cJSON_AddNumberToObject(m2m_fcnt, "cbs", 0);
 			}
@@ -568,20 +564,18 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				cJSON_AddNumberToObject(m2m_fcnt, "cni", cni_value + 1);
 			}
 
-			// Issue #13: force FCIN creation when transitioning to true
 			if (was_false_or_none && fcied_in_request && cJSON_IsTrue(fcied_in_request))
 			{
 				if (!needs_fci)
 				{
 					needs_fci = true;
-					// Set cni=1, cbs=cs for the new FCIN (reset was done by Issue #12)
-					cJSON *cs_obj13 = cJSON_GetObjectItem(m2m_fcnt, "cs");
-					if (!cs_obj13) cs_obj13 = cJSON_GetObjectItem(fcnt, "cs");
-					int cs_val13 = cs_obj13 ? cs_obj13->valueint : 0;
+					cJSON *cs_obj = cJSON_GetObjectItem(m2m_fcnt, "cs");
+					if (!cs_obj) cs_obj = cJSON_GetObjectItem(fcnt, "cs");
+					int cs_val = cs_obj ? cs_obj->valueint : 0;
 					cJSON_DeleteItemFromObject(m2m_fcnt, "cni");
 					cJSON_DeleteItemFromObject(m2m_fcnt, "cbs");
 					cJSON_AddNumberToObject(m2m_fcnt, "cni", 1);
-					cJSON_AddNumberToObject(m2m_fcnt, "cbs", cs_val13);
+					cJSON_AddNumberToObject(m2m_fcnt, "cbs", cs_val);
 				}
 			}
 
@@ -614,7 +608,7 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				       cbs_final->valueint > mbs_final->valueint &&
 				       cbs_final->valueint > 0)
 				{
-					int deleted_cs = db_delete_one_fcin_mbs(target_rtnode);
+					int deleted_cs = delete_oldest_fcin_rtnode(target_rtnode);
 					if (deleted_cs < 0) {
 						logger("FCNT", LOG_LEVEL_ERROR, "No more FCINs to delete for mbs enforcement");
 						break;
@@ -645,7 +639,7 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				       cni_final->valueint > mni_final->valueint &&
 				       cni_final->valueint > 0)
 				{
-					int deleted_cs = db_delete_one_fcin_mni(target_rtnode);
+					int deleted_cs = delete_oldest_fcin_rtnode(target_rtnode);
 					if (deleted_cs < 0) {
 						logger("FCNT", LOG_LEVEL_ERROR, "No more FCINs to delete for mni enforcement after %d deletions", deleted_count);
 						break;
@@ -671,7 +665,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 	}
 
-
 	update_resource(target_rtnode->obj, m2m_fcnt);
 
 	result = db_update_resource(m2m_fcnt, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_FCNT);
@@ -685,7 +678,7 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	if (o2pt->rvi >= RVI_4 && needs_fci)
 	{
-		add_flexcontainer_instance(target_rtnode, o2pt);
+		add_flexcontainer_instance(target_rtnode, o2pt, false);
 	}
 
 	for (int i = 0; i < updateAttrCnt; i++)

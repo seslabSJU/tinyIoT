@@ -5,7 +5,6 @@
 #include "../dbmanager.h"
 #include "../config.h"
 
-extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
 
 int create_fcin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)

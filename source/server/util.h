@@ -130,6 +130,7 @@ int check_macp_privilege(oneM2MPrimitive *o2pt, RTNode *rtnode, ACOP acop);
 char *get_local_time(int diff);
 char *resource_identifier(ResourceType ty, char *ct);
 void delete_cin_under_cnt_mni_mbs(RTNode *rtnode);
+int delete_oldest_fcin_rtnode(RTNode *fcnt_rtnode);
 void delete_fcin_under_fcnt_mni_mbs(RTNode *rtnode);
 int net_to_bit(cJSON *net);
 int get_value_querystring_int(char *key);
@@ -187,7 +188,7 @@ void increment_parent_statetag(RTNode *parent_rtnode);
 
 // FlexContainerInstance (Release 4)
 int prepare_fcnt_for_instances(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt);
-int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt);
+int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool is_create);
 int cleanup_fcnt_instances(RTNode *fcnt_rtnode, bool only_instances, bool keep_latest);
 
 #endif

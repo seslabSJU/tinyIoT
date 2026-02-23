@@ -154,12 +154,12 @@ static const table_def_t table_definitions[] = {
      "CREATE TABLE IF NOT EXISTS fcnt ( id INTEGER, "
      "cnd VARCHAR(255), oref VARCHAR(100), nl VARCHAR(45), cr VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
      "st INT, cs INT, fcied INT, mni INT, mbs INT, mia INT, cni INT, cbs INT, "
-     "custom_attrs JSONB, loc TEXT, "
+     "custom_attrs JSONB, loc TEXT, daci VARCHAR(200), "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"fcin",
      "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
-     "cs INT, st INT, org VARCHAR(200), loc TEXT, at VARCHAR(200), aa VARCHAR(100), ast INT, custom_attrs JSONB, "
+     "cs INT, st INT, org VARCHAR(200), loc TEXT, at VARCHAR(200), aa VARCHAR(100), ast INT, custom_attrs JSONB, cnd VARCHAR(255), "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     }
 };
@@ -238,12 +238,12 @@ static const table_def_t table_definitions[] = {
      "CREATE TABLE IF NOT EXISTS fcnt ( id INTEGER, "
      "cnd TEXT, oref TEXT, nl TEXT, cr TEXT, at TEXT, aa TEXT, ast INT, "
      "st INT, cs INT, fcied INT, mni INT, mbs INT, mia INT, cni INT, cbs INT, "
-     "custom_attrs JSONB, loc TEXT, "
+     "custom_attrs JSONB, loc TEXT, daci TEXT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"fcin",
      "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
-     "cs INT, st INT, org TEXT, loc TEXT, at TEXT, aa TEXT, ast INT, custom_attrs JSONB, "
+     "cs INT, st INT, org TEXT, loc TEXT, at TEXT, aa TEXT, ast INT, custom_attrs JSONB, cnd TEXT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     }
 };
@@ -425,7 +425,10 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
                 char *endptr;
                 long num = strtol(value, &endptr, 10);
                 if (*endptr == '\0') {
-                    cJSON_AddNumberToObject(resource, colname, num);
+                    if (strcmp(colname, "fcied") == 0)
+                        cJSON_AddBoolToObject(resource, colname, (int)num);
+                    else
+                        cJSON_AddNumberToObject(resource, colname, num);
                 } else {
                     cJSON_AddItemToObject(resource, colname, cJSON_CreateString(value));
                 }
@@ -436,8 +439,8 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
 
     PQclear(res);
 
-    // For FlexContainer, merge custom_attrs into the main resource object
-    if (ty == RT_FCNT) {
+    // For FlexContainer/FlexContainerInstance, merge custom_attrs into the main resource object
+    if (ty == RT_FCNT || ty == RT_FCIN) {
         cJSON *custom_attrs = cJSON_GetObjectItem(resource, "custom_attrs");
         if (custom_attrs && cJSON_IsObject(custom_attrs)) {
             // Merge each custom attribute into the main resource
@@ -505,7 +508,10 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
                 char *endptr;
                 long num = strtol(value, &endptr, 10);
                 if (*endptr == '\0') {
-                    cJSON_AddNumberToObject(resource, colname, num);
+                    if (strcmp(colname, "fcied") == 0)
+                        cJSON_AddBoolToObject(resource, colname, (int)num);
+                    else
+                        cJSON_AddNumberToObject(resource, colname, num);
                 } else {
                     cJSON_AddItemToObject(resource, colname, cJSON_CreateString(value));
                 }
@@ -516,8 +522,8 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
 
     PQclear(res);
 
-    // For FlexContainer, merge custom_attrs into the main resource object
-    if (ty == RT_FCNT) {
+    // For FlexContainer/FlexContainerInstance, merge custom_attrs into the main resource object
+    if (ty == RT_FCNT || ty == RT_FCIN) {
         cJSON *custom_attrs = cJSON_GetObjectItem(resource, "custom_attrs");
         if (custom_attrs && cJSON_IsObject(custom_attrs)) {
             // Merge each custom attribute into the main resource
@@ -993,8 +999,8 @@ RTNode *db_get_all_resource_as_rtnode()
     RTNode *head = NULL, *rtnode = NULL;
     cJSON *json, *arr;
 
-    // Select all resources except CIN (ty=4) and Sub (ty=23) 
-    sprintf(sql, "SELECT * FROM general WHERE ty != 4 AND ty != 23;");
+    // Select all resources except CIN (ty=4), Sub (ty=23) and FCIN (ty=58)
+    sprintf(sql, "SELECT * FROM general WHERE ty != 4 AND ty != 23 AND ty != 58;");
     
     res = PQexec(pg_conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -1055,7 +1061,7 @@ RTNode *db_get_all_resource_as_rtnode()
                 char *value = PQgetvalue(res2, 0, col);
 
                 if (strcmp(colname, "id") == 0) continue;
-                
+
                 if (value && strlen(value) > 0) {
                     // Try to parse as JSON first
                     arr = cJSON_Parse(value);
@@ -1066,7 +1072,10 @@ RTNode *db_get_all_resource_as_rtnode()
                         char *endptr;
                         long num = strtol(value, &endptr, 10);
                         if (*endptr == '\0') {
-                            cJSON_AddNumberToObject(json, colname, num);
+                            if (strcmp(colname, "fcied") == 0)
+                                cJSON_AddBoolToObject(json, colname, (int)num);
+                            else
+                                cJSON_AddNumberToObject(json, colname, num);
                         } else {
                             cJSON_AddItemToObject(json, colname, cJSON_CreateString(value));
                         }
@@ -1445,6 +1454,16 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
         strcat(sql, ")");
     }
 
+    // Add stateTag filters
+    if ((pjson = cJSON_GetObjectItem(fc, "sts"))) {
+        sprintf(buf, " AND id IN (SELECT id FROM cnt WHERE st < %d UNION SELECT id FROM fcnt WHERE st < %d)", pjson->valueint, pjson->valueint);
+        strcat(sql, buf);
+    }
+    if ((pjson = cJSON_GetObjectItem(fc, "stb"))) {
+        sprintf(buf, " AND id IN (SELECT id FROM cnt WHERE st >= %d UNION SELECT id FROM fcnt WHERE st >= %d)", pjson->valueint, pjson->valueint);
+        strcat(sql, buf);
+    }
+
     // Add ordering and limit
     if (DEFAULT_DISCOVERY_SORT == SORT_DESC) {
         strcat(sql, " ORDER BY id DESC");
@@ -1710,7 +1729,7 @@ int db_delete_one_fcin_mni(RTNode *fcnt)
     sprintf(sql, "SELECT general.id, fcin.cs FROM general "
                  "LEFT JOIN fcin ON general.id = fcin.id "
                  "WHERE general.pi='%s' AND general.ty=58 "
-                 "ORDER BY general.ct ASC LIMIT 1", escaped_pi);
+                 "ORDER BY fcin.st ASC LIMIT 1", escaped_pi);
 
     logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
 
@@ -1773,7 +1792,7 @@ int db_delete_one_fcin_mbs(RTNode *fcnt)
     sprintf(sql, "SELECT general.id, fcin.cs FROM general "
                  "LEFT JOIN fcin ON general.id = fcin.id "
                  "WHERE general.pi='%s' AND general.ty=58 "
-                 "ORDER BY general.ct ASC LIMIT 1", escaped_pi);
+                 "ORDER BY fcin.st ASC LIMIT 1", escaped_pi);
 
     logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
 
@@ -1877,7 +1896,7 @@ RTNode *db_get_fcin_rtnode_list(RTNode *rtnode)
     }
 
     char *escaped_pi = pg_escape_string_value(pi);
-    sprintf(sql, "SELECT * FROM general, fcin WHERE general.pi='%s' AND general.ty=58 AND general.id = fcin.id ORDER BY general.ct ASC;", escaped_pi);
+    sprintf(sql, "SELECT * FROM general, fcin WHERE general.pi='%s' AND general.ty=58 AND general.id = fcin.id ORDER BY fcin.st ASC;", escaped_pi);
 
     logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
 
@@ -1979,7 +1998,7 @@ cJSON *db_get_fcin_laol(RTNode *parent_rtnode, int laol)
     }
 
     char *escaped_pi = pg_escape_string_value(parent_ri);
-    sprintf(sql, "SELECT * FROM general, fcin WHERE general.pi='%s' AND general.ty=58 AND general.id = fcin.id ORDER BY general.ct %s, general.id %s LIMIT 1;", escaped_pi, ord, ord);
+    sprintf(sql, "SELECT * FROM general, fcin WHERE general.pi='%s' AND general.ty=58 AND general.id = fcin.id ORDER BY fcin.st %s LIMIT 1;", escaped_pi, ord);
 
     logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
 
