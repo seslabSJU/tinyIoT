@@ -227,15 +227,27 @@ int main(int argc, char **argv)
 void route(oneM2MPrimitive *o2pt)
 {
 	int rsc = 0;
+	double start;
+
+	start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
+
+	// if (o2pt->op == OP_UPPERTESTER)
+	// {
+	// 	handle_uppertester_procedure(o2pt);
+	// 	log_runtime(start);
+	// 	return;
+	// }
 
 	RTNode *target_rtnode = get_rtnode(o2pt);
 
 	if (o2pt->rsc >= 4000)
 	{
+		log_runtime(start);
 		return;
 	}
 	if (o2pt->isForwarding)
 	{
+		log_runtime(start);
 		return;
 	}
 
@@ -244,6 +256,7 @@ void route(oneM2MPrimitive *o2pt)
 		e = check_mandatory_attributes(o2pt);
 	if (e == -1)
 	{
+		log_runtime(start);
 		return;
 	}
 
@@ -273,6 +286,7 @@ void route(oneM2MPrimitive *o2pt)
 	}
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
 		notify_via_sub(o2pt, target_rtnode);
+	log_runtime(start);
 }
 
 int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)

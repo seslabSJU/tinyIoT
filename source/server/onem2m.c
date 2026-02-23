@@ -286,20 +286,12 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 	cJSON *cbs = cJSON_GetObjectItem(cnt, "cbs");
 	cJSON *st = cJSON_GetObjectItem(cnt, "st");
 	cJSON *mia = cJSON_GetObjectItem(cnt, "mia");
-	int cni_val = cni ? cni->valueint : 0;
-	int cbs_val = cbs ? cbs->valueint : 0;
-	int st_val = st ? st->valueint : 0;
-	int cin_cs = 0;
-	cJSON *cin_cs_item = cJSON_GetObjectItem(cin, "cs");
-	if (cin_cs_item)
-		cin_cs = cin_cs_item->valueint;
 
 	if (mia && mia->valueint > 0 && sign == 1) {
         time_t now = time(NULL);
         RTNode *expired[128];
 		memset(expired, 0, sizeof(expired));
         int exp_cnt = 0;
-		int exp_cbs = 0;
         RTNode *child = cnt_rtnode->child;
         while (child) {
              if (child->ty == RT_CIN) {
@@ -322,34 +314,19 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 
         for (int i = 0; i < exp_cnt; i++) {
             RTNode *n = expired[i];
-			cJSON *cs = cJSON_GetObjectItem(n->obj, "cs");
-			if (cs)
-				exp_cbs += cs->valueint;
+            update_cnt_cin(cnt_rtnode, n, -1);
             db_delete_onem2m_resource(n);
             free_rtnode(n);
         }
-		if (exp_cnt > 0) {
-			cni_val = (cni_val > exp_cnt) ? (cni_val - exp_cnt) : 0;
-			cbs_val = (cbs_val > exp_cbs) ? (cbs_val - exp_cbs) : 0;
-			st_val += exp_cnt;
-		}
     }
 
-	cni_val += sign;
-	cbs_val += (sign * cin_cs);
-	st_val += 1;
-	if (cni)
-		cJSON_SetIntValue(cni, cni_val);
-	if (cbs)
-		cJSON_SetIntValue(cbs, cbs_val);
-	if (st)
-		cJSON_SetIntValue(st, st_val);
-	logger("O2", LOG_LEVEL_DEBUG, "cni: %d, cbs: %d, st: %d", cni_val, cbs_val, st_val);
+	cJSON_SetIntValue(cni, cni->valueint + sign);
+	cJSON_SetIntValue(cbs, cbs->valueint + (sign * cJSON_GetObjectItem(cin, "cs")->valueint));
+	cJSON_SetIntValue(st, st->valueint + 1);
+	logger("O2", LOG_LEVEL_DEBUG, "cni: %d, cbs: %d, st: %d", cni->valueint, cbs->valueint, st->valueint);
 
 	if (sign == 1)
-	{
 		delete_cin_under_cnt_mni_mbs(cnt_rtnode);
-	}
 
 	db_update_resource(cnt, get_ri_rtnode(cnt_rtnode), RT_CNT);
 
