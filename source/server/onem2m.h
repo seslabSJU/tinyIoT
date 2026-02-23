@@ -170,7 +170,6 @@ void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty);
 char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isParent);
 int create_annc(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int update_annc(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
-int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op, RTNode *parent_rtnode);
 
 #define ALL_ACOP ACOP_CREATE + ACOP_RETRIEVE + ACOP_UPDATE + ACOP_DELETE + ACOP_NOTIFY + ACOP_DISCOVERY
 

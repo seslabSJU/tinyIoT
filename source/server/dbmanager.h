@@ -20,9 +20,6 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty);
 int db_begin_tx();
 int db_commit_tx();
 int db_rollback_tx();
-cJSON *db_get_tsi_laol(RTNode *parent_rtnode, int laol);
-
-cJSON *db_get_tsi_laol(RTNode *parent_rtnode, int laol);
 
 int db_delete_onem2m_resource(RTNode *rtnode);
 

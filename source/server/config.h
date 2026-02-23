@@ -7,7 +7,7 @@
 
 // #define NIC_NAME "eth0"
 #define SERVER_IP "127.0.0.1"
-#define SERVER_PORT "3050"
+#define SERVER_PORT "3000"
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
 #define CSE_BASE_SP_ID "tinyiot.example.com"
@@ -34,9 +34,9 @@
 // PostgreSQL connection settings
 #define PG_HOST "localhost"
 #define PG_PORT 5432
-#define PG_USER "tiny_user"
-#define PG_PASSWORD "password"
-#define PG_DBNAME "tinydb"
+#define PG_USER "tinyuser"
+#define PG_PASSWORD "tinypass"
+#define PG_DBNAME "tinydev"
 
 // PostgreSQL Schema Types
 #define PG_SCHEMA_VARCHAR 0  // Use VARCHAR for string fields
