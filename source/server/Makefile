@@ -40,7 +40,7 @@ endif
 
 
 
-SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket_server.c
+SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket/websocket_server.c
 
 RSCSRC = $(wildcard resources/*.c)
 
@@ -55,7 +55,7 @@ OBJS = $(SRCS:.c=.o) $(RSCSRC:.c=.o) $(LSRCS:.c=.o) $(LIBCOAP:.c=.o)
 #LWS추가
 LDFLAGS += $(shell pkg-config --libs libwebsockets)
 CFLAGS += $(shell pkg-config --cflags libwebsockets)
-LDFLAGS += -lwebsockets #왜인지 이걸 추가해야지 링크가 됨...?
+LDFLAGS += -lwebsockets
 
 
 RELEXE = server

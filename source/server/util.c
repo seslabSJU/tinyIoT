@@ -22,7 +22,7 @@
 #include "coap.h"
 
 
-#include "websocket_server.h"
+#include "websocket/websocket_server.h"
 
 extern ResourceTree* rt;
 extern cJSON* ATTRIBUTES;
@@ -1324,6 +1324,8 @@ int get_acop_origin(oneM2MPrimitive* o2pt, char* origin, RTNode* acp_rtnode, int
 				}
 				break;
 			}
+
+			logger("UTIL", LOG_LEVEL_DEBUG, "ret_acop: %d", ret_acop);
 		}
 	}
 	logger("UTIL", LOG_LEVEL_DEBUG, "get_acop_origin [%s]: %d", origin, ret_acop);
@@ -2578,6 +2580,7 @@ int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode)
 	if (!rtnode)
 		return RSC_NOT_FOUND;
 	logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource [%s]", get_uri_rtnode(rtnode));
+	logger("UTIL", LOG_LEVEL_DEBUG, "o2pt->request_pc [%s]", cJSON_PrintUnformatted(o2pt->request_pc));
 	if (rtnode->ty == RT_AE)
 	{
 		logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource AE [%s]", rtnode->rn);
@@ -2601,8 +2604,22 @@ int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode)
 		char* host, * path;
 		int port;
 
+		#ifdef ENABLE_WS	
+			// 목적지 rt주소로 세션 조회 및 전송
+			//ws 세션이 존재할경우 전송되고
+			//poa에 이것이 존재하든 말든 일단 전송됨
+		#endif
+
+		logger("UTIL", LOG_LEVEL_DEBUG, "o2pt->request_pc [%s]", cJSON_PrintUnformatted(o2pt->request_pc));
 		cJSON_ArrayForEach(pjson, poa)
 		{
+			logger("UTIL", LOG_LEVEL_DEBUG, "pjson->valuestring [%s]", pjson->valuestring);
+			if(strcmp(pjson->valuestring, "ws://default") == 0 ||strcmp(pjson->valuestring, "ws://") == 0 || strcmp(pjson->valuestring, "ws") == 0 ){
+				websocket_check_and_forwarding_from_sessionTable(o2pt, rtnode);
+				break;
+			}
+
+
 			if (parsePoa(pjson->valuestring, &prot, &host, &port, &path) == -1)
 			{
 				logger("UTIL", LOG_LEVEL_DEBUG, "poa parse error %d", 0);
@@ -2610,47 +2627,60 @@ int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode)
 			}
 			switch (prot)
 			{
-			case PROT_HTTP:
-				logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource HTTP [%s]", pjson->valuestring);
-				req = (HTTPRequest*)calloc(1, sizeof(HTTPRequest));
-				res = (HTTPResponse*)calloc(1, sizeof(HTTPResponse));
-				req->method = op_to_method(o2pt->op);
-				req->uri = strdup(path);
-				req->payload = cJSON_PrintUnformatted(o2pt->request_pc);
-				req->payload_size = strlen(req->payload);
-				req->qs = NULL;
-				req->headers = calloc(1, sizeof(header_t));
-				add_header("X-M2M-Origin", o2pt->fr, req->headers);
-				add_header("X-M2M-RI", o2pt->rqi, req->headers);
-				add_header("Content-Type", "application/json", req->headers);
-				add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
+				case PROT_HTTP:
+					logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource HTTP [%s]", pjson->valuestring);
+					req = (HTTPRequest*)calloc(1, sizeof(HTTPRequest));
+					res = (HTTPResponse*)calloc(1, sizeof(HTTPResponse));
+					req->method = op_to_method(o2pt->op);
+					req->uri = strdup(path);
+					req->payload = strdup(cJSON_PrintUnformatted(o2pt->request_pc));
+					req->payload_size = strlen(req->payload);
+					req->qs = NULL;
+					req->headers = calloc(1, sizeof(header_t));
+					add_header("X-M2M-Origin", o2pt->fr, req->headers);
+					add_header("X-M2M-RI", o2pt->rqi, req->headers);
+					add_header("Content-Type", "application/json", req->headers);
+					add_header("X-M2M-RVI", from_rvi(o2pt->rvi), req->headers);
 
 
-				send_http_request(host, port, req, res);
-				ptr = search_header(res->headers, "x-m2m-rsc");
-				if (ptr)
-				{
-					rsc = atoi(ptr);
-					logger("UTIL", LOG_LEVEL_DEBUG, "requestToresource RSC %d", rsc);
-				}
-				else
-				{
-					rsc = RSC_BAD_REQUEST;
-				}
-				free_HTTPResponse(res);
-				free_HTTPRequest(req);
-				break;
-			case PROT_MQTT:
-#ifdef ENABLE_MQTT // TODO
-				// mqtt_request(o2pt, host, port, path);
-#endif
-				break;
-				case PROT_WS:
-#ifdef ENABLE_WS // TODO
-				// mqtt_request(o2pt, host, port, path);
-				logger("WEBSOCKET", LOG_LEVEL_DEBUG, "WS SUB DEBUG CHECK IS IT?");
-#endif
-				break;
+					send_http_request(host, port, req, res);
+					ptr = search_header(res->headers, "x-m2m-rsc");
+					if (ptr)
+					{
+						rsc = atoi(ptr);
+						logger("UTIL", LOG_LEVEL_DEBUG, "requestToresource RSC %d", rsc);
+					}
+					else
+					{
+						rsc = RSC_BAD_REQUEST;
+					}
+					free_HTTPResponse(res);
+					free_HTTPRequest(req);
+
+					
+					break;
+				case PROT_MQTT:
+	#ifdef ENABLE_MQTT // TODO
+					// mqtt_request(o2pt, host, port, path);
+	#endif
+					break;
+					case PROT_WS:
+	#ifdef ENABLE_WS // TODO
+					
+					// mqtt_request(o2pt, host, port, path);
+					NotiTarget* nt = calloc(1, sizeof(NotiTarget));
+					o2pt->to = strdup(path);
+					strncpy(nt->host, host, 1024);
+					nt->port = port;
+					nt->noti_json = strdup(cJSON_PrintUnformatted(o2pt->request_pc));
+					logger("WEBSOCKET", LOG_LEVEL_DEBUG, "WS SUB DEBUG CHECK IS IT?");
+					logger("UTIL", LOG_LEVEL_DEBUG, "nt->noti_json [%s]", nt->noti_json);
+					rsc = ws_protocol_binding_notify(o2pt, nt);
+					free(nt->noti_json);
+					free(nt);
+
+	#endif
+					break;
 
 			}
 			if (host)
@@ -2698,12 +2728,20 @@ int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson)
 	}
 	else if (rat == PROTOCOL_BINDING)
 	{
+		
 
 		logger("UTIL", LOG_LEVEL_DEBUG, "protocol binding");
 		Protocol prot;
 		char* host, * path;
 		int port;
 		nt = calloc(1, sizeof(NotiTarget));
+
+		printf("noti_uri : %s\n", noti_uri);
+		if(strcmp(noti_uri, "ws://default") == 0 ||strcmp(noti_uri, "ws://") == 0 || strcmp(noti_uri, "ws") == 0 ){
+			o2pt->to = strdup(to);
+			websocket_check_and_forwarding_from_sessionTable(o2pt, rtnode);
+			return 2000;
+		}
 
 		if (parsePoa(noti_uri, &prot, &host, &port, &path) == -1)
 		{
@@ -2725,7 +2763,7 @@ int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson)
 			break;
 		case PROT_MQTT:
 #ifdef ENABLE_MQTT
-			rsc = mqtt_notify(o2pt, noti_cjson, nt);
+		rsc = mqtt_notify(o2pt, noti_cjson, nt);	
 #endif
 			break;
 #ifdef ENABLE_COAP
@@ -2734,10 +2772,11 @@ int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson)
 #endif
 			break;
 		case PROT_WS:
-		logger("UTIL", LOG_LEVEL_DEBUG, "1111");
+		// logger("UTIL", LOG_LEVEL_DEBUG, "1111");
 #ifdef ENABLE_WS
-			rsc = ws_notify_vertify(o2pt, nt);
+			rsc = ws_protocol_binding_notify(o2pt, nt);
 #endif
+			printf("rsc : %d\n", rsc);
 			break;
 		}
 
@@ -2774,16 +2813,25 @@ int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net)
 
 	oneM2MPrimitive* o2pt = calloc(1, sizeof(oneM2MPrimitive));
 	o2pt->op = OP_NOTIFY;
+	o2pt->to = strdup("/");
 	o2pt->fr = strdup("/" CSE_BASE_RI);
 	o2pt->rvi = CSE_RVI;
 	o2pt->rqi = strdup("notify");
 	o2pt->request_pc = cJSON_Duplicate(noti_cjson, true);
+	
 
 	cJSON_ArrayForEach(pjson, nu)
 	{
 		char* noti_uri = strdup(pjson->valuestring);
 		logger("UTIL", LOG_LEVEL_DEBUG, "noti_uri : %s", noti_uri);
 		index = 0;
+
+
+		if(strcmp(pjson->valuestring, "ws://default") == 0 ||strcmp(pjson->valuestring, "ws://") == 0 || strcmp(pjson->valuestring, "ws") == 0 ){
+			websocket_check_and_forwarding_from_sessionTable(o2pt, rtnode);
+			break;
+		}
+
 		ResourceAddressingType rat = checkResourceAddressingType(noti_uri);
 
 		if (rat == CSE_RELATIVE)
@@ -2851,9 +2899,10 @@ int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net)
 			case PROT_HTTP:
 				rsc = http_notify(o2pt, host, port, nt);
 				break;
-			case PROT_MQTT:
 #ifdef ENABLE_MQTT
+			case PROT_MQTT:
 				rsc = mqtt_notify(o2pt, noti_cjson, nt);
+				break;
 #endif
 #ifdef ENABLE_COAP
 			case PROT_COAP:
@@ -2862,10 +2911,9 @@ int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net)
 #endif
 #ifdef ENABLE_WS
 			case PROT_WS:
-				ws_notify_alert(nt->noti_json, nt);
+				rsc = ws_protocol_binding_notify(o2pt, nt);
 				break;
 #endif
-				break;
 			}
 			free(nt->noti_json);
 			free(nt);

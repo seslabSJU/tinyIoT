@@ -11,7 +11,7 @@
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
 #define CSE_BASE_SP_ID "tinyiot.example.com"
-#define CSE_RVI RVI_2a
+#define CSE_RVI RVI_3
 
 #if SERVER_TYPE == MN_CSE
 #define REMOTE_CSE_ID ""
@@ -105,6 +105,11 @@
 // #define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
+// #define ENABLE_MQTT_WEBSOCKET
+#ifdef ENABLE_MQTT_WEBSOCKET
+#define MQTT_OVER_WS_PORT 8888
+#endif
+
 #define MQTT_HOST "127.0.0.1"
 #define MQTT_QOS MQTT_QOS_0
 #define MQTT_KEEP_ALIVE_SEC 60
@@ -122,18 +127,22 @@
 #define MQTT_PORT 8883
 #else
 #define MQTT_USE_TLS 0
-#define MQTT_PORT 1883
+#define MQTT_PORT 1885
 #endif
+
+
 
 #define MQTT_MAX_PACKET_SZ 16384
 #define INVALID_SOCKET_FD -1
 #define PRINT_BUFFER_SIZE 16384
 
+
+
 #endif
 
 #define LOG_LEVEL LOG_LEVEL_DEBUG
 #define LOG_BUFFER_SIZE MAX_PAYLOAD_SIZE
-#define SAVE_LOG
+// #define SAVE_LOG
 
 // CoAP Settings
 
@@ -150,9 +159,10 @@
 
 #endif
 
-// To enable CoAP, de-comment the following line
+// To enable WS, de-comment the following line
 #define ENABLE_WS 1
 #ifdef ENABLE_WS
+#define WS_HOST "localhost"
 #define WS_PORT 8081
 #endif
 
