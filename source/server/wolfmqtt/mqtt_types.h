@@ -209,8 +209,14 @@ enum MqttPacketResponseCodes {
     #ifndef XSTRNCPY
         #define XSTRNCPY(s1,s2,n)   strncpy((s1),(s2),(n))
     #endif
+    #ifndef XMEMMOVE
+        #define XMEMMOVE(s1,s2,n)   memmove((s1), (s2), (n))
+    #endif
     #ifndef XMEMCPY
         #define XMEMCPY(d,s,l)      memcpy((d),(s),(l))
+    #endif
+    #ifndef XMEMMOVE
+        #define XMEMMOVE(d,s,l)      memmove((d),(s),(l))
     #endif
     #ifndef XMEMSET
         #define XMEMSET(b,c,l)      memset((b),(c),(l))

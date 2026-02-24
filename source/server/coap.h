@@ -40,66 +40,66 @@ typedef struct
 } coapPacket;
 
 typedef struct {
-    coap_binary_t *token;
+    coap_binary_t* token;
 } track_token;
 
-void *coap_serve();
-void coap_notify(oneM2MPrimitive *o2pt, char *noti_json, NotiTarget *nt);
-void coap_forwarding(oneM2MPrimitive *o2pt, Protocol protocol, char *host, int port);
+void* coap_serve();
+void coap_notify(oneM2MPrimitive* o2pt, char* noti_json, NotiTarget* nt);
+void coap_forwarding(oneM2MPrimitive* o2pt, Protocol protocol, char* host, int port);
 
-extern void route(oneM2MPrimitive *o2pt);
+extern void route(oneM2MPrimitive* o2pt);
 
 #ifdef ENABLE_COAP_DTLS
 #define MAX_KEY 64 /* Maximum length of a pre-shared key in bytes. */
 
 typedef struct psk_sni_def_t {
-  char *sni_match;
-  coap_bin_const_t *new_key;
-  coap_bin_const_t *new_hint;
+    char* sni_match;
+    coap_bin_const_t* new_key;
+    coap_bin_const_t* new_hint;
 } psk_sni_def_t;
 
 typedef struct valid_psk_snis_t {
-  size_t count;
-  psk_sni_def_t *psk_sni_list;
+    size_t count;
+    psk_sni_def_t* psk_sni_list;
 } valid_psk_snis_t;
 
-static valid_psk_snis_t valid_psk_snis = {0, NULL};
+static valid_psk_snis_t valid_psk_snis = { 0, NULL };
 
 typedef struct id_def_t {
-  char *hint_match;
-  coap_bin_const_t *identity_match;
-  coap_bin_const_t *new_key;
+    char* hint_match;
+    coap_bin_const_t* identity_match;
+    coap_bin_const_t* new_key;
 } id_def_t;
 
 typedef struct valid_ids_t {
-  size_t count;
-  id_def_t *id_list;
+    size_t count;
+    id_def_t* id_list;
 } valid_ids_t;
 
-static valid_ids_t valid_ids = {0, NULL};
+static valid_ids_t valid_ids = { 0, NULL };
 typedef struct pki_sni_def_t {
-  char *sni_match;
-  char *new_cert;
-  char *new_ca;
+    char* sni_match;
+    char* new_cert;
+    char* new_ca;
 } pki_sni_def_t;
 
 typedef struct valid_pki_snis_t {
-  size_t count;
-  pki_sni_def_t *pki_sni_list;
+    size_t count;
+    pki_sni_def_t* pki_sni_list;
 } valid_pki_snis_t;
 
-static valid_pki_snis_t valid_pki_snis = {0, NULL};
+static valid_pki_snis_t valid_pki_snis = { 0, NULL };
 
 typedef struct ih_def_t {
-  char *hint_match;
-  coap_bin_const_t *new_identity;
-  coap_bin_const_t *new_key;
+    char* hint_match;
+    coap_bin_const_t* new_identity;
+    coap_bin_const_t* new_key;
 } ih_def_t;
 
 typedef struct valid_ihs_t {
-  size_t count;
-  ih_def_t *ih_list;
+    size_t count;
+    ih_def_t* ih_list;
 } valid_ihs_t;
 
-static valid_ihs_t valid_ihs = {0, NULL};
+static valid_ihs_t valid_ihs = { 0, NULL };
 #endif
