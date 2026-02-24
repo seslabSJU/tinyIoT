@@ -2058,12 +2058,6 @@ cJSON *db_get_fcin_laol(RTNode *parent_rtnode, int laol)
     return json;
 }
 
-bool db_check_fcin_rn_dup(char *rn, char *pi)
-{
-    // Stub implementation - TODO: Implement actual duplicate check
-    logger("DB", LOG_LEVEL_DEBUG, "db_check_fcin_rn_dup called (stub)");
-    return false;
-}
 
 // FCNT custom attributes functions
 int db_store_fcnt_custom_attributes(const char *ri, cJSON *customAttrs)

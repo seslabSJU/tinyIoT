@@ -33,7 +33,6 @@ int db_delete_one_cin_mbs(RTNode *cnt);
 
 RTNode *db_get_fcin_rtnode_list(RTNode *rtnode);
 cJSON *db_get_fcin_laol(RTNode *parent_rtnode, int laol);
-bool db_check_fcin_rn_dup(char *rn, char *pi);
 
 int db_delete_one_fcin_mni(RTNode *fcnt);
 int db_delete_one_fcin_mbs(RTNode *fcnt);

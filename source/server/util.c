@@ -2811,6 +2811,25 @@ cJSON *getResource(cJSON *root, ResourceType ty)
 		return cJSON_GetObjectItem(root, "m2m:cinA");
 	case RT_CNTA:
 		return cJSON_GetObjectItem(root, "m2m:cntA");
+	case RT_FCNT:
+	{
+		cJSON *res = cJSON_GetObjectItem(root, "m2m:fcnt");
+		if (!res) {
+			cJSON *item = root->child;
+			while (item) {
+				if (item->type == cJSON_Object && item->string && strchr(item->string, ':')) {
+					cJSON *cnd = cJSON_GetObjectItem(item, "cnd");
+					if (cnd && cnd->type == cJSON_String) {
+						return item;
+					}
+				}
+				item = item->next;
+			}
+		}
+		return res;
+	}
+	case RT_FCIN:
+		return cJSON_GetObjectItem(root, "m2m:fcin");
 	case RT_FCNTA:
 		return cJSON_GetObjectItem(root, "m2m:fcntA");
 	}
