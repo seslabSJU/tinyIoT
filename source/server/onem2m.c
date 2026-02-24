@@ -23,7 +23,7 @@
 #include "mqttClient.h"
 
 #ifdef ENABLE_WS
-#include "websocket/websocket_server.h"
+// #include "websocket/websocket_server.h"
 #endif
 
 

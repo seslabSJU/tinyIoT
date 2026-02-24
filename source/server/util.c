@@ -22,7 +22,7 @@
 #include "coap.h"
 
 
-#include "websocket/websocket_server.h"
+// #include "websocket/websocket_server.h"
 
 extern ResourceTree* rt;
 extern cJSON* ATTRIBUTES;
