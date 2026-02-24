@@ -13,13 +13,19 @@
 #include "onem2m.h"
 #include "dbmanager.h"
 #include "httpd.h"
-#include "mqttClient.h"
 #include "onem2mTypes.h"
 #include "config.h"
 #include "util.h"
 #include "cJSON.h"
 #include "coap.h"
 #include "jsonparser.h"
+
+#include "mqttClient.h"
+
+#ifdef ENABLE_WS
+#include "websocket/websocket_server.h"
+#endif
+
 
 extern ResourceTree *rt;
 extern pthread_mutex_t main_lock;
@@ -1475,7 +1481,16 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	cJSON *csr = target_rtnode->obj;
 	cJSON *poa_list = cJSON_GetObjectItem(csr, "poa");
+
+	
+#ifdef ENABLE_WS	
+	websocket_check_and_forwarding_from_sessionTable(o2pt, target_rtnode); // 목적지 rt주소로 세션 조회 및 전송
+	//ws 세션이 존재할경우 전송되고
+	//poa에 이것이 존재하든 말든 일단 전송됨
+#endif
+	
 	cJSON *poa = NULL;
+
 	cJSON_ArrayForEach(poa, poa_list)
 	{
 		if (parsePoa(poa->valuestring, &protocol, &host, &port, &path) == -1)
@@ -1491,7 +1506,13 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 #ifdef ENABLE_MQTT
 		else if (protocol == PROT_MQTT)
 		{
-			mqtt_forwarding(o2pt, host, port, csr);
+			#ifdef ENABLE_MQTT_WEBSOCKET
+				mqtt_forwarding(o2pt, host, port, csr); //mqtt_forwarding fuction is same both
+			#else
+				mqtt_forwarding(o2pt, host, port, csr);
+			#endif
+
+			
 		}
 #endif
 
@@ -1501,6 +1522,11 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			coap_forwarding(o2pt, protocol, host, port);
 		}
 #endif
+
+// #ifdef ENABLE_WS
+// 		websocket_forwarding(o2pt, host, port);
+// #endif
+
 		free(host);
 		free(path);
 
@@ -1510,6 +1536,9 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			break;
 		}
 	}
+
+
+
 
 	if (o2pt->rsc == RSC_TARGET_NOT_REACHABLE)
 	{

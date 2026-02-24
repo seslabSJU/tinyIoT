@@ -215,6 +215,9 @@ enum MqttPacketResponseCodes {
     #ifndef XMEMCPY
         #define XMEMCPY(d,s,l)      memcpy((d),(s),(l))
     #endif
+    #ifndef XMEMMOVE
+        #define XMEMMOVE(d,s,l)      memmove((d),(s),(l))
+    #endif
     #ifndef XMEMSET
         #define XMEMSET(b,c,l)      memset((b),(c),(l))
     #endif

@@ -21,11 +21,18 @@
 #include "mqttClient.h"
 #endif
 
+
+#ifdef ENABLE_WS
+#include "websocket/websocket_server.h"
+#endif
+
 #ifdef UPPERTESTER
 #include "upperTester.h"
 #endif
 
 #include "coap.h"
+
+
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
@@ -34,7 +41,7 @@ RTNode *registrar_csr = NULL;
 pthread_mutex_t main_lock;
 pthread_mutex_t csr_lock;
 pthread_mutexattr_t Attr;
-
+pthread_mutex_t ws_lock;
 #endif
 
 void route(oneM2MPrimitive *o2pt);
@@ -78,6 +85,14 @@ static ssize_t cmdline_read_key(char *arg, unsigned char **buf, size_t maxlen)
 #endif
 #endif
 
+#ifdef ENABLE_WS
+pthread_t websocket_thread;
+int websocket_thread_id;
+#endif
+
+
+
+
 int main(int argc, char **argv)
 {
 	bool initialBoot = false;
@@ -89,6 +104,8 @@ int main(int argc, char **argv)
 	pthread_mutexattr_settype(&Attr, PTHREAD_MUTEX_RECURSIVE);
 	pthread_mutex_init(&main_lock, &Attr);
 	pthread_mutex_init(&csr_lock, NULL);
+	pthread_mutex_init(&ws_lock, &Attr);
+	
 #endif
 	// Attributes for resources
 	// all attributes are verified in validate_sub_attr in util.c
@@ -191,6 +208,7 @@ int main(int argc, char **argv)
 
 #ifdef ENABLE_MQTT
 	mqtt_thread_id = pthread_create(&mqtt, NULL, (void *)mqtt_serve, "mqtt Client");
+	
 	if (mqtt_thread_id < 0)
 	{
 		fprintf(stderr, "MQTT thread create error\n");
@@ -207,7 +225,18 @@ int main(int argc, char **argv)
 	}
 #endif
 
+#ifdef ENABLE_WS
+	websocket_thread_id = pthread_create(&websocket_thread, NULL, websocket_server_thread, "WS Server");
+	if(websocket_thread_id < 0) {
+		perror("Failed to create WebSocket server thread");
+		return 0;
+	}
+#endif
+	
+
 	serve_forever(PORT); // main oneM2M operation logic in void route()
+	// 스레드가 종료될 때까지 대기
+	// pthread_join(websocket_thread, NULL);
 
 #ifdef ENABLE_MQTT
 	pthread_join(mqtt, NULL);
@@ -220,9 +249,17 @@ int main(int argc, char **argv)
 #ifdef ENABLE_COAP
 	pthread_join(coap, NULL);
 #endif
+#ifdef ENABLE_WS
+	pthread_join(websocket_thread, NULL);
+#endif
 
 	return 0;
 }
+
+
+
+
+
 
 void route(oneM2MPrimitive *o2pt)
 {
@@ -423,6 +460,14 @@ void stop_server(int sig)
 	{
 		pthread_kill(coap, SIGINT);
 		pthread_detach(coap);
+	}
+#endif
+#ifdef ENABLE_WS
+	logger("MAIN", LOG_LEVEL_INFO, "Closing WS...");
+	if (websocket_thread)
+	{
+		pthread_kill(websocket_thread, SIGINT);
+		pthread_detach(websocket_thread);
 	}
 #endif
 	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");

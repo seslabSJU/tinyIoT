@@ -127,7 +127,7 @@
 #define MQTT_PORT 8883
 #else
 #define MQTT_USE_TLS 0
-#define MQTT_PORT 1883
+#define MQTT_PORT 1885
 #endif
 
 
