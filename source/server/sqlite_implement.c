@@ -93,7 +93,19 @@ static const table_def_t table_definitions[] = {
      "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, "
      "lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
-    }
+    },
+    {"ts",
+     "CREATE TABLE IF NOT EXISTS ts ( id INTEGER, "
+     "mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "pei INT, peid INT, "
+     "mdd INT, mdn INT, mdt INT, mdc INT, mdlt TEXT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"tsi",
+     "CREATE TABLE IF NOT EXISTS tsi ( id INTEGER, "
+     "dgt TEXT, con TEXT, snr INT, cs INT, vrq INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
 };
 
 #define TABLE_COUNT (sizeof(table_definitions) / sizeof(table_def_t))
@@ -175,6 +187,71 @@ int close_dbp()
     return 1;
 }
 
+int db_begin_tx()
+{
+    char *err_msg = NULL;
+    int rc = sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "BEGIN TRANSACTION failed: %s", err_msg ? err_msg : "Unknown error");
+        if (err_msg) sqlite3_free(err_msg);
+        return 0;
+    }
+    if (err_msg) sqlite3_free(err_msg);
+    return 1;
+}
+
+int db_commit_tx()
+{
+    char *err_msg = NULL;
+    int rc = sqlite3_exec(db, "COMMIT;", NULL, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "COMMIT failed: %s", err_msg ? err_msg : "Unknown error");
+        if (err_msg) sqlite3_free(err_msg);
+        return 0;
+    }
+    if (err_msg) sqlite3_free(err_msg);
+    return 1;
+}
+
+int db_rollback_tx()
+{
+    char *err_msg = NULL;
+    int rc = sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "ROLLBACK failed: %s", err_msg ? err_msg : "Unknown error");
+        if (err_msg) sqlite3_free(err_msg);
+        return 0;
+    }
+    if (err_msg) sqlite3_free(err_msg);
+    return 1;
+}
+
+// Wrapper to unify delete API used by resource logic (e.g., resources/tsi.c)
+int db_delete_resource(char *ri)
+{
+    if (!ri) return 0;
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, "DELETE FROM general WHERE ri = ?;", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "prepare error in db_delete_resource: %s", sqlite3_errmsg(db));
+        if (stmt) sqlite3_finalize(stmt);
+        return 0;
+    }
+
+    sqlite3_bind_text(stmt, 1, ri, -1, SQLITE_TRANSIENT);
+
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        logger("DB", LOG_LEVEL_ERROR, "delete error in db_delete_resource: %s", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        return 0;
+    }
+
+    sqlite3_finalize(stmt);
+    return 1;
+}
+
 char *get_table_name(ResourceType ty)
 {
     char *tableName = NULL;
@@ -200,6 +277,12 @@ char *get_table_name(ResourceType ty)
         break;
     case RT_SUB:
         tableName = "sub";
+        break;
+    case RT_TS:
+        tableName = "ts";
+        break;
+    case RT_TSI:
+        tableName = "tsi";
         break;
     case RT_CSR:
         tableName = "csr";
@@ -448,7 +531,7 @@ int db_store_resource(cJSON *obj, char *uri)
     {
         if (strcmp(cJSON_GetArrayItem(GENERAL_ATTR, i)->string, "uri") == 0)
         {
-            sqlite3_bind_text(stmt, i + 1, uri, strlen(uri), SQLITE_STATIC);
+            sqlite3_bind_text(stmt, i + 1, uri, strlen(uri), SQLITE_TRANSIENT);
             continue;
         }
         pjson = cJSON_GetObjectItem(obj, cJSON_GetArrayItem(GENERAL_ATTR, i)->string);
@@ -1680,4 +1763,388 @@ cJSON *getForbiddenUri(cJSON *acp_list)
 
     sqlite3_finalize(res);
     return result;
+}
+
+
+// Forward declarations (avoid implicit function declarations in C99+)
+int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str);
+int db_general_update_lt(const char *ri, const char *lt);
+
+// -----------------------------------------------------------------------------
+// Compatibility wrappers (must match dbmanager.h symbols)
+// Keep TS/TSI resource logic DB-agnostic by implementing these helpers per backend.
+// -----------------------------------------------------------------------------
+
+int db_general_set_lt(const char *ri, const char *lt)
+{
+    return db_general_update_lt(ri, lt);
+}
+
+int db_ts_set_mdc_and_append_mdlt(const char *ts_ri, int val, const char *time_str)
+{
+    return db_ts_update_mdc_with_mdlt(ts_ri, val, time_str);
+}
+
+// Check duplicate TSI.dgt under a TS (by TS ri == general.pi)
+int db_tsi_check_dgt_dup(const char *ts_ri, const char *dgt)
+{
+    if (!ts_ri || !dgt) return 0;
+
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT 1 "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ? AND tsi.dgt = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    int exists = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, dgt, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            exists = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return exists;
+}
+
+//------------------------------------------------------------------------------
+// TS / TSI helper APIs (SQLite backend)
+// These functions are used to decouple TS/TSI logic from raw SQL in resource code.
+// All functions are best-effort and return safe defaults on error.
+//------------------------------------------------------------------------------
+
+cJSON *db_get_tsi_laol(RTNode *parent_rtnode, int laol) {
+    const char *ord = (laol == 0) ? "DESC" : "ASC";
+    char sql[1024], buf[256];
+    sqlite3_stmt *res = NULL;
+    snprintf(sql, sizeof(sql),
+             "SELECT * FROM general, tsi WHERE pi='%s' AND general.id = tsi.id "
+             "ORDER BY general.lt %s, general.id %s LIMIT 1;",
+             get_ri_rtnode(parent_rtnode), ord, ord);
+
+    if (sqlite3_prepare_v2(db, sql, -1, &res, NULL) != SQLITE_OK) return NULL;
+    if (sqlite3_step(res) != SQLITE_ROW) { sqlite3_finalize(res); return NULL; }
+
+    int cols = sqlite3_column_count(res);
+    cJSON *json = cJSON_CreateObject();
+    for (int col=0; col<cols; col++) {
+        const char *colname = sqlite3_column_name(res, col);
+        if (!strcmp(colname, "id")) continue;
+        int coltype = sqlite3_column_type(res, col);
+        int bytes = sqlite3_column_bytes(res, col);
+        if (bytes == 0) continue;
+
+        if (coltype == SQLITE_TEXT) {
+            memset(buf, 0, sizeof(buf));
+            strncpy(buf, (const char*)sqlite3_column_text(res, col), bytes);
+            cJSON *arr = cJSON_Parse(buf);
+            if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) cJSON_AddItemToObject(json, colname, arr);
+            else { cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf)); cJSON_Delete(arr); }
+        } else if (coltype == SQLITE_INTEGER) {
+            cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
+        }
+    }
+    sqlite3_finalize(res);
+    return json;
+}
+
+int db_tsi_get_count(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT COUNT(*) "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ?;";
+
+    sqlite3_stmt *stmt = NULL;
+    int count = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            count = sqlite3_column_int(stmt, 0);
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return count;
+}
+
+int db_tsi_get_max_snr(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT COALESCE(MAX(tsi.snr), 0) "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ?;";
+
+    sqlite3_stmt *stmt = NULL;
+    int max_snr = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            max_snr = sqlite3_column_int(stmt, 0);
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return max_snr;
+}
+
+int db_tsi_get_min_snr(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT COALESCE(MIN(tsi.snr), 0) "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ?;";
+
+    sqlite3_stmt *stmt = NULL;
+    int min_snr = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            min_snr = sqlite3_column_int(stmt, 0);
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return min_snr;
+}
+
+int db_tsi_check_snr_dup(const char *ts_ri, int snr)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT 1 "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ? AND tsi.snr = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    int exists = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 2, snr);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            exists = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return exists;
+}
+
+int db_ts_get_mdc(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT COALESCE(ts.mdc, 0) "
+        "FROM ts JOIN general ON ts.id = general.id "
+        "WHERE general.ri = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    int mdc = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            mdc = sqlite3_column_int(stmt, 0);
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return mdc;
+}
+
+int db_ts_update_mdc(const char *ts_ri, int val)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "UPDATE ts SET mdc = ? "
+        "WHERE id = (SELECT id FROM general WHERE ri = ?);";
+
+    sqlite3_stmt *stmt = NULL;
+    int ok = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, val);
+        sqlite3_bind_text(stmt, 2, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            ok = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return ok;
+}
+
+// Append a missing-data timestamp to TS.mdlt and update TS.mdc.
+// SQLite doesn't have native jsonb; store mdlt as a JSON string (TEXT) like "[\"...\", ...]".
+int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str)
+{
+    if (!ts_ri || !time_str) return 0;
+
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    // 1) Read existing mdlt text (if any)
+    const char *sel =
+        "SELECT ts.mdlt "
+        "FROM ts JOIN general ON ts.id = general.id "
+        "WHERE general.ri = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    char *new_mdlt = NULL;
+    const unsigned char *mdlt_txt = NULL;
+
+    if (sqlite3_prepare_v2(db, sel, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            mdlt_txt = sqlite3_column_text(stmt, 0);
+        }
+    }
+    if (stmt) sqlite3_finalize(stmt);
+
+    // Build updated JSON array string
+    if (!mdlt_txt || strlen((const char *)mdlt_txt) == 0) {
+        // Create new array
+        size_t need = strlen(time_str) + 8;
+        new_mdlt = (char *)calloc(1, need);
+        if (new_mdlt) {
+            snprintf(new_mdlt, need, "[\"%s\"]", time_str);
+        }
+    } else {
+        // Append to existing array: replace trailing ']' with ,"time"]
+        const char *old = (const char *)mdlt_txt;
+        size_t old_len = strlen(old);
+        // If old isn't a JSON array, reset it.
+        if (old_len < 2 || old[0] != '[' || old[old_len - 1] != ']') {
+            size_t need = strlen(time_str) + 8;
+            new_mdlt = (char *)calloc(1, need);
+            if (new_mdlt) {
+                snprintf(new_mdlt, need, "[\"%s\"]", time_str);
+            }
+        } else {
+            int is_empty = (old_len == 2); // "[]"
+            size_t need = old_len + strlen(time_str) + 6; // comma + quotes + bracket + null
+            new_mdlt = (char *)calloc(1, need);
+            if (new_mdlt) {
+                memcpy(new_mdlt, old, old_len - 1); // up to before ']'
+                if (!is_empty) {
+                    strcat(new_mdlt, ",");
+                }
+                strcat(new_mdlt, "\"");
+                strcat(new_mdlt, time_str);
+                strcat(new_mdlt, "\"");
+                strcat(new_mdlt, "]");
+            }
+        }
+    }
+
+    if (!new_mdlt) {
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return 0;
+    }
+
+    // 2) Update ts.mdc and ts.mdlt
+    const char *upd =
+        "UPDATE ts SET mdc = ?, mdlt = ? "
+        "WHERE id = (SELECT id FROM general WHERE ri = ?);";
+
+    int ok = 0;
+    if (sqlite3_prepare_v2(db, upd, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, val);
+        sqlite3_bind_text(stmt, 2, new_mdlt, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            ok = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    free(new_mdlt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return ok;
+}
+
+int db_general_update_lt(const char *ri, const char *lt)
+{
+    if (!ri || !lt) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql = "UPDATE general SET lt = ? WHERE ri = ?;";
+    sqlite3_stmt *stmt = NULL;
+    int ok = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, lt, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            ok = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return ok;
+}
+
+// Return mdlt JSON string for a TS, caller must free(). Returns NULL if missing.
+char *db_ts_get_mdlt_json(const char *ts_ri)
+{
+    if (!ts_ri) return NULL;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT ts.mdlt "
+        "FROM ts JOIN general ON ts.id = general.id "
+        "WHERE general.ri = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    char *out = NULL;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            const unsigned char *txt = sqlite3_column_text(stmt, 0);
+            if (txt && strlen((const char *)txt) > 0) {
+                out = strdup((const char *)txt);
+            }
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return out;
 }

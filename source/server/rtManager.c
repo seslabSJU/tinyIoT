@@ -268,7 +268,6 @@ RTNode *find_rtnode(char *addr)
     {
         foptPtr[0] = '\0';
     }
-    logger("RTM", LOG_LEVEL_DEBUG, "find_rtnode [%s]", addr);
 
     if ((strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 && addr[strlen(CSE_BASE_NAME)] == '/') || (addr[0] == '-' && addr[1] == '/'))
     {
@@ -277,7 +276,6 @@ RTNode *find_rtnode(char *addr)
     }
     else
     {
-        logger("RTM", LOG_LEVEL_DEBUG, "Non-Hierarchical Addressing");
         rtnode = find_rtnode_by_ri(addr);
     }
     if (foptPtr)
@@ -441,7 +439,6 @@ RTNode *find_rtnode_by_uri(char *uri)
  */
 RTNode *find_rtnode_by_ri(char *ri)
 {
-    logger("RTM", LOG_LEVEL_DEBUG, "find_rtnode_by_ri [%s]", ri);
     cJSON *resource = NULL;
     RTNode *rtnode = NULL;
     char *fopt = strstr(ri, "/fopt");
