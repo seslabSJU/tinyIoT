@@ -34,6 +34,7 @@
 #include "time.h"
 #include "logger.h"
 #include "util.h"
+#include "websocket/net_libwebsockets.h"
 
 #define LOG_TAG "MQTT"
 
@@ -793,6 +794,12 @@ int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, int port, cJSON *csr)
         mNet.disconnect = mqtt_net_disconnect;
         mNet.context = &sfd;
 #endif
+        int mqtt_port;
+#ifdef ENABLE_MQTT_WEBSOCKET
+        mqtt_port = MQTT_OVER_WS_PORT;
+#else
+        mqtt_port = MQTT_PORT;
+#endif
 
         rc = MqttClient_Init(&notiClient, &mNet, NULL,
                              notiSbuf, sizeof(notiSbuf), notiRbuf, sizeof(notiRbuf),
@@ -810,7 +817,7 @@ int mqtt_forwarding(oneM2MPrimitive *o2pt, char *host, int port, cJSON *csr)
             goto exit;
         }
         logger(LOG_TAG, LOG_LEVEL_INFO, "MQTT Network Connect Success: Host %s, Port %d, UseTLS %d",
-               MQTT_HOST, MQTT_PORT, MQTT_USE_TLS);
+               MQTT_HOST, mqtt_port, MQTT_USE_TLS);
 
         sprintf(buf, "%s_forwarding", MQTT_CLIENT_ID); // new client ID for notification
         /* Send Connect and wait for Ack */
