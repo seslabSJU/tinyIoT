@@ -447,7 +447,7 @@ static int mqtt_net_connect(void *context, const char *host, word16 port,
 
     if (rc < 0) {
         PRINTF("connect failed: errno=%d (%s)",
-            rc, strerror(rc));
+            errno, strerror(errno));
     }
 
     if (rc < 0)

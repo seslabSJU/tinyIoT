@@ -40,7 +40,7 @@ endif
 
 
 
-SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket/net_libwebsockets.c
+SRCS = main.c onem2m.c cJSON.c httpd.c $(DB_IMPL) jsonparser.c mqttClient.c logger.c util.c filterCriteria.c coap.c rtManager.c websocket/websocket_server.c websocket/net_libwebsockets.c
 
 RSCSRC = $(wildcard resources/*.c)
 
