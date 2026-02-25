@@ -2604,13 +2604,6 @@ int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode)
 		char* host, * path;
 		int port;
 
-		#ifdef ENABLE_WS	
-			// 목적지 rt주소로 세션 조회 및 전송
-			//ws 세션이 존재할경우 전송되고
-			//poa에 이것이 존재하든 말든 일단 전송됨
-		#endif
-
-		logger("UTIL", LOG_LEVEL_DEBUG, "o2pt->request_pc [%s]", cJSON_PrintUnformatted(o2pt->request_pc));
 		cJSON_ArrayForEach(pjson, poa)
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "pjson->valuestring [%s]", pjson->valuestring);

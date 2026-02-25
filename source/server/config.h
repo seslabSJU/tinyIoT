@@ -102,12 +102,12 @@
 // MQTT Settings
 
 // To enable MQTT, de-comment the following line
-// #define ENABLE_MQTT
+#define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
 // #define ENABLE_MQTT_WEBSOCKET
 #ifdef ENABLE_MQTT_WEBSOCKET
-#define MQTT_OVER_WS_PORT 8888
+#define MQTT_OVER_WS_PORT 9001
 #endif
 
 #define MQTT_HOST "127.0.0.1"
