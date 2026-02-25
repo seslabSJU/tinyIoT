@@ -13,7 +13,6 @@ void set_o2pt_rsc(oneM2MPrimitive* o2pt, int rsc);
 void o2ptcpy(oneM2MPrimitive** dest, oneM2MPrimitive* src);
 void free_o2pt(oneM2MPrimitive* o2pt);
 void free_all_resource(RTNode* rtnode);
-void log_runtime(double start);
 bool isExpired(RTNode* rtnode);
 
 void update_resource(cJSON* old_obj, cJSON* new_obj);
