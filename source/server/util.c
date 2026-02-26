@@ -4550,7 +4550,8 @@ bool is_standard_fcnt_attribute(const char *attrName)
 
 	const char *fcnt_attrs[] = {
 		"cnd", "oref", "st", "cs", "_sn",
-		"fcied", "mni", "mbs", "mia", "cni", "cbs", "daci", "ast", NULL
+		"fcied", "mni", "mbs", "mia", "cni", "cbs", "daci", "ast",
+		"custom_attrs", "org", NULL
 	};
 
 	for (int i = 0; common_attrs[i] != NULL; i++) {

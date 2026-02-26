@@ -673,6 +673,19 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	{
 		cJSON *ri_obj = cJSON_GetObjectItem(target_rtnode->obj, "ri");
 		db_update_fcnt_custom_attributes(ri_obj->valuestring, customAttrs);
+
+		// FCIN 생성 전: 인메모리 객체에도 커스텀 속성 반영
+		// (add_flexcontainer_instance가 인메모리에서 읽으므로)
+		cJSON *ca_item = NULL;
+		cJSON_ArrayForEach(ca_item, customAttrs)
+		{
+			if (ca_item->string)
+			{
+				cJSON_DeleteItemFromObject(target_rtnode->obj, ca_item->string);
+				cJSON_AddItemToObject(target_rtnode->obj, ca_item->string, cJSON_Duplicate(ca_item, 1));
+			}
+		}
+
 		cJSON_Delete(customAttrs);
 	}
 

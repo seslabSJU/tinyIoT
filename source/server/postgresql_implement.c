@@ -1089,6 +1089,20 @@ RTNode *db_get_all_resource_as_rtnode()
         // Remove id from JSON object
         cJSON_DeleteItemFromObject(json, "id");
 
+        // FCNT: custom_attrs를 top-level로 병합 후 제거 (db_get_resource와 동일)
+        if (ty == RT_FCNT) {
+            cJSON *custom_attrs = cJSON_GetObjectItem(json, "custom_attrs");
+            if (custom_attrs && cJSON_IsObject(custom_attrs)) {
+                cJSON *item = NULL;
+                cJSON_ArrayForEach(item, custom_attrs) {
+                    if (item->string) {
+                        cJSON_AddItemToObject(json, item->string, cJSON_Duplicate(item, 1));
+                    }
+                }
+                cJSON_DeleteItemFromObject(json, "custom_attrs");
+            }
+        }
+
         // Create RTNode and add to list
         if (!head) {
             head = create_rtnode(json, ty);
