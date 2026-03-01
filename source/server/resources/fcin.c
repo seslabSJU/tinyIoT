@@ -36,11 +36,11 @@ int validate_fcin(oneM2MPrimitive *o2pt, cJSON *parent_fcnt, cJSON *fcin, Operat
 
 		if (!strcmp(pjson->valuestring, "la") || !strcmp(pjson->valuestring, "latest"))
 		{
-			return handle_error(o2pt, RSC_NOT_ACCEPTABLE, "resource name 'la' or 'latest' is reserved");
+			return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "resource name 'la' or 'latest' is reserved");
 		}
 		if (!strcmp(pjson->valuestring, "ol") || !strcmp(pjson->valuestring, "oldest"))
 		{
-			return handle_error(o2pt, RSC_NOT_ACCEPTABLE, "resource name 'ol' or 'oldest' is reserved");
+			return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "resource name 'ol' or 'oldest' is reserved");
 		}
 	}
 

@@ -115,7 +115,7 @@ int main(int argc, char **argv)
 		\"m2m:cntA\": {\"lnk\":\"\", \"cr\":\"\", \"mni\":0, \"mbs\":0, \"st\":0, \"cni\":0, \"cbs\":0, \"ast\":0}, \
 		\"m2m:cinA\": {\"lnk\":\"\", \"cs\":0, \"cr\":\"\", \"con\":\"\", \"cnf\":\"\", \"st\":\"\", \"ast\":0}, \
 		\"m2m:fcnt\": {\"cnd\":\"\", \"oref\":\"\", \"nl\":\"\", \"cr\":null, \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0, \"st\":0, \"cs\":0, \"fcied\":0, \"mni\":0, \"mbs\":0, \"mia\":0, \"cni\":0, \"cbs\":0, \"loc\":\"\", \"daci\":[\"\"]}, \
-		\"m2m:fcin\": {\"cs\":0, \"st\":0, \"org\":\"\", \"loc\":\"\", \"cnd\":\"\"} \
+		\"m2m:fcin\": {\"cs\":0, \"st\":0, \"org\":\"\", \"loc\":\"\", \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0} \
 	 }");
 
 	if (ATTRIBUTES == NULL)
@@ -289,6 +289,16 @@ void route(oneM2MPrimitive *o2pt)
 			if (strcmp(target_rtnode->rn, "la"))
 			{
 				logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
+				free_rtnode(target_rtnode);
+				target_rtnode = NULL;
+			}
+		}
+		if (o2pt->op != OP_DELETE && target_rtnode && target_rtnode->ty == RT_FCIN)
+		{
+			if (target_rtnode->parent &&
+				target_rtnode->parent->child != target_rtnode &&
+				!target_rtnode->sibling_left)
+			{
 				free_rtnode(target_rtnode);
 				target_rtnode = NULL;
 			}

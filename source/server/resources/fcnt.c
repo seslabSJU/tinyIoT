@@ -260,12 +260,16 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		{
 			prepare_fcnt_for_instances(child_rtnode, o2pt);
 
-			add_flexcontainer_instance(child_rtnode, o2pt, true);
-
-			cJSON_AddNumberToObject(fcnt, "cni", 1);
-			cJSON_AddNumberToObject(fcnt, "cbs", contentSize);
-
-			db_update_resource(fcnt, get_ri_rtnode(child_rtnode), RT_FCNT);
+			if (add_flexcontainer_instance(child_rtnode, o2pt, true) == 0)
+			{
+				cJSON_AddNumberToObject(fcnt, "cni", 1);
+				cJSON_AddNumberToObject(fcnt, "cbs", contentSize);
+				db_update_resource(fcnt, get_ri_rtnode(child_rtnode), RT_FCNT);
+			}
+			else
+			{
+				logger("FCNT", LOG_LEVEL_ERROR, "Failed to create initial FCIN, cni/cbs not updated");
+			}
 		}
 	}
 
@@ -350,6 +354,13 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 
 		result = validate_custom_attributes(shortname, customAttrs, cnd ? cnd->valuestring : NULL, &error_msg);
+		if (result != RSC_OK)
+		{
+			cJSON_Delete(customAttrs);
+			return handle_error(o2pt, result, error_msg);
+		}
+
+		result = sdt_validate_fcnt(shortname, cnd ? cnd->valuestring : NULL, customAttrs, &error_msg, OP_UPDATE);
 		if (result != RSC_OK)
 		{
 			cJSON_Delete(customAttrs);
@@ -501,6 +512,13 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			cJSON_DeleteItemFromObject(fcnt, "mbs");
 			cJSON_DeleteItemFromObject(fcnt, "mni");
 			cJSON_DeleteItemFromObject(fcnt, "mia");
+
+			// Ensure DB columns are cleared (null → DELETE in update_resource)
+			if (!cJSON_GetObjectItem(m2m_fcnt, "cni")) cJSON_AddNullToObject(m2m_fcnt, "cni");
+			if (!cJSON_GetObjectItem(m2m_fcnt, "cbs")) cJSON_AddNullToObject(m2m_fcnt, "cbs");
+			if (!cJSON_GetObjectItem(m2m_fcnt, "mni")) cJSON_AddNullToObject(m2m_fcnt, "mni");
+			if (!cJSON_GetObjectItem(m2m_fcnt, "mbs")) cJSON_AddNullToObject(m2m_fcnt, "mbs");
+			if (!cJSON_GetObjectItem(m2m_fcnt, "mia")) cJSON_AddNullToObject(m2m_fcnt, "mia");
 
 			cleanup_fcnt_instances(target_rtnode, false, false);
 		}
@@ -722,7 +740,25 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	if (o2pt->rvi >= RVI_4 && needs_fci)
 	{
-		add_flexcontainer_instance(target_rtnode, o2pt, false);
+		if (add_flexcontainer_instance(target_rtnode, o2pt, false) != 0)
+		{
+			// Rollback cni/cbs: undo the increment done before DB commit
+			cJSON *cni_rb = cJSON_GetObjectItem(target_rtnode->obj, "cni");
+			cJSON *cbs_rb = cJSON_GetObjectItem(target_rtnode->obj, "cbs");
+			cJSON *cs_rb = cJSON_GetObjectItem(target_rtnode->obj, "cs");
+			if (cni_rb && cJSON_IsNumber(cni_rb))
+				cni_rb->valueint--;
+			if (cbs_rb && cJSON_IsNumber(cbs_rb) && cs_rb && cJSON_IsNumber(cs_rb))
+				cbs_rb->valueint -= cs_rb->valueint;
+
+			cJSON *rb = cJSON_CreateObject();
+			cJSON_AddNumberToObject(rb, "cni", cni_rb ? cni_rb->valueint : 0);
+			cJSON_AddNumberToObject(rb, "cbs", cbs_rb ? cbs_rb->valueint : 0);
+			db_update_resource(rb, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_FCNT);
+			cJSON_Delete(rb);
+
+			logger("FCNT", LOG_LEVEL_ERROR, "Failed to create FCIN, rolled back cni/cbs");
+		}
 	}
 
 	for (int i = 0; i < updateAttrCnt; i++)

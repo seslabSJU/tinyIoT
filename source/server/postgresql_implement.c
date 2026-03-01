@@ -159,7 +159,7 @@ static const table_def_t table_definitions[] = {
     },
     {"fcin",
      "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
-     "cs INT, st INT, org VARCHAR(200), loc TEXT, at VARCHAR(200), aa VARCHAR(100), ast INT, custom_attrs JSONB, cnd VARCHAR(255), "
+     "cs INT, st INT, org VARCHAR(200), loc TEXT, at VARCHAR(200), aa VARCHAR(100), ast INT, custom_attrs JSONB, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     }
 };
@@ -243,7 +243,7 @@ static const table_def_t table_definitions[] = {
     },
     {"fcin",
      "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
-     "cs INT, st INT, org TEXT, loc TEXT, at TEXT, aa TEXT, ast INT, custom_attrs JSONB, cnd TEXT, "
+     "cs INT, st INT, org TEXT, loc TEXT, at TEXT, aa TEXT, ast INT, custom_attrs JSONB, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     }
 };

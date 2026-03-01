@@ -26,6 +26,6 @@ void sdt_cleanup(void);
 SDTDef* sdt_find_by_type(const char *type);
 SDTDef* sdt_find_by_cnd(const char *cnd);
 int sdt_validate_attr_type(const char *sdt_type, cJSON *value, char **error);
-int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attrs, char **error, int check_mandatory);
+int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attrs, char **error, int op);
 
 #endif

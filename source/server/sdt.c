@@ -319,22 +319,105 @@ static int is_valid_time(const char *s) {
     return 1;
 }
 
+static int is_valid_base64(const char *s) {
+    if (!s) return 0;
+    for (size_t i = 0; s[i]; i++) {
+        char c = s[i];
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+            (c >= '0' && c <= '9') || c == '+' || c == '/' || c == '=') continue;
+        if (c == '\n' || c == '\r' || c == ' ' || c == '\t') continue;
+        return 0;
+    }
+    return 1;
+}
+
+static int is_valid_token(const char *s) {
+    if (!s || strlen(s) == 0) return 0;
+    for (const char *p = s; *p; p++) {
+        if (*p == '\t' || *p == '\n' || *p == '\r') return 0;
+        if (*p == ' ' && *(p+1) == ' ') return 0;
+    }
+    return 1;
+}
+
+static int is_valid_ncname(const char *s) {
+    if (!s || strlen(s) == 0) return 0;
+    char c = s[0];
+    if ((c >= '0' && c <= '9') || c == '-' || c == '.') return 0;
+    for (const char *p = s; *p; p++) {
+        if (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') return 0;
+    }
+    return 1;
+}
+
+static int is_valid_duration(const char *s) {
+    if (!s || strlen(s) < 2) return 0;
+    return s[0] == 'P' || s[0] == 'p';
+}
+
 int sdt_validate_attr_type(const char *sdt_type, cJSON *value, char **error) {
     if (!sdt_type || !value) return RSC_OK;
 
-    if (strcmp(sdt_type, "string") == 0 || strcmp(sdt_type, "anyuri") == 0) {
+    // String types
+    if (strcmp(sdt_type, "string") == 0 || strcmp(sdt_type, "anyURI") == 0 ||
+        strcmp(sdt_type, "anyuri") == 0 || strcmp(sdt_type, "ID") == 0 ||
+        strcmp(sdt_type, "imsi") == 0 || strcmp(sdt_type, "iccid") == 0 ||
+        strcmp(sdt_type, "ipv4Address") == 0 || strcmp(sdt_type, "ipv6Address") == 0) {
         if (!cJSON_IsString(value)) {
             if (error) *error = "Expected string value";
             return RSC_BAD_REQUEST;
         }
     }
-    else if (strcmp(sdt_type, "integer") == 0) {
+    else if (strcmp(sdt_type, "token") == 0) {
+        if (!cJSON_IsString(value)) {
+            if (error) *error = "Expected token string";
+            return RSC_BAD_REQUEST;
+        }
+        if (!is_valid_token(value->valuestring)) {
+            if (error) *error = "Invalid token format";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "ncname") == 0) {
+        if (!cJSON_IsString(value)) {
+            if (error) *error = "Expected NCName string";
+            return RSC_BAD_REQUEST;
+        }
+        if (!is_valid_ncname(value->valuestring)) {
+            if (error) *error = "Invalid NCName format";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "base64") == 0) {
+        if (!cJSON_IsString(value)) {
+            if (error) *error = "Expected base64 string";
+            return RSC_BAD_REQUEST;
+        }
+        if (!is_valid_base64(value->valuestring)) {
+            if (error) *error = "Invalid base64 encoding";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    // Integer types
+    else if (strcmp(sdt_type, "integer") == 0 || strcmp(sdt_type, "enum") == 0) {
         if (!cJSON_IsNumber(value)) {
             if (error) *error = "Expected integer value";
             return RSC_BAD_REQUEST;
         }
     }
-    else if (strcmp(sdt_type, "nonNegInteger") == 0) {
+    else if (strcmp(sdt_type, "positiveInteger") == 0) {
+        if (!cJSON_IsNumber(value)) {
+            if (error) *error = "Expected positive integer value";
+            return RSC_BAD_REQUEST;
+        }
+        if (value->valuedouble <= 0) {
+            if (error) *error = "Value must be positive";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "nonNegInteger") == 0 ||
+             strcmp(sdt_type, "unsignedInt") == 0 ||
+             strcmp(sdt_type, "unsignedLong") == 0) {
         if (!cJSON_IsNumber(value)) {
             if (error) *error = "Expected non-negative integer value";
             return RSC_BAD_REQUEST;
@@ -356,6 +439,7 @@ int sdt_validate_attr_type(const char *sdt_type, cJSON *value, char **error) {
             return RSC_BAD_REQUEST;
         }
     }
+    // Timestamp types
     else if (strcmp(sdt_type, "timestamp") == 0 || strcmp(sdt_type, "dateTime") == 0) {
         if (!cJSON_IsString(value)) {
             if (error) *error = "Expected timestamp string";
@@ -363,6 +447,22 @@ int sdt_validate_attr_type(const char *sdt_type, cJSON *value, char **error) {
         }
         if (!is_valid_timestamp(value->valuestring)) {
             if (error) *error = "Invalid timestamp format";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "absRelTimestamp") == 0) {
+        if (!cJSON_IsString(value) && !cJSON_IsNumber(value)) {
+            if (error) *error = "Expected timestamp string or integer";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    else if (strcmp(sdt_type, "duration") == 0) {
+        if (!cJSON_IsString(value)) {
+            if (error) *error = "Expected duration string";
+            return RSC_BAD_REQUEST;
+        }
+        if (!is_valid_duration(value->valuestring)) {
+            if (error) *error = "Invalid duration format";
             return RSC_BAD_REQUEST;
         }
     }
@@ -386,17 +486,52 @@ int sdt_validate_attr_type(const char *sdt_type, cJSON *value, char **error) {
             return RSC_BAD_REQUEST;
         }
     }
+    // Collection types
     else if (strcmp(sdt_type, "list") == 0) {
         if (!cJSON_IsArray(value)) {
             if (error) *error = "Expected array value";
             return RSC_BAD_REQUEST;
         }
     }
+    else if (strcmp(sdt_type, "listNE") == 0) {
+        if (!cJSON_IsArray(value)) {
+            if (error) *error = "Expected non-empty array value";
+            return RSC_BAD_REQUEST;
+        }
+        if (cJSON_GetArraySize(value) == 0) {
+            if (error) *error = "Array must not be empty";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    // Object types
+    else if (strcmp(sdt_type, "complex") == 0 || strcmp(sdt_type, "dict") == 0) {
+        if (!cJSON_IsObject(value)) {
+            if (error) *error = "Expected object value";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    // Structured string types
+    else if (strcmp(sdt_type, "schedule") == 0 || strcmp(sdt_type, "geoJsonCoordinate") == 0) {
+        if (!cJSON_IsString(value)) {
+            if (error) *error = "Expected string value";
+            return RSC_BAD_REQUEST;
+        }
+    }
+    // Permissive types
+    else if (strcmp(sdt_type, "jsonLike") == 0 || strcmp(sdt_type, "any") == 0 ||
+             strcmp(sdt_type, "void") == 0) {
+        // Accept any value
+    }
+    // Unknown type -> reject (ACME compatible)
+    else {
+        if (error) *error = "Unknown attribute type";
+        return RSC_BAD_REQUEST;
+    }
 
     return RSC_OK;
 }
 
-int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attrs, char **error, int check_mandatory) {
+int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attrs, char **error, int op) {
     if (!cnd) {
         *error = "Missing containerDefinition";
         return RSC_BAD_REQUEST;
@@ -405,13 +540,15 @@ int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attr
     SDTDef *def = NULL;
     if (shortname) {
         def = sdt_find_by_type(shortname);
-    } else {
-        def = sdt_find_by_cnd(cnd);
     }
 
     if (!def) {
-        *error = "Specialization schema not found for containerDefinition";
-        return RSC_SPECIALIZATION_SCHEMA_NOT_FOUND;
+        if (shortname) {
+            *error = "unknown resource type";
+            return RSC_BAD_REQUEST;
+        }
+        // m2m:fcnt without specialization shortname: skip SDT validation (ACME compatible)
+        return RSC_OK;
     }
 
     if (def->cnd && strlen(def->cnd) > 0) {
@@ -421,26 +558,85 @@ int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attr
         }
     }
 
+    // No attributes defined: reject any custom attributes (ACME __none__ behavior)
     if (!def->attributes) {
+        if (custom_attrs && cJSON_GetArraySize(custom_attrs) > 0) {
+            *error = "Unknown attribute in FlexContainer";
+            return RSC_BAD_REQUEST;
+        }
         return RSC_OK;
     }
 
-    if (check_mandatory) {
-        int attr_count = cJSON_GetArraySize(def->attributes);
+    int attr_count = cJSON_GetArraySize(def->attributes);
+
+    // Validate each custom attribute against SDT definition
+    if (custom_attrs) {
+        cJSON *item = NULL;
+        cJSON_ArrayForEach(item, custom_attrs) {
+            if (!item->string) continue;
+
+            int found = 0;
+            for (int i = 0; i < attr_count; i++) {
+                cJSON *attr_def = cJSON_GetArrayItem(def->attributes, i);
+                if (!attr_def) continue;
+
+                cJSON *sname_item = cJSON_GetObjectItem(attr_def, "sname");
+                if (!sname_item || strcmp(sname_item->valuestring, item->string) != 0)
+                    continue;
+
+                found = 1;
+
+                // Type validation
+                cJSON *type_item = cJSON_GetObjectItem(attr_def, "type");
+                if (type_item && cJSON_IsString(type_item)) {
+                    int rsc = sdt_validate_attr_type(type_item->valuestring, item, error);
+                    if (rsc != RSC_OK) return rsc;
+                }
+
+                // UPDATE: check ou="NP" (attribute must not be provided)
+                if (op == 3) { // OP_UPDATE
+                    cJSON *ou_item = cJSON_GetObjectItem(attr_def, "ou");
+                    if (ou_item && cJSON_IsString(ou_item) &&
+                        strcmp(ou_item->valuestring, "NP") == 0) {
+                        *error = "Attribute is not allowed in UPDATE";
+                        return RSC_BAD_REQUEST;
+                    }
+                }
+
+                // Cardinality: CAR1 means value cannot be null
+                cJSON *car_item = cJSON_GetObjectItem(attr_def, "car");
+                if (car_item && cJSON_IsString(car_item)) {
+                    if (strcmp(car_item->valuestring, "1") == 0 ||
+                        strcmp(car_item->valuestring, "1N") == 0) {
+                        if (cJSON_IsNull(item)) {
+                            *error = "Attribute with cardinality 1 cannot be null";
+                            return RSC_BAD_REQUEST;
+                        }
+                    }
+                }
+
+                break;
+            }
+            if (!found) {
+                *error = "Unknown attribute in FlexContainer";
+                return RSC_BAD_REQUEST;
+            }
+        }
+    }
+
+    // CREATE: check mandatory attributes (oc="M")
+    if (op == 1) { // OP_CREATE
         for (int i = 0; i < attr_count; i++) {
             cJSON *attr_def = cJSON_GetArrayItem(def->attributes, i);
             if (!attr_def) continue;
 
             cJSON *sname_item = cJSON_GetObjectItem(attr_def, "sname");
             cJSON *oc_item = cJSON_GetObjectItem(attr_def, "oc");
-
             if (!sname_item) continue;
 
-            char *sname = sname_item->valuestring;
             char *oc = oc_item ? oc_item->valuestring : "O";
-
             if (strcmp(oc, "M") == 0) {
-                if (!custom_attrs || !cJSON_GetObjectItem(custom_attrs, sname)) {
+                if (!custom_attrs || !cJSON_GetObjectItem(custom_attrs, sname_item->valuestring)) {
                     *error = "Missing mandatory attribute";
                     return RSC_BAD_REQUEST;
                 }

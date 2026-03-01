@@ -4545,11 +4545,11 @@ bool is_standard_fcnt_attribute(const char *attrName)
 
 	const char *common_attrs[] = {
 		"rn", "ri", "pi", "ct", "lt", "ty", "acpi", "lbl", "loc",
-		"at", "aa", "cr", "et", "nl", NULL
+		"at", "aa", "cr", "et", NULL
 	};
 
 	const char *fcnt_attrs[] = {
-		"cnd", "or", "oref", "st", "cs", "_sn",
+		"cnd", "or", "oref", "nl", "st", "cs", "_sn",
 		"fcied", "mni", "mbs", "mia", "cni", "cbs", "daci", "ast",
 		"custom_attrs", "org", NULL
 	};
@@ -4619,24 +4619,6 @@ int validate_custom_attributes(const char *shortname, cJSON *customAttrs, const 
 		return RSC_BAD_REQUEST;
 	}
 
-	SDTDef *def = NULL;
-	if (shortname) {
-		def = sdt_find_by_type(shortname);
-	} else {
-		def = sdt_find_by_cnd(cnd);
-	}
-
-	if (!def) {
-		return RSC_OK;
-	}
-
-	if (def->cnd && strlen(def->cnd) > 0) {
-		if (strcmp(def->cnd, cnd) != 0) {
-			if (error_msg) *error_msg = "Mismatch between shortname and containerDefinition";
-			return RSC_BAD_REQUEST;
-		}
-	}
-
 	cJSON *item = NULL;
 	cJSON_ArrayForEach(item, customAttrs) {
 		if (!item->string) {
@@ -4656,35 +4638,9 @@ int validate_custom_attributes(const char *shortname, cJSON *customAttrs, const 
 			if (error_msg) *error_msg = "Custom attribute has invalid type";
 			return RSC_BAD_REQUEST;
 		}
-
-		if (def->attributes) {
-			int found = 0;
-			int attr_count = cJSON_GetArraySize(def->attributes);
-			for (int i = 0; i < attr_count; i++) {
-				cJSON *attr_def = cJSON_GetArrayItem(def->attributes, i);
-				if (attr_def) {
-					cJSON *sname_item = cJSON_GetObjectItem(attr_def, "sname");
-					if (sname_item && strcmp(sname_item->valuestring, item->string) == 0) {
-						found = 1;
-						cJSON *type_item = cJSON_GetObjectItem(attr_def, "type");
-						if (type_item && cJSON_IsString(type_item)) {
-							int rsc = sdt_validate_attr_type(type_item->valuestring, item, error_msg);
-							if (rsc != RSC_OK) return rsc;
-						}
-						break;
-					}
-				}
-			}
-			if (!found) {
-				if (error_msg) *error_msg = "Unknown attribute in FlexContainer";
-				return RSC_BAD_REQUEST;
-			}
-		}
 	}
 
-	// For UPDATE operations, we don't check mandatory attributes (check_mandatory=0)
-	// Mandatory attributes are only checked during CREATE
-	return sdt_validate_fcnt(shortname, cnd, customAttrs, error_msg, 0);
+	return RSC_OK;
 }
 
 int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
@@ -4725,16 +4681,6 @@ int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
 		}
 	}
 
-	if (op == OP_UPDATE)
-	{
-		pjson = cJSON_GetObjectItem(fcnt, "acpi");
-		if (pjson && cJSON_GetArraySize(fcnt) > 1)
-		{
-			handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
-			return RSC_BAD_REQUEST;
-		}
-	}
-
 	pjson = cJSON_GetObjectItem(fcnt, "cnd");
 	if (pjson && pjson->type == cJSON_String)
 	{
@@ -4742,21 +4688,6 @@ int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
 		{
 			handle_error(o2pt, RSC_BAD_REQUEST, "attribute `cnd` cannot be empty");
 			return RSC_BAD_REQUEST;
-		}
-	}
-
-	pjson = cJSON_GetObjectItem(fcnt, "nl");
-	if (pjson)
-	{
-		if (pjson->type != cJSON_String)
-		{
-			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `nl` must be string");
-		}
-
-		RTNode *node_rtnode = find_rtnode_by_ri(pjson->valuestring);
-		if (!node_rtnode || node_rtnode->ty != RT_NOD)
-		{
-			return handle_error(o2pt, RSC_NOT_FOUND, "nodeLink references non-existent node resource");
 		}
 	}
 
@@ -4938,13 +4869,6 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool 
 	snprintf(rn_buf, rn_len, "%s_%d", fcnt_rtnode->rn, st_obj->valueint);
 	cJSON_AddStringToObject(fcin, "rn", rn_buf);
 
-	// Copy containerDefinition from parent FCNT
-	cJSON *cnd = cJSON_GetObjectItem(fcnt, "cnd");
-	if (cnd && cJSON_IsString(cnd))
-	{
-		cJSON_AddStringToObject(fcin, "cnd", cnd->valuestring);
-	}
-
 	// Copy label attribute if present
 	cJSON *lbl = cJSON_GetObjectItem(fcnt, "lbl");
 	if (lbl)
@@ -4992,6 +4916,11 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool 
 	if (o2pt->fr)
 	{
 		cJSON_AddStringToObject(fcin, "org", o2pt->fr);
+	}
+	else
+	{
+		cJSON *cr = cJSON_GetObjectItem(fcnt, "cr");
+		cJSON_AddStringToObject(fcin, "org", (cr && cJSON_IsString(cr)) ? cr->valuestring : "");
 	}
 
 	// Add general attributes (ri, pi, ct, ty, etc.)

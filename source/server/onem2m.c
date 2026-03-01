@@ -242,7 +242,6 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 			}
 		}
 	}
-
 	rtnode->rn = strdup(cJSON_GetObjectItem(obj, "rn")->valuestring);
 
 	return rtnode;
@@ -346,16 +345,14 @@ int update_fcnt_fcin(RTNode *fcnt_rtnode, RTNode *fcin_rtnode, int sign)
 		return -1;
 	cJSON *cni = cJSON_GetObjectItem(fcnt, "cni");
 	cJSON *cbs = cJSON_GetObjectItem(fcnt, "cbs");
-	cJSON *st = cJSON_GetObjectItem(fcnt, "st");
 	cJSON *fcin_cs = cJSON_GetObjectItem(fcin, "cs");
 
-	if (!cni || !cbs || !st || !fcin_cs)
+	if (!cni || !cbs || !fcin_cs)
 		return -1;
 
 	cJSON_SetIntValue(cni, cni->valueint + sign);
 	cJSON_SetIntValue(cbs, cbs->valueint + (sign * fcin_cs->valueint));
-	cJSON_SetIntValue(st, st->valueint + 1);
-	logger("O2", LOG_LEVEL_DEBUG, "FCIN cni: %d, cbs: %d, st: %d", cni->valueint, cbs->valueint, st->valueint);
+	logger("O2", LOG_LEVEL_DEBUG, "FCIN cni: %d, cbs: %d", cni->valueint, cbs->valueint);
 
 	db_update_resource(fcnt, get_ri_rtnode(fcnt_rtnode), RT_FCNT);
 
@@ -407,20 +404,26 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 	else if (target_rtnode->ty == RT_FCIN && o2pt->rvi >= RVI_4)
 	{
-		// Handle FCIN /la and /ol virtual resources
-		if (!strcmp(target_rtnode->rn, "la"))
+		cJSON *ri_obj = cJSON_GetObjectItem(target_rtnode->obj, "ri");
+		if (ri_obj && target_rtnode->parent)
 		{
-			cJSON_Delete(target_rtnode->obj);
-			target_rtnode->obj = db_get_fcin_laol(target_rtnode->parent, 0);
-			if (!target_rtnode->obj)
+			RTNode *child = target_rtnode->parent->child;
+			while (child)
 			{
-				free_rtnode(target_rtnode);
+				RTNode *next = child->sibling_right;
+				if (child != target_rtnode && child->ty == RT_FCIN)
+				{
+					cJSON *cri = cJSON_GetObjectItem(child->obj, "ri");
+					if (cri && strcmp(cri->valuestring, ri_obj->valuestring) == 0)
+					{
+						free_rtnode(child);
+						break;
+					}
+				}
+				child = next;
 			}
 		}
-		else
-		{
-			free_rtnode(target_rtnode);
-		}
+		free_rtnode(target_rtnode);
 	}
 	else
 	{
