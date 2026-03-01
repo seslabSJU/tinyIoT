@@ -1378,7 +1378,7 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 
     // Add level filter
     if ((pjson = cJSON_GetObjectItem(fc, "lvl"))) {
-        sprintf(buf, " AND uri NOT LIKE '%s", escaped_uri);
+        sprintf(buf, " AND uri NOT LIKE '%s/%%", escaped_uri);
         strcat(sql, buf);
         for (int i = 0; i < pjson->valueint; i++) {
             strcat(sql, "/%%");
