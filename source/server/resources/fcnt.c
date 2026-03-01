@@ -258,8 +258,6 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		cJSON *fcied = cJSON_GetObjectItem(fcnt, "fcied");
 		if (fcied && !cJSON_IsNull(fcied))
 		{
-			prepare_fcnt_for_instances(child_rtnode, o2pt);
-
 			if (add_flexcontainer_instance(child_rtnode, o2pt, true) == 0)
 			{
 				cJSON_AddNumberToObject(fcnt, "cni", 1);
@@ -520,7 +518,7 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			if (!cJSON_GetObjectItem(m2m_fcnt, "mbs")) cJSON_AddNullToObject(m2m_fcnt, "mbs");
 			if (!cJSON_GetObjectItem(m2m_fcnt, "mia")) cJSON_AddNullToObject(m2m_fcnt, "mia");
 
-			cleanup_fcnt_instances(target_rtnode, false, false);
+			cleanup_fcnt_instances(target_rtnode, false);
 		}
 		else if (!fcied_final || cJSON_IsNull(fcied_final))
 		{
@@ -558,11 +556,10 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			{
 				if (!fcied_current || cJSON_IsNull(fcied_current))
 				{
-					prepare_fcnt_for_instances(target_rtnode, o2pt);
 					add_flexcontainer_instance(target_rtnode, o2pt, false);
 				}
 
-				cleanup_fcnt_instances(target_rtnode, true, true);
+				cleanup_fcnt_instances(target_rtnode, true);
 
 				cJSON *cs_obj = cJSON_GetObjectItem(m2m_fcnt, "cs");
 				if (!cs_obj) cs_obj = cJSON_GetObjectItem(fcnt, "cs");
@@ -577,8 +574,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 			if (was_false_or_none && fcied_in_request && cJSON_IsTrue(fcied_in_request))
 			{
-				prepare_fcnt_for_instances(target_rtnode, o2pt);
-
 				cJSON_AddNumberToObject(m2m_fcnt, "cni", 0);
 				cJSON_AddNumberToObject(m2m_fcnt, "cbs", 0);
 			}

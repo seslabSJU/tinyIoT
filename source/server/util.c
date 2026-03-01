@@ -470,62 +470,6 @@ int delete_oldest_fcin_rtnode(RTNode *fcnt_rtnode)
 	return deleted_cs;
 }
 
-void delete_fcin_under_fcnt_mni_mbs(RTNode *rtnode)
-{
-	logger("UTIL", LOG_LEVEL_DEBUG, "call delete_fcin_under_fcnt_mni_mbs");
-	cJSON *fcnt = rtnode->obj;
-	cJSON *cni_obj = NULL;
-	cJSON *cbs_obj = NULL;
-	cJSON *mni_obj = NULL;
-	cJSON *mbs_obj = NULL;
-	int cni = 0, mni = 0, cbs = 0, mbs = 0, tmp = 0;
-
-	cni_obj = cJSON_GetObjectItem(fcnt, "cni");
-	if (cni_obj && cJSON_IsNumber(cni_obj))
-	{
-		cni = cni_obj->valueint;
-	}
-	mni_obj = cJSON_GetObjectItem(fcnt, "mni");
-	if (mni_obj && cJSON_IsNumber(mni_obj))
-	{
-		mni = mni_obj->valueint;
-	}
-	else
-	{
-		mni = DEFAULT_MAX_NR_INSTANCES;
-	}
-	cbs_obj = cJSON_GetObjectItem(fcnt, "cbs");
-	if (cbs_obj && cJSON_IsNumber(cbs_obj))
-	{
-		cbs = cbs_obj->valueint;
-	}
-	mbs_obj = cJSON_GetObjectItem(fcnt, "mbs");
-	if (mbs_obj && cJSON_IsNumber(mbs_obj))
-	{
-		mbs = mbs_obj->valueint;
-	}
-	else
-	{
-		mbs = DEFAULT_MAX_BYTE_SIZE;
-	}
-	if (cni <= mni && cbs <= mbs)
-		return;
-
-	while ((mni >= 0 && cni > mni) || (mbs >= 0 && cbs > mbs))
-	{
-		tmp = delete_oldest_fcin_rtnode(rtnode);
-		if (tmp < 0)
-		{
-			logger("UTIL", LOG_LEVEL_ERROR, "delete_fcin_under_fcnt_mni_mbs: no more FCINs to delete");
-			break;
-		}
-		cbs -= tmp;
-		cni--;
-	}
-
-	if (cni_obj) cJSON_SetIntValue(cni_obj, cni);
-	if (cbs_obj) cJSON_SetIntValue(cbs_obj, cbs);
-}
 
 void delete_cin_under_cnt_mni_mbs(RTNode *rtnode)
 {
@@ -4659,14 +4603,12 @@ int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
 	{
 		if (!strcmp(pjson->valuestring, "la") || !strcmp(pjson->valuestring, "ol"))
 		{
-			handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "attribute `rn` is invalid");
-			return RSC_BAD_REQUEST;
+			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `rn` is invalid");
 		}
 
 		if (!strcmp(pjson->valuestring, "latest") || !strcmp(pjson->valuestring, "oldest"))
 		{
-			handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "attribute `rn` is invalid");
-			return RSC_BAD_REQUEST;
+			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `rn` is invalid");
 		}
 	}
 
@@ -4821,27 +4763,6 @@ void increment_parent_statetag(RTNode *parent_rtnode)
 }
 // FlexContainerInstance (Release 4) functions
 
-int prepare_fcnt_for_instances(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt)
-{
-	if (!fcnt_rtnode || fcnt_rtnode->ty != RT_FCNT || o2pt->rvi < RVI_4)
-	{
-		return -1;
-	}
-
-	cJSON *fcnt = fcnt_rtnode->obj;
-	cJSON *fcied = cJSON_GetObjectItem(fcnt, "fcied");
-	
-	// Only prepare if fcied is present
-	if (!fcied)
-	{
-		return 0;
-	}
-
-	logger("UTIL", LOG_LEVEL_DEBUG, "FCNT has fcied, ready for instances: %s", fcnt_rtnode->uri);
-
-	return 0;
-}
-
 int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool is_create)
 {
 	if (!fcnt_rtnode || fcnt_rtnode->ty != RT_FCNT || o2pt->rvi < RVI_4)
@@ -4912,15 +4833,22 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool 
 		cJSON_AddNumberToObject(fcin, "cs", 0);
 	}
 
-	// Set originator
-	if (o2pt->fr)
+	// Set originator: always use FCNT creator per FC/FCIN diagram
+	cJSON *cr = cJSON_GetObjectItem(fcnt, "cr");
+	if (is_create)
 	{
-		cJSON_AddStringToObject(fcin, "org", o2pt->fr);
+		cJSON_AddStringToObject(fcin, "org", o2pt->fr ? o2pt->fr : "");
 	}
 	else
 	{
-		cJSON *cr = cJSON_GetObjectItem(fcnt, "cr");
-		cJSON_AddStringToObject(fcin, "org", (cr && cJSON_IsString(cr)) ? cr->valuestring : "");
+		if (cr && cJSON_IsString(cr))
+		{
+			cJSON_AddStringToObject(fcin, "org", cr->valuestring);
+		}
+		else
+		{
+			cJSON_AddStringToObject(fcin, "org", o2pt->fr ? o2pt->fr : "");
+		}
 	}
 
 	// Add general attributes (ri, pi, ct, ty, etc.)
@@ -4988,15 +4916,14 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool 
 	return 0;
 }
 
-int cleanup_fcnt_instances(RTNode *fcnt_rtnode, bool only_instances, bool keep_latest)
+int cleanup_fcnt_instances(RTNode *fcnt_rtnode, bool keep_latest)
 {
 	if (!fcnt_rtnode || fcnt_rtnode->ty != RT_FCNT)
 	{
 		return -1;
 	}
 
-	logger("UTIL", LOG_LEVEL_DEBUG, "Cleaning up FCNT instances: only_instances=%d, keep_latest=%d",
-		   only_instances, keep_latest);
+	logger("UTIL", LOG_LEVEL_DEBUG, "Cleaning up FCNT instances: keep_latest=%d", keep_latest);
 
 	// If keep_latest, first find the FCIN with highest st (stateTag) in the in-memory tree
 	RTNode *latest = NULL;
