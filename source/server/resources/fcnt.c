@@ -45,6 +45,14 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		cJSON_AddStringToObject(fcnt, "_sn", shortname);
 	}
 
+	cJSON *or_item = cJSON_GetObjectItem(fcnt, "or");
+	if (or_item)
+	{
+		cJSON *or_copy = cJSON_Duplicate(or_item, 1);
+		cJSON_DeleteItemFromObject(fcnt, "or");
+		cJSON_AddItemToObject(fcnt, "oref", or_copy);
+	}
+
 	cJSON *customAttrs = extract_custom_attributes(fcnt);
 
 	pjson = cJSON_GetObjectItem(fcnt, "cnd");
@@ -83,6 +91,19 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		if (customAttrs) cJSON_Delete(customAttrs);
 		cJSON_Delete(root);
 		return handle_error(o2pt, rsc, error_msg);
+	}
+
+	{
+		const char *np_attrs[] = {"ty", "ri", "pi", "ct", "lt", "st", "cs", "cni", "cbs", NULL};
+		for (int i = 0; np_attrs[i] != NULL; i++)
+		{
+			if (cJSON_GetObjectItem(fcnt, np_attrs[i]))
+			{
+				if (customAttrs) cJSON_Delete(customAttrs);
+				cJSON_Delete(root);
+				return handle_error(o2pt, RSC_BAD_REQUEST, "not-permitted attribute on create");
+			}
+		}
 	}
 
 	add_general_attribute(fcnt, parent_rtnode, RT_FCNT);
@@ -265,7 +286,7 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-	char invalid_key[][9] = {"ty", "pi", "ri", "rn", "ct", "cr", "cnd", "cs", "st", "cni", "cbs"};
+	char invalid_key[][9] = {"ty", "pi", "ri", "rn", "ct", "lt", "cr", "cnd", "cs", "st", "cni", "cbs"};
 	cJSON *m2m_fcnt = cJSON_GetObjectItem(o2pt->request_pc, "m2m:fcnt");
 	if (!m2m_fcnt)
 	{
@@ -300,6 +321,14 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			handle_error(o2pt, RSC_BAD_REQUEST, "unsupported attribute on update");
 			return RSC_BAD_REQUEST;
 		}
+	}
+
+	cJSON *or_item = cJSON_GetObjectItem(m2m_fcnt, "or");
+	if (or_item)
+	{
+		cJSON *or_copy = cJSON_Duplicate(or_item, 1);
+		cJSON_DeleteItemFromObject(m2m_fcnt, "or");
+		cJSON_AddItemToObject(m2m_fcnt, "oref", or_copy);
 	}
 
 	cJSON *fcnt = target_rtnode->obj;
@@ -560,6 +589,8 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				int cni_value = cni_obj ? cni_obj->valueint : 0;
 				int cs_value = cs_obj ? cs_obj->valueint : 0;
 
+				cJSON_DeleteItemFromObject(m2m_fcnt, "cbs");
+				cJSON_DeleteItemFromObject(m2m_fcnt, "cni");
 				cJSON_AddNumberToObject(m2m_fcnt, "cbs", cbs_value + cs_value);
 				cJSON_AddNumberToObject(m2m_fcnt, "cni", cni_value + 1);
 			}

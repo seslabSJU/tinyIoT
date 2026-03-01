@@ -397,14 +397,21 @@ int sdt_validate_attr_type(const char *sdt_type, cJSON *value, char **error) {
 }
 
 int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attrs, char **error, int check_mandatory) {
-    if (!shortname || !cnd) {
-        *error = "Missing shortname or containerDefinition";
+    if (!cnd) {
+        *error = "Missing containerDefinition";
         return RSC_BAD_REQUEST;
     }
 
-    SDTDef *def = sdt_find_by_type(shortname);
+    SDTDef *def = NULL;
+    if (shortname) {
+        def = sdt_find_by_type(shortname);
+    } else {
+        def = sdt_find_by_cnd(cnd);
+    }
+
     if (!def) {
-        return RSC_OK;
+        *error = "Specialization schema not found for containerDefinition";
+        return RSC_SPECIALIZATION_SCHEMA_NOT_FOUND;
     }
 
     if (def->cnd && strlen(def->cnd) > 0) {

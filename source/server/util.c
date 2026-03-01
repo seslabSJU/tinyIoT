@@ -4549,7 +4549,7 @@ bool is_standard_fcnt_attribute(const char *attrName)
 	};
 
 	const char *fcnt_attrs[] = {
-		"cnd", "oref", "st", "cs", "_sn",
+		"cnd", "or", "oref", "st", "cs", "_sn",
 		"fcied", "mni", "mbs", "mia", "cni", "cbs", "daci", "ast",
 		"custom_attrs", "org", NULL
 	};
@@ -4619,7 +4619,13 @@ int validate_custom_attributes(const char *shortname, cJSON *customAttrs, const 
 		return RSC_BAD_REQUEST;
 	}
 
-	SDTDef *def = sdt_find_by_type(shortname);
+	SDTDef *def = NULL;
+	if (shortname) {
+		def = sdt_find_by_type(shortname);
+	} else {
+		def = sdt_find_by_cnd(cnd);
+	}
+
 	if (!def) {
 		return RSC_OK;
 	}
@@ -5060,50 +5066,47 @@ int cleanup_fcnt_instances(RTNode *fcnt_rtnode, bool only_instances, bool keep_l
 		return -1;
 	}
 
-	logger("UTIL", LOG_LEVEL_DEBUG, "Cleaning up FCNT instances: only_instances=%d, keep_latest=%d", 
+	logger("UTIL", LOG_LEVEL_DEBUG, "Cleaning up FCNT instances: only_instances=%d, keep_latest=%d",
 		   only_instances, keep_latest);
 
-	// Remove FCIN instances
-	RTNode *fci_list = db_get_fcin_rtnode_list(fcnt_rtnode);
-	if (fci_list)
-	{
-		// If keep_latest, find the FCIN with highest st (stateTag)
-		RTNode *latest = NULL;
-		int max_st = -1;
+	// If keep_latest, first find the FCIN with highest st (stateTag) in the in-memory tree
+	RTNode *latest = NULL;
+	int max_st = -1;
 
-		if (keep_latest)
+	if (keep_latest)
+	{
+		RTNode *child = fcnt_rtnode->child;
+		while (child)
 		{
-			RTNode *ptr = fci_list;
-			while (ptr)
+			if (child->ty == RT_FCIN)
 			{
-				cJSON *st_obj = cJSON_GetObjectItem(ptr->obj, "st");
+				cJSON *st_obj = cJSON_GetObjectItem(child->obj, "st");
 				if (st_obj && cJSON_IsNumber(st_obj))
 				{
-					int st = st_obj->valueint;
-					if (st > max_st)
+					if (st_obj->valueint > max_st)
 					{
-						max_st = st;
-						latest = ptr;
+						max_st = st_obj->valueint;
+						latest = child;
 					}
 				}
-				ptr = ptr->sibling_right;
 			}
+			child = child->sibling_right;
 		}
+	}
 
-		// Delete all FCIs except latest (if keep_latest is true)
-		RTNode *ptr = fci_list;
-		while (ptr)
+	// Delete FCIN children from both DB and in-memory tree
+	RTNode *child = fcnt_rtnode->child;
+	while (child)
+	{
+		RTNode *next = child->sibling_right;
+
+		if (child->ty == RT_FCIN && (!keep_latest || child != latest))
 		{
-			RTNode *next = ptr->sibling_right;
-
-			if (!keep_latest || ptr != latest)
-			{
-				db_delete_onem2m_resource(ptr);
-				free_rtnode(ptr);
-			}
-
-			ptr = next;
+			db_delete_onem2m_resource(child);
+			free_rtnode(child);
 		}
+
+		child = next;
 	}
 
 	logger("UTIL", LOG_LEVEL_DEBUG, "Cleanup completed");
