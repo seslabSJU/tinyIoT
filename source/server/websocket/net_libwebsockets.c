@@ -1,0 +1,421 @@
+/* net_libwebsockets.c
+ *
+ * Copyright (C) 2006-2025 wolfSSL Inc.
+ *
+ * This file is part of wolfMQTT.
+ *
+ * wolfMQTT is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * wolfMQTT is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
+ */
+
+/* Include the autoconf generated config.h */
+#include "../wolfmqtt/mqtt_types.h"
+#include "../wolfmqtt/mqtt_client.h"
+#include "net_libwebsockets.h"
+#include "../config.h"
+
+#ifdef ENABLE_MQTT_WEBSOCKET
+
+#include <libwebsockets.h>
+
+/* Callback for libwebsockets events */
+static int callback_mqtt(struct lws *wsi, enum lws_callback_reasons reason,
+        void *user, void *in, size_t len)
+{
+    LibwebsockContext *net;
+
+    (void)user;
+
+    net = (LibwebsockContext*)lws_context_user(lws_get_context(wsi));
+
+    /* Only handle the events we care about */
+    if (reason == LWS_CALLBACK_CLIENT_ESTABLISHED) {
+        net->status = 1;
+    }
+    else if (reason == LWS_CALLBACK_CLIENT_CONNECTION_ERROR) {
+        net->status = -1;
+    }
+    else if (reason == LWS_CALLBACK_CLOSED) {
+        net->status = 0;
+    } else if (reason == LWS_CALLBACK_RECEIVE){
+
+    }
+    else if (reason == LWS_CALLBACK_CLIENT_RECEIVE) {
+        // recive test print
+
+        // printf("Received2 %d\n", len);
+        // printf("\n");
+
+        // for(int i=0; i<len; i++){
+        //     printf("%c", *((char*)in+i));
+        // }
+        // printf("\n");
+
+        if (in && len > 0) {
+            
+            /* Check if we have enough space in the buffer */
+            if (net->rx_len + len <= sizeof(net->rx_buffer)) {
+                /* Append new data to existing buffer */
+                XMEMCPY(net->rx_buffer + net->rx_len, in, len);
+                net->rx_len += len;
+            } else {
+                /* Buffer overflow - handle error */
+                lwsl_err("WebSocket receive buffer overflow"
+                         "- dropping oldest data\n");
+
+                /* Simple approach: If new data is larger than buffer,
+                 * just keep newest data */
+                if (len >= sizeof(net->rx_buffer)) {
+                    /* New data is larger than entire buffer,
+                     * keep only what fits */
+                    /* Cast to byte pointer to allow pointer arithmetic */
+                    const byte* in_bytes = (const byte*)in;
+                    XMEMCPY(net->rx_buffer, 
+                            &in_bytes[len - sizeof(net->rx_buffer)], 
+                            sizeof(net->rx_buffer));
+                    net->rx_len = sizeof(net->rx_buffer);
+                } else {
+                    /* Keep as much new data as possible */
+                    size_t keep_bytes = sizeof(net->rx_buffer) - len;
+
+                    /* Move the portion of old data we want to
+                     * keep to the beginning */
+                    if (keep_bytes > 0 && net->rx_len > 0) {
+                        XMEMMOVE(net->rx_buffer, 
+                                net->rx_buffer + (net->rx_len - keep_bytes),
+                                keep_bytes);
+                    }
+
+                    /* Append all new data */
+                    XMEMCPY(net->rx_buffer + keep_bytes, in, len);
+                    net->rx_len = keep_bytes + len;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+static const struct lws_protocols protocols[] = {
+    {
+        "mqtt",
+        callback_mqtt,
+        sizeof(LibwebsockContext),
+        65536,
+        0, /* id */
+        NULL, /* user */
+        0 /* tx_packet_size */
+    },
+    {NULL, NULL, 0, 0} /* end */
+};
+
+int NetWebsocket_Connect(void *ctx, const char* host, word16 port,
+        int timeout_ms)
+{
+    SocketContext *sock = (SocketContext*)ctx;
+    LibwebsockContext *net;
+    
+
+
+    struct lws_client_connect_info conn_info;
+    struct lws_context_creation_info info;
+    int rc = 0;
+#ifdef ENABLE_MQTT_TLS
+    MQTTCtx* mqttCtx = sock->mqttCtx;
+#endif /* ENABLE_MQTT_TLS */
+
+    (void)timeout_ms;
+    if (net == NULL || host == NULL) {
+        return MQTT_CODE_ERROR_BAD_ARG;
+    }
+
+    /* Create libwebsocket context */
+    net = (LibwebsockContext*)WOLFMQTT_MALLOC(sizeof(LibwebsockContext));
+    if (net == NULL) {
+        return MQTT_CODE_ERROR_MEMORY;
+    }
+    XMEMSET(net, 0, sizeof(LibwebsockContext));
+    
+
+    /* Initialize info struct */
+    XMEMSET(&info, 0, sizeof(info));
+    info.port = CONTEXT_PORT_NO_LISTEN;
+    info.protocols = protocols;
+    info.gid = -1;
+    info.uid = -1;
+    info.user = net;
+
+#ifdef ENABLE_MQTT_TLS
+    /* Configure TLS if enabled */
+    if (mqttCtx && mqttCtx->use_tls) {
+        info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+
+        /* Set SSL verification options */
+        if (mqttCtx->ca_file) {
+            info.ssl_ca_filepath = mqttCtx->ca_file;
+        }
+
+        /* Set client certificate if using mutual TLS */
+        if (mqttCtx->mtls_certfile) {
+            info.ssl_cert_filepath = mqttCtx->mtls_certfile;
+        }
+
+        /* Set client key if using mutual TLS */
+        if (mqttCtx->mtls_keyfile) {
+            info.ssl_private_key_filepath = mqttCtx->mtls_keyfile;
+        }
+    }
+#endif /* ENABLE_MQTT_TLS */
+
+    net->context = lws_create_context(&info);
+    if (net->context == NULL) {
+        sock->websocket_ctx = NULL;
+        WOLFMQTT_FREE(net);
+        net = NULL;
+        return MQTT_CODE_ERROR_NETWORK;
+    }
+
+    sock->websocket_ctx = net;
+
+    XMEMSET(&conn_info, 0, sizeof(conn_info));
+    conn_info.context = net->context;
+    conn_info.address = host;
+    conn_info.port = port;
+    conn_info.path = "/mqtt";
+    conn_info.host = host;
+    conn_info.protocol = "mqtt";
+    conn_info.pwsi = &net->wsi;
+
+#ifdef ENABLE_MQTT_TLS
+    /* Set SSL options for the connection if TLS is enabled */
+    if (mqttCtx && mqttCtx->use_tls) {
+        conn_info.ssl_connection = LCCSCF_USE_SSL;
+        conn_info.ssl_connection |= LCCSCF_ALLOW_SELFSIGNED;
+        conn_info.ssl_connection |= LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+    }
+#endif /* ENABLE_MQTT_TLS */
+
+    net->wsi = lws_client_connect_via_info(&conn_info);
+    if (net->wsi == NULL) {
+        lws_context_destroy(net->context);
+        WOLFMQTT_FREE(net);
+        net = NULL;
+        return MQTT_CODE_ERROR_NETWORK;
+    }
+
+    /* Wait for connection */
+    while (rc >= 0 && net->status == 0) {
+        rc = lws_service(net->context, 0);
+    }
+
+    return (net->status > 0) ? MQTT_CODE_SUCCESS : MQTT_CODE_ERROR_NETWORK;
+}
+
+int NetWebsocket_Write(void *context, const byte* buf, int buf_len,
+        int timeout_ms)
+{
+    SocketContext *sock = (SocketContext*)context;
+    LibwebsockContext *net;
+    
+    net = (LibwebsockContext*)sock->websocket_ctx;
+
+    unsigned char *ws_buf;
+    int ret;
+    time_t start_time, current_time;
+
+    if (buf == NULL || buf_len <= 0) {
+        return MQTT_CODE_ERROR_BAD_ARG;
+    }
+
+
+    if (net == NULL) {
+        return MQTT_CODE_ERROR_BAD_ARG;
+    }
+
+    if (net->status <= 0) {
+        return MQTT_CODE_ERROR_NETWORK;
+    }
+
+    /* Add LWS_PRE bytes for libwebsockets header */
+    ws_buf = (unsigned char*)WOLFMQTT_MALLOC(LWS_PRE + buf_len);
+    if (ws_buf == NULL) {
+        return MQTT_CODE_ERROR_MEMORY;
+    }
+
+    XMEMCPY(ws_buf + LWS_PRE, buf, buf_len);
+
+    /* Record start time for timeout handling */
+    start_time = time(NULL);
+
+    /* Try to write with timeout */
+    ret = 0;
+    while (ret <= 0 && net->status > 0) {
+        
+        ret = lws_write(net->wsi, ws_buf + LWS_PRE, buf_len, LWS_WRITE_BINARY);
+
+        if (ret <= 0) {
+            /* Check if we've timed out */
+            current_time = time(NULL);
+            if ((current_time - start_time) * 1000 >= timeout_ms) {
+                ret = MQTT_CODE_ERROR_TIMEOUT;
+                break;
+            }
+
+            /* Service libwebsockets and try again */
+            lws_service(net->context, 100);
+
+            /* Check if connection was lost during service */
+            if (net->status <= 0) {
+                ret = MQTT_CODE_ERROR_NETWORK;
+                break;
+            }
+
+            /* Small delay before retrying */
+#ifdef _WIN32
+            Sleep(10);
+#else
+            usleep(10000);
+#endif
+        }
+    }
+
+    WOLFMQTT_FREE(ws_buf);
+
+    /* If connection was lost, return network error */
+    if (net->status <= 0) {
+        return MQTT_CODE_ERROR_NETWORK;
+    }
+
+    return (ret > 0) ? ret : ret;
+}
+
+int NetWebsocket_Read(void *context, byte* buf, int buf_len,
+        int timeout_ms)
+{
+    SocketContext *sock = (SocketContext*)context;
+    LibwebsockContext *net;
+    
+    int ret = 0;
+    time_t start_time, current_time;
+
+    if (buf == NULL || buf_len <= 0) {
+        return MQTT_CODE_ERROR_BAD_ARG;
+    }
+    
+    net = (LibwebsockContext*)sock->websocket_ctx;
+
+    if (net == NULL) {
+        return MQTT_CODE_ERROR_BAD_ARG;
+    }
+
+    if (net->status <= 0) {
+        return MQTT_CODE_ERROR_NETWORK;
+    }
+
+    /* Record start time for timeout handling */
+    start_time = time(NULL);
+
+    /* Check if we already have data */
+    if (net->rx_len > 0 && net->status > 0) {
+        ret = (net->rx_len <= (size_t)buf_len) ? (int)net->rx_len : buf_len;
+        XMEMCPY(buf, net->rx_buffer, ret);
+
+        /* If we didn't consume all data, move remaining data to
+         * beginning of buffer */
+        if (ret < (int)net->rx_len) {
+            XMEMMOVE(net->rx_buffer, net->rx_buffer + ret, net->rx_len - ret);
+            net->rx_len -= ret;
+        } else {
+            net->rx_len = 0;
+        }
+
+        return ret;
+    }
+
+    /* Wait for data with timeout */
+    while (net->rx_len == 0) {
+        /* Service libwebsockets to process callbacks */
+        // printf("read %d\n", net->rx_len);
+        
+        lws_service(net->context, 100);
+
+        /* Check if connection was lost during service */
+        if (net->status <= 0) {
+            return MQTT_CODE_ERROR_NETWORK;
+        }
+
+        /* Check if we received data in the callback */
+        if (net->rx_len > 0) {
+            ret = (net->rx_len <= (size_t)buf_len) ? (int)net->rx_len : buf_len;
+            XMEMCPY(buf, net->rx_buffer, ret);
+
+            /* If we didn't consume all data, move remaining data to
+             * beginning of buffer */
+            if (ret < (int)net->rx_len) {
+                XMEMMOVE(net->rx_buffer, net->rx_buffer + ret,
+                         net->rx_len - ret);
+                net->rx_len -= ret;
+            } else {
+                net->rx_len = 0;
+            }
+
+            return ret;
+        }
+
+        /* Check if we've timed out */
+        current_time = time(NULL);
+        if ((current_time - start_time) * 1000 >= timeout_ms) {
+            return MQTT_CODE_ERROR_TIMEOUT;
+        }
+
+        /* Small delay to avoid tight loops */
+#ifdef _WIN32
+        Sleep(10);
+#else
+        usleep(10000);
+#endif
+    }
+
+    /* Should not reach here, but just in case */
+    return MQTT_CODE_ERROR_NETWORK;
+}
+
+int NetWebsocket_Disconnect(void *context)
+{
+    SocketContext *sock = (SocketContext*)context;
+    LibwebsockContext *net;
+    
+    net = (LibwebsockContext*)sock->websocket_ctx;
+
+    if (net == NULL) {
+        return MQTT_CODE_SUCCESS; /* Already disconnected */
+    }
+
+    if (net->wsi) {
+        lws_close_reason(net->wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
+        net->wsi = NULL;
+    }
+
+    if (net->context) {
+        lws_context_destroy(net->context);
+        net->context = NULL;
+    }
+
+    WOLFMQTT_FREE(net);
+
+    return MQTT_CODE_SUCCESS;
+}
+
+#endif /* ENABLE_MQTT_WEBSOCKET */  

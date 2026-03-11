@@ -13,13 +13,19 @@
 #include "onem2m.h"
 #include "dbmanager.h"
 #include "httpd.h"
-#include "mqttClient.h"
 #include "onem2mTypes.h"
 #include "config.h"
 #include "util.h"
 #include "cJSON.h"
 #include "coap.h"
 #include "jsonparser.h"
+
+#include "mqttClient.h"
+
+#ifdef ENABLE_WS
+// #include "websocket/websocket_server.h"
+#endif
+
 
 extern ResourceTree *rt;
 extern pthread_mutex_t main_lock;
@@ -286,12 +292,20 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 	cJSON *cbs = cJSON_GetObjectItem(cnt, "cbs");
 	cJSON *st = cJSON_GetObjectItem(cnt, "st");
 	cJSON *mia = cJSON_GetObjectItem(cnt, "mia");
+	int cni_val = cni ? cni->valueint : 0;
+	int cbs_val = cbs ? cbs->valueint : 0;
+	int st_val = st ? st->valueint : 0;
+	int cin_cs = 0;
+	cJSON *cin_cs_item = cJSON_GetObjectItem(cin, "cs");
+	if (cin_cs_item)
+		cin_cs = cin_cs_item->valueint;
 
 	if (mia && mia->valueint > 0 && sign == 1) {
         time_t now = time(NULL);
         RTNode *expired[128];
 		memset(expired, 0, sizeof(expired));
         int exp_cnt = 0;
+		int exp_cbs = 0;
         RTNode *child = cnt_rtnode->child;
         while (child) {
              if (child->ty == RT_CIN) {
@@ -314,19 +328,34 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 
         for (int i = 0; i < exp_cnt; i++) {
             RTNode *n = expired[i];
-            update_cnt_cin(cnt_rtnode, n, -1);
+			cJSON *cs = cJSON_GetObjectItem(n->obj, "cs");
+			if (cs)
+				exp_cbs += cs->valueint;
             db_delete_onem2m_resource(n);
             free_rtnode(n);
         }
+		if (exp_cnt > 0) {
+			cni_val = (cni_val > exp_cnt) ? (cni_val - exp_cnt) : 0;
+			cbs_val = (cbs_val > exp_cbs) ? (cbs_val - exp_cbs) : 0;
+			st_val += exp_cnt;
+		}
     }
 
-	cJSON_SetIntValue(cni, cni->valueint + sign);
-	cJSON_SetIntValue(cbs, cbs->valueint + (sign * cJSON_GetObjectItem(cin, "cs")->valueint));
-	cJSON_SetIntValue(st, st->valueint + 1);
-	logger("O2", LOG_LEVEL_DEBUG, "cni: %d, cbs: %d, st: %d", cni->valueint, cbs->valueint, st->valueint);
+	cni_val += sign;
+	cbs_val += (sign * cin_cs);
+	st_val += 1;
+	if (cni)
+		cJSON_SetIntValue(cni, cni_val);
+	if (cbs)
+		cJSON_SetIntValue(cbs, cbs_val);
+	if (st)
+		cJSON_SetIntValue(st, st_val);
+	logger("O2", LOG_LEVEL_DEBUG, "cni: %d, cbs: %d, st: %d", cni_val, cbs_val, st_val);
 
 	if (sign == 1)
+	{
 		delete_cin_under_cnt_mni_mbs(cnt_rtnode);
+	}
 
 	db_update_resource(cnt, get_ri_rtnode(cnt_rtnode), RT_CNT);
 
@@ -1498,7 +1527,16 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	cJSON *csr = target_rtnode->obj;
 	cJSON *poa_list = cJSON_GetObjectItem(csr, "poa");
+
+	
+#ifdef ENABLE_WS	
+	websocket_check_and_forwarding_from_sessionTable(o2pt, target_rtnode); // 목적지 rt주소로 세션 조회 및 전송
+	//ws 세션이 존재할경우 전송되고
+	//poa에 이것이 존재하든 말든 일단 전송됨
+#endif
+	
 	cJSON *poa = NULL;
+
 	cJSON_ArrayForEach(poa, poa_list)
 	{
 		if (parsePoa(poa->valuestring, &protocol, &host, &port, &path) == -1)
@@ -1514,7 +1552,13 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 #ifdef ENABLE_MQTT
 		else if (protocol == PROT_MQTT)
 		{
-			mqtt_forwarding(o2pt, host, port, csr);
+			#ifdef ENABLE_MQTT_WEBSOCKET
+				mqtt_forwarding(o2pt, host, port, csr); //mqtt_forwarding fuction is same both
+			#else
+				mqtt_forwarding(o2pt, host, port, csr);
+			#endif
+
+			
 		}
 #endif
 
@@ -1524,6 +1568,11 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			coap_forwarding(o2pt, protocol, host, port);
 		}
 #endif
+
+// #ifdef ENABLE_WS
+// 		websocket_forwarding(o2pt, host, port);
+// #endif
+
 		free(host);
 		free(path);
 
@@ -1533,6 +1582,9 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			break;
 		}
 	}
+
+
+
 
 	if (o2pt->rsc == RSC_TARGET_NOT_REACHABLE)
 	{

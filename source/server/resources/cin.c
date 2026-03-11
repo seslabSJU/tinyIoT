@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <regex.h>
+#include <time.h>
 #include "../onem2m.h"
 #include "../logger.h"
 #include "../util.h"
@@ -96,7 +97,21 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 #endif
 
     RTNode *cin_rtnode = create_rtnode(cin, RT_CIN);
-    update_cnt_cin(parent_rtnode, cin_rtnode, 1);
+    if (!db_begin_tx())
+    {
+        handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB begin fail");
+        free_rtnode(cin_rtnode);
+        cJSON_Delete(root);
+        return o2pt->rsc;
+    }
+    if (update_cnt_cin(parent_rtnode, cin_rtnode, 1) != 0)
+    {
+        db_rollback_tx();
+        handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "CNT update fail");
+        free_rtnode(cin_rtnode);
+        cJSON_Delete(root);
+        return o2pt->rsc;
+    }
 
     make_response_body(o2pt, cin_rtnode);
     o2pt->rsc = RSC_CREATED;
@@ -110,7 +125,15 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     int result = db_store_resource(cin, ptr);
     if (result != 1)
     {
+        db_rollback_tx();
         handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB store fail");
+        free_rtnode(cin_rtnode);
+        cJSON_Delete(root);
+        return o2pt->rsc;
+    }
+    if (!db_commit_tx())
+    {
+        handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB commit fail");
         free_rtnode(cin_rtnode);
         cJSON_Delete(root);
         return o2pt->rsc;

@@ -362,9 +362,14 @@ static const table_def_t table_definitions[] = {
 /* Helper function to execute SQL and handle errors for PostgreSQL */
 static int execute_sql_with_error_handling(const char *sql, const char *context)
 {
-    PGresult *res = PQexec(pg_conn, sql);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "%s error: %s", context, PQerrorMessage(pg_conn));
+    PGconn *conn = get_pg_conn();
+    if (!conn)
+        return 0;
+
+    PGresult *res = PQexec(conn, sql);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK)
+    {
+        logger("DB", LOG_LEVEL_ERROR, "%s error: %s", context, PQerrorMessage(conn));
         PQclear(res);
         return 0;
     }
@@ -428,15 +433,18 @@ int init_dbp()
         return 0;
     }
 
+    pg_unlock();
     return 1;
 }
 
 int close_dbp()
 {
+    pg_lock();
     if (pg_conn) {
         PQfinish(pg_conn);
         pg_conn = NULL;
     }
+    pg_unlock();
     return 1;
 }
 
@@ -506,15 +514,17 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
     sprintf(sql, "SELECT * FROM general, %s WHERE general.uri='%s' and %s.id=general.id;", 
             get_table_name(ty), uri, get_table_name(ty));
 
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Query failed: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Query failed: %s", PQerrorMessage(conn));
         PQclear(res);
+        pg_unlock();
         return NULL;
     }
 
     if (PQntuples(res) == 0) {
         PQclear(res);
+        pg_unlock();
         return NULL;
     }
 
@@ -550,6 +560,7 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
     }
 
     PQclear(res);
+    pg_unlock();
     return resource;
 }
 
@@ -574,15 +585,17 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
     sprintf(sql, "SELECT * FROM general, %s WHERE general.id=%s.id AND general.ri='%s';", 
             get_table_name(ty), get_table_name(ty), ri);
 
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Query failed: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Query failed: %s", PQerrorMessage(conn));
         PQclear(res);
+        pg_unlock();
         return NULL;
     }
 
     if (PQntuples(res) == 0) {
         PQclear(res);
+        pg_unlock();
         return NULL;
     }
 
@@ -618,6 +631,7 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
     }
 
     PQclear(res);
+    pg_unlock();
     return resource;
 }
 
@@ -626,9 +640,12 @@ static char *pg_escape_string_value(const char *value)
 {
     if (!value) return NULL;
     
+    PGconn *conn = get_pg_conn();
+    if (!conn) return NULL;
+
     size_t len = strlen(value);
     char *escaped = malloc(len * 2 + 1);
-    PQescapeStringConn(pg_conn, escaped, value, len, NULL);
+    PQescapeStringConn(conn, escaped, value, len, NULL);
     return escaped;
 }
 
@@ -668,12 +685,14 @@ int db_store_resource(cJSON *obj, char *uri)
 
     if (!obj) {
         logger("DB", LOG_LEVEL_ERROR, "Resource object is NULL");
+        pg_unlock();
         return -1;
     }
 
     cJSON *ty_obj = cJSON_GetObjectItem(obj, "ty");
     if (!ty_obj) {
         logger("DB", LOG_LEVEL_ERROR, "Missing 'ty' field in resource object");
+        pg_unlock();
         return -1;
     }
     ResourceType ty = ty_obj->valueint;
@@ -692,18 +711,28 @@ int db_store_resource(cJSON *obj, char *uri)
         pg_unlock();
         return -1;
     }
-    PQclear(res);
 
-    // Build INSERT statement for general table
-    sql = malloc(2048);
-    sprintf(sql, "INSERT INTO general (");
+    if (pg_tx_depth == 0) {
+        res = PQexec(conn, "BEGIN");
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to begin transaction: %s", PQerrorMessage(conn));
+            PQclear(res);
+            pg_unlock();
+            return -1;
+        }
+        PQclear(res);
+        started_tx = 1;
+    }
+
+    sql = malloc(4096);
+    sql[0] = '\0';
+    strcat(sql, "WITH ins AS (INSERT INTO general (");
     for (int i = 0; i < general_cnt; i++) {
         strcat(sql, cJSON_GetArrayItem(GENERAL_ATTR, i)->string);
         if (i < general_cnt - 1) strcat(sql, ",");
     }
     strcat(sql, ") VALUES (");
 
-    // Add values
     for (int i = 0; i < general_cnt; i++) {
         char *attr = cJSON_GetArrayItem(GENERAL_ATTR, i)->string;
         if (strcmp(attr, "uri") == 0) {
@@ -736,52 +765,15 @@ int db_store_resource(cJSON *obj, char *uri)
         }
         if (i < general_cnt - 1) strcat(sql, ",");
     }
-    strcat(sql, ");");
+    strcat(sql, ") RETURNING id) INSERT INTO ");
+    strcat(sql, get_table_name(ty));
+    strcat(sql, " (id, ");
 
-    logger("DB", LOG_LEVEL_DEBUG, "Executing General Table INSERT: %s", sql);
-    res = PQexec(pg_conn, sql);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed to insert into general table: %s", PQerrorMessage(pg_conn));
-        logger("DB", LOG_LEVEL_ERROR, "Failed SQL was: %s", sql);
-        PQclear(res);
-        free(sql);
-        PQexec(pg_conn, "ROLLBACK");
-        return -1;
-    }
-    PQclear(res);
-    logger("DB", LOG_LEVEL_DEBUG, "General table INSERT successful");
-
-    // Insert into specific table
-    cJSON *specific_attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
-    if (!specific_attr) {
-        logger("DB", LOG_LEVEL_ERROR, "No specific attributes found for resource type %d", ty);
-        free(sql);
-        PQexec(pg_conn, "ROLLBACK");
-        return -1;
-    }
-    
-    sql[0] = '\0';
-    sprintf(sql, "INSERT INTO %s (id, ", get_table_name(ty));
-    
     for (int i = 0; i < cJSON_GetArraySize(specific_attr); i++) {
         strcat(sql, cJSON_GetArrayItem(specific_attr, i)->string);
         if (i < cJSON_GetArraySize(specific_attr) - 1) strcat(sql, ",");
     }
-    strcat(sql, ") VALUES ((SELECT id FROM general WHERE ri='");
-    
-    cJSON *ri_obj = cJSON_GetObjectItem(obj, "ri");
-    if (!ri_obj || !cJSON_IsString(ri_obj)) {
-        logger("DB", LOG_LEVEL_ERROR, "Missing or invalid 'ri' field in resource object");
-        free(sql);
-        PQexec(pg_conn, "ROLLBACK");
-        return -1;
-    }
-    
-    char *ri_str = ri_obj->valuestring;
-    char *escaped_ri = pg_escape_string_value(ri_str);
-    strcat(sql, escaped_ri);
-    free(escaped_ri);
-    strcat(sql, "'),");
+    strcat(sql, ") SELECT id, ");
 
     for (int i = 0; i < cJSON_GetArraySize(specific_attr); i++) {
         pjson = cJSON_GetObjectItem(obj, cJSON_GetArrayItem(specific_attr, i)->string);
@@ -808,7 +800,7 @@ int db_store_resource(cJSON *obj, char *uri)
         }
         if (i < cJSON_GetArraySize(specific_attr) - 1) strcat(sql, ",");
     }
-    strcat(sql, ");");
+    strcat(sql, " FROM ins;");
 
     logger("DB", LOG_LEVEL_DEBUG, "Executing General+Specific INSERT: %s", sql);
     res = PQexec(conn, sql);
@@ -823,7 +815,7 @@ int db_store_resource(cJSON *obj, char *uri)
         return -1;
     }
     PQclear(res);
-    logger("DB", LOG_LEVEL_DEBUG, "Specific table INSERT successful");
+    logger("DB", LOG_LEVEL_DEBUG, "General+Specific INSERT successful");
 
     if (started_tx) {
         res = PQexec(conn, "COMMIT");
@@ -835,14 +827,11 @@ int db_store_resource(cJSON *obj, char *uri)
             return -1;
         }
         PQclear(res);
-        free(sql);
-        return -1;
     }
-    PQclear(res);
-    logger("DB", LOG_LEVEL_DEBUG, "Transaction committed successfully");
 
     free(sql);
     logger("DB", LOG_LEVEL_DEBUG, "db_store_resource completed successfully");
+    pg_unlock();
     return 1;
 }
 
@@ -861,7 +850,19 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         pg_unlock();
         return 0;
     }
-    PQclear(res);
+
+    // Begin transaction
+    if (pg_tx_depth == 0) {
+        res = PQexec(conn, "BEGIN");
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to begin transaction: %s", PQerrorMessage(conn));
+            PQclear(res);
+            pg_unlock();
+            return 0;
+        }
+        PQclear(res);
+        started_tx = 1;
+    }
 
     sql = malloc(2048);
     int has_general_updates = 0;
@@ -902,9 +903,9 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         sprintf(sql + strlen(sql), " WHERE ri='%s';", escaped_ri);
         free(escaped_ri);
 
-        res = PQexec(pg_conn, sql);
+        res = PQexec(conn, sql);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            logger("DB", LOG_LEVEL_ERROR, "Failed to update general table: %s", PQerrorMessage(pg_conn));
+            logger("DB", LOG_LEVEL_ERROR, "Failed to update general table: %s", PQerrorMessage(conn));
             PQclear(res);
             free(sql);
             if (started_tx)
@@ -955,9 +956,9 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         sprintf(sql + strlen(sql), " WHERE id=(SELECT id FROM general WHERE ri='%s');", escaped_ri);
         free(escaped_ri);
 
-        res = PQexec(pg_conn, sql);
+        res = PQexec(conn, sql);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            logger("DB", LOG_LEVEL_ERROR, "Failed to update %s table: %s", get_table_name(ty), PQerrorMessage(pg_conn));
+            logger("DB", LOG_LEVEL_ERROR, "Failed to update %s table: %s", get_table_name(ty), PQerrorMessage(conn));
             PQclear(res);
             free(sql);
             if (started_tx)
@@ -979,12 +980,10 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             return 0;
         }
         PQclear(res);
-        free(sql);
-        return 0;
     }
-    PQclear(res);
 
     free(sql);
+    pg_unlock();
     return 1;
 }
 
@@ -1002,6 +1001,7 @@ int db_delete_onem2m_resource(RTNode *rtnode)
     }
     
     if (!ri) {
+        pg_unlock();
         return 0;
     }
 
@@ -1011,18 +1011,20 @@ int db_delete_onem2m_resource(RTNode *rtnode)
     sprintf(sql, "DELETE FROM general WHERE uri LIKE '%s/%%' OR ri='%s';", escaped_uri, escaped_ri);
     logger("DB", LOG_LEVEL_DEBUG, "SQL : %s", sql);
     
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource: %s", PQerrorMessage(conn));
         PQclear(res);
         free(escaped_uri);
         free(escaped_ri);
+        pg_unlock();
         return 0;
     }
     PQclear(res);
     
     free(escaped_uri);
     free(escaped_ri);
+    pg_unlock();
     return 1;
 }
 
@@ -1041,12 +1043,14 @@ int db_delete_one_cin_mni(RTNode *cnt)
 
     if (!cnt) {
         logger("DB", LOG_LEVEL_ERROR, "CNT node is NULL");
+        pg_unlock();
         return -1;
     }
 
     char *cnt_ri = get_ri_rtnode(cnt);
     if (!cnt_ri) {
         logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from CNT node");
+        pg_unlock();
         return -1;
     }
 
@@ -1055,11 +1059,12 @@ int db_delete_one_cin_mni(RTNode *cnt)
     // Find the oldest CIN (lowest lt value) under this CNT
     sprintf(sql, "SELECT general.ri, cin.cs FROM general, cin WHERE general.pi='%s' AND general.id = cin.id ORDER BY general.lt ASC LIMIT 1;", escaped_cnt_ri);
     
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed to select oldest CIN: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed to select oldest CIN: %s", PQerrorMessage(conn));
         PQclear(res);
         free(escaped_cnt_ri);
+        pg_unlock();
         return -1;
     }
 
@@ -1067,6 +1072,7 @@ int db_delete_one_cin_mni(RTNode *cnt)
         logger("DB", LOG_LEVEL_DEBUG, "No CIN found to delete under CNT: %s", cnt_ri);
         PQclear(res);
         free(escaped_cnt_ri);
+        pg_unlock();
         return 0;
     }
 
@@ -1084,13 +1090,14 @@ int db_delete_one_cin_mni(RTNode *cnt)
     char *escaped_ri = pg_escape_string_value(ri_copy);
     sprintf(sql, "DELETE FROM general WHERE ri='%s';", escaped_ri);
     
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from general: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from general: %s", PQerrorMessage(conn));
         PQclear(res);
         free(escaped_cnt_ri);
         free(escaped_ri);
         free(ri_copy);
+        pg_unlock();
         return -1;
     }
     PQclear(res);
@@ -1098,7 +1105,7 @@ int db_delete_one_cin_mni(RTNode *cnt)
     free(escaped_cnt_ri);
     free(escaped_ri);
     free(ri_copy);
-    
+    pg_unlock();
     return latest_cs;
 }
 
@@ -1120,10 +1127,11 @@ RTNode *db_get_all_resource_as_rtnode()
     // Select all resources except CIN (ty=4) and Sub (ty=23) 
     sprintf(sql, "SELECT * FROM general WHERE ty != 4 AND ty != 23;");
     
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed select from general: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed select from general: %s", PQerrorMessage(conn));
         PQclear(res);
+        pg_unlock();
         return NULL;
     }
 
@@ -1164,9 +1172,9 @@ RTNode *db_get_all_resource_as_rtnode()
         char sql2[1024] = {0};
         sprintf(sql2, "SELECT * FROM %s WHERE id=%d;", get_table_name(ty), id);
         
-        res2 = PQexec(pg_conn, sql2);
+        res2 = PQexec(conn, sql2);
         if (PQresultStatus(res2) != PGRES_TUPLES_OK) {
-            logger("DB", LOG_LEVEL_ERROR, "Failed select from %s: %s", get_table_name(ty), PQerrorMessage(pg_conn));
+            logger("DB", LOG_LEVEL_ERROR, "Failed select from %s: %s", get_table_name(ty), PQerrorMessage(conn));
             PQclear(res2);
             cJSON_Delete(json);
             continue;
@@ -1216,6 +1224,7 @@ RTNode *db_get_all_resource_as_rtnode()
     }
 
     PQclear(res);
+    pg_unlock();
     return head;
 }
 
@@ -1248,11 +1257,12 @@ RTNode *db_get_cin_rtnode_list(RTNode *parent_rtnode)
     char *escaped_pi = pg_escape_string_value(pi);
     sprintf(sql, "SELECT * FROM general, cin WHERE general.pi='%s' AND general.id=cin.id ORDER BY general.id ASC;", escaped_pi);
 
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(conn));
         PQclear(res);
         free(escaped_pi);
+        pg_unlock();
         return NULL;
     }
 
@@ -1300,6 +1310,7 @@ RTNode *db_get_cin_rtnode_list(RTNode *parent_rtnode)
 
     PQclear(res);
     free(escaped_pi);
+    pg_unlock();
     return head;
 }
 
@@ -1321,10 +1332,11 @@ RTNode *db_get_latest_cins()
     // Get the latest CIN (highest id) for each CNT (grouped by pi)
     sprintf(sql, "SELECT * FROM general, cin WHERE general.id IN (SELECT max(id) FROM general WHERE ty=4 GROUP BY pi) AND general.id=cin.id;");
     
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(conn));
         PQclear(res);
+        pg_unlock();
         return NULL;
     }
 
@@ -1371,6 +1383,7 @@ RTNode *db_get_latest_cins()
     }
 
     PQclear(res);
+    pg_unlock();
     return head;
 }
 
@@ -1384,6 +1397,12 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol)
     char sql[1024] = {0};
     char *ord = NULL;
     PGresult *res;
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return NULL;
+    }
     cJSON *json, *arr;
 
     // Determine order (Latest: DESC, Oldest: ASC)
@@ -1396,12 +1415,14 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol)
         break;
     default:
         logger("DB", LOG_LEVEL_DEBUG, "Invalid la ol flag");
+        pg_unlock();
         return NULL;
     }
 
     char *parent_ri = get_ri_rtnode(parent_rtnode);
     if (!parent_ri) {
         logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from parent rtnode");
+        pg_unlock();
         return NULL;
     }
 
@@ -1410,11 +1431,12 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol)
     
     logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
     
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(conn));
         PQclear(res);
         free(escaped_pi);
+        pg_unlock();
         return NULL;
     }
 
@@ -1422,6 +1444,7 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol)
         logger("DB", LOG_LEVEL_DEBUG, "No CIN found for parent: %s", parent_ri);
         PQclear(res);
         free(escaped_pi);
+        pg_unlock();
         return NULL;
     }
 
@@ -1455,6 +1478,7 @@ cJSON *db_get_cin_laol(RTNode *parent_rtnode, int laol)
 
     PQclear(res);
     free(escaped_pi);
+    pg_unlock();
     return json;
 }
 
@@ -1611,11 +1635,12 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
     strcat(sql, ";");
     logger("DB", LOG_LEVEL_DEBUG, "Filter SQL: %s", sql);
     
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed filter query: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed filter query: %s", PQerrorMessage(conn));
         PQclear(res);
         free(escaped_uri);
+        pg_unlock();
         return json;
     }
 
@@ -1639,6 +1664,7 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 
     PQclear(res);
     free(escaped_uri);
+    pg_unlock();
     return json;
 }
 
@@ -1660,12 +1686,13 @@ bool db_check_cin_rn_dup(char *rn, char *pi)
     
     sprintf(sql, "SELECT * FROM general WHERE rn='%s' AND pi='%s';", escaped_rn, escaped_pi);
     
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Query failed: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Query failed: %s", PQerrorMessage(conn));
         PQclear(res);
         free(escaped_rn);
         free(escaped_pi);
+        pg_unlock();
         return false;
     }
     
@@ -1673,7 +1700,7 @@ bool db_check_cin_rn_dup(char *rn, char *pi)
     PQclear(res);
     free(escaped_rn);
     free(escaped_pi);
-    
+    pg_unlock();
     return result;
 }
 
@@ -1731,10 +1758,11 @@ cJSON *getForbiddenUri(cJSON *acp_list)
     
     logger("DB", LOG_LEVEL_DEBUG, "getForbiddenUri SQL: %s", sql);
     
-    res = PQexec(pg_conn, sql);
+    res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "Failed select in getForbiddenUri: %s", PQerrorMessage(pg_conn));
+        logger("DB", LOG_LEVEL_ERROR, "Failed select in getForbiddenUri: %s", PQerrorMessage(conn));
         PQclear(res);
+        pg_unlock();
         return result;
     }
 
@@ -1747,6 +1775,7 @@ cJSON *getForbiddenUri(cJSON *acp_list)
     }
 
     PQclear(res);
+    pg_unlock();
     return result;
 }
 

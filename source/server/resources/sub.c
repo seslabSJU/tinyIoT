@@ -83,9 +83,8 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         {
             continue;
         }
-
-        result = send_verification_request(pjson->valuestring, noti_cjson);
-        logger("SUB", LOG_LEVEL_INFO, "vrq result : %d", result);
+        result = send_verification_request(o2pt->to, pjson->valuestring, noti_cjson);
+        
 
         if (result == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE)
         {
@@ -177,7 +176,7 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             {
                 continue;
             }
-            if (send_verification_request(pjson->valuestring, noti_cjson) != RSC_OK)
+            if (send_verification_request(o2pt->to, pjson->valuestring, noti_cjson) != RSC_OK)
             {
                 cJSON_Delete(noti_cjson);
 
