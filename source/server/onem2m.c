@@ -23,7 +23,7 @@
 #include "mqttClient.h"
 
 #ifdef ENABLE_WS
-// #include "websocket/websocket_server.h"
+#include "websocket/websocket_server.h"
 #endif
 
 
@@ -1215,11 +1215,13 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 
 		cJSON *net_obj = cJSON_GetObjectItem(cJSON_GetObjectItem(node->rtnode->obj, "enc"), "net");
+		logger("DEBUG", LOG_LEVEL_DEBUG, "node->rtnode->obj : %s", cJSON_PrintUnformatted(node->rtnode->obj));
 
 		if (net_obj)
 		{
 			cJSON_ArrayForEach(pjson, net_obj)
 			{
+				logger("DEBUG", LOG_LEVEL_DEBUG, "pjson->valueint : %d", pjson->valueint);
 				if (pjson->valueint == net)
 				{
 					logger("O2M", LOG_LEVEL_DEBUG, "notify to nu \n%s", cJSON_Print(noti_cjson));
@@ -1504,13 +1506,6 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	cJSON *csr = target_rtnode->obj;
 	cJSON *poa_list = cJSON_GetObjectItem(csr, "poa");
-
-	
-#ifdef ENABLE_WS	
-	websocket_check_and_forwarding_from_sessionTable(o2pt, target_rtnode); // 목적지 rt주소로 세션 조회 및 전송
-	//ws 세션이 존재할경우 전송되고
-	//poa에 이것이 존재하든 말든 일단 전송됨
-#endif
 	
 	cJSON *poa = NULL;
 

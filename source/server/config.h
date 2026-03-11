@@ -11,7 +11,7 @@
 #define CSE_BASE_NAME "TinyIoT"
 #define CSE_BASE_RI "tinyiot"
 #define CSE_BASE_SP_ID "tinyiot.example.com"
-#define CSE_RVI RVI_2a
+#define CSE_RVI RVI_3
 
 #if SERVER_TYPE == MN_CSE
 #define REMOTE_CSE_ID ""
