@@ -63,29 +63,22 @@ static void set_last_gen_us_for_ri(const char *ri, long long v) {
 static int should_throttle_missing(const char *ri, long long now_us, long long pei_us) {
     if (!ri || pei_us <= 0) return 0;
     long long last = get_last_gen_us_for_ri(ri);
-    // If we generated missing data recently (< pei), skip this cycle.
     if (last > 0 && (now_us - last) < pei_us) return 1;
     return 0;
 }
 
-// Throttle missing-data NOTIFICATION per SUB to respect SUB.enc.md.dur as a cooldown between notifications.
-// Tracks pending in-flight notification to prevent duplicate sends.
 typedef struct _sub_md_notify_throttle_entry {
     char ri[256];
-    long long last_notify_ts_us;     // TS-time when we last successfully sent a missing-data notification for this SUB
-    long long pending_reserve_us;    // TS-time reserved for an in-flight notification (prevents duplicate sends)
-    int pending;                     // 1 while a notification is in-flight for this SUB
+    long long last_notify_ts_us;     
+    long long pending_reserve_us;   
+    int pending;                    
     struct _sub_md_notify_throttle_entry *next;
 } sub_md_notify_throttle_entry_t;
 
 
 static sub_md_notify_throttle_entry_t *g_sub_md_notify_throttle = NULL;
-// Protect g_sub_md_notify_throttle against concurrent access from monitor thread and request threads.
 static pthread_mutex_t g_sub_md_notify_lock = PTHREAD_MUTEX_INITIALIZER;
 
-// Begin missing-data notification cooldown enforcement for a SUB.
-// Returns 1 if the notification should be SUPPRESSED.
-// Returns 0 if allowed, and marks the SUB as "pending" to prevent duplicate sends from concurrent callers.
 static int md_notify_try_begin(const char *sub_ri, long long event_us, long long dur_us) {
     if (!sub_ri || dur_us <= 0) return 0;
     logger("TSI_TRACE", LOG_LEVEL_DEBUG, "md_notify_try_begin: subRi=%s event_us=%lld dur_us=%lld", sub_ri, event_us, dur_us);
@@ -97,10 +90,7 @@ static int md_notify_try_begin(const char *sub_ri, long long event_us, long long
             logger("TSI_TRACE", LOG_LEVEL_DEBUG,
                    "md_notify_try_begin: found entry subRi=%s last_notify_ts_us=%lld pending=%d pending_reserve_us=%lld",
                    sub_ri, e->last_notify_ts_us, e->pending, e->pending_reserve_us);
-            // If another thread is already sending a missing-data notification for this SUB,
-            // then wait briefly for it to finish. This prevents a race where the caller that
-            // hits the threshold gets suppressed before the in-flight notification is actually
-            // delivered (unit tests then observe no notification).
+
             if (e->pending) {
                 logger("TSI_TRACE", LOG_LEVEL_DEBUG, "md_notify_try_begin: subRi=%s is pending -> waiting", sub_ri);
                 pthread_mutex_unlock(&g_sub_md_notify_lock);
@@ -267,10 +257,6 @@ static long long current_md_event_us(cJSON *ts_mdlt) {
     return wallclock_now_us();
 }
 
-// --- Simple HTTP notifier (non-VRQ) -------------------------------------------------
-// Sends a plain HTTP/1.1 POST with JSON body to the given URL (http://host:port[/path]).
-// This is used for SUB notifications. It intentionally does NOT mark the payload as VRQ.
-// Returns 2000 on 2xx response, else 4000.
 static int http_post_json_simple(const char *url, const char *json_body) {
     if (!url || !json_body) return 4000;
     logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: url=%s body_len=%zu", url, strlen(json_body));
