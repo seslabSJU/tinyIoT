@@ -26,7 +26,7 @@
 #define DB_POSTGRESQL 2
 
 // Select Database Type: DB_SQLITE or DB_POSTGRESQL
-#define DB_TYPE DB_SQLITE
+#define DB_TYPE DB_POSTGRESQL
 // #define DB_TYPE DB_POSTGRESQL
 
 
@@ -102,7 +102,7 @@
 // MQTT Settings
 
 // To enable MQTT, de-comment the following line
-#define ENABLE_MQTT
+// #define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
 // #define ENABLE_MQTT_WEBSOCKET

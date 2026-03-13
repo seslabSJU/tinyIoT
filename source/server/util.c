@@ -651,33 +651,6 @@ void get_child_references(oneM2MPrimitive* o2pt, RTNode* rtnode, cJSON* result_o
 			RTNode* cin_list_head = db_get_cin_rtnode_list(child);
 
 			RTNode* cin = cin_list_head;
-
-			while (cin)
-			{
-				if (*ofst <= 0 && *lim > 0)
-				{
-					if (isResourceAptFC(o2pt, cin, o2pt->fc))
-					{
-						root = cJSON_CreateObject();
-						cJSON_AddStringToObject(root, "nm", cin->rn);
-						cJSON_AddNumberToObject(root, "typ", cin->ty);
-						if (o2pt->drt == DRT_STRUCTURED)
-						{
-							cJSON_AddStringToObject(root, "val", child->uri);
-						}
-						else
-						{
-							cJSON_AddStringToObject(root, "val", cJSON_GetObjectItem(child->obj, "ri")->valuestring);
-						}
-						cJSON_AddItemToArray(result_obj, root);
-					}
-					else
-					{
-						*ofst -= 1;
-					}
-				}
-				cin = cin->sibling_right;
-			}
 			free_rtnode_list(cin_list_head);
 		}
 		if (rcn == RCN_CHILD_RESOURCES || RCN_CHILD_RESOURCE_REFERENCES)
@@ -710,11 +683,11 @@ void get_child_references(oneM2MPrimitive* o2pt, RTNode* rtnode, cJSON* result_o
 					cJSON_AddNumberToObject(root, "typ", cin->ty);
 					if (o2pt->drt == DRT_STRUCTURED)
 					{
-						cJSON_AddStringToObject(root, "val", child->uri);
+						cJSON_AddStringToObject(root, "val", cin->uri);
 					}
 					else
 					{
-						cJSON_AddStringToObject(root, "val", cJSON_GetObjectItem(child->obj, "ri")->valuestring);
+						cJSON_AddStringToObject(root, "val", cJSON_GetObjectItem(cin->obj, "ri")->valuestring);
 					}
 					cJSON_AddItemToArray(result_obj, root);
 				}
@@ -1783,25 +1756,21 @@ int make_response_body(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 			cJSON_Delete(root);
 			return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "Internal Server Error");
 		}
-		if (o2pt->op == OP_CREATE)
-		{
-			cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);
+		if (o2pt->op == OP_CREATE) {
+			cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), cJSON_Duplicate(target_rtnode->obj, true));
 			pjson2 = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(target_rtnode->ty));
 			pjson3 = cJSON_GetObjectItem(root, get_resource_key(target_rtnode->ty));
-			cJSON_ArrayForEach(pjson, pjson2)
-				/*{
+			
+			if (pjson2 && pjson3) {
+				pjson = NULL;
+				cJSON_ArrayForEach(pjson, pjson2){
 					cJSON_DeleteItemFromObject(pjson3, pjson->string);
-				}*/
-
-				if (pjson2 && pjson3) {
-					cJSON_ArrayForEach(pjson2, pjson3) {
-						cJSON_DeleteItemFromObject(pjson3, pjson->string);
-					}
 				}
+			}
 		}
 		else
 		{
-			cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), o2pt->request_pc);
+			root = cJSON_Duplicate(o2pt->request_pc, true);
 		}
 		break;
 	case RCN_SEMANTIC_CONTENT:
