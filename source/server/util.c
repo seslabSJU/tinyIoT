@@ -2657,6 +2657,18 @@ int requestToResource(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 		cJSON_ArrayForEach(pjson, poa)
 		{
+<<<<<<< HEAD
+=======
+			logger("UTIL", LOG_LEVEL_DEBUG, "pjson->valuestring [%s]", pjson->valuestring);
+			if(strcmp(pjson->valuestring, "ws://default") == 0 ||strcmp(pjson->valuestring, "ws://") == 0 || strcmp(pjson->valuestring, "ws") == 0 ){
+#ifdef ENABLE_WS
+				websocket_check_and_forwarding_from_sessionTable(o2pt, rtnode);
+#endif
+				break;
+			}
+
+
+>>>>>>> d506e4a (Fitx hostname, sqlite build)
 			if (parsePoa(pjson->valuestring, &prot, &host, &port, &path) == -1)
 			{
 				logger("UTIL", LOG_LEVEL_DEBUG, "poa parse error %d", 0);
@@ -2751,6 +2763,18 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		int port;
 		nt = calloc(1, sizeof(NotiTarget));
 
+<<<<<<< HEAD
+=======
+		printf("noti_uri : %s\n", noti_uri);
+		if(strcmp(noti_uri, "ws://default") == 0 ||strcmp(noti_uri, "ws://") == 0 || strcmp(noti_uri, "ws") == 0 ){
+			o2pt->to = strdup(to);
+#ifdef ENABLE_WS
+			websocket_check_and_forwarding_from_sessionTable(o2pt, rtnode);
+#endif
+			return 2000;
+		}
+
+>>>>>>> d506e4a (Fitx hostname, sqlite build)
 		if (parsePoa(noti_uri, &prot, &host, &port, &path) == -1)
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "poa parse error");
@@ -2824,6 +2848,18 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 		char *noti_uri = strdup(pjson->valuestring);
 		logger("UTIL", LOG_LEVEL_DEBUG, "noti_uri : %s", noti_uri);
 		index = 0;
+<<<<<<< HEAD
+=======
+
+
+		if(strcmp(pjson->valuestring, "ws://default") == 0 ||strcmp(pjson->valuestring, "ws://") == 0 || strcmp(pjson->valuestring, "ws") == 0 ){
+#ifdef ENABLE_WS
+			websocket_check_and_forwarding_from_sessionTable(o2pt, rtnode);
+#endif
+			break;
+		}
+
+>>>>>>> d506e4a (Fitx hostname, sqlite build)
 		ResourceAddressingType rat = checkResourceAddressingType(noti_uri);
 
 		if (rat == CSE_RELATIVE)

@@ -40,7 +40,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install isodate
+          pip install isodate requests rich
 
       - name: Setup PostgreSQL database
         env:
@@ -90,9 +90,24 @@ jobs:
             exit 1
           fi
 
-      - name: Run tests
+      - name: Run tinyIoT tests
         run: |
           cd tests
+          python3 testCSE.py
+          python3 testAE.py
+          python3 testCNT.py
+          python3 testCIN.py
+          python3 testCNT_CIN.py
+          python3 testGRP.py
+
+      - name: Run ACME-ported tests
+        env:
+          CSE_HOST: localhost
+          CSE_PORT: 3050
+          CSE_RN: TinyIoT
+          CSE_RI: tinyiot
+        run: |
+          cd tests/acme
           python3 testCSE.py
           python3 testAE.py
           python3 testCNT.py

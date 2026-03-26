@@ -1,0 +1,132 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  test-sqlite:
+    image: ubuntu:22.04
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        echo "=== Installing dependencies ==="
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y \
+          build-essential libssl-dev libpq-dev sqlite3 \
+          libwebsockets-dev pkg-config python3 python3-pip
+        pip3 install isodate --break-system-packages
+
+        echo "=== Configuring for SQLite ==="
+        cd source/server
+        sed -i 's/^#define DB_TYPE DB_POSTGRESQL/#define DB_TYPE DB_SQLITE/' config.h
+        grep '^#define DB_TYPE' config.h
+
+        echo "=== Building server ==="
+        make clean
+        make
+        ls -lh server
+
+        echo "=== Starting server ==="
+        ./server &
+        SERVER_PID=$$!
+        sleep 5
+
+        if ps -p $$SERVER_PID > /dev/null; then
+          echo "✓ Server is running"
+          cd /workspace/tests
+          echo "=== Running tests ==="
+          python3 testCSE.py
+          python3 testAE.py
+          python3 testCNT.py
+          python3 testCIN.py
+          python3 testCNT_CIN.py
+          python3 testGRP.py
+          echo "✓ All tests passed!"
+          kill $$SERVER_PID
+        else
+          echo "✗ Server failed to start"
+          exit 1
+        fi
+
+  test-postgresql:
+    image: ubuntu:22.04
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      PGPASSWORD: postgres
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        echo "=== Installing dependencies ==="
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y \
+          build-essential libssl-dev libpq-dev postgresql-client \
+          sqlite3 libwebsockets-dev pkg-config python3 python3-pip
+        pip3 install isodate --break-system-packages
+
+        echo "=== Setting up PostgreSQL database ==="
+        until pg_isready -h postgres -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+        psql -h postgres -U postgres -c "CREATE DATABASE tinyiot;"
+        psql -h postgres -U postgres -c "CREATE USER tinyiot WITH PASSWORD 'tinyiot';"
+        psql -h postgres -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE tinyiot TO tinyiot;"
+        psql -h postgres -U postgres -c "ALTER DATABASE tinyiot OWNER TO tinyiot;"
+
+        echo "=== Configuring for PostgreSQL ==="
+        cd source/server
+        sed -i 's/^#define DB_TYPE DB_SQLITE/#define DB_TYPE DB_POSTGRESQL/' config.h
+        sed -i 's/#define PG_HOST ".*"/#define PG_HOST "postgres"/' config.h
+        sed -i 's/#define PG_USER ".*"/#define PG_USER "tinyiot"/' config.h
+        sed -i 's/#define PG_PASSWORD ".*"/#define PG_PASSWORD "tinyiot"/' config.h
+        sed -i 's/#define PG_DBNAME ".*"/#define PG_DBNAME "tinyiot"/' config.h
+        grep '^#define DB_TYPE' config.h
+        grep '^#define PG_' config.h
+
+        echo "=== Building server ==="
+        make clean
+        make
+        ls -lh server
+
+        echo "=== Starting server ==="
+        ./server &
+        SERVER_PID=$$!
+        sleep 5
+
+        if ps -p $$SERVER_PID > /dev/null; then
+          echo "✓ Server is running"
+          cd /workspace/tests
+          echo "=== Running tests ==="
+          python3 testCSE.py
+          python3 testAE.py
+          python3 testCNT.py
+          python3 testCIN.py
+          python3 testCNT_CIN.py
+          python3 testGRP.py
+          echo "✓ All tests passed!"
+          kill $$SERVER_PID
+        else
+          echo "✗ Server failed to start"
+          exit 1
+        fi

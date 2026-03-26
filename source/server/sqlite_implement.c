@@ -14,6 +14,95 @@
 #include "sqlite/sqlite3.h"
 sqlite3 *db;
 
+static pthread_mutex_t sqlite_tx_lock;
+static pthread_mutexattr_t sqlite_tx_lock_attr;
+static int sqlite_lock_initialized = 0;
+static int sqlite_tx_depth = 0;
+static pthread_t sqlite_tx_owner;
+static int sqlite_tx_owner_valid = 0;
+
+static void sqlite_lock(void)
+{
+    if (sqlite_lock_initialized)
+        pthread_mutex_lock(&sqlite_tx_lock);
+}
+
+static void sqlite_unlock(void)
+{
+    if (sqlite_lock_initialized)
+        pthread_mutex_unlock(&sqlite_tx_lock);
+}
+
+int db_begin_tx()
+{
+    if (sqlite_tx_owner_valid && pthread_equal(sqlite_tx_owner, pthread_self())) {
+        sqlite_tx_depth++;
+        return 1;
+    }
+
+    sqlite_lock();
+    if (sqlite_tx_depth != 0) {
+        logger("DB", LOG_LEVEL_ERROR, "Transaction owner mismatch");
+        sqlite_unlock();
+        return 0;
+    }
+
+    int rc = sqlite3_exec(db, "BEGIN", NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to begin transaction: %s", sqlite3_errmsg(db));
+        sqlite_unlock();
+        return 0;
+    }
+    sqlite_tx_owner = pthread_self();
+    sqlite_tx_owner_valid = 1;
+    sqlite_tx_depth = 1;
+    return 1;
+}
+
+int db_commit_tx()
+{
+    if (!sqlite_tx_owner_valid || !pthread_equal(sqlite_tx_owner, pthread_self())) {
+        logger("DB", LOG_LEVEL_ERROR, "Commit without transaction ownership");
+        return 0;
+    }
+    if (sqlite_tx_depth == 0) {
+        return 0;
+    }
+    sqlite_tx_depth--;
+    if (sqlite_tx_depth == 0) {
+        int rc = sqlite3_exec(db, "COMMIT", NULL, NULL, NULL);
+        if (rc != SQLITE_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to commit transaction: %s", sqlite3_errmsg(db));
+            return 0;
+        }
+        sqlite_tx_owner_valid = 0;
+        sqlite_unlock();
+    }
+    return 1;
+}
+
+int db_rollback_tx()
+{
+    if (!sqlite_tx_owner_valid || !pthread_equal(sqlite_tx_owner, pthread_self())) {
+        logger("DB", LOG_LEVEL_ERROR, "Rollback without transaction ownership");
+        return 0;
+    }
+    if (sqlite_tx_depth == 0) {
+        sqlite_tx_owner_valid = 0;
+        sqlite_unlock();
+        return 0;
+    }
+    sqlite_tx_depth = 0;
+    int rc = sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to rollback transaction: %s", sqlite3_errmsg(db));
+        return 0;
+    }
+    sqlite_tx_owner_valid = 0;
+    sqlite_unlock();
+    return 1;
+}
+
 extern cJSON *ATTRIBUTES;
 extern ResourceTree *rt;
 
@@ -124,6 +213,13 @@ int init_dbp()
 {
     char *err_msg = NULL;
     int rc = 0;
+
+    if (!sqlite_lock_initialized) {
+        pthread_mutexattr_init(&sqlite_tx_lock_attr);
+        pthread_mutexattr_settype(&sqlite_tx_lock_attr, PTHREAD_MUTEX_RECURSIVE);
+        pthread_mutex_init(&sqlite_tx_lock, &sqlite_tx_lock_attr);
+        sqlite_lock_initialized = 1;
+    }
 
     // Open (or create) DB File
     rc = sqlite3_open("data.db", &db);
@@ -385,7 +481,7 @@ int db_store_resource(cJSON *obj, char *uri)
 {
     logger("DB", LOG_LEVEL_DEBUG, "Call db_store_resource with URI: %s", uri ? uri : "NULL");
     
-    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+    sqlite_lock();
     char *sql = NULL, *err_msg = NULL;
     cJSON *pjson = NULL;
     cJSON *GENERAL_ATTR = cJSON_GetObjectItem(ATTRIBUTES, "general");
@@ -393,14 +489,14 @@ int db_store_resource(cJSON *obj, char *uri)
 
     if (!obj) {
         logger("DB", LOG_LEVEL_ERROR, "Resource object is NULL");
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return -1;
     }
 
     cJSON *ty_obj = cJSON_GetObjectItem(obj, "ty");
     if (!ty_obj) {
         logger("DB", LOG_LEVEL_ERROR, "Missing 'ty' field in resource object");
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return -1;
     }
     ResourceType ty = ty_obj->valueint;
@@ -429,8 +525,11 @@ int db_store_resource(cJSON *obj, char *uri)
     
     sqlite3_stmt *stmt;
     int rc = 0;
-    logger("DB", LOG_LEVEL_DEBUG, "Executing: BEGIN TRANSACTION");
-    sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
+    int need_tx = (sqlite_tx_depth == 0);
+    if (need_tx) {
+        logger("DB", LOG_LEVEL_DEBUG, "Executing: BEGIN TRANSACTION");
+        sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
+    }
 
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
@@ -438,9 +537,9 @@ int db_store_resource(cJSON *obj, char *uri)
         logger("DB", LOG_LEVEL_DEBUG, "Failed SQL was: %s", sql);
         free(sql);
         logger("DB", LOG_LEVEL_ERROR, "prepare error store_resource");
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
         sqlite3_finalize(stmt);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return -1;
     }
 
@@ -468,8 +567,8 @@ int db_store_resource(cJSON *obj, char *uri)
         free(sql);
         logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg ? err_msg : "NULL");
         sqlite3_finalize(stmt);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
+        sqlite_unlock();
         return -1;
     }
 
@@ -480,8 +579,8 @@ int db_store_resource(cJSON *obj, char *uri)
     if (!specific_attr) {
         logger("DB", LOG_LEVEL_ERROR, "No specific attributes found for resource type %d", ty);
         free(sql);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
+        sqlite_unlock();
         return -1;
     }
 
@@ -512,8 +611,8 @@ int db_store_resource(cJSON *obj, char *uri)
         logger("DB", LOG_LEVEL_ERROR, "prepare error %d", rc);
         logger("DB", LOG_LEVEL_ERROR, "Failed SQL was: %s", sql);
         free(sql);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
+        sqlite_unlock();
         return -1;
     }
 
@@ -521,8 +620,8 @@ int db_store_resource(cJSON *obj, char *uri)
     if (!ri_obj || !cJSON_IsString(ri_obj)) {
         logger("DB", LOG_LEVEL_ERROR, "Missing or invalid 'ri' field in resource object");
         free(sql);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
+        sqlite_unlock();
         return -1;
     }
 
@@ -546,34 +645,32 @@ int db_store_resource(cJSON *obj, char *uri)
     {
         logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg ? err_msg : "NULL");
         free(sql);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
         sqlite3_finalize(stmt);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return -1;
     }
     logger("DB", LOG_LEVEL_DEBUG, "Specific table INSERT successful");
-    
-    logger("DB", LOG_LEVEL_DEBUG, "Executing: END TRANSACTION");
-    sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &err_msg);
-    if (err_msg)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Error: %s", err_msg);
-    }
-    else
-    {
-        logger("DB", LOG_LEVEL_DEBUG, "Transaction committed successfully");
+
+    if (need_tx) {
+        logger("DB", LOG_LEVEL_DEBUG, "Executing: END TRANSACTION");
+        sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &err_msg);
+        if (err_msg)
+            logger("DB", LOG_LEVEL_ERROR, "Error: %s", err_msg);
+        else
+            logger("DB", LOG_LEVEL_DEBUG, "Transaction committed successfully");
     }
 
     sqlite3_finalize(stmt);
     free(sql);
-    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    sqlite_unlock();
     logger("DB", LOG_LEVEL_DEBUG, "db_store_resource completed successfully");
     return 1;
 }
 
 int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
 {
-    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+    sqlite_lock();
     logger("DB", LOG_LEVEL_DEBUG, "Call db_update_resource [RI]: %s", ri);
     char *sql = NULL;
     cJSON *pjson = NULL;
@@ -581,14 +678,17 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
     int general_cnt = cJSON_GetArraySize(GENERAL_ATTR);
     char *err_msg = NULL;
 
-    int rc = sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Failed Begin Transaction: %s", err_msg);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
-        return 0;
+    int need_tx = (sqlite_tx_depth == 0);
+    if (need_tx) {
+        int rc2 = sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
+        if (rc2 != SQLITE_OK)
+        {
+            logger("DB", LOG_LEVEL_ERROR, "Failed Begin Transaction: %s", err_msg);
+            sqlite_unlock();
+            return 0;
+        }
     }
+    int rc = 0;
     int idx = 0;
     sql = malloc(1024);
     sprintf(sql, "UPDATE general SET ");
@@ -616,8 +716,8 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         {
             free(sql);
             logger("DB", LOG_LEVEL_ERROR, "prepare error");
-            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-            sqlite3_mutex_leave(sqlite3_db_mutex(db));
+            if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite_unlock();
             return 0;
         }
         int idx = 1;
@@ -637,8 +737,8 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         {
             free(sql);
             logger("DB", LOG_LEVEL_ERROR, "Failed Update SQL: %s, msg : %s", sql, err_msg);
-            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-            sqlite3_mutex_leave(sqlite3_db_mutex(db));
+            if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite_unlock();
             return 0;
         }
 
@@ -671,8 +771,8 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             logger("DB", LOG_LEVEL_ERROR, "prepare error");
             free(sql);
             sqlite3_finalize(stmt);
-            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-            sqlite3_mutex_leave(sqlite3_db_mutex(db));
+            if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite_unlock();
             return 0;
         }
 
@@ -693,17 +793,17 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         {
             logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
             free(sql);
-            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-            sqlite3_mutex_leave(sqlite3_db_mutex(db));
+            if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite_unlock();
             return 0;
         }
 
         sqlite3_finalize(stmt);
     }
 
-    sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+    if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
     free(sql);
-    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    sqlite_unlock();
     // Update uri of all child resources
     return 1;
 }
@@ -767,7 +867,7 @@ int db_delete_onem2m_resource(RTNode *rtnode)
     {
         return 0;
     }
-    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+    sqlite_lock();
 
     // sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
     sprintf(sql, "DELETE FROM general WHERE uri LIKE '%s/%%' OR ri='%s';", get_uri_rtnode(rtnode), ri);
@@ -777,10 +877,10 @@ int db_delete_onem2m_resource(RTNode *rtnode)
     {
         logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from %s/ msg : %s", tableName, err_msg);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return 0;
     }
-    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    sqlite_unlock();
 
     return 1;
 }
