@@ -2603,7 +2603,9 @@ int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode)
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "pjson->valuestring [%s]", pjson->valuestring);
 			if(strcmp(pjson->valuestring, "ws://default") == 0 ||strcmp(pjson->valuestring, "ws://") == 0 || strcmp(pjson->valuestring, "ws") == 0 ){
+#ifdef ENABLE_WS
 				websocket_check_and_forwarding_from_sessionTable(o2pt, rtnode);
+#endif
 				break;
 			}
 
@@ -2727,7 +2729,9 @@ int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson)
 		printf("noti_uri : %s\n", noti_uri);
 		if(strcmp(noti_uri, "ws://default") == 0 ||strcmp(noti_uri, "ws://") == 0 || strcmp(noti_uri, "ws") == 0 ){
 			o2pt->to = strdup(to);
+#ifdef ENABLE_WS
 			websocket_check_and_forwarding_from_sessionTable(o2pt, rtnode);
+#endif
 			return 2000;
 		}
 
@@ -2816,7 +2820,9 @@ int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net)
 
 
 		if(strcmp(pjson->valuestring, "ws://default") == 0 ||strcmp(pjson->valuestring, "ws://") == 0 || strcmp(pjson->valuestring, "ws") == 0 ){
+#ifdef ENABLE_WS
 			websocket_check_and_forwarding_from_sessionTable(o2pt, rtnode);
+#endif
 			break;
 		}
 
