@@ -100,6 +100,12 @@ ResourceType http_parse_object_type(header_t* headers)
 	case 23:
 		ty = RT_SUB;
 		break;
+	case 29:
+		ty = RT_TS;
+		break;
+	case 30:
+		ty = RT_TSI;
+		break;
 	case 10002:
 		ty = RT_AEA;
 		break;
@@ -158,6 +164,14 @@ ResourceType coap_parse_object_type(int object_type)
 	case 23:
 	case 71:
 		ty = RT_SUB;
+		break;
+	case 29:
+	case 77:
+		ty = RT_TS;
+		break;
+	case 30:
+	case 78:
+		ty = RT_TSI;
 		break;
 	default:
 		ty = RT_MIXED;
@@ -242,6 +256,12 @@ char* get_resource_key(ResourceType ty)
 	case RT_CINA:
 		key = "m2m:cinA";
 		break;
+	case RT_TS:
+		key = "m2m:ts";
+		break;
+	case RT_TSI:
+		key = "m2m:tsi";
+		break;
 	case RT_CBA:
 		key = "m2m:cbA";
 		break;
@@ -279,6 +299,10 @@ ResourceType parse_object_type_cjson(cJSON* cjson)
 		ty = RT_CIN;
 	else if (cJSON_GetObjectItem(cjson, "m2m:sub"))
 		ty = RT_SUB;
+	else if (cJSON_GetObjectItem(cjson, "m2m:ts"))
+		ty = RT_TS;
+	else if (cJSON_GetObjectItem(cjson, "m2m:tsi"))
+		ty = RT_TSI;
 	else if (cJSON_GetObjectItem(cjson, "m2m:grp"))
 		ty = RT_GRP;
 	else if (cJSON_GetObjectItem(cjson, "m2m:acp"))
@@ -316,6 +340,12 @@ char* resource_identifier(ResourceType ty, char* ct)
 		break;
 	case RT_SUB:
 		strcpy(ri, "23-");
+		break;
+	case RT_TS:
+		strcpy(ri, "29-");
+		break;
+	case RT_TSI:
+		strcpy(ri, "30-");
 		break;
 	case RT_ACP:
 		strcpy(ri, "1-");
@@ -2367,6 +2397,10 @@ cJSON* getResource(cJSON* root, ResourceType ty)
 		return cJSON_GetObjectItem(root, "m2m:cinA");
 	case RT_CNTA:
 		return cJSON_GetObjectItem(root, "m2m:cntA");
+	case RT_TS:
+		return cJSON_GetObjectItem(root, "m2m:ts");
+	case RT_TSI:
+		return cJSON_GetObjectItem(root, "m2m:tsi");
 	}
 	return NULL;
 }
@@ -4081,6 +4115,14 @@ bool isValidChildType(ResourceType parent, ResourceType child)
 		break;
 	case RT_CNT:
 		if (child == RT_CIN || child == RT_SUB || child == RT_CNT || child == RT_SMD || child == RT_FCNT || child == RT_TS)
+			return true;
+		break;
+	case RT_TS:
+		if (child == RT_TSI || child == RT_SUB)
+			return true;
+		break;
+	case RT_TSI:
+		if (child == RT_SUB)
 			return true;
 		break;
 	case RT_CIN:

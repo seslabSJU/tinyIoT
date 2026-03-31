@@ -14,10 +14,6 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 
 extern pthread_mutex_t main_lock;
 extern int terminate;
@@ -257,169 +253,6 @@ static long long current_md_event_us(cJSON *ts_mdlt) {
     return wallclock_now_us();
 }
 
-static int http_post_json_simple(const char *url, const char *json_body) {
-    if (!url || !json_body) return 4000;
-    logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: url=%s body_len=%zu", url, strlen(json_body));
-
-    // Only support http:// URLs for unit tests.
-    const char *p = NULL;
-    if (strncmp(url, "http://", 7) == 0) {
-        p = url + 7;
-    } else {
-        logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: unsupported url scheme: %s", url);
-        return 4000;
-    }
-
-    // Extract host[:port][/path]
-    char host[256] = {0};
-    char port[16] = {0};
-    char path[512] = {0};
-
-    const char *slash = strchr(p, '/');
-    size_t hostport_len = slash ? (size_t)(slash - p) : strlen(p);
-    if (hostport_len == 0 || hostport_len >= sizeof(host)) {
-        logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: invalid hostport in url: %s", url);
-        return 4000;
-    }
-
-    char hostport[256] = {0};
-    memcpy(hostport, p, hostport_len);
-    hostport[hostport_len] = '\0';
-
-    if (slash) {
-        snprintf(path, sizeof(path), "%s", slash);
-    } else {
-        strcpy(path, "/");
-    }
-
-    // Split host and port
-    const char *colon = strrchr(hostport, ':');
-    if (colon) {
-        size_t hlen = (size_t)(colon - hostport);
-        if (hlen == 0 || hlen >= sizeof(host)) {
-            logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: invalid host in url: %s", url);
-            return 4000;
-        }
-        memcpy(host, hostport, hlen);
-        host[hlen] = '\0';
-        snprintf(port, sizeof(port), "%s", colon + 1);
-        if (strlen(port) == 0) {
-            logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: missing port in url: %s", url);
-            return 4000;
-        }
-    } else {
-        snprintf(host, sizeof(host), "%s", hostport);
-        snprintf(port, sizeof(port), "%d", 80);
-    }
-
-    // Resolve & connect
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-
-    struct addrinfo *res = NULL;
-    if (getaddrinfo(host, port, &hints, &res) != 0 || !res) {
-        logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: getaddrinfo failed host=%s port=%s", host, port);
-        return 4000;
-    }
-
-    int sock = -1;
-    struct addrinfo *rp;
-    for (rp = res; rp != NULL; rp = rp->ai_next) {
-        sock = (int)socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (sock < 0) continue;
-        if (connect(sock, rp->ai_addr, rp->ai_addrlen) == 0) break;
-        close(sock);
-        sock = -1;
-    }
-    freeaddrinfo(res);
-    if (sock < 0) {
-        logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: connect failed host=%s port=%s path=%s", host, port, path);
-        return 4000;
-    }
-
-    // Prevent blocking forever on recv
-    struct timeval rcv_to;
-    rcv_to.tv_sec = 2;
-    rcv_to.tv_usec = 0;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&rcv_to, sizeof(rcv_to));
-
-    // Build request
-    const size_t body_len = strlen(json_body);
-    char header[1024];
-    long long ri = wallclock_now_us();
-    int header_len = snprintf(header, sizeof(header),
-                              "POST %s HTTP/1.1\r\n"
-                              "Host: %s:%s\r\n"
-                              "User-Agent: tinyIoT-monitor\r\n"
-                              "Accept: application/json\r\n"
-                              "X-M2M-RI: %lld\r\n"
-                              "X-M2M-Origin: CAdmin\r\n"
-                              "X-M2M-RVI: 2a\r\n"
-                              "Connection: close\r\n"
-                              "Content-Type: application/json\r\n"
-                              "Content-Length: %zu\r\n"
-                              "\r\n",
-                              path, host, port, ri, body_len);
-    if (header_len <= 0 || (size_t)header_len >= sizeof(header)) {
-        logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: header build failed");
-        close(sock);
-        return 4000;
-    }
-
-    // Send header + body
-    ssize_t sent = send(sock, header, (size_t)header_len, 0);
-    if (sent != (ssize_t)header_len) {
-        logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: send header failed");
-        close(sock);
-        return 4000;
-    }
-    sent = send(sock, json_body, body_len, 0);
-    if (sent != (ssize_t)body_len) {
-        logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: send body failed");
-        close(sock);
-        return 4000;
-    }
-
-    // Read response header (at least the status line). Some servers may split the response.
-    char resp[1024];
-    size_t used = 0;
-    int got_line = 0;
-    while (used < sizeof(resp) - 1) {
-        ssize_t n = recv(sock, resp + used, (int)(sizeof(resp) - 1 - used), 0);
-        if (n <= 0) break;
-        used += (size_t)n;
-        resp[used] = '\0';
-        if (strstr(resp, "\r\n") || strchr(resp, '\n')) {
-            got_line = 1;
-            break;
-        }
-    }
-    close(sock);
-    if (!got_line || used == 0) {
-        logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: no response (timeout or empty)");
-        return 4000;
-    }
-
-    // Extract the first line
-    char *line_end = strstr(resp, "\r\n");
-    if (!line_end) line_end = strchr(resp, '\n');
-    if (line_end) *line_end = '\0';
-    logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: status_line=%s", resp);
-
-    // Expect: HTTP/1.1 200 ... (be tolerant about formatting)
-    int status = 0;
-    if (sscanf(resp, "HTTP/%*[^ ] %d", &status) == 1) {
-        if (status >= 200 && status < 300) {
-            logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: success status=%d", status);
-            return 2000;
-        }
-    }
-    logger("HTTPNOTI", LOG_LEVEL_DEBUG, "http_post_json_simple: non-2xx or parse failed");
-    return 4000;
-}
-// ------------------------------------------------------------------------------------
 
 
 long long parse_time_monitor(char *s) {
@@ -673,26 +506,13 @@ void notify_missing_data(RTNode *ts_node, int current_mdc, mdc_source_t src) {
                     }
                 }
 
+                // Send missing-data notification via existing infrastructure (util.c)
                 int sent_ok_any = 0;
-                int nu_size = cJSON_GetArraySize(nu);
-                for (int j = 0; j < nu_size; j++) {
-                    cJSON *nuItem = cJSON_GetArrayItem(nu, j);
-                    if (nuItem && cJSON_IsString(nuItem) && nuItem->valuestring) {
-                        // Deliver a normal (non-VRQ) notification to the NU endpoint.
-                        char *payload = cJSON_PrintUnformatted(noti_cjson);
-                        if (payload) {
-                            logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                                   "Sending missing-data notification: subRi=%s nu=%s payload_len=%zu",
-                                   sub_ri_s ? sub_ri_s : get_ri_rtnode(child), nuItem->valuestring, strlen(payload));
-                            int rsc = http_post_json_simple(nuItem->valuestring, payload);
-                            logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                                   "Missing-data notification result: subRi=%s nu=%s rsc=%d",
-                                   sub_ri_s ? sub_ri_s : get_ri_rtnode(child), nuItem->valuestring, rsc);
-                            if (rsc == 2000) sent_ok_any = 1;
-                            free(payload);
-                        }
-                    }
-                }
+                int rsc = notify_to_nu(child, noti_cjson, 8);
+                logger("TSI_TRACE", LOG_LEVEL_DEBUG,
+                       "Missing-data notification result: subRi=%s rsc=%d",
+                       sub_ri_s ? sub_ri_s : get_ri_rtnode(child), rsc);
+                if (rsc == 2000) sent_ok_any = 1;
 
                 logger("TSI_TRACE", LOG_LEVEL_DEBUG,
                        "Missing-data notification send summary: subRi=%s sent_ok_any=%d",

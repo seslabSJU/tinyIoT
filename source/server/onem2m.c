@@ -19,7 +19,13 @@
 #include "util.h"
 #include "cJSON.h"
 #include "coap.h"
+
 #include "jsonparser.h"
+
+// --- TS / TSI resource handlers (implemented in resources/ts.c and resources/tsi.c) ---
+int create_ts(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int update_ts(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 
 extern ResourceTree *rt;
 extern pthread_mutex_t main_lock;
@@ -39,6 +45,8 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_GRP));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CSR));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_SUB));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_TS));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_TSI));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_ACPA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_AEA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CNTA));
@@ -451,6 +459,56 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 			}
 		}
 		break;
+	case RT_TS:
+		// TS-specific delete hook (children are already handled recursively above).
+		// Kept for completeness so TS deletion can have explicit cleanup if needed.
+		break;
+	case RT_TSI:
+		// When deleting a TSI, update the parent TS aggregate counters (cni/cbs) and lt.
+		if (rtnode->parent && rtnode->parent->ty == RT_TS && rtnode->parent->obj && rtnode->obj) {
+			cJSON *ts = rtnode->parent->obj;
+			cJSON *tsi = rtnode->obj;
+
+			cJSON *cni = cJSON_GetObjectItem(ts, "cni");
+			cJSON *cbs = cJSON_GetObjectItem(ts, "cbs");
+			cJSON *csObj = cJSON_GetObjectItem(tsi, "cs");
+			int cs = (csObj && cJSON_IsNumber(csObj)) ? (int)cJSON_GetNumberValue(csObj) : 0;
+
+			int new_cni = (cni && cJSON_IsNumber(cni)) ? ((int)cJSON_GetNumberValue(cni) - 1) : 0;
+			if (new_cni < 0) new_cni = 0;
+			int new_cbs = (cbs && cJSON_IsNumber(cbs)) ? ((int)cJSON_GetNumberValue(cbs) - cs) : 0;
+			if (new_cbs < 0) new_cbs = 0;
+
+			if (cni && cJSON_IsNumber(cni)) {
+				cJSON_SetNumberValue(cni, new_cni);
+			} else {
+				cJSON_DeleteItemFromObject(ts, "cni");
+				cJSON_AddNumberToObject(ts, "cni", new_cni);
+			}
+
+			if (cbs && cJSON_IsNumber(cbs)) {
+				cJSON_SetNumberValue(cbs, new_cbs);
+			} else {
+				cJSON_DeleteItemFromObject(ts, "cbs");
+				cJSON_AddNumberToObject(ts, "cbs", new_cbs);
+			}
+
+			// Update lt (and persist it) so monitor logic stays consistent.
+			char *now_lt = get_local_time(0);
+			if (now_lt) {
+				if (cJSON_GetObjectItem(ts, "lt")) {
+					cJSON_ReplaceItemInObject(ts, "lt", cJSON_CreateString(now_lt));
+				} else {
+					cJSON_AddStringToObject(ts, "lt", now_lt);
+				}
+				db_general_set_lt(get_ri_rtnode(rtnode->parent), now_lt);
+				free(now_lt);
+			}
+
+			// Persist TS aggregate update.
+			db_update_resource(ts, get_ri_rtnode(rtnode->parent), RT_TS);
+		}
+		break;
 	case RT_AEA:
 		break;
 	case RT_CBA:
@@ -662,6 +720,16 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Create CSR");
 		rsc = create_csr(o2pt, parent_rtnode);
 		break;
+	
+	case RT_TS:
+		logger("O2M", LOG_LEVEL_INFO, "Create TS");
+		rsc = create_ts(o2pt, parent_rtnode);
+		break;
+
+	case RT_TSI:
+		logger("O2M", LOG_LEVEL_INFO, "Create TSI");
+		rsc = create_tsi(o2pt, parent_rtnode);
+		break;
 
 	case RT_ACPA:
 	case RT_AEA:
@@ -757,9 +825,20 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Update GRP");
 		rsc = update_grp(o2pt, target_rtnode);
 		break;
+
 	case RT_CSR:
 		logger("O2M", LOG_LEVEL_INFO, "Update CSR");
 		rsc = update_csr(o2pt, target_rtnode);
+		break;
+
+	case RT_TS:
+		logger("O2M", LOG_LEVEL_INFO, "Update TS");
+		rsc = update_ts(o2pt, target_rtnode);
+		break;
+
+	case RT_TSI:
+		logger("O2M", LOG_LEVEL_INFO, "Update TSI");
+		rsc = handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` for tsi is not allowed");
 		break;
 
 #if CSE_RVI >= RVI_3
