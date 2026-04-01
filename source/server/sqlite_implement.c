@@ -185,9 +185,9 @@ static const table_def_t table_definitions[] = {
     },
     {"ts",
      "CREATE TABLE IF NOT EXISTS ts ( id INTEGER, "
-     "mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "cr VARCHAR(45), mni INT, mbs INT, mia INT, cni INT, cbs INT, "
      "pei INT, peid INT, "
-     "mdd INT, mdn INT, mdt INT, mdc INT, mdlt TEXT, "
+     "mdd INT, mdn INT, mdt INT, mdc INT, mdlt TEXT, cnf VARCHAR(45),"
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"tsi",
@@ -280,71 +280,6 @@ int close_dbp()
         sqlite3_close_v2(db);
         db = NULL;
     }
-    return 1;
-}
-
-int db_begin_tx()
-{
-    char *err_msg = NULL;
-    int rc = sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "BEGIN TRANSACTION failed: %s", err_msg ? err_msg : "Unknown error");
-        if (err_msg) sqlite3_free(err_msg);
-        return 0;
-    }
-    if (err_msg) sqlite3_free(err_msg);
-    return 1;
-}
-
-int db_commit_tx()
-{
-    char *err_msg = NULL;
-    int rc = sqlite3_exec(db, "COMMIT;", NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "COMMIT failed: %s", err_msg ? err_msg : "Unknown error");
-        if (err_msg) sqlite3_free(err_msg);
-        return 0;
-    }
-    if (err_msg) sqlite3_free(err_msg);
-    return 1;
-}
-
-int db_rollback_tx()
-{
-    char *err_msg = NULL;
-    int rc = sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "ROLLBACK failed: %s", err_msg ? err_msg : "Unknown error");
-        if (err_msg) sqlite3_free(err_msg);
-        return 0;
-    }
-    if (err_msg) sqlite3_free(err_msg);
-    return 1;
-}
-
-// Wrapper to unify delete API used by resource logic (e.g., resources/tsi.c)
-int db_delete_resource(char *ri)
-{
-    if (!ri) return 0;
-
-    sqlite3_stmt *stmt = NULL;
-    int rc = sqlite3_prepare_v2(db, "DELETE FROM general WHERE ri = ?;", -1, &stmt, NULL);
-    if (rc != SQLITE_OK) {
-        logger("DB", LOG_LEVEL_ERROR, "prepare error in db_delete_resource: %s", sqlite3_errmsg(db));
-        if (stmt) sqlite3_finalize(stmt);
-        return 0;
-    }
-
-    sqlite3_bind_text(stmt, 1, ri, -1, SQLITE_TRANSIENT);
-
-    rc = sqlite3_step(stmt);
-    if (rc != SQLITE_DONE) {
-        logger("DB", LOG_LEVEL_ERROR, "delete error in db_delete_resource: %s", sqlite3_errmsg(db));
-        sqlite3_finalize(stmt);
-        return 0;
-    }
-
-    sqlite3_finalize(stmt);
     return 1;
 }
 
@@ -630,7 +565,7 @@ int db_store_resource(cJSON *obj, char *uri)
     {
         if (strcmp(cJSON_GetArrayItem(GENERAL_ATTR, i)->string, "uri") == 0)
         {
-            sqlite3_bind_text(stmt, i + 1, uri, strlen(uri), SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, i + 1, uri, strlen(uri), SQLITE_STATIC);
             continue;
         }
         pjson = cJSON_GetObjectItem(obj, cJSON_GetArrayItem(GENERAL_ATTR, i)->string);
@@ -1864,7 +1799,6 @@ cJSON *getForbiddenUri(cJSON *acp_list)
     sqlite3_finalize(res);
     return result;
 }
-
 
 // Forward declarations (avoid implicit function declarations in C99+)
 int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str);

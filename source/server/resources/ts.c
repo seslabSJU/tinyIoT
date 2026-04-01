@@ -34,6 +34,12 @@ int create_ts(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
     cJSON *root = cJSON_Duplicate(o2pt->request_pc, 1);
     cJSON *ts = cJSON_GetObjectItem(root, "m2m:ts");
     add_general_attribute(ts, parent_rtnode, RT_TS);
+
+    // Ensure creator (cr) is stored so the originator can retrieve/update/delete later.
+    // Many privilege checks rely on the resource's creator/owner information.
+    if (!cJSON_GetObjectItem(ts, "cr") && o2pt->fr) {
+        cJSON_AddStringToObject(ts, "cr", o2pt->fr);
+    }
     
     if (validate_ts(o2pt, ts, OP_CREATE) != RSC_OK) { cJSON_Delete(root); return o2pt->rsc; }
 
