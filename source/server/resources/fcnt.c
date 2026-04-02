@@ -106,6 +106,20 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		}
 	}
 
+	if (o2pt->rvi < RVI_4)
+	{
+		const char *rvi4_attrs[] = {"fcied", "mni", "mbs", "mia", NULL};
+		for (int i = 0; rvi4_attrs[i] != NULL; i++)
+		{
+			if (cJSON_GetObjectItem(fcnt, rvi4_attrs[i]))
+			{
+				if (customAttrs) cJSON_Delete(customAttrs);
+				cJSON_Delete(root);
+				return handle_error(o2pt, RSC_NOT_IMPLEMENTED, "not supported attribute for this release version");
+			}
+		}
+	}
+
 	add_general_attribute(fcnt, parent_rtnode, RT_FCNT);
 
 	rsc = validate_fcnt(o2pt, fcnt, OP_CREATE);
@@ -322,6 +336,18 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		{
 			handle_error(o2pt, RSC_BAD_REQUEST, "unsupported attribute on update");
 			return RSC_BAD_REQUEST;
+		}
+	}
+
+	if (o2pt->rvi < RVI_4)
+	{
+		const char *rvi4_attrs[] = {"fcied", "mni", "mbs", "mia", NULL};
+		for (int i = 0; rvi4_attrs[i] != NULL; i++)
+		{
+			if (cJSON_GetObjectItem(m2m_fcnt, rvi4_attrs[i]))
+			{
+				return handle_error(o2pt, RSC_NOT_IMPLEMENTED, "not supported attribute for this release version");
+			}
 		}
 	}
 

@@ -637,7 +637,7 @@ bool isResourceAptFC(oneM2MPrimitive* o2pt, RTNode *rtnode, cJSON *fc){
             if(fo == FO_AND)
                 return false;
         }
-        if(!FC_isAptPty(pjson, rtnode->ty)){
+        if(!FC_isAptPty(pjson, rtnode->parent->ty)){
             if(fo == FO_AND)
                 return false;
         }else{

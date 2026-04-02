@@ -27,6 +27,16 @@ extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
 extern pthread_mutex_t main_lock;
 
+static void sanitize_fcnt_response(cJSON *copy) {
+	cJSON_DeleteItemFromObject(copy, "_sn");
+	cJSON *oref_item = cJSON_GetObjectItem(copy, "oref");
+	if (oref_item) {
+		cJSON *or_copy = cJSON_Duplicate(oref_item, 1);
+		cJSON_DeleteItemFromObject(copy, "oref");
+		cJSON_AddItemToObject(copy, "or", or_copy);
+	}
+}
+
 /**
  * @brief get uri of resource with ri
  * @param ri resource identifier
@@ -679,7 +689,9 @@ void build_rcn6(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
  */
 void build_rcn5(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level)
 {
-	cJSON_AddItemToObject(result_obj, get_resource_key(rtnode->ty), cJSON_Duplicate(rtnode->obj, true));
+	cJSON *dup = cJSON_Duplicate(rtnode->obj, true);
+	if (rtnode->ty == RT_FCNT) sanitize_fcnt_response(dup);
+	cJSON_AddItemToObject(result_obj, get_resource_key(rtnode->ty), dup);
 	cJSON *target = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty));
 	target = cJSON_AddArrayToObject(target, "ch");
 	get_child_references(o2pt, rtnode, target, &ofst, &lim, level - 1, RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES);
@@ -696,7 +708,9 @@ void build_rcn5(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int of
  */
 void build_rcn4(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_obj, int ofst, int lim, int level)
 {
-	cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), cJSON_Duplicate(rtnode->obj, true));
+	cJSON *dup = cJSON_Duplicate(rtnode->obj, true);
+	if (rtnode->ty == RT_FCNT) sanitize_fcnt_response(dup);
+	cJSON_AddItemReferenceToObject(result_obj, get_resource_key(rtnode->ty), dup);
 	RTNode *child = rtnode->child;
 	cJSON *target = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty));
 	if (!target)
@@ -902,11 +916,11 @@ void get_child_references(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_o
 			}
 			free_rtnode_list(fcin_list_head);
 		}
-		if (rcn == RCN_CHILD_RESOURCES || RCN_CHILD_RESOURCE_REFERENCES)
+		if (rcn == RCN_CHILD_RESOURCES || rcn == RCN_CHILD_RESOURCE_REFERENCES)
 		{
 			get_child_references(o2pt, child, result_obj, ofst, lim, level - 1, rcn);
 		}
-		else if (rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCES || RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES)
+		else if (rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCES || rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES)
 		{
 			if (apt)
 			{
@@ -1007,6 +1021,7 @@ void build_child_structure(oneM2MPrimitive *o2pt, RTNode *rtnode, cJSON *result_
 			else
 			{
 				target = cJSON_Duplicate(rtnode->obj, true);
+				if (rtnode->ty == RT_FCNT) sanitize_fcnt_response(target);
 				if (pjson = cJSON_GetObjectItem(result_obj, get_resource_key(rtnode->ty)))
 				{
 					cJSON_AddItemToArray(pjson, target);
@@ -2049,8 +2064,7 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			cJSON *sn = cJSON_GetObjectItem(target_rtnode->obj, "_sn");
 			const char *key = (sn && cJSON_IsString(sn)) ? sn->valuestring : get_resource_key(target_rtnode->ty);
 			cJSON *fcnt_copy = cJSON_Duplicate(target_rtnode->obj, true);
-			// Remove the internal _sn field from the response
-			cJSON_DeleteItemFromObject(fcnt_copy, "_sn");
+			sanitize_fcnt_response(fcnt_copy);
 			cJSON_AddItemToObject(root, key, fcnt_copy);
 		}
 		else if (target_rtnode->ty == RT_FCIN)
@@ -2091,7 +2105,11 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		break;
 	case RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES:
 		pjson = cJSON_CreateObject();
-		cJSON_AddItemReferenceToObject(pjson, get_resource_key(target_rtnode->ty), target_rtnode->obj);
+		{
+			cJSON *haa_copy = cJSON_Duplicate(target_rtnode->obj, true);
+			if (target_rtnode->ty == RT_FCNT) sanitize_fcnt_response(haa_copy);
+			cJSON_AddItemToObject(pjson, get_resource_key(target_rtnode->ty), haa_copy);
+		}
 		cJSON_AddItemToObject(pjson, "uri", cJSON_CreateString(target_rtnode->uri));
 		cJSON_AddItemToObject(root, "m2m:rce", pjson);
 		break;
@@ -2160,8 +2178,7 @@ int make_response_body(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 				cJSON *sn = cJSON_GetObjectItem(target_rtnode->obj, "_sn");
 				const char *key = (sn && cJSON_IsString(sn)) ? sn->valuestring : get_resource_key(target_rtnode->ty);
 				cJSON *fcnt_copy = cJSON_Duplicate(target_rtnode->obj, true);
-				// Remove the internal _sn field from the response
-				cJSON_DeleteItemFromObject(fcnt_copy, "_sn");
+				sanitize_fcnt_response(fcnt_copy);
 				cJSON_AddItemToObject(root, key, fcnt_copy);
 				pjson2 = cJSON_GetObjectItem(o2pt->request_pc, key);
 				if (!pjson2) {
@@ -4797,6 +4814,12 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool 
 		cJSON_AddItemToObject(fcin, "lbl", cJSON_Duplicate(lbl, 1));
 	}
 
+	cJSON *fcied = cJSON_GetObjectItem(fcnt, "fcied");
+	if (fcied)
+	{
+		cJSON_AddItemToObject(fcin, "fcied", cJSON_Duplicate(fcied, 1));
+	}
+
 	// Copy location attribute if present
 	cJSON *loc = cJSON_GetObjectItem(fcnt, "loc");
 	if (loc)
@@ -4833,23 +4856,7 @@ int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool 
 		cJSON_AddNumberToObject(fcin, "cs", 0);
 	}
 
-	// Set originator: always use FCNT creator per FC/FCIN diagram
-	cJSON *cr = cJSON_GetObjectItem(fcnt, "cr");
-	if (is_create)
-	{
-		cJSON_AddStringToObject(fcin, "org", o2pt->fr ? o2pt->fr : "");
-	}
-	else
-	{
-		if (cr && cJSON_IsString(cr))
-		{
-			cJSON_AddStringToObject(fcin, "org", cr->valuestring);
-		}
-		else
-		{
-			cJSON_AddStringToObject(fcin, "org", o2pt->fr ? o2pt->fr : "");
-		}
-	}
+	cJSON_AddStringToObject(fcin, "org", o2pt->fr ? o2pt->fr : "");
 
 	// Add general attributes (ri, pi, ct, ty, etc.)
 	add_general_attribute(fcin, fcnt_rtnode, RT_FCIN);

@@ -545,10 +545,13 @@ int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attr
     if (!def) {
         if (shortname) {
             *error = "unknown resource type";
-            return RSC_BAD_REQUEST;
+            return RSC_SPECIALIZATION_SCHEMA_NOT_FOUND;
         }
-        // m2m:fcnt without specialization shortname: skip SDT validation (ACME compatible)
-        return RSC_OK;
+        def = sdt_find_by_cnd(cnd);
+        if (!def) {
+            *error = "Schema not found for containerDefinition";
+            return RSC_SPECIALIZATION_SCHEMA_NOT_FOUND;
+        }
     }
 
     if (def->cnd && strlen(def->cnd) > 0) {
