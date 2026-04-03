@@ -26,8 +26,8 @@
 #define DB_POSTGRESQL 2
 
 // Select Database Type: DB_SQLITE or DB_POSTGRESQL
+// #define DB_TYPE DB_SQLITE
 #define DB_TYPE DB_POSTGRESQL
-// #define DB_TYPE DB_POSTGRESQL
 
 
 #if DB_TYPE == DB_POSTGRESQL
@@ -35,8 +35,8 @@
 #define PG_HOST "localhost"
 #define PG_PORT 5432
 #define PG_USER "tinyuser"
-#define PG_PASSWORD "tinypass"
-#define PG_DBNAME "tinydev"
+#define PG_PASSWORD "password"
+#define PG_DBNAME "tinydb"
 
 // PostgreSQL Schema Types
 #define PG_SCHEMA_VARCHAR 0  // Use VARCHAR for string fields
@@ -76,7 +76,7 @@
 #define MAX_URI_SIZE 1024
 #define MAX_ATTRIBUTE_SIZE 4096
 
-#define DEFAULT_EXPIRE_TIME -3600 * 24 * 365 * 2
+#define DEFAULT_EXPIRE_TIME (-3600 * 24 * 365 * 2)
 
 #define SOCKET_TIMEOUT 3 // seconds
 #define MAX_URI_LENGTH 1024
@@ -88,6 +88,9 @@
 // CNT Settings
 #define DEFAULT_MAX_NR_INSTANCES 1000
 #define DEFAULT_MAX_BYTE_SIZE 65536
+
+// FCIN Settings
+#define DEFAULT_MAX_INSTANCE_AGE 157680000 // 5 years in seconds
 
 // CIN Settings
 #define ALLOW_CIN_RN true // true → allow, false → not allow
@@ -102,7 +105,7 @@
 // MQTT Settings
 
 // To enable MQTT, de-comment the following line
-// #define ENABLE_MQTT
+#define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
 // #define ENABLE_MQTT_WEBSOCKET
@@ -130,11 +133,9 @@
 #define MQTT_PORT 1885
 #endif
 
-
-
-#define MQTT_MAX_PACKET_SZ 16384
+#define MQTT_MAX_PACKET_SZ 131072
 #define INVALID_SOCKET_FD -1
-#define PRINT_BUFFER_SIZE 16384
+#define PRINT_BUFFER_SIZE 131072
 
 
 
@@ -170,7 +171,7 @@
 
 // For browser access, CORS should be enabled
 // To add CORS headers to HTTP response decomment following line.
-#define CORS *
+#define CORS
 
 // De-Register remoteCSE on shutdown
 // To make server delete all remote remoteCSE resource decomment following line.

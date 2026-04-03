@@ -1,0 +1,43 @@
+
+// Created by SDTTool
+// oneM2M Release: 5.6.0
+// Domain:         org.onem2m.management
+[
+    // SubDevice: dmAreaNwkInfo
+    {
+        "type"      : "mad:dANIo",
+        "lname"     : "dmAreaNwkInfo",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.management.subdevice.dmAreaNwkInfo",
+        "children"  : [
+            "mad:dANDo"
+            ,"mad:dANIoInst"
+        ]
+    }
+,
+
+    // SubDevice Announced: dmAreaNwkInfoAnnc
+    {
+        "type"      : "mad:dANIoAnnc",
+        "lname"     : "dmAreaNwkInfoAnnc",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.management.subdevice.dmAreaNwkInfoAnnc",
+        "children"  : [
+            "mad:dANDo", 
+            "mad:dANDoAnnc"
+        ]
+    }
+,
+
+    // SubDevice Instance: dmAreaNwkInfoInst
+    {
+        "type"      : "mad:dANIoInst",
+        "lname"     : "dmAreaNwkInfoInst",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.management.subdevice.dmAreaNwkInfoInst"
+    }
+
+
+
+
+]

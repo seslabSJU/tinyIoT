@@ -1,0 +1,139 @@
+
+// Created by SDTTool
+// oneM2M Release: 5.6.0
+// Domain:         org.onem2m.vehicular
+[
+
+    // DeviceClass: deviceElectricVehicleCharger
+    {
+        "type"      : "ved:dEVCr",
+        "lname"     : "deviceElectricVehicleCharger",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.vehicular.device.deviceElectricVehicleCharger",
+        "attributes": [
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:fauDn", 
+            "cod:binSh", 
+            "cod:runSe", 
+            "cod:bat", 
+            "cod:elVCr"
+            ,"ved:dEVCrInst"
+        ]
+    },        
+
+    // DeviceClass Announced: deviceElectricVehicleChargerAnnc
+    {
+        "type"      : "ved:dEVCrAnnc",
+        "lname"     : "deviceElectricVehicleChargerAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.vehicular.device.deviceElectricVehicleChargerAnnc",
+        "attributes": [
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:fauDn", 
+            "cod:fauDnAnnc", 
+            "cod:binSh", 
+            "cod:binShAnnc", 
+            "cod:runSe", 
+            "cod:runSeAnnc", 
+            "cod:bat", 
+            "cod:batAnnc", 
+            "cod:elVCr", 
+            "cod:elVCrAnnc"
+        ]
+    },
+    // DeviceClass Instance: deviceElectricVehicleChargerInst
+    {
+        "type"      : "ved:dEVCrInst",
+        "lname"     : "deviceElectricVehicleChargerInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.vehicular.device.deviceElectricVehicleChargerInst",
+        "attributes": [
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    }, 
+
+    // DeviceClass: deviceElectricMotorcycle
+    {
+        "type"      : "ved:deEMe",
+        "lname"     : "deviceElectricMotorcycle",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.vehicular.device.deviceElectricMotorcycle",
+        "attributes": [
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:binSh", 
+            "cod:runSe", 
+            "cod:bat", 
+            "cod:geoLn", 
+            "cod:clock", 
+            "cod:conny", 
+            "cod:fauDn", 
+            "cod:lock"
+            ,"ved:deEMeInst"
+        ]
+    },        
+
+    // DeviceClass Announced: deviceElectricMotorcycleAnnc
+    {
+        "type"      : "ved:deEMeAnnc",
+        "lname"     : "deviceElectricMotorcycleAnnc",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.vehicular.device.deviceElectricMotorcycleAnnc",
+        "attributes": [
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ],
+        "children"  : [
+            "cod:binSh", 
+            "cod:binShAnnc", 
+            "cod:runSe", 
+            "cod:runSeAnnc", 
+            "cod:bat", 
+            "cod:batAnnc", 
+            "cod:geoLn", 
+            "cod:geoLnAnnc", 
+            "cod:clock", 
+            "cod:clockAnnc", 
+            "cod:conny", 
+            "cod:connyAnnc", 
+            "cod:fauDn", 
+            "cod:fauDnAnnc", 
+            "cod:lock", 
+            "cod:lockAnnc"
+        ]
+    },
+    // DeviceClass Instance: deviceElectricMotorcycleInst
+    {
+        "type"      : "ved:deEMeInst",
+        "lname"     : "deviceElectricMotorcycleInst",
+        "sdttype"   : "device",
+        "cnd"       : "org.onem2m.vehicular.device.deviceElectricMotorcycleInst",
+        "attributes": [
+            // Property: nodeLink
+            { "sname" : "nodLk", "lname" : "nodeLink", "type" : "string", "car" : "01" }, 
+            // Property: flexNodeLink
+            { "sname" : "flNLk", "lname" : "flexNodeLink", "type" : "string", "car" : "01" }
+        ]
+    }
+
+
+]

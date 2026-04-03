@@ -274,9 +274,21 @@ static const table_def_t table_definitions[] = {
      "lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
-    {"cinA", 
+    {"cinA",
      "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, "
      "lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"fcnt",
+     "CREATE TABLE IF NOT EXISTS fcnt ( id INTEGER, "
+     "cnd VARCHAR(255), oref VARCHAR(100), nl VARCHAR(45), cr VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "st INT, cs INT, fcied INT, mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "custom_attrs JSONB, loc TEXT, daci VARCHAR(200), "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"fcin",
+     "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
+     "cs INT, st INT, org VARCHAR(200), loc TEXT, at VARCHAR(200), aa VARCHAR(100), ast INT, custom_attrs JSONB, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     }
 };
@@ -346,9 +358,21 @@ static const table_def_t table_definitions[] = {
      "lnk TEXT, cr TEXT, mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
-    {"cinA", 
+    {"cinA",
      "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, "
      "lnk TEXT, cs INT, cr TEXT, cnf TEXT, st TEXT, con TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"fcnt",
+     "CREATE TABLE IF NOT EXISTS fcnt ( id INTEGER, "
+     "cnd TEXT, oref TEXT, nl TEXT, cr TEXT, at TEXT, aa TEXT, ast INT, "
+     "st INT, cs INT, fcied INT, mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "custom_attrs JSONB, loc TEXT, daci TEXT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"fcin",
+     "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
+     "cs INT, st INT, org TEXT, loc TEXT, at TEXT, aa TEXT, ast INT, custom_attrs JSONB, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     }
 };
@@ -489,6 +513,12 @@ char *get_table_name(ResourceType ty)
     case RT_CINA:
         tableName = "cinA";
         break;
+    case RT_FCNT:
+        tableName = "fcnt";
+        break;
+    case RT_FCIN:
+        tableName = "fcin";
+        break;
     }
     return tableName;
 }
@@ -511,7 +541,7 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
         return NULL;
     }
 
-    sprintf(sql, "SELECT * FROM general, %s WHERE general.uri='%s' and %s.id=general.id;", 
+    sprintf(sql, "SELECT * FROM general, %s WHERE general.uri='%s' and %s.id=general.id;",
             get_table_name(ty), uri, get_table_name(ty));
 
     res = PQexec(conn, sql);
@@ -550,7 +580,10 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
                 char *endptr;
                 long num = strtol(value, &endptr, 10);
                 if (*endptr == '\0') {
-                    cJSON_AddNumberToObject(resource, colname, num);
+                    if (strcmp(colname, "fcied") == 0)
+                        cJSON_AddBoolToObject(resource, colname, (int)num);
+                    else
+                        cJSON_AddNumberToObject(resource, colname, num);
                 } else {
                     cJSON_AddItemToObject(resource, colname, cJSON_CreateString(value));
                 }
@@ -560,6 +593,24 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
     }
 
     PQclear(res);
+
+    // For FlexContainer/FlexContainerInstance, merge custom_attrs into the main resource object
+    if (ty == RT_FCNT || ty == RT_FCIN) {
+        cJSON *custom_attrs = cJSON_GetObjectItem(resource, "custom_attrs");
+        if (custom_attrs && cJSON_IsObject(custom_attrs)) {
+            // Merge each custom attribute into the main resource
+            cJSON *item = NULL;
+            cJSON_ArrayForEach(item, custom_attrs) {
+                if (item->string) {
+                    // Duplicate the item and add it to the resource
+                    cJSON_AddItemToObject(resource, item->string, cJSON_Duplicate(item, 1));
+                }
+            }
+            // Remove the custom_attrs object as it's now merged
+            cJSON_DeleteItemFromObject(resource, "custom_attrs");
+        }
+    }
+
     pg_unlock();
     return resource;
 }
@@ -582,7 +633,7 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
         return NULL;
     }
 
-    sprintf(sql, "SELECT * FROM general, %s WHERE general.id=%s.id AND general.ri='%s';", 
+    sprintf(sql, "SELECT * FROM general, %s WHERE general.id=%s.id AND general.ri='%s';",
             get_table_name(ty), get_table_name(ty), ri);
 
     res = PQexec(conn, sql);
@@ -621,7 +672,10 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
                 char *endptr;
                 long num = strtol(value, &endptr, 10);
                 if (*endptr == '\0') {
-                    cJSON_AddNumberToObject(resource, colname, num);
+                    if (strcmp(colname, "fcied") == 0)
+                        cJSON_AddBoolToObject(resource, colname, (int)num);
+                    else
+                        cJSON_AddNumberToObject(resource, colname, num);
                 } else {
                     cJSON_AddItemToObject(resource, colname, cJSON_CreateString(value));
                 }
@@ -631,6 +685,24 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
     }
 
     PQclear(res);
+
+    // For FlexContainer/FlexContainerInstance, merge custom_attrs into the main resource object
+    if (ty == RT_FCNT || ty == RT_FCIN) {
+        cJSON *custom_attrs = cJSON_GetObjectItem(resource, "custom_attrs");
+        if (custom_attrs && cJSON_IsObject(custom_attrs)) {
+            // Merge each custom attribute into the main resource
+            cJSON *item = NULL;
+            cJSON_ArrayForEach(item, custom_attrs) {
+                if (item->string) {
+                    // Duplicate the item and add it to the resource
+                    cJSON_AddItemToObject(resource, item->string, cJSON_Duplicate(item, 1));
+                }
+            }
+            // Remove the custom_attrs object as it's now merged
+            cJSON_DeleteItemFromObject(resource, "custom_attrs");
+        }
+    }
+
     pg_unlock();
     return resource;
 }
@@ -1124,8 +1196,8 @@ RTNode *db_get_all_resource_as_rtnode()
     RTNode *head = NULL, *rtnode = NULL;
     cJSON *json, *arr;
 
-    // Select all resources except CIN (ty=4) and Sub (ty=23) 
-    sprintf(sql, "SELECT * FROM general WHERE ty != 4 AND ty != 23;");
+    // Select all resources except CIN (ty=4), Sub (ty=23) and FCIN (ty=58)
+    sprintf(sql, "SELECT * FROM general WHERE ty != 4 AND ty != 23 AND ty != 58;");
     
     res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -1187,7 +1259,7 @@ RTNode *db_get_all_resource_as_rtnode()
                 char *value = PQgetvalue(res2, 0, col);
 
                 if (strcmp(colname, "id") == 0) continue;
-                
+
                 if (value && strlen(value) > 0) {
                     // Try to parse as JSON first
                     arr = cJSON_Parse(value);
@@ -1198,7 +1270,10 @@ RTNode *db_get_all_resource_as_rtnode()
                         char *endptr;
                         long num = strtol(value, &endptr, 10);
                         if (*endptr == '\0') {
-                            cJSON_AddNumberToObject(json, colname, num);
+                            if (strcmp(colname, "fcied") == 0)
+                                cJSON_AddBoolToObject(json, colname, (int)num);
+                            else
+                                cJSON_AddNumberToObject(json, colname, num);
                         } else {
                             cJSON_AddItemToObject(json, colname, cJSON_CreateString(value));
                         }
@@ -1211,6 +1286,20 @@ RTNode *db_get_all_resource_as_rtnode()
 
         // Remove id from JSON object
         cJSON_DeleteItemFromObject(json, "id");
+
+        // FCNT: custom_attrs를 top-level로 병합 후 제거 (db_get_resource와 동일)
+        if (ty == RT_FCNT) {
+            cJSON *custom_attrs = cJSON_GetObjectItem(json, "custom_attrs");
+            if (custom_attrs && cJSON_IsObject(custom_attrs)) {
+                cJSON *item = NULL;
+                cJSON_ArrayForEach(item, custom_attrs) {
+                    if (item->string) {
+                        cJSON_AddItemToObject(json, item->string, cJSON_Duplicate(item, 1));
+                    }
+                }
+                cJSON_DeleteItemFromObject(json, "custom_attrs");
+            }
+        }
 
         // Create RTNode and add to list
         if (!head) {
@@ -1521,7 +1610,7 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 
     // Add level filter
     if ((pjson = cJSON_GetObjectItem(fc, "lvl"))) {
-        sprintf(buf, " AND uri NOT LIKE '%s", escaped_uri);
+        sprintf(buf, " AND uri NOT LIKE '%s/%%", escaped_uri);
         strcat(sql, buf);
         for (int i = 0; i < pjson->valueint; i++) {
             strcat(sql, "/%%");
@@ -1609,6 +1698,16 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
             free(escaped_lbl);
         }
         strcat(sql, ")");
+    }
+
+    // Add stateTag filters
+    if ((pjson = cJSON_GetObjectItem(fc, "sts"))) {
+        sprintf(buf, " AND id IN (SELECT id FROM cnt WHERE st < %d UNION SELECT id FROM fcnt WHERE st < %d)", pjson->valueint, pjson->valueint);
+        strcat(sql, buf);
+    }
+    if ((pjson = cJSON_GetObjectItem(fc, "stb"))) {
+        sprintf(buf, " AND id IN (SELECT id FROM cnt WHERE st >= %d UNION SELECT id FROM fcnt WHERE st >= %d)", pjson->valueint, pjson->valueint);
+        strcat(sql, buf);
     }
 
     // Add ordering and limit
@@ -1778,6 +1877,473 @@ cJSON *getForbiddenUri(cJSON *acp_list)
     pg_unlock();
     return result;
 }
+
+int db_store_fcnt_custom_attributes(const char *ri, cJSON *customAttrs)
+{
+    if (!ri || !customAttrs) {
+        return 0;
+    }
+
+    char *json_str = cJSON_PrintUnformatted(customAttrs);
+    if (!json_str) {
+        return 0;
+    }
+
+    char *escaped_json = pg_escape_string_value(json_str);
+    free(json_str);
+
+    if (!escaped_json) {
+        return 0;
+    }
+
+    char sql[4096] = {0};
+    sprintf(sql, "UPDATE fcnt SET custom_attrs = '%s'::jsonb WHERE id = (SELECT id FROM general WHERE ri = '%s');",
+            escaped_json, ri);
+
+    logger("DB", LOG_LEVEL_DEBUG, "db_store_fcnt_custom_attributes SQL: %s", sql);
+
+    PGresult *res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to store FCNT custom attributes: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_json);
+        return 0;
+    }
+    PQclear(res);
+
+    sprintf(sql, "UPDATE fcin SET custom_attrs = '%s'::jsonb WHERE id = (SELECT id FROM general WHERE ri = '%s');",
+            escaped_json, ri);
+
+    logger("DB", LOG_LEVEL_DEBUG, "db_store_fcnt_custom_attributes SQL (FCIN): %s", sql);
+
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to store FCIN custom attributes: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_json);
+        return 0;
+    }
+
+    PQclear(res);
+    free(escaped_json);
+    return 1;
+}
+
+int db_update_fcnt_custom_attributes(const char *ri, cJSON *customAttrs)
+{
+    return db_store_fcnt_custom_attributes(ri, customAttrs);
+}
+
+cJSON *db_get_fcnt_custom_attributes(const char *ri)
+{
+    if (!ri) {
+        return NULL;
+    }
+
+    char sql[1024] = {0};
+    sprintf(sql, "SELECT COALESCE(fcnt.custom_attrs, fcin.custom_attrs) AS custom_attrs FROM general LEFT JOIN fcnt ON general.id = fcnt.id LEFT JOIN fcin ON general.id = fcin.id WHERE general.ri = '%s';", ri);
+
+    logger("DB", LOG_LEVEL_DEBUG, "db_get_fcnt_custom_attributes SQL: %s", sql);
+
+    PGresult *res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to get FCNT/FCIN custom attributes: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        return NULL;
+    }
+
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        PQclear(res);
+        return NULL;
+    }
+
+    char *json_str = PQgetvalue(res, 0, 0);
+    if (!json_str || strlen(json_str) == 0 || strcmp(json_str, "null") == 0) {
+        PQclear(res);
+        return NULL;
+    }
+
+    cJSON *customAttrs = cJSON_Parse(json_str);
+    PQclear(res);
+
+    return customAttrs;
+}
+
+
+// FCIN related functions
+int db_delete_one_fcin_mni(RTNode *fcnt)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "db_delete_one_fcin_mni called");
+    if (!fcnt) {
+        logger("DB", LOG_LEVEL_ERROR, "FCNT rtnode is NULL");
+        return -1;
+    }
+
+    char *pi = get_ri_rtnode(fcnt);
+    if (!pi) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from FCNT rtnode");
+        return -1;
+    }
+
+    char sql[512] = {0};
+    char *escaped_pi = pg_escape_string_value(pi);
+
+    sprintf(sql, "SELECT general.id, fcin.cs FROM general "
+                 "LEFT JOIN fcin ON general.id = fcin.id "
+                 "WHERE general.pi='%s' AND general.ty=58 "
+                 "ORDER BY fcin.st ASC LIMIT 1", escaped_pi);
+
+    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+
+    PGresult *res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to select oldest FCIN: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return -1;
+    }
+
+    if (PQntuples(res) == 0) {
+        logger("DB", LOG_LEVEL_ERROR, "No FCIN found to delete");
+        PQclear(res);
+        free(escaped_pi);
+        return -1;
+    }
+
+    char *fcin_id = PQgetvalue(res, 0, 0);
+    int deleted_cs = atoi(PQgetvalue(res, 0, 1));
+    char fcin_id_copy[64];
+    strncpy(fcin_id_copy, fcin_id, sizeof(fcin_id_copy) - 1);
+    fcin_id_copy[sizeof(fcin_id_copy) - 1] = '\0';
+    PQclear(res);
+
+    sprintf(sql, "DELETE FROM general WHERE id=%s", fcin_id_copy);
+    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to delete oldest FCIN: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return -1;
+    }
+
+    PQclear(res);
+    free(escaped_pi);
+    logger("DB", LOG_LEVEL_DEBUG, "Successfully deleted oldest FCIN with cs=%d", deleted_cs);
+    return deleted_cs;
+}
+
+int db_delete_one_fcin_mbs(RTNode *fcnt)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "db_delete_one_fcin_mbs called");
+    if (!fcnt) {
+        logger("DB", LOG_LEVEL_ERROR, "FCNT rtnode is NULL");
+        return -1;
+    }
+
+    char *pi = get_ri_rtnode(fcnt);
+    if (!pi) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from FCNT rtnode");
+        return -1;
+    }
+
+    char sql[512] = {0};
+    char *escaped_pi = pg_escape_string_value(pi);
+
+    sprintf(sql, "SELECT general.id, fcin.cs FROM general "
+                 "LEFT JOIN fcin ON general.id = fcin.id "
+                 "WHERE general.pi='%s' AND general.ty=58 "
+                 "ORDER BY fcin.st ASC LIMIT 1", escaped_pi);
+
+    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+
+    PGresult *res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to select oldest FCIN: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return -1;
+    }
+
+    if (PQntuples(res) == 0) {
+        logger("DB", LOG_LEVEL_ERROR, "No FCIN found to delete");
+        PQclear(res);
+        free(escaped_pi);
+        return -1;
+    }
+
+    char *fcin_id = PQgetvalue(res, 0, 0);
+    int deleted_cs = atoi(PQgetvalue(res, 0, 1));
+    char fcin_id_copy[64];
+    strncpy(fcin_id_copy, fcin_id, sizeof(fcin_id_copy) - 1);
+    fcin_id_copy[sizeof(fcin_id_copy) - 1] = '\0';
+    PQclear(res);
+
+    sprintf(sql, "DELETE FROM general WHERE id=%s", fcin_id_copy);
+    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to delete oldest FCIN: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return -1;
+    }
+
+    PQclear(res);
+    free(escaped_pi);
+    logger("DB", LOG_LEVEL_DEBUG, "Successfully deleted oldest FCIN with cs=%d", deleted_cs);
+    return deleted_cs;
+}
+
+int db_get_fcin_cbs_cni(RTNode *fcnt, int *out_cbs, int *out_cni)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_cbs_cni called");
+    if (!fcnt || !out_cbs || !out_cni) return -1;
+
+    char *pi = get_ri_rtnode(fcnt);
+    if (!pi) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from FCNT rtnode");
+        return -1;
+    }
+
+    char sql[512] = {0};
+    char *escaped_pi = pg_escape_string_value(pi);
+
+    sprintf(sql, "SELECT COUNT(*), COALESCE(SUM(fcin.cs), 0) FROM general "
+                 "LEFT JOIN fcin ON general.id = fcin.id "
+                 "WHERE general.pi='%s' AND general.ty=58", escaped_pi);
+
+    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+
+    PGresult *res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to get FCIN count/sum: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return -1;
+    }
+
+    if (PQntuples(res) > 0) {
+        *out_cni = atoi(PQgetvalue(res, 0, 0));
+        *out_cbs = atoi(PQgetvalue(res, 0, 1));
+        PQclear(res);
+        free(escaped_pi);
+        logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_cbs_cni: cni=%d, cbs=%d", *out_cni, *out_cbs);
+        return 0;
+    } else {
+        PQclear(res);
+        free(escaped_pi);
+        logger("DB", LOG_LEVEL_ERROR, "Failed to get FCIN count/sum");
+        return -1;
+    }
+}
+
+RTNode *db_get_fcin_rtnode_list(RTNode *rtnode)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "call db_get_fcin_rtnode_list");
+
+    if (!rtnode) {
+        logger("DB", LOG_LEVEL_ERROR, "Parent rtnode is NULL");
+        return NULL;
+    }
+
+    char sql[1024] = {0};
+    char *pi = get_ri_rtnode(rtnode);
+
+    if (!pi) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from parent rtnode");
+        return NULL;
+    }
+
+    char *escaped_pi = pg_escape_string_value(pi);
+    sprintf(sql, "SELECT * FROM general, fcin WHERE general.pi='%s' AND general.ty=58 AND general.id = fcin.id ORDER BY fcin.st ASC;", escaped_pi);
+
+    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+
+    PGresult *res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return NULL;
+    }
+
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        logger("DB", LOG_LEVEL_DEBUG, "No FCIN found for parent: %s", pi);
+        PQclear(res);
+        free(escaped_pi);
+        return NULL;
+    }
+
+    RTNode *head = NULL, *rtnode_ptr = NULL;
+    cJSON *arr;
+
+    for (int row = 0; row < rows; row++) {
+        cJSON *json = cJSON_CreateObject();
+        int cols = PQnfields(res);
+
+        for (int col = 0; col < cols; col++) {
+            char *colname = PQfname(res, col);
+            char *value = PQgetvalue(res, row, col);
+
+            if (strcmp(colname, "id") == 0) continue;
+
+            if (value && strlen(value) > 0) {
+                // Try to parse as JSON first
+                arr = cJSON_Parse(value);
+                if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                    cJSON_AddItemToObject(json, colname, arr);
+                } else {
+                    // Check if it's a number
+                    char *endptr;
+                    long num = strtol(value, &endptr, 10);
+                    if (*endptr == '\0') {
+                        cJSON_AddNumberToObject(json, colname, num);
+                    } else {
+                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(value));
+                    }
+                    cJSON_Delete(arr);
+                }
+            }
+        }
+
+        // Create RTNode and add to list
+        if (!head) {
+            head = create_rtnode(json, RT_FCIN);
+            rtnode_ptr = head;
+        } else {
+            rtnode_ptr->sibling_right = create_rtnode(json, RT_FCIN);
+            rtnode_ptr->sibling_right->sibling_left = rtnode_ptr;
+            rtnode_ptr = rtnode_ptr->sibling_right;
+        }
+    }
+
+    PQclear(res);
+    free(escaped_pi);
+    return head;
+}
+
+cJSON *db_get_fcin_laol(RTNode *parent_rtnode, int laol)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "call db_get_fcin_laol, laol=%d", laol);
+
+    if (!parent_rtnode) {
+        logger("DB", LOG_LEVEL_ERROR, "Parent rtnode is NULL");
+        return NULL;
+    }
+
+    char sql[1024] = {0};
+    char *ord = NULL;
+    PGresult *res;
+    cJSON *json, *arr;
+
+    // Determine order (Latest: DESC, Oldest: ASC)
+    switch (laol) {
+    case 0:
+        ord = "DESC";
+        break;
+    case 1:
+        ord = "ASC";
+        break;
+    default:
+        logger("DB", LOG_LEVEL_DEBUG, "Invalid la ol flag");
+        return NULL;
+    }
+
+    char *parent_ri = get_ri_rtnode(parent_rtnode);
+    if (!parent_ri) {
+        logger("DB", LOG_LEVEL_ERROR, "Cannot get RI from parent rtnode");
+        return NULL;
+    }
+
+    char *escaped_pi = pg_escape_string_value(parent_ri);
+    sprintf(sql, "SELECT * FROM general, fcin WHERE general.pi='%s' AND general.ty=58 AND general.id = fcin.id ORDER BY fcin.st %s LIMIT 1;", escaped_pi, ord);
+
+    logger("DB", LOG_LEVEL_DEBUG, "SQL: %s", sql);
+
+    res = PQexec(pg_conn, sql);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed select: %s", PQerrorMessage(pg_conn));
+        PQclear(res);
+        free(escaped_pi);
+        return NULL;
+    }
+
+    if (PQntuples(res) == 0) {
+        logger("DB", LOG_LEVEL_DEBUG, "No FCIN found for parent: %s", parent_ri);
+        PQclear(res);
+        free(escaped_pi);
+        return NULL;
+    }
+
+    char *result_rn = PQgetvalue(res, 0, PQfnumber(res, "rn"));
+    char *result_ct = PQgetvalue(res, 0, PQfnumber(res, "ct"));
+    char *result_id = PQgetvalue(res, 0, PQfnumber(res, "id"));
+    logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_laol returned: rn='%s', ct='%s', id='%s', order=%s", result_rn, result_ct, result_id, ord);
+
+    json = cJSON_CreateObject();
+    int cols = PQnfields(res);
+
+    for (int col = 0; col < cols; col++) {
+        char *colname = PQfname(res, col);
+        char *value = PQgetvalue(res, 0, col);
+
+        if (strcmp(colname, "id") == 0) continue;
+        if (strcmp(colname, "custom_attrs") == 0) continue;
+
+        if (value && strlen(value) > 0) {
+            // Try to parse as JSON first
+            arr = cJSON_Parse(value);
+            if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                cJSON_AddItemToObject(json, colname, arr);
+            } else {
+                // Check if it's a number
+                char *endptr;
+                long num = strtol(value, &endptr, 10);
+                if (*endptr == '\0') {
+                    cJSON_AddNumberToObject(json, colname, num);
+                } else {
+                    cJSON_AddItemToObject(json, colname, cJSON_CreateString(value));
+                }
+                cJSON_Delete(arr);
+            }
+        }
+    }
+
+    PQclear(res);
+    free(escaped_pi);
+
+    cJSON *ri_obj = cJSON_GetObjectItem(json, "ri");
+    logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_laol: ri_obj = %s", ri_obj ? (cJSON_IsString(ri_obj) ? ri_obj->valuestring : "NOT_STRING") : "NULL");
+    if (ri_obj && cJSON_IsString(ri_obj))
+    {
+        cJSON *customAttrs = db_get_fcnt_custom_attributes(ri_obj->valuestring);
+        logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_laol: customAttrs = %s", customAttrs ? "EXISTS" : "NULL");
+        if (customAttrs)
+        {
+            char *debug_str = cJSON_PrintUnformatted(customAttrs);
+            logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_laol: customAttrs content = %s", debug_str);
+            free(debug_str);
+            cJSON *item = NULL;
+            cJSON_ArrayForEach(item, customAttrs)
+            {
+                if (item->string)
+                {
+                    logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_laol: Adding custom attr: %s", item->string);
+                    cJSON_AddItemToObject(json, item->string, cJSON_Duplicate(item, 1));
+                }
+            }
+            cJSON_Delete(customAttrs);
+        }
+    }
+
+    return json;
+}
+
 
 
 cJSON *db_get_tsi_laol(RTNode *parent_rtnode, int laol)

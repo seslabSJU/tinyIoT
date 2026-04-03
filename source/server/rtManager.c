@@ -289,6 +289,11 @@ RTNode *find_rtnode(char *addr)
 #if MONO_THREAD == 0
         pthread_mutex_lock(&main_lock);
 #endif
+        // Update parent FCNT's cni/cbs when FCIN expires
+        if (rtnode->ty == RT_FCIN && rtnode->parent)
+        {
+            update_fcnt_fcin(rtnode->parent, rtnode, -1);
+        }
         db_delete_onem2m_resource(rtnode);
         free_rtnode(rtnode);
 #if MONO_THREAD == 0
@@ -406,7 +411,11 @@ RTNode *find_rtnode_by_uri(char *uri)
             }
             if (!rtnode && !strtok_r(NULL, "/", &target_ptr))
             { // if next '/' doesn't exist
-                if (!strcmp(ptr, "ol") || !strcmp(ptr, "oldest"))
+                if (!strcmp(ptr, "la") || !strcmp(ptr, "latest"))
+                {
+                    flag = 0;
+                }
+                else if (!strcmp(ptr, "ol") || !strcmp(ptr, "oldest"))
                 {
                     flag = 1;
                 }
@@ -421,6 +430,35 @@ RTNode *find_rtnode_by_uri(char *uri)
                 if (cin)
                 {
                     rtnode = create_rtnode(cin, RT_CIN);
+                    rtnode->parent = parent_rtnode;
+                }
+            }
+        }
+        else if (parent_rtnode->ty == RT_FCNT)
+        {
+            cJSON *fcin = NULL;
+
+            if (!strtok_r(NULL, "/", &target_ptr))
+            { // if next '/' doesn't exist
+                if (!strcmp(ptr, "la") || !strcmp(ptr, "latest"))
+                {
+                    flag = 0;
+                }
+                else if (!strcmp(ptr, "ol") || !strcmp(ptr, "oldest"))
+                {
+                    flag = 1;
+                }
+                if (flag == 0 || flag == 1)
+                {
+                    fcin = db_get_fcin_laol(parent_rtnode, flag);
+                }
+                else
+                {
+                    fcin = db_get_resource_by_uri(uri, RT_FCIN);
+                }
+                if (fcin)
+                {
+                    rtnode = create_rtnode(fcin, RT_FCIN);
                     rtnode->parent = parent_rtnode;
                 }
             }

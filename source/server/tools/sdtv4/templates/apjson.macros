@@ -1,0 +1,258 @@
+{# 
+
+apjson.macros
+
+(c) 2015 by Andreas Kraft
+License: Apache 2. See the LICENSE file for further details.
+#}
+
+{% macro printDataType(type) %}
+{%- if type %}
+{%- set it = instanceType(type, withNameSpace=False) %}
+{%- set en = namespaceprefix + ':enum' %}
+{%- if it == 'SDT4SimpleType' %}
+{%- if type.tpe == 'datetime' %}timestamp
+{%- elif type.tpe == 'uri' %}anyuri
+{%- else %}{{type.tpe}}{% endif %}
+{%- endif %}
+{%- if it == 'SDT4ArrayType' %}list{% endif %}
+{%- if it.startswith('enum') %}nonNegInteger{% endif %}
+{%- if it.startswith(en) %}nonNegInteger{% endif %}
+{%- else %}void
+{%- endif %}
+{%endmacro %}
+
+{% macro printOptional(optional) %}
+{%- if optional %}
+{%- if optional == 'true' %}01{% endif %}
+{%- if optional == 'false' %}1{% endif %}
+{%- else %}01
+{%- endif %}
+{%endmacro %}
+
+
+{% macro printEmptyEntry(name, type, cnd, children, postfix, properties, sdttype) -%}
+{
+        "type"      : "{{ getNSName(shortname(name)) }}{{ postfix if postfix}}",
+        "lname"     : "{{ name }}{{ postfix if postfix }}",
+{% if sdttype | length > 0 %}
+        "sdttype"   : "{{ sdttype }}",
+{% endif %}
+        "cnd"       : "{{ cnd }}{{ postfix if postfix }}"{{"," if (attributes and attributes|length > 0) or (properties and properties|length > 0) or (children and children|length > 0 and postfix != "Inst") }}
+{% if properties and properties|length > 0 %}
+        "attributes": [
+{% for pr in properties %}
+{{ printAsProperty(pr, loop.last) }}
+{% endfor %}
+        ]{{"," if children | length > 0 and postfix != "Inst" }}
+{% endif %}
+{% if (children | length > 0 or not postfix) and postfix != "Inst" %}
+        "children"  : [
+{% for child in children %}
+            "{{ getNamespacePrefix(child) }}:{{ shortname(componentName(child)) }}"{{ ", " if not loop.last or postfix == "Annc" or postfix == "Inst" }}
+{% if postfix == "Annc" %}
+            "{{ getNamespacePrefix(child) }}:{{ shortname(componentName(child)) }}{{ postfix }}"{{ ", " if not loop.last or not postfix}}
+{% endif %}
+{% endfor %}
+{% if not postfix %}
+            ,"{{ getNSName(shortname(name)) }}Inst"
+{% endif %}
+        ]
+{% endif %}
+    }{% endmacro %}
+
+
+{% macro printAsAttribute(dp, last) %}
+            // DataPoint: {{ dp.name }}
+            { "sname" : "{{shortname(dp.name)}}", "lname" : "{{ dp.name }}", "type" : "{{printDataType(dp.dataPointType)}}", "car" : "{{printOptional(dp.optional)}}" }{{ ", " if not last }}
+{%- endmacro %}
+
+{% macro printAsProperty(pr, last) %}
+            // Property: {{ pr.name }}
+            { "sname" : "{{shortname(pr.name)}}", "lname" : "{{ pr.name }}", "type" : "{{pr.type.tpe}}", "car" : "{{printOptional(pr.optional)}}" }{{ ", " if not last }}
+{%- endmacro %}
+
+{##### Generate ModuleClasses (normal, announced, and instance version) #####}
+{%- macro printModuleClasses(moduleClasses) %}
+{#%- if moduleClasses | length > 0 and countUnextend(moduleClasses) > 0 %#}
+{% for moduleClass in moduleClasses %}
+{% if moduleClass.extend == None %}
+
+    // ModuleClass: {{moduleClass.name}} ({{ shortname(moduleClass.name) }})
+    {
+        "type"      : "{{getNSName(shortname(moduleClass.name))}}",
+        "lname"     : "{{ moduleClass.name }}",
+        {% set cnd = getNamespaceFromPrefix(namespaceprefix) ~ ".moduleclass." ~ moduleClass.name %}
+        "cnd"       : "{{ cnd }}",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+{% for pr in moduleClass.properties %}
+{{ printAsProperty(pr, loop.last) }}
+{% endfor %}
+{% for dp in moduleClass.data %}
+{{ printAsAttribute(dp, loop.last) }}
+{% endfor %}
+        ],
+		"children"  : [
+{% for action in moduleClass.actions %}
+            "{{ getNamespacePrefix(action) }}:{{ shortname(componentName(action)) }}",
+{% endfor %}
+            "{{getNSName(shortname(moduleClass.name))}}Inst"
+        ]
+    },
+{% for action in moduleClass.actions %}
+
+    // Action: {{ action.name }}
+    {% set cnd = getNamespaceFromPrefix(namespaceprefix) ~ ".action." ~ action.name %}
+    {
+        "type"      : "{{ getNSName(shortname(action.name)) }}",
+        "lname"     : "{{ action.name }}",
+        "cnd"       : "{{ cnd }}",
+        "sdttype"   : "action"{{ ",	" if action.args | length > 0 }}
+{% if action.args | length > 0 %}
+        "attributes": [
+{% for arg in action.args %}
+{{ printAsAttribute(arg, loop.last) }}
+{% endfor %}
+        ],
+		"children"  : [
+            "{{getNSName(shortname(action.name))}}Inst"
+        ]
+{% endif %}
+    },
+{% endfor %}
+
+    // ModuleClass Announced: {{moduleClass.name}}Annc ({{ shortname(moduleClass.name) }}Annc)
+    {
+        "type"      : "{{getNSName(shortname(moduleClass.name))}}Annc",
+        "lname"     : "{{ moduleClass.name }}Annc",
+        {% set cnd = getNamespaceFromPrefix(namespaceprefix) ~ ".moduleclass." ~ moduleClass.name %}
+        "cnd"       : "{{ cnd }}Annc",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+{% for pr in properties %}
+{{ printAsProperty(pr, loop.last) }}
+{% endfor %}
+{% for dp in moduleClass.data %}
+{{ printAsAttribute(dp, loop.last) }}
+{% endfor %}
+        ]{{ ", " if moduleClass.actions  | length > 0 }}
+{% if moduleClass.actions | length > 0 %}
+        "children"  : [
+{% for action in moduleClass.actions %}
+            "{{ getNamespacePrefix(action) }}:{{ shortname(componentName(action)) }}",
+            "{{ getNamespacePrefix(action) }}:{{ shortname(componentName(action)) }}Annc"{{ ", " if not loop.last }}
+{% endfor %}        ]
+{% endif %}
+    }{{", " if moduleClass.actions | length > 0 }}
+{%- for action in moduleClass.actions %}
+
+    // Action Announced: {{ action.name }}Annc
+    {% set cnd = getNamespaceFromPrefix(namespaceprefix) ~ ".action." ~ action.name ~ "Annc" %}
+    {
+        "type"      : "{{ getNSName(shortname(action.name)) }}Annc",
+        "lname"     : "{{ action.name }}Annc",
+        "cnd"       : "{{ cnd }}"{{"," if action.args | length > 0 }}
+		"sdttype"	: "action"{{ "," if action.args | length > 0 }}
+{% if action.args | length > 0 %}
+        "attributes": [
+{% for pr in moduleClass.properties %}
+{{ printAsProperty(pr, loop.last) }}
+{% endfor %}
+{% for arg in action.args %}
+{{ printAsAttribute(arg, loop.last) }}
+{% endfor %}
+        ]
+{% endif %}
+    }{{ ", " if not loop.last }}
+{% endfor %}{{- ", "}}
+
+    // ModuleClass Instance: {{moduleClass.name}}Inst ({{ shortname(moduleClass.name) }}Inst)
+    {
+        "type"      : "{{getNSName(shortname(moduleClass.name))}}Inst",
+        "lname"     : "{{ moduleClass.name }}Inst",
+        {% set cnd = getNamespaceFromPrefix(namespaceprefix) ~ ".moduleclass." ~ moduleClass.name %}
+        "cnd"       : "{{ cnd }}Inst",
+        "sdttype"   : "moduleclass",
+        "attributes": [
+{% for pr in properties %}
+{{ printAsProperty(pr, loop.last) }}
+{% endfor %}
+{% for dp in moduleClass.data %}
+{{ printAsAttribute(dp, loop.last) }}
+{% endfor %}
+        ]
+    }{{", " if moduleClass.actions | length > 0 }}
+
+{%- for action in moduleClass.actions %}
+
+    // Action Instance: {{ action.name }}Inst
+    {% set cnd = getNamespaceFromPrefix(namespaceprefix) ~ ".action." ~ action.name ~ "Inst" %}
+    {
+        "type"      : "{{ getNSName(shortname(action.name)) }}Inst",
+        "lname"     : "{{ action.name }}Inst",
+        "cnd"       : "{{ cnd }}"{{"," if action.args | length > 0 }}
+		"sdttype"	: "action"{{ "," if action.args | length > 0 }}
+{% if action.args | length > 0 %}
+        "attributes": [
+{% for pr in moduleClass.properties %}
+{{ printAsProperty(pr, loop.last) }}
+{% endfor %}
+{% for arg in action.args %}
+{{ printAsAttribute(arg, loop.last) }}
+{% endfor %}
+        ]
+{% endif %}
+    }{{ ", " if not loop.last }}
+{% endfor %}{{- ", " if not loop.last }}
+
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+
+{##### Print Devices #####}
+{%- macro printDeviceClasses(deviceClasses) %}
+{% if deviceClasses | length > 0 %}
+{% for device in deviceClasses %}
+    // DeviceClass: {{device.id}}
+    {% set cnd = getNamespaceFromPrefix(namespaceprefix) ~ ".device." ~ device.id %}
+    {{ printEmptyEntry(device.id, None, cnd, device.moduleClasses+device.subDevices, None, device.properties, "device") }},
+{%- if device.moduleClasses | length > 0 %}{{ printModuleClasses(device.moduleClasses) }}{% endif %}        
+
+    // DeviceClass Announced: {{device.id}}Annc
+    {{ printEmptyEntry(device.id, None, cnd, device.moduleClasses+device.subDevices, "Annc", device.properties, "device") }},
+{%- if device.moduleClasses | length > 0 %}{{ printModuleClasses(device.moduleClasses) }}{% endif %}
+
+    // DeviceClass Instance: {{device.id}}Inst
+    {{ printEmptyEntry(device.id, None, cnd, device.moduleClasses+device.subDevices, "Inst", device.properties, "device") }}
+{%- if device.moduleClasses | length > 0 %}{{ printModuleClasses(device.moduleClasses) }}{% endif %}{{ ", " if not loop.last }}
+
+{% endfor %}
+{% endif %}
+{% endmacro %}
+
+
+{##### Print SubDevices #####}
+{%- macro printSubDevices(subDevices) %}
+{% if subDevices | length > 0 %}
+{% for subDevice in subDevices %}
+    // SubDevice: {{subDevice.id}}
+    {% set cnd = getNamespaceFromPrefix(namespaceprefix) ~ ".subdevice." ~ subDevice.id %}
+    {{ printEmptyEntry(subDevice.id, None, cnd, subDevice.moduleClasses, None, None, "subdevice") }}
+{#    {{ printEmptyEntry(shortname(subDevice.id), None, cnd, subDevice.moduleClasses, None, None, "subdevice") }} #}
+{%- if subDevice.moduleClasses | length > 0 %}{{ printModuleClasses(subDevice.moduleClasses) }}{% endif %},
+
+    // SubDevice Announced: {{subDevice.id}}Annc
+    {{ printEmptyEntry(subDevice.id, None, cnd, subDevice.moduleClasses, "Annc", None, "subdevice") }}
+{#    {{ printEmptyEntry(shortname(subDevice.id), None, cnd, subDevice.moduleClasses, "Annc", None, "subdevice") }} #}
+{%- if subDevice.moduleClasses | length > 0 %}{{ printModuleClasses(subDevice.moduleClasses) }}{% endif %},
+
+    // SubDevice Instance: {{subDevice.id}}Inst
+    {{ printEmptyEntry(subDevice.id, None, cnd, subDevice.moduleClasses, "Inst", None, "subdevice") }}
+{#    {{ printEmptyEntry(shortname(subDevice.id), None, cnd, subDevice.moduleClasses, "Inst", None, "subdevice") }} #}
+{%- if subDevice.moduleClasses | length > 0 %}{{ printModuleClasses(subDevice.moduleClasses) }}{% endif %}{{ ", " if not loop.last }}
+
+{% endfor %}
+{%- endif %}
+{%- endmacro %}

@@ -1,0 +1,351 @@
+{# 
+
+markdown.macros
+
+(c) 2015 by Andreas Kraft
+License: Apache 2. See the LICENSE file for further details.
+#}
+
+{% macro header(name) %}
+{{''.rjust(getLevel(), '#')}} {{name}}
+{% endmacro %}
+
+{##### Print Documentation #####}
+{% macro doc(text) %}
+{% if text and text.content and text.content | length > 0 %}
+{{text.content | trim | replace("*", "\\*") | replace("#", "\\#") -}}
+{% endif %}
+{% endmacro %}
+
+
+{% macro boolean(val, dft) %}
+{% if val != None %}{% if val=='true' or val=='yes'%}true{% else %}false{% endif %}{% else %}{{dft}}{% endif %}
+{% endmacro %}
+
+
+{% macro text(val) %}
+{% if val != None %}{{val}}{% else %}{% endif %}
+{% endmacro %}
+
+
+{% macro readWrite(dp) %}
+{% if dp.readable=='true' and dp.writable=='true' %}R/W{% endif %}
+{% if dp.readable=='true' and dp.writable=='false' %}R{% endif %}
+{% if dp.readable=='false' and dp.writable=='true' %}W{% endif %}
+{% endmacro %}
+
+
+{% macro getCardinality(obj) %}
+{% set min = '1' %}{% set max = '1' %}
+{% if obj.minOccurs %}{% set min = obj.minOccurs %}{% endif %}
+{% if obj.maxOccurs %}{% set max = obj.maxOccurs %}{% endif %}
+{% if min != max %}{% set card = min + '..' + max %}{% else %}{% set card = min %}{% endif %}
+{{card -}}
+{% endmacro %}
+
+
+{##### Print License #####}
+{%- macro printLicense(license) -%}
+{%- if license %}
+{#% set lines = license.split('\n') %#}
+{% for line in license.split('\n') %}
+> {{ line }}
+{% endfor %}
+{% endif -%}
+{% endmacro %}
+
+
+{##### Print Includes #####}
+{%- macro printIncludes(includes) -%}
+{% if includes and includes | length > 0 %}
+
+- **Includes**
+{% for include in includes %}
+	- Parse: {{include.parse}}, Href: {{include.href}}
+{%- endfor %}
+{%- endif %} {# includes #}
+{% endmacro %}
+
+
+{##### Print DataType #####}
+{% macro printDataType(type) -%}
+{%- if type %}
+{% set it = instanceType(type) %}
+{%- if it == 'SDT4SimpleType' %}
+{# {{type.type.type}} {{printDataTypeAttributes(type.type)}} #}
+{{type.tpe}} {{printDataTypeAttributes(type)}}
+{%- elif it == 'SDT4StructType' %}
+SDT4StructType
+{%- elif it == 'SDT4ArrayType' %}
+List {{printDataTypeAttributes(type.type)}}
+{%- if type.type.arrayType %} of <br/>{{printDataType(type.type.arrayType)}}{%- endif %}
+{%- if type.type.doc %}  <br />{{doc(type.type.doc)}}{%- endif %}
+{%- if type.type.constraints %}  <br />{{printConstraints(type.type.constraints)}}{%- endif %}
+{% else %}
+{{it}}
+{%- endif %}
+{% if type.doc and type.doc | length > 0 %}
+<br />{{doc(type.doc)}}
+{% endif %}
+{% else %}
+void
+{%- endif %}
+{% endmacro %}
+
+
+{##### Print DataType Attributes #####}
+{% macro printDataTypeAttributes(type) %}
+{%- if type and type.name %}
+*{{type.name}}* {{'{'}}
+{%- if type.unitOfMeasure %}UnitOfMeasure: "{{type.unitOfMeasure}}"{%- endif %}
+{{'}'}}
+{% endif %}
+{% endmacro %}
+
+
+{##### Print DataType Constraints #####}
+{% macro printConstraints(constraints) %}
+{%- if constraints %}
+{%- for constraint in constraints %}
+   ' {Constraint: '
+{%- if constraint.name %}{{constraint.name}}{%- endif %}
+{%- if constraint.type %}({{constraint.type}}){%- endif %}
+{%- if constraint.value %}="{{constraint.value}}"{%- endif %}
+{%- if constraint.doc %};{{doc(constraint.doc)}}{%- endif %}
+}
+{%- endfor %}
+{%- endif %}
+{% endmacro %}
+
+
+{##### Print Properties #####}
+{% macro printProperties(properties) %}
+{% if properties and properties | length > 0 %}
+
+{{incLevel('Properties')}}
+
+|Name |Type |Value |Optional |Documentation |
+|:----|:----|:-----|:--------|:-------------|
+{% for prop in properties %}
+| {{ prop.name }} | {{prop.type.type}} | {% if prop.value %}{{ prop.value }}{% else %} {% endif %} | {{boolean(prop.optional, 'false') }} | {{doc(prop.doc)}} |
+{% endfor %}
+{{decLevel()-}}
+{% endif %}
+{% endmacro %}
+
+
+{##### print Actions #####}
+{% macro printActions(actions) %}
+{% if actions and actions | length > 0 %}
+{{incLevel('Actions')}}
+
+|Return Type |Name |Arguments |Optional |Documentation |
+|:-----------|:----|:---------|:--------|:-------------|
+{% for action in actions %}
+| {{ printDataType(action.type) -}} | {{action.name}} |
+{%- if action.args | length == 1 %}{{printArgument(action.args[0])}}
+{%- elif action.args | length > 1 %}{% for arg in action.args %}{{printArgument(arg)}}<br /><br />{% endfor %}
+{%- else %}None{% endif -%}
+ | {{boolean(action.optional, 'false')}} | {{doc(action.doc)}} |
+{% endfor -%}
+{{decLevel()-}}
+{% endif -%}
+{% endmacro %}
+
+
+{##### Print Argument #####}
+{% macro printArgument(argument) %}
+{{argument.name}}:&nbsp;{{printDataType(argument.type)}}
+{%- endmacro %}
+
+
+{##### Print Data #####}
+{% macro printData(data) %}
+{% if data and data | length > 0 %}
+{{incLevel('Data Points')}}
+
+|Name |Type |R/W |Optional |Unit |Documentation |
+|:----|:----|:---|:--------|:----|:-------------|
+{% for dp in data %}
+| {{dp.name}} | {{printDataType(dp.dataPointType)}} | {{readWrite(dp)}} | {{boolean(dp.optional, 'false')}} | {{text(dp.dataPointType.unitOfMeasure)}} | {{doc(dp.doc)}} |
+{% endfor -%}
+{{decLevel()-}}
+{% endif -%}
+{% endmacro %}
+
+
+{##### Print Events #####}
+{%- macro printEvents(events) %}
+{% if events and events | length > 0 %}
+{{incLevel('Events')}}
+
+|Name |Data |Optional |Documentation |
+|:----|:----|:--------|:-------------|
+{% for event in events %}
+| {{event.name}} | {% for dp in event.data %}{{dp.name}}: {{printDataType(dp.type)}}<br />{% endfor %} | {{event.optional}} | {{doc(event.doc)}} |
+{% endfor %}
+{{decLevel()}}
+{% endif %}
+{% endmacro %}
+
+
+{##### Print ModuleClasses #####}
+{%- macro printModuleClasses(moduleClasses, withCardinality) %}
+{%- if moduleClasses | length > 0 and countUnextend(moduleClasses) > 0 %}
+{% if markdownPageBreak %}<!--BREAK-->
+
+{% endif %}
+{{incLevel('ModuleClasses')}}
+{% for moduleClass in moduleClasses if not moduleClass.extend %}
+{{incLevel(getNSName(moduleClass.name))}}
+
+{% if not hideDetails %}
+
+{% if moduleClass.doc %}
+{{ doc(moduleClass.doc) }}
+{% endif %}
+
+{% if withCardinality == 'true' %}
+- **Cardinality**: {{getCardinality(moduleClass)}}
+{% endif %}{# withCardinality #}
+
+{% if moduleClass.extend %}
+- **Domain**: {{moduleClass.extend.domain}}
+- **ModuleClass**: {{moduleClass.extend.entity}}
+{% endif %}
+{{ printProperties(moduleClass.properties)}}
+{{ printActions(moduleClass.actions)}}
+{{ printData(moduleClass.data)}}
+{{ printEvents(moduleClass.events)}}
+{% endif %} {# hideDetails #}
+{{decLevel()-}}
+{% endfor %} {# domain.moduleClasses #}
+{{decLevel()-}}
+{% endif %} {# domain.moduleClassess #}
+{% endmacro %}
+
+
+
+{##### Print only extendedModuleClasses #####}
+{%- macro printExtendedModuleClasses(moduleClasses) %}
+{% if countExtend(moduleClasses) > 0 %}
+{{incLevel('Extended ModuleClasses')}}
+
+|ModuleClass Instance Name |ModuleClass Name |Cardinality |Description |
+|:-------------------------|:----------------|:-----------|:-----------|
+{% for moduleClass in moduleClasses %}
+{% if moduleClass.extend %}
+|{{getNSName(moduleClass.name)}} | {{moduleClass.extend.domain}} : {{moduleClass.extend.entity}} | {{getCardinality(moduleClass)}} | {{doc(moduleClass.doc)}} |
+{% endif %} {# moduleClass.extend() #}
+{% endfor %} {# moduleClasses #}
+{{decLevel()-}}
+{% endif %} {# countExtend() #}
+{% endmacro %}
+
+
+
+
+{##### Print SubDevices #####}
+{% macro printSubDevices(subdevices) %}
+{% if subdevices and subdevices | length > 0 and countUnextend(subdevices) > 0 %}
+{% if markdownPageBreak %}<!--BREAK-->
+
+{% endif %}
+{{ incLevel('SubDevices') }}
+{% for sd in subdevices %}
+{#{incLevel('SubDevice ' + getNSName(sd.id))} #}
+{{ incLevel(getNSName(sd.id)) }}
+{{ doc(sd.doc)}}
+{{ printProperties(sd.properties) }}
+{{ printExtendedModuleClasses(sd.moduleClasses) }}
+{{ printModuleClasses(sd.moduleClasses, 'true') }}
+{{ decLevel() }}
+{% endfor %}
+{{ decLevel() -}}
+{% endif %}
+{% endmacro %}
+
+
+{##### Print only Extended SubDevices #####}
+{% macro printExtendedSubDevices(subdevices) %}
+{% if countExtend(subdevices) > 0 %}
+{{ incLevel('Extended SubDevices') }}
+
+|SubDevice Instance Name |SubDevice Name |Cardinality |Description |
+|:-----------------------|:--------------|:-----------|:-----------|
+{% for sd in subdevices %}
+|{{getNSName(sd.id)}} | {{sd.extend.domain}} : {{sd.extend.entity}} | {{getCardinality(sd)}} |{{ doc(sd.doc)}} |
+{% endfor %}
+{{ decLevel() -}}
+{% endif %}
+{% endmacro %}
+
+
+{##### Print Devices #####}
+{% macro printDeviceClasses(deviceClasses) %}
+{% if deviceClasses | length > 0 %}
+{% if markdownPageBreak %}<!--BREAK-->
+
+{% endif %}
+{{incLevel('DeviceClasses')}}
+{% for device in deviceClasses %}
+{% if not hideDetails %}
+{{incLevel(getNSName(device.id))}}
+{{ doc(device.doc) }}
+{% if not hideDetails %}{{ printProperties(device.properties)}}{% endif %}
+{{ printExtendedModuleClasses(device.moduleClasses) }}
+{{ printModuleClasses(device.moduleClasses, 'true') }}
+{{ printExtendedSubDevices(device.subDevices)}}
+{{ printSubDevices(device.subDevices)}}
+{% endif %}
+{{decLevel()-}}
+{% endfor %}
+{{decLevel()-}}
+{% endif %}
+
+{% endmacro %}
+
+
+
+
+
+
+{##### Print Products TODO #####}
+{% macro printProductClasses(productClasses) %}
+{% if productClasses | length > 0 %}
+# TODO: ProductClasses
+{% endif %}
+{% endmacro %}
+
+
+
+
+{##### Print DataTypes #####}
+{% macro printDataTypes(dataTypes) %}
+{% if dataTypes | length > 0 %}
+{% if markdownPageBreak %}<!--BREAK-->
+
+{% endif %}
+{{incLevel('DataTypes')}}
+{% for dataType in dataTypes %}
+
+{{incLevel(getNSName(dataType.name))}}
+{{ doc(dataType.doc) }}
+{% if instanceType(dataType) == 'SDT4EnumType' %}
+
+|Name |Value  |Documentation |
+|:----|:------|:-------------|
+{% for value in dataType.type.enumValues %}
+| {{ value.name }} | {{ value.value }} | {{ doc(value.doc) }} |
+{% endfor %}
+{% endif %}
+
+{{decLevel()-}}
+{% endfor %}
+{{decLevel()-}}
+
+{% endif %}
+{% endmacro %}
+
+
+

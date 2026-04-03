@@ -127,12 +127,13 @@ int check_csi_duplicate(char* new_csi, RTNode* rtnode);
 int check_macp_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop);
 
 // etc
-char* get_local_time(int diff);
-char* resource_identifier(ResourceType ty, char* ct);
-void delete_cin_under_cnt_mni_mbs(RTNode* rtnode);
-int net_to_bit(cJSON* net);
-int get_value_querystring_int(char* key);
-void remove_invalid_char_json(char* json);
+char *get_local_time(int diff);
+char *resource_identifier(ResourceType ty, char *ct);
+void delete_cin_under_cnt_mni_mbs(RTNode *rtnode);
+int delete_oldest_fcin_rtnode(RTNode *fcnt_rtnode);
+int net_to_bit(cJSON *net);
+int get_value_querystring_int(char *key);
+void remove_invalid_char_json(char *json);
 int is_json_valid_char(char c);
 bool is_rn_valid_char(char c);
 int parsePoa(char* poa_str, Protocol* prot, char** host, int* port, char** path);
@@ -174,4 +175,18 @@ cJSON* qs_to_json(char* qs);
 cJSON* handle_uril(cJSON* uril, char* new_uri, FilterOperation fo);
 void filterOptionStr(FilterOperation fo, char* sql);
 ACOP op_to_acop(Operation op);
+
+// FlexContainer custom attributes (Release 2)
+bool is_standard_fcnt_attribute(const char *attrName);
+cJSON *extract_custom_attributes(cJSON *fcnt);
+int validate_shortname_cnd(const char *shortname, const char *cnd, char **error_msg);
+int validate_custom_attributes(const char *shortname, cJSON *customAttrs, const char *cnd, char **error_msg);
+int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op);
+int calculate_content_size(cJSON *customAttrs);
+void increment_parent_statetag(RTNode *parent_rtnode);
+
+// FlexContainerInstance (Release 4)
+int add_flexcontainer_instance(RTNode *fcnt_rtnode, oneM2MPrimitive *o2pt, bool is_create);
+int cleanup_fcnt_instances(RTNode *fcnt_rtnode, bool keep_latest);
+
 #endif

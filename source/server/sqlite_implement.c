@@ -178,11 +178,23 @@ static const table_def_t table_definitions[] = {
      "lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
-    {"cinA", 
+    {"cinA",
      "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, "
      "lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
+    {"fcin",
+     "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
+     "cs INT, st INT, org VARCHAR(200), loc TEXT, at VARCHAR(200), aa VARCHAR(100), ast INT, custom_attrs TEXT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"fcnt",
+     "CREATE TABLE IF NOT EXISTS fcnt ( id INTEGER, "
+     "cnd VARCHAR(200), oref VARCHAR(100), nl VARCHAR(45), cr VARCHAR(40), at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "st INT, cs INT, fcied INT, mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "custom_attrs TEXT, loc TEXT, daci VARCHAR(200), "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    }
     {"ts",
      "CREATE TABLE IF NOT EXISTS ts ( id INTEGER, "
      "cr VARCHAR(45), mni INT, mbs INT, mia INT, cni INT, cbs INT, "
@@ -330,6 +342,12 @@ char *get_table_name(ResourceType ty)
     case RT_CINA:
         tableName = "cinA";
         break;
+    case RT_FCIN:
+        tableName = "fcin";
+        break;
+    case RT_FCNT:
+        tableName = "fcnt";
+        break;
     }
     return tableName;
 }
@@ -402,13 +420,31 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
             }
             break;
         case SQLITE_INTEGER:
-            cJSON_AddNumberToObject(resource, colname, sqlite3_column_int(stmt, col));
+            if (strcmp(colname, "fcied") == 0)
+                cJSON_AddBoolToObject(resource, colname, sqlite3_column_int(stmt, col));
+            else
+                cJSON_AddNumberToObject(resource, colname, sqlite3_column_int(stmt, col));
             break;
         }
     }
 
     sqlite3_finalize(stmt);
     free(sql);
+
+    // For FlexContainer/FlexContainerInstance, merge custom_attrs into the main resource object
+    if (ty == RT_FCNT || ty == RT_FCIN) {
+        cJSON *custom_attrs = cJSON_GetObjectItem(resource, "custom_attrs");
+        if (custom_attrs && cJSON_IsObject(custom_attrs)) {
+            cJSON *item = NULL;
+            cJSON_ArrayForEach(item, custom_attrs) {
+                if (item->string) {
+                    cJSON_AddItemToObject(resource, item->string, cJSON_Duplicate(item, 1));
+                }
+            }
+            cJSON_DeleteItemFromObject(resource, "custom_attrs");
+        }
+    }
+
     return resource;
 }
 
@@ -479,13 +515,31 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
             }
             break;
         case SQLITE_INTEGER:
-            cJSON_AddNumberToObject(resource, colname, sqlite3_column_int(stmt, col));
+            if (strcmp(colname, "fcied") == 0)
+                cJSON_AddBoolToObject(resource, colname, sqlite3_column_int(stmt, col));
+            else
+                cJSON_AddNumberToObject(resource, colname, sqlite3_column_int(stmt, col));
             break;
         }
     }
 
     sqlite3_finalize(stmt);
     free(sql);
+
+    // For FlexContainer/FlexContainerInstance, merge custom_attrs into the main resource object
+    if (ty == RT_FCNT || ty == RT_FCIN) {
+        cJSON *custom_attrs = cJSON_GetObjectItem(resource, "custom_attrs");
+        if (custom_attrs && cJSON_IsObject(custom_attrs)) {
+            cJSON *item = NULL;
+            cJSON_ArrayForEach(item, custom_attrs) {
+                if (item->string) {
+                    cJSON_AddItemToObject(resource, item->string, cJSON_Duplicate(item, 1));
+                }
+            }
+            cJSON_DeleteItemFromObject(resource, "custom_attrs");
+        }
+    }
+
     return resource;
 }
 
@@ -964,7 +1018,7 @@ RTNode *db_get_all_resource_as_rtnode()
     char sql[1024] = {0};
     char buf[256] = {0};
 
-    sprintf(sql, "SELECT * FROM general WHERE ty != 4 AND ty != 5;");
+    sprintf(sql, "SELECT * FROM general WHERE ty != 4 AND ty != 5 AND ty != 58;");
     rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
     if (rc != SQLITE_OK)
     {
@@ -1049,7 +1103,10 @@ RTNode *db_get_all_resource_as_rtnode()
                     }
                     break;
                 case SQLITE_INTEGER:
-                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res2, col)));
+                    if (strcmp(colname, "fcied") == 0)
+                        cJSON_AddItemToObject(json, colname, sqlite3_column_int(res2, col) ? cJSON_CreateTrue() : cJSON_CreateFalse());
+                    else
+                        cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res2, col)));
                     break;
                 }
             }
@@ -1058,6 +1115,20 @@ RTNode *db_get_all_resource_as_rtnode()
         sqlite3_finalize(res2);
 
         cJSON_DeleteItemFromObject(json, "id");
+
+        // FCNT: custom_attrs를 top-level로 병합 후 제거 (db_get_resource와 동일)
+        if (ty == RT_FCNT) {
+            cJSON *custom_attrs = cJSON_GetObjectItem(json, "custom_attrs");
+            if (custom_attrs && cJSON_IsObject(custom_attrs)) {
+                cJSON *item = NULL;
+                cJSON_ArrayForEach(item, custom_attrs) {
+                    if (item->string) {
+                        cJSON_AddItemToObject(json, item->string, cJSON_Duplicate(item, 1));
+                    }
+                }
+                cJSON_DeleteItemFromObject(json, "custom_attrs");
+            }
+        }
 
         if (!head)
         {
@@ -1502,28 +1573,28 @@ cJSON *db_get_filter_criteria(oneM2MPrimitive *o2pt)
 
     if ((pjson = cJSON_GetObjectItem(fc, "sza")))
     {
-        sprintf(buf, " ri IN (SELECT ri FROM cin WHERE cs >= %d) ", pjson->valueint);
+        sprintf(buf, " id IN (SELECT id FROM cin WHERE cs >= %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
     if ((pjson = cJSON_GetObjectItem(fc, "szb")))
     {
-        sprintf(buf, " ri IN (SELECT ri FROM cin WHERE cs < %d) ", pjson->valueint);
+        sprintf(buf, " id IN (SELECT id FROM cin WHERE cs < %d) ", pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
     if ((pjson = cJSON_GetObjectItem(fc, "sts")))
     {
-        sprintf(buf, " ri IN (SELECT ri FROM cnt WHERE st < %d) ", pjson->valueint);
+        sprintf(buf, " id IN (SELECT id FROM cnt WHERE st < %d UNION SELECT id FROM fcnt WHERE st < %d) ", pjson->valueint, pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
 
     if ((pjson = cJSON_GetObjectItem(fc, "stb")))
     {
-        sprintf(buf, " ri IN (SELECT ri FROM cnt WHERE st >= %d) ", pjson->valueint);
+        sprintf(buf, " id IN (SELECT id FROM cnt WHERE st >= %d UNION SELECT id FROM fcnt WHERE st >= %d) ", pjson->valueint, pjson->valueint);
         strcat(sql, buf);
         filterOptionStr(fo, sql);
     }
@@ -1798,6 +1869,430 @@ cJSON *getForbiddenUri(cJSON *acp_list)
 
     sqlite3_finalize(res);
     return result;
+}
+
+// FCIN related functions
+int db_delete_one_fcin_mni(RTNode *fcnt)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "db_delete_one_fcin_mni called");
+    if (!fcnt) return -1;
+
+    char *pi = get_ri_rtnode(fcnt);
+    sqlite3_stmt *res = NULL;
+    int deleted_cs = 0;
+
+    // Find the oldest FCIN (smallest ct) and get its cs value
+    char *sql_select = "SELECT general.id, fcin.cs FROM general "
+                       "LEFT JOIN fcin ON general.id = fcin.id "
+                       "WHERE general.pi=? AND general.ty=58 "
+                       "ORDER BY fcin.st ASC LIMIT 1";
+
+    int rc = sqlite3_prepare_v2(db, sql_select, -1, &res, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to prepare select FCIN statement");
+        return -1;
+    }
+
+    sqlite3_bind_text(res, 1, pi, -1, NULL);
+    rc = sqlite3_step(res);
+
+    if (rc == SQLITE_ROW) {
+        int fcin_id = sqlite3_column_int(res, 0);
+        deleted_cs = sqlite3_column_int(res, 1);
+        sqlite3_finalize(res);
+
+        char *sql_delete = "DELETE FROM general WHERE id=?";
+        rc = sqlite3_prepare_v2(db, sql_delete, -1, &res, NULL);
+        if (rc != SQLITE_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to prepare delete FCIN statement");
+            return -1;
+        }
+
+        sqlite3_bind_int(res, 1, fcin_id);
+        rc = sqlite3_step(res);
+        sqlite3_finalize(res);
+
+        if (rc != SQLITE_DONE) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to delete oldest FCIN");
+            return -1;
+        }
+
+        logger("DB", LOG_LEVEL_DEBUG, "Successfully deleted oldest FCIN with cs=%d", deleted_cs);
+        return deleted_cs;
+    } else {
+        sqlite3_finalize(res);
+        logger("DB", LOG_LEVEL_ERROR, "No FCIN found to delete");
+        return -1;
+    }
+}
+
+int db_delete_one_fcin_mbs(RTNode *fcnt)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "db_delete_one_fcin_mbs called");
+    if (!fcnt) return -1;
+
+    char *pi = get_ri_rtnode(fcnt);
+    sqlite3_stmt *res = NULL;
+    int deleted_cs = 0;
+
+    char *sql_select = "SELECT general.id, fcin.cs FROM general "
+                       "LEFT JOIN fcin ON general.id = fcin.id "
+                       "WHERE general.pi=? AND general.ty=58 "
+                       "ORDER BY fcin.st ASC LIMIT 1";
+
+    int rc = sqlite3_prepare_v2(db, sql_select, -1, &res, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to prepare select FCIN statement");
+        return -1;
+    }
+
+    sqlite3_bind_text(res, 1, pi, -1, NULL);
+    rc = sqlite3_step(res);
+
+    if (rc == SQLITE_ROW) {
+        int fcin_id = sqlite3_column_int(res, 0);
+        deleted_cs = sqlite3_column_int(res, 1);
+        sqlite3_finalize(res);
+
+        char *sql_delete = "DELETE FROM general WHERE id=?";
+        rc = sqlite3_prepare_v2(db, sql_delete, -1, &res, NULL);
+        if (rc != SQLITE_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to prepare delete FCIN statement");
+            return -1;
+        }
+
+        sqlite3_bind_int(res, 1, fcin_id);
+        rc = sqlite3_step(res);
+        sqlite3_finalize(res);
+
+        if (rc != SQLITE_DONE) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to delete oldest FCIN");
+            return -1;
+        }
+
+        logger("DB", LOG_LEVEL_DEBUG, "Successfully deleted oldest FCIN with cs=%d", deleted_cs);
+        return deleted_cs;
+    } else {
+        sqlite3_finalize(res);
+        logger("DB", LOG_LEVEL_ERROR, "No FCIN found to delete");
+        return -1;
+    }
+}
+
+int db_get_fcin_cbs_cni(RTNode *fcnt, int *out_cbs, int *out_cni)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_cbs_cni called");
+    if (!fcnt || !out_cbs || !out_cni) return -1;
+
+    char *pi = get_ri_rtnode(fcnt);
+    sqlite3_stmt *res = NULL;
+
+    char *sql = "SELECT COUNT(*), COALESCE(SUM(fcin.cs), 0) FROM general "
+                "LEFT JOIN fcin ON general.id = fcin.id "
+                "WHERE general.pi=? AND general.ty=58";
+
+    int rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to prepare FCIN count statement");
+        return -1;
+    }
+
+    sqlite3_bind_text(res, 1, pi, -1, NULL);
+    rc = sqlite3_step(res);
+
+    if (rc == SQLITE_ROW) {
+        *out_cni = sqlite3_column_int(res, 0);
+        *out_cbs = sqlite3_column_int(res, 1);
+        sqlite3_finalize(res);
+        logger("DB", LOG_LEVEL_DEBUG, "db_get_fcin_cbs_cni: cni=%d, cbs=%d", *out_cni, *out_cbs);
+        return 0;
+    } else {
+        sqlite3_finalize(res);
+        logger("DB", LOG_LEVEL_ERROR, "Failed to get FCIN count/sum");
+        return -1;
+    }
+}
+
+RTNode *db_get_fcin_rtnode_list(RTNode *rtnode)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "call db_get_fcin_rtnode_list");
+    char *pi = get_ri_rtnode(rtnode);
+    int rc = 0;
+    int cols = 0, bytes = 0, coltype = 0;
+    cJSON *json;
+    sqlite3_stmt *res = NULL;
+    const char *colname = NULL;
+    char *sql;
+
+    sql = "SELECT * FROM 'general', 'fcin' WHERE general.pi=? AND general.ty=58 AND general.id=fcin.id ORDER BY fcin.st ASC;";
+    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    if (rc != SQLITE_OK)
+    {
+        logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);
+        return NULL;
+    }
+    sqlite3_bind_text(res, 1, pi, -1, NULL);
+
+    RTNode *head = NULL, *rtnode_ptr = NULL;
+    rc = sqlite3_step(res);
+    cols = sqlite3_column_count(res);
+    cJSON *arr = NULL;
+
+    while (rc == SQLITE_ROW)
+    {
+        json = cJSON_CreateObject();
+
+        for (int col = 0; col < cols; col++)
+        {
+            colname = sqlite3_column_name(res, col);
+            bytes = sqlite3_column_bytes(res, col);
+            coltype = sqlite3_column_type(res, col);
+
+            if (bytes == 0)
+                continue;
+            if (strcmp(colname, "id") == 0)
+                continue;
+
+            switch (coltype)
+            {
+                case SQLITE_TEXT:
+                    const char *text = (const char*)sqlite3_column_text(res, col);
+                    int len = sqlite3_column_bytes(res, col);
+                    char *safe_str = malloc(len + 1);
+                    if (safe_str) {
+                        memcpy(safe_str, text, len);
+                        safe_str[len] = '\0';
+                        arr = cJSON_Parse(safe_str);
+                        if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                            cJSON_AddItemToObject(json, colname, arr);
+                        } else {
+                            cJSON_AddItemToObject(json, colname, cJSON_CreateString(safe_str));
+                            if (arr) cJSON_Delete(arr);
+                        }
+                        free(safe_str);
+                    }
+                    break;
+                case SQLITE_INTEGER:
+                    cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
+                    break;
+            }
+        }
+
+        if (!head)
+        {
+            head = create_rtnode(json, RT_FCIN);
+            rtnode_ptr = head;
+        }
+        else
+        {
+            rtnode_ptr->sibling_right = create_rtnode(json, RT_FCIN);
+            rtnode_ptr->sibling_right->sibling_left = rtnode_ptr;
+            rtnode_ptr = rtnode_ptr->sibling_right;
+        }
+        json = NULL;
+        rc = sqlite3_step(res);
+    }
+
+    sqlite3_finalize(res);
+    return head;
+}
+
+cJSON *db_get_fcin_laol(RTNode *parent_rtnode, int laol)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "call db_get_fcin_laol, laol=%d", laol);
+    char *pi = get_ri_rtnode(parent_rtnode);
+    int rc = 0;
+    int cols = 0, bytes = 0, coltype = 0;
+    cJSON *json = NULL;
+    sqlite3_stmt *res = NULL;
+    const char *colname = NULL;
+
+    const char *sql = (laol == 0)
+        ? "SELECT * FROM general, fcin WHERE general.pi=? AND general.ty=58 AND general.id=fcin.id ORDER BY fcin.st DESC LIMIT 1"
+        : "SELECT * FROM general, fcin WHERE general.pi=? AND general.ty=58 AND general.id=fcin.id ORDER BY fcin.st ASC LIMIT 1";
+
+    rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    if (rc != SQLITE_OK)
+    {
+        logger("DB", LOG_LEVEL_ERROR, "Failed select, %d", rc);
+        return NULL;
+    }
+    sqlite3_bind_text(res, 1, pi, -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(res);
+    if (rc != SQLITE_ROW) {
+        sqlite3_finalize(res);
+        return NULL;
+    }
+
+    cols = sqlite3_column_count(res);
+    json = cJSON_CreateObject();
+    cJSON *arr = NULL;
+
+    for (int col = 0; col < cols; col++)
+    {
+        colname = sqlite3_column_name(res, col);
+        bytes = sqlite3_column_bytes(res, col);
+        coltype = sqlite3_column_type(res, col);
+
+        if (bytes == 0)
+            continue;
+        if (strcmp(colname, "id") == 0)
+            continue;
+        if (strcmp(colname, "custom_attrs") == 0)
+            continue;
+
+        switch (coltype)
+        {
+            case SQLITE_TEXT:
+                const char *text = (const char*)sqlite3_column_text(res, col);
+                int len = sqlite3_column_bytes(res, col);
+                char *safe_str = malloc(len + 1);
+                if (safe_str) {
+                    memcpy(safe_str, text, len);
+                    safe_str[len] = '\0';
+                    arr = cJSON_Parse(safe_str);
+                    if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) {
+                        cJSON_AddItemToObject(json, colname, arr);
+                    } else {
+                        cJSON_AddItemToObject(json, colname, cJSON_CreateString(safe_str));
+                        if (arr) cJSON_Delete(arr);
+                    }
+                    free(safe_str);
+                }
+                break;
+            case SQLITE_INTEGER:
+                cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
+                break;
+        }
+    }
+
+    sqlite3_finalize(res);
+
+    cJSON *ri_obj = cJSON_GetObjectItem(json, "ri");
+    if (ri_obj && cJSON_IsString(ri_obj))
+    {
+        cJSON *customAttrs = db_get_fcnt_custom_attributes(ri_obj->valuestring);
+        if (customAttrs)
+        {
+            cJSON *item = NULL;
+            cJSON_ArrayForEach(item, customAttrs)
+            {
+                if (item->string)
+                {
+                    cJSON_AddItemToObject(json, item->string, cJSON_Duplicate(item, 1));
+                }
+            }
+            cJSON_Delete(customAttrs);
+        }
+    }
+
+    return json;
+}
+
+
+// FCNT custom attributes functions
+int db_store_fcnt_custom_attributes(const char *ri, cJSON *customAttrs)
+{
+    if (!ri || !customAttrs) {
+        logger("DB", LOG_LEVEL_DEBUG, "db_store_fcnt_custom_attributes: invalid parameters");
+        return 0;
+    }
+
+    char *json_str = cJSON_PrintUnformatted(customAttrs);
+    if (!json_str) {
+        logger("DB", LOG_LEVEL_ERROR, "db_store_fcnt_custom_attributes: failed to serialize JSON");
+        return 0;
+    }
+
+    // Update FCNT custom_attrs
+    const char *sql_fcnt = "UPDATE fcnt SET custom_attrs=? WHERE id=(SELECT id FROM general WHERE ri=?)";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql_fcnt, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to prepare store FCNT custom attributes: %d", rc);
+        free(json_str);
+        return 0;
+    }
+    sqlite3_bind_text(stmt, 1, json_str, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, ri, -1, SQLITE_STATIC);
+
+    logger("DB", LOG_LEVEL_DEBUG, "db_store_fcnt_custom_attributes (FCNT): ri=%s", ri);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to store FCNT custom attributes: %d", rc);
+        free(json_str);
+        return 0;
+    }
+
+    // Update FCIN custom_attrs
+    const char *sql_fcin = "UPDATE fcin SET custom_attrs=? WHERE id=(SELECT id FROM general WHERE ri=?)";
+    rc = sqlite3_prepare_v2(db, sql_fcin, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to prepare store FCIN custom attributes: %d", rc);
+        free(json_str);
+        return 0;
+    }
+    sqlite3_bind_text(stmt, 1, json_str, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, ri, -1, SQLITE_STATIC);
+
+    logger("DB", LOG_LEVEL_DEBUG, "db_store_fcnt_custom_attributes (FCIN): ri=%s", ri);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    free(json_str);
+
+    if (rc != SQLITE_DONE) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to store FCIN custom attributes: %d", rc);
+        return 0;
+    }
+
+    return 1;
+}
+
+int db_update_fcnt_custom_attributes(const char *ri, cJSON *customAttrs)
+{
+    return db_store_fcnt_custom_attributes(ri, customAttrs);
+}
+
+cJSON *db_get_fcnt_custom_attributes(const char *ri)
+{
+    if (!ri) {
+        return NULL;
+    }
+
+    const char *sql = "SELECT COALESCE(fcnt.custom_attrs, fcin.custom_attrs) AS custom_attrs "
+        "FROM general LEFT JOIN fcnt ON general.id = fcnt.id "
+        "LEFT JOIN fcin ON general.id = fcin.id WHERE general.ri = ?";
+
+    logger("DB", LOG_LEVEL_DEBUG, "db_get_fcnt_custom_attributes: ri=%s", ri);
+
+    sqlite3_stmt *res = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &res, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to prepare get FCNT/FCIN custom attributes: %d", rc);
+        return NULL;
+    }
+    sqlite3_bind_text(res, 1, ri, -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(res);
+    if (rc != SQLITE_ROW) {
+        sqlite3_finalize(res);
+        return NULL;
+    }
+
+    const char *json_str = (const char*)sqlite3_column_text(res, 0);
+    if (!json_str) {
+        sqlite3_finalize(res);
+        return NULL;
+    }
+
+    cJSON *customAttrs = cJSON_Parse(json_str);
+    sqlite3_finalize(res);
+
+    return customAttrs;
 }
 
 // Forward declarations (avoid implicit function declarations in C99+)

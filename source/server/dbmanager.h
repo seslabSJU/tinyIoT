@@ -59,7 +59,19 @@ RTNode *db_get_latest_cins();
 bool db_check_cin_rn_dup(char *rn, char *pi);
 
 int db_delete_one_cin_mni(RTNode *cnt);
+int db_delete_one_cin_mbs(RTNode *cnt);
+
+RTNode *db_get_fcin_rtnode_list(RTNode *rtnode);
+cJSON *db_get_fcin_laol(RTNode *parent_rtnode, int laol);
+
+int db_delete_one_fcin_mni(RTNode *fcnt);
+int db_delete_one_fcin_mbs(RTNode *fcnt);
+int db_get_fcin_cbs_cni(RTNode *fcnt, int *out_cbs, int *out_cni);
 cJSON *getForbiddenUri(cJSON *acp_list);
+
+int db_store_fcnt_custom_attributes(const char *ri, cJSON *customAttrs);
+int db_update_fcnt_custom_attributes(const char *ri, cJSON *customAttrs);
+cJSON *db_get_fcnt_custom_attributes(const char *ri);
 
 #if DB_TYPE == DB_SQLITE
     void db_test_and_bind_value(sqlite3_stmt *stmt, int index, cJSON *obj);

@@ -1,0 +1,52 @@
+
+// Created by SDTTool
+// oneM2M Release: 5.6.0
+// Domain:         org.onem2m.common
+[
+    // SubDevice: subDevicePowerOutlet
+    {
+        "type"      : "cod:sDPOt",
+        "lname"     : "subDevicePowerOutlet",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.common.subdevice.subDevicePowerOutlet",
+        "children"  : [
+            "cod:binSh", 
+            "cod:eneCn", 
+            "cod:oveSr", 
+            "cod:numVe"
+            ,"cod:sDPOtInst"
+        ]
+    }
+,
+
+    // SubDevice Announced: subDevicePowerOutletAnnc
+    {
+        "type"      : "cod:sDPOtAnnc",
+        "lname"     : "subDevicePowerOutletAnnc",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.common.subdevice.subDevicePowerOutletAnnc",
+        "children"  : [
+            "cod:binSh", 
+            "cod:binShAnnc", 
+            "cod:eneCn", 
+            "cod:eneCnAnnc", 
+            "cod:oveSr", 
+            "cod:oveSrAnnc", 
+            "cod:numVe", 
+            "cod:numVeAnnc"
+        ]
+    }
+,
+
+    // SubDevice Instance: subDevicePowerOutletInst
+    {
+        "type"      : "cod:sDPOtInst",
+        "lname"     : "subDevicePowerOutletInst",
+        "sdttype"   : "subdevice",
+        "cnd"       : "org.onem2m.common.subdevice.subDevicePowerOutletInst"
+    }
+
+
+
+
+]

@@ -52,6 +52,8 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CNTA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CINA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CBA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_FCNT));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_FCIN));
 
 	cJSON_AddStringToObject(cse, "ct", ct);
 	cJSON_AddStringToObject(cse, "ri", CSE_BASE_RI);
@@ -66,6 +68,7 @@ void init_cse(cJSON *cse)
 
 	cJSON *srv = cJSON_CreateArray();
 	cJSON_AddItemToArray(srv, cJSON_CreateString(from_rvi(CSE_RVI)));
+	cJSON_AddItemToArray(srv, cJSON_CreateString("4"));
 
 	cJSON_AddItemToObject(cse, "srv", srv);
 	cJSON_AddItemToObject(cse, "pi", cJSON_CreateString(""));
@@ -221,7 +224,7 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 	}
 	if ((pjson = cJSON_GetObjectItem(obj, "rr")))
 	{
-		if (pjson->type != cJSON_True || pjson->type != cJSON_False)
+		if (pjson->type != cJSON_True && pjson->type != cJSON_False)
 		{
 			if (pjson->valueint == 1)
 			{
@@ -235,7 +238,7 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 	}
 	if ((pjson = cJSON_GetObjectItem(obj, "mtv")))
 	{
-		if (pjson->type != cJSON_True || pjson->type != cJSON_False)
+		if (pjson->type != cJSON_True && pjson->type != cJSON_False)
 		{
 			if (cJSON_IsTrue(pjson) || pjson->valueint == 1)
 			{
@@ -247,7 +250,6 @@ RTNode *create_rtnode(cJSON *obj, ResourceType ty)
 			}
 		}
 	}
-
 	rtnode->rn = strdup(cJSON_GetObjectItem(obj, "rn")->valuestring);
 
 	return rtnode;
@@ -341,6 +343,30 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 	return 0;
 }
 
+int update_fcnt_fcin(RTNode *fcnt_rtnode, RTNode *fcin_rtnode, int sign)
+{
+	if (!fcnt_rtnode || !fcin_rtnode)
+		return -1;
+	cJSON *fcnt = fcnt_rtnode->obj;
+	cJSON *fcin = fcin_rtnode->obj;
+	if (!fcnt || !fcin)
+		return -1;
+	cJSON *cni = cJSON_GetObjectItem(fcnt, "cni");
+	cJSON *cbs = cJSON_GetObjectItem(fcnt, "cbs");
+	cJSON *fcin_cs = cJSON_GetObjectItem(fcin, "cs");
+
+	if (!cni || !cbs || !fcin_cs)
+		return -1;
+
+	cJSON_SetIntValue(cni, cni->valueint + sign);
+	cJSON_SetIntValue(cbs, cbs->valueint + (sign * fcin_cs->valueint));
+	logger("O2", LOG_LEVEL_DEBUG, "FCIN cni: %d, cbs: %d", cni->valueint, cbs->valueint);
+
+	db_update_resource(fcnt, get_ri_rtnode(fcnt_rtnode), RT_FCNT);
+
+	return 0;
+}
+
 int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
 	logger("O2M", LOG_LEVEL_INFO, "Delete oneM2M resource");
@@ -384,6 +410,29 @@ int delete_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			free_rtnode(target_rtnode);
 		}
 	}
+	else if (target_rtnode->ty == RT_FCIN && o2pt->rvi >= RVI_4)
+	{
+		cJSON *ri_obj = cJSON_GetObjectItem(target_rtnode->obj, "ri");
+		if (ri_obj && target_rtnode->parent)
+		{
+			RTNode *child = target_rtnode->parent->child;
+			while (child)
+			{
+				RTNode *next = child->sibling_right;
+				if (child != target_rtnode && child->ty == RT_FCIN)
+				{
+					cJSON *cri = cJSON_GetObjectItem(child->obj, "ri");
+					if (cri && strcmp(cri->valuestring, ri_obj->valuestring) == 0)
+					{
+						free_rtnode(child);
+						break;
+					}
+				}
+				child = next;
+			}
+		}
+		free_rtnode(target_rtnode);
+	}
 	else
 	{
 		free_rtnode(target_rtnode);
@@ -424,6 +473,11 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		break;
 	case RT_CIN:
 		update_cnt_cin(rtnode->parent, rtnode, -1);
+		break;
+	case RT_FCNT:
+		break;
+	case RT_FCIN:
+		update_fcnt_fcin(rtnode->parent, rtnode, -1);
 		break;
 	case RT_SUB:
 		detach_subs(rtnode->parent, rtnode);
@@ -520,12 +574,12 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 	cJSON_ArrayForEach(member, rtnode->memberOf)
 	{
 		grp_rtnode = find_rtnode(member->valuestring);
-		logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", grp_rtnode->uri, member->valuestring);
 		if (!grp_rtnode)
 		{
 			logger("O2M", LOG_LEVEL_ERROR, "Node of MemberOf missing - INTERNAL SERVER ERROR");
 			continue;
 		}
+		logger("O2M", LOG_LEVEL_DEBUG, "delete[%s] memberOf %s", grp_rtnode->uri, member->valuestring);
 		pjson = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
 		idx = cJSON_getArrayIdx(pjson, cJSON_GetObjectItem(rtnode->obj, "ri")->valuestring);
 		if (idx >= 0)
@@ -556,6 +610,11 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		o2pt->isForwarding = true;
 
 		forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
+	}
+
+	if ((rtnode->ty == RT_CNT || rtnode->ty == RT_FCNT) && rtnode->parent && rtnode->parent->ty == RT_FCNT)
+	{
+		increment_parent_statetag(rtnode->parent);
 	}
 
 	return 1;
@@ -663,9 +722,12 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	if (e == -1)
 		return o2pt->rsc;
 
-	if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
+	if (o2pt->ty != RT_FCNT && o2pt->ty != RT_FCIN)
 	{
-		return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+		if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
+		{
+			return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+		}
 	}
 
 	if (!isValidChildType(parent_rtnode->ty, o2pt->ty))
@@ -674,13 +736,40 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		{
 			return handle_error(o2pt, RSC_TARGET_NOT_SUBSCRIBABLE, "target not subscribable");
 		}
+		// FCIN cannot be created via API - special case
+		if (o2pt->ty == RT_FCIN)
+		{
+			return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "creating FCIN is forbidden");
+		}
 		return handle_error(o2pt, RSC_INVALID_CHILD_RESOURCETYPE, "child type error");
 	}
+
 	cJSON *pjson = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(o2pt->ty));
-	pjson = cJSON_GetObjectItem(pjson, "et");
-	if (pjson && !isETvalid(pjson->valuestring))
+	if (!pjson && o2pt->ty == RT_FCNT)
 	{
-		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
+		cJSON *item = o2pt->request_pc->child;
+		while (item)
+		{
+			if (item->type == cJSON_Object && item->string)
+			{
+				cJSON *cnd = cJSON_GetObjectItem(item, "cnd");
+				if (cnd && cnd->type == cJSON_String && strchr(item->string, ':'))
+				{
+					pjson = item;
+					break;
+				}
+			}
+			item = item->next;
+		}
+	}
+
+	if (pjson)
+	{
+		cJSON *et_obj = cJSON_GetObjectItem(pjson, "et");
+		if (et_obj && !isETvalid(et_obj->valuestring))
+		{
+			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
+		}
 	}
 
 	switch (o2pt->ty)
@@ -731,6 +820,25 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		rsc = create_tsi(o2pt, parent_rtnode);
 		break;
 
+	case RT_FCNT:
+		logger("O2M", LOG_LEVEL_INFO, "Create FCNT");
+		rsc = create_fcnt(o2pt, parent_rtnode);
+		break;
+
+	case RT_FCIN:
+		// FCIN can only be created internally by FCNT (RVI >= 4)
+		if (o2pt->rvi >= RVI_4)
+		{
+			logger("O2M", LOG_LEVEL_INFO, "Create FCIN - forbidden");
+			rsc = create_fcin(o2pt, parent_rtnode);
+		}
+		else
+		{
+			logger("O2M", LOG_LEVEL_INFO, "FCIN not supported for RVI < 4");
+			rsc = handle_error(o2pt, RSC_BAD_REQUEST, "resource type not supported");
+		}
+		break;
+
 	case RT_ACPA:
 	case RT_AEA:
 	case RT_CBA:
@@ -745,6 +853,12 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		handle_error(o2pt, RSC_BAD_REQUEST, "resource type error");
 		rsc = o2pt->rsc;
 	}
+
+	if (rsc == RSC_CREATED && (o2pt->ty == RT_CNT || o2pt->ty == RT_FCNT) && parent_rtnode && parent_rtnode->ty == RT_FCNT)
+	{
+		increment_parent_statetag(parent_rtnode);
+	}
+
 	return rsc;
 }
 
@@ -768,6 +882,11 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	    return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "CSE cannot be updated");
     }
 
+	if(target_rtnode->ty == RT_FCIN) {
+		logger("O2M", LOG_LEVEL_INFO, "FCIN cannot be updated");
+	    return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "updating FCIN is forbidden");
+    }
+
 	int rsc = 0;
 	char err_msg[256] = {0};
 	o2pt->ty = target_rtnode->ty;
@@ -789,12 +908,29 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (e == -1)
 		return o2pt->rsc;
 
-	if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
+	if (o2pt->ty != RT_FCNT && o2pt->ty != RT_FCIN)
 	{
-		return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+		if (!is_attr_valid(o2pt->request_pc, o2pt->ty, err_msg))
+		{
+			return handle_error(o2pt, RSC_BAD_REQUEST, err_msg);
+		}
 	}
 
 	cJSON *pjson = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(o2pt->ty));
+	// For FlexContainer, try to get the SDT shortname object if standard key doesn't exist
+	if (!pjson && o2pt->ty == RT_FCNT)
+	{
+		cJSON *item = o2pt->request_pc->child;
+		while (item)
+		{
+			if (item->type == cJSON_Object && item->string && strchr(item->string, ':'))
+			{
+				pjson = item;
+				break;
+			}
+			item = item->next;
+		}
+	}
 	pjson = cJSON_GetObjectItem(pjson, "et");
 	if (pjson && !isETvalid(pjson->valuestring))
 	{
@@ -838,6 +974,23 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		rsc = update_csr(o2pt, target_rtnode);
 		break;
 
+	case RT_FCNT:
+		logger("O2M", LOG_LEVEL_INFO, "Update FCNT");
+		rsc = update_fcnt(o2pt, target_rtnode);
+		break;
+
+	case RT_FCIN:
+		// FCIN cannot be updated directly (RVI >= 4)
+		if (o2pt->rvi >= RVI_4)
+		{
+			logger("O2M", LOG_LEVEL_INFO, "Update FCIN - forbidden");
+			rsc = update_fcin(o2pt, target_rtnode);
+		}
+		else
+		{
+			logger("O2M", LOG_LEVEL_INFO, "FCIN not supported for RVI < 4");
+			rsc = handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` is unsupported");
+		}
 	case RT_TS:
 		logger("O2M", LOG_LEVEL_INFO, "Update TS");
 		rsc = update_ts(o2pt, target_rtnode);
@@ -1469,6 +1622,10 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 			free(et);
 			break;
 		case RT_GRP:
+			cJSON_AddStringToObject(annc, "et", et);
+			free(et);
+			break;
+		case RT_FCNT:
 			cJSON_AddStringToObject(annc, "et", et);
 			free(et);
 			break;

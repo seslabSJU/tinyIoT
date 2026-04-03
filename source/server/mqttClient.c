@@ -55,7 +55,7 @@ static byte mSendBuf[MQTT_MAX_PACKET_SZ];
 static byte mReadBuf[MQTT_MAX_PACKET_SZ];
 static volatile word16 mPacketIdLast;
 
-extern pthread_mutex_t mutex_lock;
+extern pthread_mutex_t main_lock;
 
 /* Local Functions */
 
@@ -210,6 +210,7 @@ int mqtt_message_cb(MqttClient *client, MqttMessage *msg, byte msg_new, byte msg
     if (pjson)
     {
         o2pt->fc = cJSON_Duplicate(pjson, true);
+        parse_filter_criteria(o2pt->fc);
         if ((rsc = validate_filter_criteria(o2pt)) > 4000)
         {
             handle_error(o2pt, rsc, "Invalid FilterCriteria");
@@ -270,9 +271,9 @@ int mqtt_message_cb(MqttClient *client, MqttMessage *msg, byte msg_new, byte msg
     }
     else
     {
-        // pthread_mutex_trylock(&mutex_lock);
+        // pthread_mutex_lock(&main_lock);
         route(o2pt);
-        // pthread_mutex_unlock(&mutex_lock);
+        // pthread_mutex_unlock(&main_lock);
         mqtt_respond_to_client(o2pt, req_type);
     }
 

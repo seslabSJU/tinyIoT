@@ -26,6 +26,7 @@
 #endif
 
 #include "coap.h"
+#include "sdt.h"
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
@@ -114,6 +115,8 @@ int main(int argc, char **argv)
 		\"m2m:aeA\": {\"lnk\":\"\", \"api\":\"\", \"aei\":\"\", \"rr\":true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"], \"ast\":0}, \
 		\"m2m:cntA\": {\"lnk\":\"\", \"cr\":\"\", \"mni\":0, \"mbs\":0, \"st\":0, \"cni\":0, \"cbs\":0, \"ast\":0}, \
 		\"m2m:cinA\": {\"lnk\":\"\", \"cs\":0, \"cr\":\"\", \"con\":\"\", \"cnf\":\"\", \"st\":\"\", \"ast\":0}, \
+		\"m2m:fcnt\": {\"cnd\":\"\", \"oref\":\"\", \"nl\":\"\", \"cr\":null, \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0, \"st\":0, \"cs\":0, \"fcied\":0, \"mni\":0, \"mbs\":0, \"mia\":0, \"cni\":0, \"cbs\":0, \"loc\":\"\", \"daci\":[\"\"]}, \
+		\"m2m:fcin\": {\"cs\":0, \"st\":0, \"org\":\"\", \"loc\":\"\", \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0} \
 		\"m2m:ts\": {\"cr\": null, \"mni\":0, \"mbs\":0, \"mia\":0, \"cni\":0, \"cbs\":0,\"cnf\":\"\", \"pei\":0, \"peid\":0,\"mdd\":false, \"mdn\":0, \"mdt\":0, \"mdc\":0, \"mdlt\":[\"\"]}, \
 		\"m2m:tsi\": {\"dgt\":\"\", \"con\":\"\", \"snr\":0, \"cs\":0} \
 	 }");
@@ -165,6 +168,13 @@ int main(int argc, char **argv)
 #endif
 
 	initialBoot = init_server();
+
+	int sdt_count = sdt_init("./sdt_definitions");
+	if (sdt_count > 0) {
+		logger("MAIN", LOG_LEVEL_INFO, "Loaded %d SDT definitions", sdt_count);
+	} else {
+		logger("MAIN", LOG_LEVEL_WARN, "No SDT definitions loaded");
+	}
 
 	init_resource_tree();
 
@@ -282,6 +292,16 @@ void route(oneM2MPrimitive *o2pt)
 			if (strcmp(target_rtnode->rn, "la"))
 			{
 				logger("MAIN", LOG_LEVEL_DEBUG, "delete cin rtnode");
+				free_rtnode(target_rtnode);
+				target_rtnode = NULL;
+			}
+		}
+		if (o2pt->op != OP_DELETE && target_rtnode && target_rtnode->ty == RT_FCIN)
+		{
+			if (target_rtnode->parent &&
+				target_rtnode->parent->child != target_rtnode &&
+				!target_rtnode->sibling_left)
+			{
 				free_rtnode(target_rtnode);
 				target_rtnode = NULL;
 			}
@@ -434,6 +454,9 @@ void stop_server(int sig)
 	free_rtnode(rt->cb);
 	free(rt);
 	cJSON_Delete(ATTRIBUTES);
+
+	logger("MAIN", LOG_LEVEL_INFO, "Cleaning SDT...");
+	sdt_cleanup();
 
 	logger("MAIN", LOG_LEVEL_INFO, "Done");
 	logger_free();
