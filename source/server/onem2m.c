@@ -527,7 +527,7 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 			continue;
 		}
 		pjson = cJSON_GetObjectItem(grp_rtnode->obj, "mid");
-		idx = cJSON_getArrayIdx(pjson, rtnode->uri);
+		idx = cJSON_getArrayIdx(pjson, cJSON_GetObjectItem(rtnode->obj, "ri")->valuestring);
 		if (idx >= 0)
 		{
 			cJSON_DeleteItemFromArray(pjson, idx);

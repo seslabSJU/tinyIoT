@@ -396,10 +396,13 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
             }
         }
 
-        // check duplicated with heirarchical address
+        char *member_id = (resourceLocation == 2)
+            ? rt_node->uri
+            : cJSON_GetObjectItem(rt_node->obj, "ri")->valuestring;
+
         for (int j = 0; j < cJSON_GetArraySize(final_mid); j++)
         {
-            if (!strcmp(rt_node->uri, cJSON_GetStringValue(cJSON_GetArrayItem(final_mid, j))))
+            if (!strcmp(member_id, cJSON_GetStringValue(cJSON_GetArrayItem(final_mid, j))))
             {
                 duplicated = true;
                 break;
@@ -415,12 +418,12 @@ int validate_grp_member(cJSON *grp, cJSON *final_mid, int csy, int mt)
         }
         if (hasFopt)
         {
-            sprintf(tStr, "%s/fopt", rt_node->uri);
+            sprintf(tStr, "%s/fopt", member_id);
             cJSON_AddItemToArray(final_mid, cJSON_CreateString(tStr));
         }
         else
         {
-            cJSON_AddItemToArray(final_mid, cJSON_CreateString(rt_node->uri));
+            cJSON_AddItemToArray(final_mid, cJSON_CreateString(member_id));
         }
 
         if (resourceLocation == 2)
