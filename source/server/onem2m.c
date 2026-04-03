@@ -771,6 +771,13 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	int rsc = 0;
 	char err_msg[256] = {0};
 	o2pt->ty = target_rtnode->ty;
+
+	// CIN and TSI are immutable — reject UPDATE before privilege check
+	if (target_rtnode->ty == RT_CIN)
+		return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` for cin is not allowed");
+	if (target_rtnode->ty == RT_TSI)
+		return handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` for tsi is not allowed");
+
 	int e = check_payload_empty(o2pt);
 	ResourceType ty = parse_object_type_cjson(o2pt->request_pc);
 	if (e != -1)
