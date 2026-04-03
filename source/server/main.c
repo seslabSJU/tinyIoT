@@ -40,6 +40,7 @@ pthread_mutexattr_t Attr;
 
 void route(oneM2MPrimitive *o2pt);
 void stop_server(int sig);
+void log_runtime(double start);
 cJSON *ATTRIBUTES;
 char *PORT = SERVER_PORT;
 int terminate = 0;
@@ -116,6 +117,8 @@ int main(int argc, char **argv)
 		\"m2m:cinA\": {\"lnk\":\"\", \"cs\":0, \"cr\":\"\", \"con\":\"\", \"cnf\":\"\", \"st\":\"\", \"ast\":0}, \
 		\"m2m:fcnt\": {\"cnd\":\"\", \"oref\":\"\", \"nl\":\"\", \"cr\":null, \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0, \"st\":0, \"cs\":0, \"fcied\":0, \"mni\":0, \"mbs\":0, \"mia\":0, \"cni\":0, \"cbs\":0, \"loc\":\"\", \"daci\":[\"\"]}, \
 		\"m2m:fcin\": {\"cs\":0, \"st\":0, \"org\":\"\", \"loc\":\"\", \"at\":[\"\"], \"aa\":[\"\"], \"ast\":0} \
+		\"m2m:ts\": {\"cr\": null, \"mni\":0, \"mbs\":0, \"mia\":0, \"cni\":0, \"cbs\":0,\"cnf\":\"\", \"pei\":0, \"peid\":0,\"mdd\":false, \"mdn\":0, \"mdt\":0, \"mdc\":0, \"mdlt\":[\"\"]}, \
+		\"m2m:tsi\": {\"dgt\":\"\", \"con\":\"\", \"snr\":0, \"cs\":0} \
 	 }");
 
 	if (ATTRIBUTES == NULL)
@@ -305,8 +308,7 @@ void route(oneM2MPrimitive *o2pt)
 		}
 	}
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
-		notify_via_sub(o2pt, target_rtnode);
-	log_runtime(start);
+        notify_via_sub(o2pt, target_rtnode);
 }
 
 int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
@@ -459,4 +461,12 @@ void stop_server(int sig)
 	logger("MAIN", LOG_LEVEL_INFO, "Done");
 	logger_free();
 	exit(0);
+}
+
+void log_runtime(double start)
+{
+    double end = (double)clock() / CLOCKS_PER_SEC;
+    double elapsed = end - start;
+
+    logger("MAIN", LOG_LEVEL_DEBUG, "runtime: %.6f sec", elapsed);
 }

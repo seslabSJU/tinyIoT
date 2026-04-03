@@ -733,15 +733,23 @@ int send_http_request(char *host, int port, HTTPRequest *req, HTTPResponse *res)
             res->status_code = 500;
         return 500;
     }
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(port);
-    if (strcmp(host, "localhost") == 0)
     {
-        serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    }
-    else
-    {
-        serv_addr.sin_addr.s_addr = inet_addr(host);
+        struct addrinfo hints, *result;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        char port_str[16];
+        snprintf(port_str, sizeof(port_str), "%d", port);
+        const char *resolve_host = (strcmp(host, "localhost") == 0) ? "127.0.0.1" : host;
+        if (getaddrinfo(resolve_host, port_str, &hints, &result) != 0 || !result)
+        {
+            logger("HTTP", LOG_LEVEL_ERROR, "getaddrinfo error for host: %s", host);
+            if (res) res->status_code = 504;
+            close(sock);
+            return 504;
+        }
+        memcpy(&serv_addr, result->ai_addr, result->ai_addrlen);
+        freeaddrinfo(result);
     }
     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1)
     {

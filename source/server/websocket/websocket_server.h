@@ -1,7 +1,7 @@
-#include "libcoap/coap.h"
+#pragma once
 // #include <coap3/coap.h>
-#include "util.h"
-
+#include "../util.h"
+#include <libwebsockets.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,34 +20,43 @@
 #include <netdb.h>
 #include <dirent.h>
 #include <syslog.h>
+#include "../config.h"
 
-// Current CoAP attributes
-#define COAP_VERSION 1
-#define COAP_HEADER_SIZE 4
-#define COAP_OPTION_HEADER_SIZE 1
-#define COAP_PAYLOAD_MARKER 0xFF
+#include "../wolfmqtt/mqtt_client.h"
+#include "../mqttClient.h"
 
-#define LOG_TAG "COAP"
+// // Current CoAP attributes
+// #define COAP_VERSION 1
+// #define COAP_HEADER_SIZE 4
+// #define COAP_OPTION_HEADER_SIZE 1
+// #define COAP_PAYLOAD_MARKER 0xFF
+
+
 #define BUF_SIZE 65535
-
-typedef struct
-{
-    coap_pdu_type_t type;
-    coap_pdu_code_t code;
-    coap_bin_const_t token;
-    coap_mid_t message_id;
-    int option_cnt;
-} coapPacket;
-
-typedef struct {
-    coap_binary_t* token;
-} track_token;
 
 void* coap_serve();
 void coap_notify(oneM2MPrimitive* o2pt, char* noti_json, NotiTarget* nt);
 void coap_forwarding(oneM2MPrimitive* o2pt, Protocol protocol, char* host, int port);
-
+void response_retrieve(oneM2MPrimitive* o2pt, cJSON* resource_obj, const char* resource_key);
 extern void route(oneM2MPrimitive* o2pt);
+void *websocket_server_thread(void *arg);
+void initialize_websocket_server();
+// int ws_protocol_binding_notify_vertify(oneM2MPrimitive* o2pt, NotiTarget *nt);
+int ws_protocol_binding_notify(oneM2MPrimitive* o2pt, NotiTarget *nt);
+//int ws_notify_alert(char* noti_json, NotiTarget* nt);
+
+
+static int mqtt_over_ws_net_connect(void *context, const char *host, short unsigned int port, int timeout_ms);
+static int mqtt_over_ws_net_read(void *context, byte *buf, int buf_len, int timeout_ms);
+static int mqtt_over_ws_net_write(void *context, const byte *buf, int buf_len, int timeout_ms);
+static int mqtt_over_ws_net_disconnect(void *context);
+
+void websocket_check_and_forwarding_from_sessionTable(oneM2MPrimitive *o2pt, RTNode* target_rtnode);
+struct notify_result {
+    char *json_to_send;  // 전송할 nt->noti_json
+    int rsc;
+    int done;
+};
 
 #ifdef ENABLE_COAP_DTLS
 #define MAX_KEY 64 /* Maximum length of a pre-shared key in bytes. */
