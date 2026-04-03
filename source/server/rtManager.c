@@ -162,12 +162,14 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
     char *ptr = NULL;
     if (isSpRelativeLocal(target_uri))
     {
-        if (strcmp(target_uri + 1, CSE_BASE_RI) == 0)
+        size_t prefix_len = (strncmp(target_uri + 1, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0)
+                            ? strlen(CSE_BASE_NAME) : strlen(CSE_BASE_RI);
+        if (strcmp(target_uri + 1, CSE_BASE_RI) == 0 || strcmp(target_uri + 1, CSE_BASE_NAME) == 0)
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "Invalid uri");
             return NULL;
         }
-        ptr = target_uri + strlen(CSE_BASE_RI) + 2; // for first / and end /
+        ptr = target_uri + prefix_len + 2; // skip leading / and prefix
         if (strlen(ptr) == 0)
         {
             logger("RTM", LOG_LEVEL_DEBUG, "addr is empty");
