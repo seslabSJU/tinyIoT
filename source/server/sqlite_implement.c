@@ -14,6 +14,95 @@
 #include "sqlite/sqlite3.h"
 sqlite3 *db;
 
+static pthread_mutex_t sqlite_tx_lock;
+static pthread_mutexattr_t sqlite_tx_lock_attr;
+static int sqlite_lock_initialized = 0;
+static int sqlite_tx_depth = 0;
+static pthread_t sqlite_tx_owner;
+static int sqlite_tx_owner_valid = 0;
+
+static void sqlite_lock(void)
+{
+    if (sqlite_lock_initialized)
+        pthread_mutex_lock(&sqlite_tx_lock);
+}
+
+static void sqlite_unlock(void)
+{
+    if (sqlite_lock_initialized)
+        pthread_mutex_unlock(&sqlite_tx_lock);
+}
+
+int db_begin_tx()
+{
+    if (sqlite_tx_owner_valid && pthread_equal(sqlite_tx_owner, pthread_self())) {
+        sqlite_tx_depth++;
+        return 1;
+    }
+
+    sqlite_lock();
+    if (sqlite_tx_depth != 0) {
+        logger("DB", LOG_LEVEL_ERROR, "Transaction owner mismatch");
+        sqlite_unlock();
+        return 0;
+    }
+
+    int rc = sqlite3_exec(db, "BEGIN", NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to begin transaction: %s", sqlite3_errmsg(db));
+        sqlite_unlock();
+        return 0;
+    }
+    sqlite_tx_owner = pthread_self();
+    sqlite_tx_owner_valid = 1;
+    sqlite_tx_depth = 1;
+    return 1;
+}
+
+int db_commit_tx()
+{
+    if (!sqlite_tx_owner_valid || !pthread_equal(sqlite_tx_owner, pthread_self())) {
+        logger("DB", LOG_LEVEL_ERROR, "Commit without transaction ownership");
+        return 0;
+    }
+    if (sqlite_tx_depth == 0) {
+        return 0;
+    }
+    sqlite_tx_depth--;
+    if (sqlite_tx_depth == 0) {
+        int rc = sqlite3_exec(db, "COMMIT", NULL, NULL, NULL);
+        if (rc != SQLITE_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "Failed to commit transaction: %s", sqlite3_errmsg(db));
+            return 0;
+        }
+        sqlite_tx_owner_valid = 0;
+        sqlite_unlock();
+    }
+    return 1;
+}
+
+int db_rollback_tx()
+{
+    if (!sqlite_tx_owner_valid || !pthread_equal(sqlite_tx_owner, pthread_self())) {
+        logger("DB", LOG_LEVEL_ERROR, "Rollback without transaction ownership");
+        return 0;
+    }
+    if (sqlite_tx_depth == 0) {
+        sqlite_tx_owner_valid = 0;
+        sqlite_unlock();
+        return 0;
+    }
+    sqlite_tx_depth = 0;
+    int rc = sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "Failed to rollback transaction: %s", sqlite3_errmsg(db));
+        return 0;
+    }
+    sqlite_tx_owner_valid = 0;
+    sqlite_unlock();
+    return 1;
+}
+
 extern cJSON *ATTRIBUTES;
 extern ResourceTree *rt;
 
@@ -93,7 +182,19 @@ static const table_def_t table_definitions[] = {
      "CREATE TABLE IF NOT EXISTS cinA ( id INTEGER, "
      "lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
-    }
+    },
+    {"ts",
+     "CREATE TABLE IF NOT EXISTS ts ( id INTEGER, "
+     "cr VARCHAR(45), mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "pei INT, peid INT, "
+     "mdd INT, mdn INT, mdt INT, mdc INT, mdlt TEXT, cnf VARCHAR(45),"
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"tsi",
+     "CREATE TABLE IF NOT EXISTS tsi ( id INTEGER, "
+     "dgt TEXT, con TEXT, snr INT, cs INT, vrq INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
 };
 
 #define TABLE_COUNT (sizeof(table_definitions) / sizeof(table_def_t))
@@ -124,6 +225,13 @@ int init_dbp()
 {
     char *err_msg = NULL;
     int rc = 0;
+
+    if (!sqlite_lock_initialized) {
+        pthread_mutexattr_init(&sqlite_tx_lock_attr);
+        pthread_mutexattr_settype(&sqlite_tx_lock_attr, PTHREAD_MUTEX_RECURSIVE);
+        pthread_mutex_init(&sqlite_tx_lock, &sqlite_tx_lock_attr);
+        sqlite_lock_initialized = 1;
+    }
 
     // Open (or create) DB File
     rc = sqlite3_open("data.db", &db);
@@ -200,6 +308,12 @@ char *get_table_name(ResourceType ty)
         break;
     case RT_SUB:
         tableName = "sub";
+        break;
+    case RT_TS:
+        tableName = "ts";
+        break;
+    case RT_TSI:
+        tableName = "tsi";
         break;
     case RT_CSR:
         tableName = "csr";
@@ -385,7 +499,7 @@ int db_store_resource(cJSON *obj, char *uri)
 {
     logger("DB", LOG_LEVEL_DEBUG, "Call db_store_resource with URI: %s", uri ? uri : "NULL");
     
-    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+    sqlite_lock();
     char *sql = NULL, *err_msg = NULL;
     cJSON *pjson = NULL;
     cJSON *GENERAL_ATTR = cJSON_GetObjectItem(ATTRIBUTES, "general");
@@ -393,14 +507,14 @@ int db_store_resource(cJSON *obj, char *uri)
 
     if (!obj) {
         logger("DB", LOG_LEVEL_ERROR, "Resource object is NULL");
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return -1;
     }
 
     cJSON *ty_obj = cJSON_GetObjectItem(obj, "ty");
     if (!ty_obj) {
         logger("DB", LOG_LEVEL_ERROR, "Missing 'ty' field in resource object");
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return -1;
     }
     ResourceType ty = ty_obj->valueint;
@@ -429,8 +543,11 @@ int db_store_resource(cJSON *obj, char *uri)
     
     sqlite3_stmt *stmt;
     int rc = 0;
-    logger("DB", LOG_LEVEL_DEBUG, "Executing: BEGIN TRANSACTION");
-    sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
+    int need_tx = (sqlite_tx_depth == 0);
+    if (need_tx) {
+        logger("DB", LOG_LEVEL_DEBUG, "Executing: BEGIN TRANSACTION");
+        sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
+    }
 
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
@@ -438,9 +555,9 @@ int db_store_resource(cJSON *obj, char *uri)
         logger("DB", LOG_LEVEL_DEBUG, "Failed SQL was: %s", sql);
         free(sql);
         logger("DB", LOG_LEVEL_ERROR, "prepare error store_resource");
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
         sqlite3_finalize(stmt);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return -1;
     }
 
@@ -468,8 +585,8 @@ int db_store_resource(cJSON *obj, char *uri)
         free(sql);
         logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg ? err_msg : "NULL");
         sqlite3_finalize(stmt);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
+        sqlite_unlock();
         return -1;
     }
 
@@ -480,8 +597,8 @@ int db_store_resource(cJSON *obj, char *uri)
     if (!specific_attr) {
         logger("DB", LOG_LEVEL_ERROR, "No specific attributes found for resource type %d", ty);
         free(sql);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
+        sqlite_unlock();
         return -1;
     }
 
@@ -512,8 +629,8 @@ int db_store_resource(cJSON *obj, char *uri)
         logger("DB", LOG_LEVEL_ERROR, "prepare error %d", rc);
         logger("DB", LOG_LEVEL_ERROR, "Failed SQL was: %s", sql);
         free(sql);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
+        sqlite_unlock();
         return -1;
     }
 
@@ -521,8 +638,8 @@ int db_store_resource(cJSON *obj, char *uri)
     if (!ri_obj || !cJSON_IsString(ri_obj)) {
         logger("DB", LOG_LEVEL_ERROR, "Missing or invalid 'ri' field in resource object");
         free(sql);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
+        sqlite_unlock();
         return -1;
     }
 
@@ -546,34 +663,32 @@ int db_store_resource(cJSON *obj, char *uri)
     {
         logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg ? err_msg : "NULL");
         free(sql);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+        if (need_tx) sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &err_msg);
         sqlite3_finalize(stmt);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return -1;
     }
     logger("DB", LOG_LEVEL_DEBUG, "Specific table INSERT successful");
-    
-    logger("DB", LOG_LEVEL_DEBUG, "Executing: END TRANSACTION");
-    sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &err_msg);
-    if (err_msg)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Error: %s", err_msg);
-    }
-    else
-    {
-        logger("DB", LOG_LEVEL_DEBUG, "Transaction committed successfully");
+
+    if (need_tx) {
+        logger("DB", LOG_LEVEL_DEBUG, "Executing: END TRANSACTION");
+        sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &err_msg);
+        if (err_msg)
+            logger("DB", LOG_LEVEL_ERROR, "Error: %s", err_msg);
+        else
+            logger("DB", LOG_LEVEL_DEBUG, "Transaction committed successfully");
     }
 
     sqlite3_finalize(stmt);
     free(sql);
-    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    sqlite_unlock();
     logger("DB", LOG_LEVEL_DEBUG, "db_store_resource completed successfully");
     return 1;
 }
 
 int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
 {
-    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+    sqlite_lock();
     logger("DB", LOG_LEVEL_DEBUG, "Call db_update_resource [RI]: %s", ri);
     char *sql = NULL;
     cJSON *pjson = NULL;
@@ -581,14 +696,17 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
     int general_cnt = cJSON_GetArraySize(GENERAL_ATTR);
     char *err_msg = NULL;
 
-    int rc = sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
-    if (rc != SQLITE_OK)
-    {
-        logger("DB", LOG_LEVEL_ERROR, "Failed Begin Transaction: %s", err_msg);
-        sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
-        return 0;
+    int need_tx = (sqlite_tx_depth == 0);
+    if (need_tx) {
+        int rc2 = sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
+        if (rc2 != SQLITE_OK)
+        {
+            logger("DB", LOG_LEVEL_ERROR, "Failed Begin Transaction: %s", err_msg);
+            sqlite_unlock();
+            return 0;
+        }
     }
+    int rc = 0;
     int idx = 0;
     sql = malloc(1024);
     sprintf(sql, "UPDATE general SET ");
@@ -616,8 +734,8 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         {
             free(sql);
             logger("DB", LOG_LEVEL_ERROR, "prepare error");
-            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-            sqlite3_mutex_leave(sqlite3_db_mutex(db));
+            if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite_unlock();
             return 0;
         }
         int idx = 1;
@@ -637,8 +755,8 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         {
             free(sql);
             logger("DB", LOG_LEVEL_ERROR, "Failed Update SQL: %s, msg : %s", sql, err_msg);
-            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-            sqlite3_mutex_leave(sqlite3_db_mutex(db));
+            if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite_unlock();
             return 0;
         }
 
@@ -671,8 +789,8 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
             logger("DB", LOG_LEVEL_ERROR, "prepare error");
             free(sql);
             sqlite3_finalize(stmt);
-            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-            sqlite3_mutex_leave(sqlite3_db_mutex(db));
+            if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite_unlock();
             return 0;
         }
 
@@ -693,17 +811,17 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
         {
             logger("DB", LOG_LEVEL_ERROR, "Failed Insert SQL: %s, msg : %s", sql, err_msg);
             free(sql);
-            sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-            sqlite3_mutex_leave(sqlite3_db_mutex(db));
+            if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+            sqlite_unlock();
             return 0;
         }
 
         sqlite3_finalize(stmt);
     }
 
-    sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
+    if (need_tx) sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
     free(sql);
-    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    sqlite_unlock();
     // Update uri of all child resources
     return 1;
 }
@@ -767,7 +885,7 @@ int db_delete_onem2m_resource(RTNode *rtnode)
     {
         return 0;
     }
-    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+    sqlite_lock();
 
     // sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &err_msg);
     sprintf(sql, "DELETE FROM general WHERE uri LIKE '%s/%%' OR ri='%s';", get_uri_rtnode(rtnode), ri);
@@ -777,10 +895,10 @@ int db_delete_onem2m_resource(RTNode *rtnode)
     {
         logger("DB", LOG_LEVEL_ERROR, "Cannot delete resource from %s/ msg : %s", tableName, err_msg);
         sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, &err_msg);
-        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        sqlite_unlock();
         return 0;
     }
-    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    sqlite_unlock();
 
     return 1;
 }
@@ -1680,4 +1798,387 @@ cJSON *getForbiddenUri(cJSON *acp_list)
 
     sqlite3_finalize(res);
     return result;
+}
+
+// Forward declarations (avoid implicit function declarations in C99+)
+int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str);
+int db_general_update_lt(const char *ri, const char *lt);
+
+// -----------------------------------------------------------------------------
+// Compatibility wrappers (must match dbmanager.h symbols)
+// Keep TS/TSI resource logic DB-agnostic by implementing these helpers per backend.
+// -----------------------------------------------------------------------------
+
+int db_general_set_lt(const char *ri, const char *lt)
+{
+    return db_general_update_lt(ri, lt);
+}
+
+int db_ts_set_mdc_and_append_mdlt(const char *ts_ri, int val, const char *time_str)
+{
+    return db_ts_update_mdc_with_mdlt(ts_ri, val, time_str);
+}
+
+// Check duplicate TSI.dgt under a TS (by TS ri == general.pi)
+int db_tsi_check_dgt_dup(const char *ts_ri, const char *dgt)
+{
+    if (!ts_ri || !dgt) return 0;
+
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT 1 "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ? AND tsi.dgt = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    int exists = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, dgt, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            exists = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return exists;
+}
+
+//------------------------------------------------------------------------------
+// TS / TSI helper APIs (SQLite backend)
+// These functions are used to decouple TS/TSI logic from raw SQL in resource code.
+// All functions are best-effort and return safe defaults on error.
+//------------------------------------------------------------------------------
+
+cJSON *db_get_tsi_laol(RTNode *parent_rtnode, int laol) {
+    const char *ord = (laol == 0) ? "DESC" : "ASC";
+    char sql[1024], buf[256];
+    sqlite3_stmt *res = NULL;
+    snprintf(sql, sizeof(sql),
+             "SELECT * FROM general, tsi WHERE pi='%s' AND general.id = tsi.id "
+             "ORDER BY general.lt %s, general.id %s LIMIT 1;",
+             get_ri_rtnode(parent_rtnode), ord, ord);
+
+    if (sqlite3_prepare_v2(db, sql, -1, &res, NULL) != SQLITE_OK) return NULL;
+    if (sqlite3_step(res) != SQLITE_ROW) { sqlite3_finalize(res); return NULL; }
+
+    int cols = sqlite3_column_count(res);
+    cJSON *json = cJSON_CreateObject();
+    for (int col=0; col<cols; col++) {
+        const char *colname = sqlite3_column_name(res, col);
+        if (!strcmp(colname, "id")) continue;
+        int coltype = sqlite3_column_type(res, col);
+        int bytes = sqlite3_column_bytes(res, col);
+        if (bytes == 0) continue;
+
+        if (coltype == SQLITE_TEXT) {
+            memset(buf, 0, sizeof(buf));
+            strncpy(buf, (const char*)sqlite3_column_text(res, col), bytes);
+            cJSON *arr = cJSON_Parse(buf);
+            if (arr && (arr->type == cJSON_Array || arr->type == cJSON_Object)) cJSON_AddItemToObject(json, colname, arr);
+            else { cJSON_AddItemToObject(json, colname, cJSON_CreateString(buf)); cJSON_Delete(arr); }
+        } else if (coltype == SQLITE_INTEGER) {
+            cJSON_AddItemToObject(json, colname, cJSON_CreateNumber(sqlite3_column_int(res, col)));
+        }
+    }
+    sqlite3_finalize(res);
+    return json;
+}
+
+int db_tsi_get_count(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT COUNT(*) "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ?;";
+
+    sqlite3_stmt *stmt = NULL;
+    int count = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            count = sqlite3_column_int(stmt, 0);
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return count;
+}
+
+int db_tsi_get_max_snr(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT COALESCE(MAX(tsi.snr), 0) "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ?;";
+
+    sqlite3_stmt *stmt = NULL;
+    int max_snr = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            max_snr = sqlite3_column_int(stmt, 0);
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return max_snr;
+}
+
+int db_tsi_get_min_snr(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT COALESCE(MIN(tsi.snr), 0) "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ?;";
+
+    sqlite3_stmt *stmt = NULL;
+    int min_snr = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            min_snr = sqlite3_column_int(stmt, 0);
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return min_snr;
+}
+
+int db_tsi_check_snr_dup(const char *ts_ri, int snr)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT 1 "
+        "FROM tsi JOIN general ON tsi.id = general.id "
+        "WHERE general.pi = ? AND tsi.snr = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    int exists = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 2, snr);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            exists = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return exists;
+}
+
+int db_ts_get_mdc(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT COALESCE(ts.mdc, 0) "
+        "FROM ts JOIN general ON ts.id = general.id "
+        "WHERE general.ri = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    int mdc = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            mdc = sqlite3_column_int(stmt, 0);
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return mdc;
+}
+
+int db_ts_update_mdc(const char *ts_ri, int val)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "UPDATE ts SET mdc = ? "
+        "WHERE id = (SELECT id FROM general WHERE ri = ?);";
+
+    sqlite3_stmt *stmt = NULL;
+    int ok = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, val);
+        sqlite3_bind_text(stmt, 2, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            ok = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return ok;
+}
+
+// Append a missing-data timestamp to TS.mdlt and update TS.mdc.
+// SQLite doesn't have native jsonb; store mdlt as a JSON string (TEXT) like "[\"...\", ...]".
+int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str)
+{
+    if (!ts_ri || !time_str) return 0;
+
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    // 1) Read existing mdlt text (if any)
+    const char *sel =
+        "SELECT ts.mdlt "
+        "FROM ts JOIN general ON ts.id = general.id "
+        "WHERE general.ri = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    char *new_mdlt = NULL;
+    const unsigned char *mdlt_txt = NULL;
+
+    if (sqlite3_prepare_v2(db, sel, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            mdlt_txt = sqlite3_column_text(stmt, 0);
+        }
+    }
+    if (stmt) sqlite3_finalize(stmt);
+
+    // Build updated JSON array string
+    if (!mdlt_txt || strlen((const char *)mdlt_txt) == 0) {
+        // Create new array
+        size_t need = strlen(time_str) + 8;
+        new_mdlt = (char *)calloc(1, need);
+        if (new_mdlt) {
+            snprintf(new_mdlt, need, "[\"%s\"]", time_str);
+        }
+    } else {
+        // Append to existing array: replace trailing ']' with ,"time"]
+        const char *old = (const char *)mdlt_txt;
+        size_t old_len = strlen(old);
+        // If old isn't a JSON array, reset it.
+        if (old_len < 2 || old[0] != '[' || old[old_len - 1] != ']') {
+            size_t need = strlen(time_str) + 8;
+            new_mdlt = (char *)calloc(1, need);
+            if (new_mdlt) {
+                snprintf(new_mdlt, need, "[\"%s\"]", time_str);
+            }
+        } else {
+            int is_empty = (old_len == 2); // "[]"
+            size_t need = old_len + strlen(time_str) + 6; // comma + quotes + bracket + null
+            new_mdlt = (char *)calloc(1, need);
+            if (new_mdlt) {
+                memcpy(new_mdlt, old, old_len - 1); // up to before ']'
+                if (!is_empty) {
+                    strcat(new_mdlt, ",");
+                }
+                strcat(new_mdlt, "\"");
+                strcat(new_mdlt, time_str);
+                strcat(new_mdlt, "\"");
+                strcat(new_mdlt, "]");
+            }
+        }
+    }
+
+    if (!new_mdlt) {
+        sqlite3_mutex_leave(sqlite3_db_mutex(db));
+        return 0;
+    }
+
+    // 2) Update ts.mdc and ts.mdlt
+    const char *upd =
+        "UPDATE ts SET mdc = ?, mdlt = ? "
+        "WHERE id = (SELECT id FROM general WHERE ri = ?);";
+
+    int ok = 0;
+    if (sqlite3_prepare_v2(db, upd, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, val);
+        sqlite3_bind_text(stmt, 2, new_mdlt, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            ok = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    free(new_mdlt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return ok;
+}
+
+int db_general_update_lt(const char *ri, const char *lt)
+{
+    if (!ri || !lt) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql = "UPDATE general SET lt = ? WHERE ri = ?;";
+    sqlite3_stmt *stmt = NULL;
+    int ok = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, lt, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            ok = 1;
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return ok;
+}
+
+// Return mdlt JSON string for a TS, caller must free(). Returns NULL if missing.
+char *db_ts_get_mdlt_json(const char *ts_ri)
+{
+    if (!ts_ri) return NULL;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "SELECT ts.mdlt "
+        "FROM ts JOIN general ON ts.id = general.id "
+        "WHERE general.ri = ? "
+        "LIMIT 1;";
+
+    sqlite3_stmt *stmt = NULL;
+    char *out = NULL;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            const unsigned char *txt = sqlite3_column_text(stmt, 0);
+            if (txt && strlen((const char *)txt) > 0) {
+                out = strdup((const char *)txt);
+            }
+        }
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return out;
 }

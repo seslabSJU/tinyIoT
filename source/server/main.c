@@ -21,18 +21,11 @@
 #include "mqttClient.h"
 #endif
 
-
-#ifdef ENABLE_WS
-#include "websocket/websocket_server.h"
-#endif
-
 #ifdef UPPERTESTER
 #include "upperTester.h"
 #endif
 
 #include "coap.h"
-
-
 
 ResourceTree *rt;
 RTNode *registrar_csr = NULL;
@@ -41,11 +34,12 @@ RTNode *registrar_csr = NULL;
 pthread_mutex_t main_lock;
 pthread_mutex_t csr_lock;
 pthread_mutexattr_t Attr;
-pthread_mutex_t ws_lock;
+
 #endif
 
 void route(oneM2MPrimitive *o2pt);
 void stop_server(int sig);
+void log_runtime(double start);
 cJSON *ATTRIBUTES;
 char *PORT = SERVER_PORT;
 int terminate = 0;
@@ -85,14 +79,6 @@ static ssize_t cmdline_read_key(char *arg, unsigned char **buf, size_t maxlen)
 #endif
 #endif
 
-#ifdef ENABLE_WS
-pthread_t websocket_thread;
-int websocket_thread_id;
-#endif
-
-
-
-
 int main(int argc, char **argv)
 {
 	bool initialBoot = false;
@@ -104,8 +90,6 @@ int main(int argc, char **argv)
 	pthread_mutexattr_settype(&Attr, PTHREAD_MUTEX_RECURSIVE);
 	pthread_mutex_init(&main_lock, &Attr);
 	pthread_mutex_init(&csr_lock, NULL);
-	pthread_mutex_init(&ws_lock, &Attr);
-	
 #endif
 	// Attributes for resources
 	// all attributes are verified in validate_sub_attr in util.c
@@ -129,7 +113,9 @@ int main(int argc, char **argv)
 		\"m2m:cbA\": {\"lnk\":\"\", \"cst\":0, \"csi\":\"\", \"srt\":[\"\"], \"poa\":[\"\"], \"srv\":[\"\"], \"rr\":true, \"ast\":0}, \
 		\"m2m:aeA\": {\"lnk\":\"\", \"api\":\"\", \"aei\":\"\", \"rr\":true, \"poa\":[\"\"], \"apn\":\"\", \"srv\":[\"\"], \"ast\":0}, \
 		\"m2m:cntA\": {\"lnk\":\"\", \"cr\":\"\", \"mni\":0, \"mbs\":0, \"st\":0, \"cni\":0, \"cbs\":0, \"ast\":0}, \
-		\"m2m:cinA\": {\"lnk\":\"\", \"cs\":0, \"cr\":\"\", \"con\":\"\", \"cnf\":\"\", \"st\":\"\", \"ast\":0} \
+		\"m2m:cinA\": {\"lnk\":\"\", \"cs\":0, \"cr\":\"\", \"con\":\"\", \"cnf\":\"\", \"st\":\"\", \"ast\":0}, \
+		\"m2m:ts\": {\"cr\": null, \"mni\":0, \"mbs\":0, \"mia\":0, \"cni\":0, \"cbs\":0,\"cnf\":\"\", \"pei\":0, \"peid\":0,\"mdd\":false, \"mdn\":0, \"mdt\":0, \"mdc\":0, \"mdlt\":[\"\"]}, \
+		\"m2m:tsi\": {\"dgt\":\"\", \"con\":\"\", \"snr\":0, \"cs\":0} \
 	 }");
 
 	if (ATTRIBUTES == NULL)
@@ -208,7 +194,6 @@ int main(int argc, char **argv)
 
 #ifdef ENABLE_MQTT
 	mqtt_thread_id = pthread_create(&mqtt, NULL, (void *)mqtt_serve, "mqtt Client");
-	
 	if (mqtt_thread_id < 0)
 	{
 		fprintf(stderr, "MQTT thread create error\n");
@@ -225,18 +210,7 @@ int main(int argc, char **argv)
 	}
 #endif
 
-#ifdef ENABLE_WS
-	websocket_thread_id = pthread_create(&websocket_thread, NULL, websocket_server_thread, "WS Server");
-	if(websocket_thread_id < 0) {
-		perror("Failed to create WebSocket server thread");
-		return 0;
-	}
-#endif
-	
-
 	serve_forever(PORT); // main oneM2M operation logic in void route()
-	// 스레드가 종료될 때까지 대기
-	// pthread_join(websocket_thread, NULL);
 
 #ifdef ENABLE_MQTT
 	pthread_join(mqtt, NULL);
@@ -249,30 +223,34 @@ int main(int argc, char **argv)
 #ifdef ENABLE_COAP
 	pthread_join(coap, NULL);
 #endif
-#ifdef ENABLE_WS
-	pthread_join(websocket_thread, NULL);
-#endif
 
 	return 0;
 }
 
-
-
-
-
-
 void route(oneM2MPrimitive *o2pt)
 {
 	int rsc = 0;
+	double start;
+
+	start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
+
+	// if (o2pt->op == OP_UPPERTESTER)
+	// {
+	// 	handle_uppertester_procedure(o2pt);
+	// 	log_runtime(start);
+	// 	return;
+	// }
 
 	RTNode *target_rtnode = get_rtnode(o2pt);
 
 	if (o2pt->rsc >= 4000)
 	{
+		log_runtime(start);
 		return;
 	}
 	if (o2pt->isForwarding)
 	{
+		log_runtime(start);
 		return;
 	}
 
@@ -281,6 +259,7 @@ void route(oneM2MPrimitive *o2pt)
 		e = check_mandatory_attributes(o2pt);
 	if (e == -1)
 	{
+		log_runtime(start);
 		return;
 	}
 
@@ -309,7 +288,7 @@ void route(oneM2MPrimitive *o2pt)
 		}
 	}
 	if (o2pt->op != OP_DELETE && !o2pt->errFlag && target_rtnode)
-		notify_via_sub(o2pt, target_rtnode);
+        notify_via_sub(o2pt, target_rtnode);
 }
 
 int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
@@ -448,14 +427,6 @@ void stop_server(int sig)
 		pthread_detach(coap);
 	}
 #endif
-#ifdef ENABLE_WS
-	logger("MAIN", LOG_LEVEL_INFO, "Closing WS...");
-	if (websocket_thread)
-	{
-		pthread_kill(websocket_thread, SIGINT);
-		pthread_detach(websocket_thread);
-	}
-#endif
 	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
 	close_dbp();
 	logger("MAIN", LOG_LEVEL_INFO, "Cleaning ResourceTree...");
@@ -467,4 +438,12 @@ void stop_server(int sig)
 	logger("MAIN", LOG_LEVEL_INFO, "Done");
 	logger_free();
 	exit(0);
+}
+
+void log_runtime(double start)
+{
+    double end = (double)clock() / CLOCKS_PER_SEC;
+    double elapsed = end - start;
+
+    logger("MAIN", LOG_LEVEL_DEBUG, "runtime: %.6f sec", elapsed);
 }
