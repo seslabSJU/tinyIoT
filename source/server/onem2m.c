@@ -13,19 +13,19 @@
 #include "onem2m.h"
 #include "dbmanager.h"
 #include "httpd.h"
+#include "mqttClient.h"
 #include "onem2mTypes.h"
 #include "config.h"
 #include "util.h"
 #include "cJSON.h"
 #include "coap.h"
+
 #include "jsonparser.h"
 
-#include "mqttClient.h"
-
-#ifdef ENABLE_WS
-#include "websocket/websocket_server.h"
-#endif
-
+// --- TS / TSI resource handlers (implemented in resources/ts.c and resources/tsi.c) ---
+int create_ts(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
+int update_ts(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
+int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 
 extern ResourceTree *rt;
 extern pthread_mutex_t main_lock;
@@ -45,6 +45,8 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_GRP));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CSR));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_SUB));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_TS));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_TSI));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_ACPA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_AEA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CNTA));
@@ -292,20 +294,12 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 	cJSON *cbs = cJSON_GetObjectItem(cnt, "cbs");
 	cJSON *st = cJSON_GetObjectItem(cnt, "st");
 	cJSON *mia = cJSON_GetObjectItem(cnt, "mia");
-	int cni_val = cni ? cni->valueint : 0;
-	int cbs_val = cbs ? cbs->valueint : 0;
-	int st_val = st ? st->valueint : 0;
-	int cin_cs = 0;
-	cJSON *cin_cs_item = cJSON_GetObjectItem(cin, "cs");
-	if (cin_cs_item)
-		cin_cs = cin_cs_item->valueint;
 
 	if (mia && mia->valueint > 0 && sign == 1) {
         time_t now = time(NULL);
         RTNode *expired[128];
 		memset(expired, 0, sizeof(expired));
         int exp_cnt = 0;
-		int exp_cbs = 0;
         RTNode *child = cnt_rtnode->child;
         while (child) {
              if (child->ty == RT_CIN) {
@@ -328,34 +322,19 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
 
         for (int i = 0; i < exp_cnt; i++) {
             RTNode *n = expired[i];
-			cJSON *cs = cJSON_GetObjectItem(n->obj, "cs");
-			if (cs)
-				exp_cbs += cs->valueint;
+            update_cnt_cin(cnt_rtnode, n, -1);
             db_delete_onem2m_resource(n);
             free_rtnode(n);
         }
-		if (exp_cnt > 0) {
-			cni_val = (cni_val > exp_cnt) ? (cni_val - exp_cnt) : 0;
-			cbs_val = (cbs_val > exp_cbs) ? (cbs_val - exp_cbs) : 0;
-			st_val += exp_cnt;
-		}
     }
 
-	cni_val += sign;
-	cbs_val += (sign * cin_cs);
-	st_val += 1;
-	if (cni)
-		cJSON_SetIntValue(cni, cni_val);
-	if (cbs)
-		cJSON_SetIntValue(cbs, cbs_val);
-	if (st)
-		cJSON_SetIntValue(st, st_val);
-	logger("O2", LOG_LEVEL_DEBUG, "cni: %d, cbs: %d, st: %d", cni_val, cbs_val, st_val);
+	cJSON_SetIntValue(cni, cni->valueint + sign);
+	cJSON_SetIntValue(cbs, cbs->valueint + (sign * cJSON_GetObjectItem(cin, "cs")->valueint));
+	cJSON_SetIntValue(st, st->valueint + 1);
+	logger("O2", LOG_LEVEL_DEBUG, "cni: %d, cbs: %d, st: %d", cni->valueint, cbs->valueint, st->valueint);
 
 	if (sign == 1)
-	{
 		delete_cin_under_cnt_mni_mbs(cnt_rtnode);
-	}
 
 	db_update_resource(cnt, get_ri_rtnode(cnt_rtnode), RT_CNT);
 
@@ -478,6 +457,56 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 				cJSON_DetachItemFromObject(update_obj, "memberOf");
 				cJSON_Delete(update_obj);
 			}
+		}
+		break;
+	case RT_TS:
+		// TS-specific delete hook (children are already handled recursively above).
+		// Kept for completeness so TS deletion can have explicit cleanup if needed.
+		break;
+	case RT_TSI:
+		// When deleting a TSI, update the parent TS aggregate counters (cni/cbs) and lt.
+		if (rtnode->parent && rtnode->parent->ty == RT_TS && rtnode->parent->obj && rtnode->obj) {
+			cJSON *ts = rtnode->parent->obj;
+			cJSON *tsi = rtnode->obj;
+
+			cJSON *cni = cJSON_GetObjectItem(ts, "cni");
+			cJSON *cbs = cJSON_GetObjectItem(ts, "cbs");
+			cJSON *csObj = cJSON_GetObjectItem(tsi, "cs");
+			int cs = (csObj && cJSON_IsNumber(csObj)) ? (int)cJSON_GetNumberValue(csObj) : 0;
+
+			int new_cni = (cni && cJSON_IsNumber(cni)) ? ((int)cJSON_GetNumberValue(cni) - 1) : 0;
+			if (new_cni < 0) new_cni = 0;
+			int new_cbs = (cbs && cJSON_IsNumber(cbs)) ? ((int)cJSON_GetNumberValue(cbs) - cs) : 0;
+			if (new_cbs < 0) new_cbs = 0;
+
+			if (cni && cJSON_IsNumber(cni)) {
+				cJSON_SetNumberValue(cni, new_cni);
+			} else {
+				cJSON_DeleteItemFromObject(ts, "cni");
+				cJSON_AddNumberToObject(ts, "cni", new_cni);
+			}
+
+			if (cbs && cJSON_IsNumber(cbs)) {
+				cJSON_SetNumberValue(cbs, new_cbs);
+			} else {
+				cJSON_DeleteItemFromObject(ts, "cbs");
+				cJSON_AddNumberToObject(ts, "cbs", new_cbs);
+			}
+
+			// Update lt (and persist it) so monitor logic stays consistent.
+			char *now_lt = get_local_time(0);
+			if (now_lt) {
+				if (cJSON_GetObjectItem(ts, "lt")) {
+					cJSON_ReplaceItemInObject(ts, "lt", cJSON_CreateString(now_lt));
+				} else {
+					cJSON_AddStringToObject(ts, "lt", now_lt);
+				}
+				db_general_set_lt(get_ri_rtnode(rtnode->parent), now_lt);
+				free(now_lt);
+			}
+
+			// Persist TS aggregate update.
+			db_update_resource(ts, get_ri_rtnode(rtnode->parent), RT_TS);
 		}
 		break;
 	case RT_AEA:
@@ -691,6 +720,16 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Create CSR");
 		rsc = create_csr(o2pt, parent_rtnode);
 		break;
+	
+	case RT_TS:
+		logger("O2M", LOG_LEVEL_INFO, "Create TS");
+		rsc = create_ts(o2pt, parent_rtnode);
+		break;
+
+	case RT_TSI:
+		logger("O2M", LOG_LEVEL_INFO, "Create TSI");
+		rsc = create_tsi(o2pt, parent_rtnode);
+		break;
 
 	case RT_ACPA:
 	case RT_AEA:
@@ -786,9 +825,20 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_INFO, "Update GRP");
 		rsc = update_grp(o2pt, target_rtnode);
 		break;
+
 	case RT_CSR:
 		logger("O2M", LOG_LEVEL_INFO, "Update CSR");
 		rsc = update_csr(o2pt, target_rtnode);
+		break;
+
+	case RT_TS:
+		logger("O2M", LOG_LEVEL_INFO, "Update TS");
+		rsc = update_ts(o2pt, target_rtnode);
+		break;
+
+	case RT_TSI:
+		logger("O2M", LOG_LEVEL_INFO, "Update TSI");
+		rsc = handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "operation `update` for tsi is not allowed");
 		break;
 
 #if CSE_RVI >= RVI_3
@@ -1102,8 +1152,12 @@ int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	o2pt->rsc = RSC_OK;
 }
 
+
+// Helper forward declaration (definition is below)
+static int sub_has_net(cJSON *subContainer, int event_net);
 int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
+	logger("O2M", LOG_LEVEL_DEBUG, "Target OBJ = %s", target_rtnode && target_rtnode->obj ? cJSON_PrintUnformatted(target_rtnode->obj) : "(null)");
 	logger("O2M", LOG_LEVEL_DEBUG, "Notify via SUB [%s]", target_rtnode->uri);
 	cJSON *pjson = NULL;
 	NodeList *del = NULL;
@@ -1148,8 +1202,11 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			net = NET_DELETE_OF_RESOURCE;
 		} else {
 			if (target_rtnode->parent && target_rtnode->parent->sub_cnt != 0)
-			net = NET_DELETE_OF_DIRECT_CHILD_RESOURCE;
+				net = NET_DELETE_OF_DIRECT_CHILD_RESOURCE;
 		}
+		break;
+	default:
+		net = NET_NONE;
 		break;
 	}
 	logger("O2M", LOG_LEVEL_DEBUG, "Net : %d", net);
@@ -1174,6 +1231,7 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	while (node)
 	{
+		logger("O2M", LOG_LEVEL_DEBUG, "SUB OBJ = %s", node->rtnode && node->rtnode->obj ? cJSON_PrintUnformatted(node->rtnode->obj) : "(null)");
 		if (!isAptEnc(o2pt, target_rtnode, node->rtnode))
 		{
 			logger("O2M", LOG_LEVEL_DEBUG, "skip notification");
@@ -1181,7 +1239,20 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			continue;
 		}
 
-		cJSON *enc = cJSON_GetObjectItem(node->rtnode->obj, "enc");
+        // IMPORTANT: Do not send notifications for events that are not subscribed via enc.net.
+        // This prevents unrelated net=3 notifications from overwriting net=8 missing-data notifications.
+        if (!sub_has_net(node->rtnode->obj, net)) {
+            logger("O2M", LOG_LEVEL_DEBUG, "skip sub notification (net=%d not subscribed)", net);
+            node = node->next;
+            continue;
+        }
+
+        cJSON *subContainer = node->rtnode->obj;
+        cJSON *subWrapped = cJSON_GetObjectItem(subContainer, "m2m:sub");
+        if (subWrapped && cJSON_IsObject(subWrapped)) {
+            subContainer = subWrapped;
+        }
+        cJSON *enc = cJSON_GetObjectItem(subContainer, "enc");
 		exc = cJSON_GetObjectItem(node->rtnode->obj, "exc");
 		cJSON_AddStringToObject(sgn, "sur", node->rtnode->uri);
 
@@ -1214,14 +1285,15 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			cJSON_AddItemToObject(sgn, "cr", cJSON_Duplicate(pjson, true));
 		}
 
-		cJSON *net_obj = cJSON_GetObjectItem(cJSON_GetObjectItem(node->rtnode->obj, "enc"), "net");
-		logger("DEBUG", LOG_LEVEL_DEBUG, "node->rtnode->obj : %s", cJSON_PrintUnformatted(node->rtnode->obj));
+        cJSON *net_obj = NULL;
+        if (enc) {
+            net_obj = cJSON_GetObjectItem(enc, "net");
+        }
 
 		if (net_obj)
 		{
 			cJSON_ArrayForEach(pjson, net_obj)
 			{
-				logger("DEBUG", LOG_LEVEL_DEBUG, "pjson->valueint : %d", pjson->valueint);
 				if (pjson->valueint == net)
 				{
 					logger("O2M", LOG_LEVEL_DEBUG, "notify to nu \n%s", cJSON_Print(noti_cjson));
@@ -1473,7 +1545,6 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	char *host = NULL;
 	int port = 0;
 	char *path = NULL;
-	int rsc = 0;
 	char buf[256] = {0};
 
 	logger("O2M", LOG_LEVEL_DEBUG, "Forwarding Resource");
@@ -1506,9 +1577,7 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	cJSON *csr = target_rtnode->obj;
 	cJSON *poa_list = cJSON_GetObjectItem(csr, "poa");
-	
 	cJSON *poa = NULL;
-
 	cJSON_ArrayForEach(poa, poa_list)
 	{
 		if (parsePoa(poa->valuestring, &protocol, &host, &port, &path) == -1)
@@ -1524,13 +1593,7 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 #ifdef ENABLE_MQTT
 		else if (protocol == PROT_MQTT)
 		{
-			#ifdef ENABLE_MQTT_WEBSOCKET
-				mqtt_forwarding(o2pt, host, port, csr); //mqtt_forwarding fuction is same both
-			#else
-				mqtt_forwarding(o2pt, host, port, csr);
-			#endif
-
-			
+			mqtt_forwarding(o2pt, host, port, csr);
 		}
 #endif
 
@@ -1540,11 +1603,6 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			coap_forwarding(o2pt, protocol, host, port);
 		}
 #endif
-
-// #ifdef ENABLE_WS
-// 		websocket_forwarding(o2pt, host, port);
-// #endif
-
 		free(host);
 		free(path);
 
@@ -1555,9 +1613,6 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 	}
 
-
-
-
 	if (o2pt->rsc == RSC_TARGET_NOT_REACHABLE)
 	{
 		logger("O2M", LOG_LEVEL_ERROR, "forwarding target not reachable");
@@ -1565,4 +1620,30 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 
 	return o2pt->rsc;
+}
+
+// Helper: SUB objects may be stored either as a plain object or wrapped in {"m2m:sub":{...}}.
+// Return true if sub's enc.net contains `event_net`.
+static int sub_has_net(cJSON *subContainer, int event_net) {
+    if (!subContainer) return 0;
+
+    cJSON *subObj = cJSON_GetObjectItem(subContainer, "m2m:sub");
+    if (subObj && cJSON_IsObject(subObj)) {
+        subContainer = subObj;
+    }
+
+    cJSON *enc = cJSON_GetObjectItem(subContainer, "enc");
+    if (!enc) return 0;
+
+    cJSON *netArr = cJSON_GetObjectItem(enc, "net");
+    if (!netArr || !cJSON_IsArray(netArr)) return 0;
+
+    cJSON *v = NULL;
+    cJSON_ArrayForEach(v, netArr) {
+        if (v && cJSON_IsNumber(v) && (int)v->valuedouble == event_net) {
+            return 1;
+        }
+    }
+
+    return 0;
 }
