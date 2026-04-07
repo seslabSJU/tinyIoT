@@ -105,7 +105,7 @@
 // MQTT Settings
 
 // To enable MQTT, de-comment the following line
-#define ENABLE_MQTT
+// #define ENABLE_MQTT
 
 #ifdef ENABLE_MQTT
 // #define ENABLE_MQTT_WEBSOCKET
@@ -130,7 +130,7 @@
 #define MQTT_PORT 8883
 #else
 #define MQTT_USE_TLS 0
-#define MQTT_PORT 1885
+#define MQTT_PORT 1883
 #endif
 
 #define MQTT_MAX_PACKET_SZ 131072
@@ -161,7 +161,7 @@
 #endif
 
 // To enable WS, de-comment the following line
-#define ENABLE_WS 1
+// #define ENABLE_WS 1
 #ifdef ENABLE_WS
 #define WS_HOST "localhost"
 #define WS_PORT 8081
@@ -171,7 +171,7 @@
 
 // For browser access, CORS should be enabled
 // To add CORS headers to HTTP response decomment following line.
-#define CORS
+// #define CORS
 
 // De-Register remoteCSE on shutdown
 // To make server delete all remote remoteCSE resource decomment following line.
