@@ -2692,6 +2692,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		Protocol prot;
 		char *host, *path;
 		int port;
+		cJSON *delivery_json = noti_cjson;
 		nt = calloc(1, sizeof(NotiTarget));
 
 		if (parsePoa(noti_uri, &prot, &host, &port, &path) == -1)
@@ -2703,7 +2704,12 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		o2pt->to = strdup(path);
 		strncpy(nt->host, host, 1024);
 		nt->port = port;
-		nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
+		if (prot == PROT_HTTP || prot == PROT_MQTT)
+		{
+			delivery_json = cJSON_CreateObject();
+			cJSON_AddItemToObject(delivery_json, "pc", cJSON_Duplicate(noti_cjson, true));
+		}
+		nt->noti_json = cJSON_PrintUnformatted(delivery_json);
 		strncpy(nt->target, path, 256);
 		nt->prot = prot;
 
@@ -2714,7 +2720,7 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 			break;
 		case PROT_MQTT:
 #ifdef ENABLE_MQTT
-			rsc = mqtt_notify(o2pt, noti_cjson, nt);
+			rsc = mqtt_notify(o2pt, delivery_json, nt);
 #endif
 			break;
 #ifdef ENABLE_COAP
@@ -2725,6 +2731,8 @@ int send_verification_request(char *noti_uri, cJSON *noti_cjson)
 		}
 
 		free(nt->noti_json);
+		if (delivery_json != noti_cjson)
+			cJSON_Delete(delivery_json);
 		free(nt);
 		if (host)
 			free(host);
@@ -2815,6 +2823,7 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 			Protocol prot;
 			char *host, *path;
 			int port;
+			cJSON *delivery_json = noti_cjson;
 			nt = calloc(1, sizeof(NotiTarget));
 
 			if (parsePoa(noti_uri, &prot, &host, &port, &path) == -1)
@@ -2826,7 +2835,12 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 			o2pt->to = strdup(path);
 			strncpy(nt->host, host, 1024);
 			nt->port = port;
-			nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
+			if (prot == PROT_HTTP || prot == PROT_MQTT)
+			{
+				delivery_json = cJSON_CreateObject();
+				cJSON_AddItemToObject(delivery_json, "pc", cJSON_Duplicate(noti_cjson, true));
+			}
+			nt->noti_json = cJSON_PrintUnformatted(delivery_json);
 			strncpy(nt->target, path, 256);
 			nt->prot = prot;
 			switch (prot)
@@ -2836,7 +2850,7 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 				break;
 			case PROT_MQTT:
 #ifdef ENABLE_MQTT
-				rsc = mqtt_notify(o2pt, noti_cjson, nt);
+				rsc = mqtt_notify(o2pt, delivery_json, nt);
 #endif
 #ifdef ENABLE_COAP
 			case PROT_COAP:
@@ -2846,6 +2860,8 @@ int notify_to_nu(RTNode *sub_rtnode, cJSON *noti_cjson, int net)
 				break;
 			}
 			free(nt->noti_json);
+			if (delivery_json != noti_cjson)
+				cJSON_Delete(delivery_json);
 			free(nt);
 			if (host)
 				free(host);
