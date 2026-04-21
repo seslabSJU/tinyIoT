@@ -86,18 +86,11 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
         result = send_verification_request(pjson->valuestring, noti_cjson);
         logger("SUB", LOG_LEVEL_INFO, "vrq result : %d", result);
-
-        if (result == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE)
+        if (result != RSC_OK)
         {
-            cJSON_Delete(noti_cjson);
-            cJSON_Delete(root);
-            return handle_error(o2pt, RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE, "subscription verification error");
-        }
-        else if (result / 1000 == 4 || result / 1000 == 5)
-        {
-            cJSON_Delete(noti_cjson);
-            cJSON_Delete(root);
-            return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "subscription verification error");
+            logger("SUB", LOG_LEVEL_WARN,
+                   "Ignoring vrq result %d for nu %s during subscription create",
+                   result, pjson->valuestring);
         }
 
         cJSON_DeleteItemFromObject(sgn, "vrq");
@@ -177,13 +170,12 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             {
                 continue;
             }
-            if (send_verification_request(pjson->valuestring, noti_cjson) != RSC_OK)
+            result = send_verification_request(pjson->valuestring, noti_cjson);
+            if (result != RSC_OK)
             {
-                cJSON_Delete(noti_cjson);
-
-                cJSON_DetachItemFromObject(sub, "nu");
-                cJSON_AddItemToObject(sub, "nu", old_nu);
-                return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification error");
+                logger("SUB", LOG_LEVEL_WARN,
+                       "Ignoring vrq result %d for nu %s during subscription update",
+                       result, pjson->valuestring);
             }
         }
 
