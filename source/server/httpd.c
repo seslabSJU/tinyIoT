@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <fcntl.h>
+#include <time.h>
 
 #define MAX_CONNECTIONS 1024
 #define BUF_SIZE 65535
@@ -395,6 +396,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
         if (cJSON_GetObjectItem(qs, "drt"))
         {
             o2pt->drt = cJSON_GetObjectItem(qs, "drt")->valueint;
+            if (o2pt->drt != 1 && o2pt->drt != 2) handle_error(o2pt, RSC_BAD_REQUEST, "Invalid Discovery Reesult Type (drt) value");
         }
         else
         {
@@ -406,6 +408,9 @@ void handle_http_request(HTTPRequest *req, int slotno)
             o2pt->op = OP_DISCOVERY;
             o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
         }
+        else if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) > FU_DISCOVERY_BASED_OPERATION) {
+            handle_error(o2pt, RSC_BAD_REQUEST, "Invalid Filter Usage (fu) value");
+        }
 
         if (cJSON_GetObjectItem(qs, "rcn"))
         {
@@ -414,6 +419,9 @@ void handle_http_request(HTTPRequest *req, int slotno)
         }
         o2pt->fc = qs;
     }
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     route(o2pt);
 

@@ -879,13 +879,6 @@ void get_child_references(oneM2MPrimitive* o2pt, RTNode* rtnode, cJSON* result_o
 				}
 			}
 		}
-		if (child->ty == RT_CNT)
-		{
-			RTNode* cin_list_head = db_get_cin_rtnode_list(child);
-
-			RTNode* cin = cin_list_head;
-			free_rtnode_list(cin_list_head);
-		}
 		if (child->ty == RT_FCNT)
 		{
 			RTNode *fcin_list_head = db_get_fcin_rtnode_list(child);
@@ -2219,15 +2212,11 @@ int make_response_body(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 			}
 			else
 			{
-				cJSON_AddItemReferenceToObject(root, get_resource_key(target_rtnode->ty), target_rtnode->obj);
+				cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), cJSON_Duplicate(target_rtnode->obj, true));
 				pjson2 = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(target_rtnode->ty));
 				pjson3 = cJSON_GetObjectItem(root, get_resource_key(target_rtnode->ty));
 			}
-			cJSON_ArrayForEach(pjson, pjson2)
-			/*{
-				cJSON_DeleteItemFromObject(pjson3, pjson->string);
-			}*/
-
+			// 수정 후
 			if (pjson2 && pjson3) {
 				pjson = NULL;
 				cJSON_ArrayForEach(pjson, pjson2){
@@ -2269,6 +2258,270 @@ int make_response_body(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 			o2pt->cnst = CS_FULL_CONTENT;
 	}
 	return 0;
+}
+
+#define PI_MAP_SIZE 1024
+typedef struct ChildSlot {
+	int type;
+    cJSON *obj;   // 이 pi를 부모로 갖는 노드의 cJSON 객체
+    struct ChildSlot *next;  // 같은 pi를 갖는 형제들 chaining
+} ChildSlot;
+
+typedef struct PIEntry {
+    const char  *pi;
+    ChildSlot   *children;   // 이 pi를 부모로 갖는 노드들의 목록
+    struct PIEntry *next;    // 버킷 chaining
+} PIEntry;
+
+typedef struct {
+    PIEntry *buckets[PI_MAP_SIZE];
+} PIMap;
+
+static unsigned int hash_str(const char *s);
+static void pimap_put(PIMap *m, const char *pi, cJSON *obj, int ty);
+static ChildSlot* pimap_get(PIMap *m, const char *pi);
+static void maps_free(PIMap *pi_map);
+static PIMap* restruct_descendant_arr_to_hash(cJSON *descendant_arr);
+static void attach_descendant_to_target(cJSON *parent_obj, cJSON *descendant_arr, PIMap *pi_map, const char *ri);
+
+int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJSON *target_obj, cJSON *descendant_arr) {
+	cJSON *root = cJSON_CreateObject();
+	cJSON *pjson = NULL;
+	PIMap *pi_map = NULL;
+
+	switch (o2pt->rcn) {
+	// 0
+	case RCN_NOTHING:
+		cJSON_Delete(root);
+		root = NULL;
+		break;
+	// 1
+	case RCN_ATTRIBUTES:
+		if (target_rtnode->ty == RT_FCNT)
+		{
+			// For FlexContainer, use SDT shortname if available
+			cJSON *sn = cJSON_GetObjectItem(target_obj, "_sn");
+			const char *key = (sn && cJSON_IsString(sn)) ? sn->valuestring : get_resource_key(target_rtnode->ty);
+			cJSON *fcnt_copy = cJSON_Duplicate(target_obj, true);
+			sanitize_fcnt_response(fcnt_copy);
+			cJSON_AddItemToObject(root, key, fcnt_copy);
+		}
+		else if (target_rtnode->ty == RT_FCIN)
+		{
+			// For FlexContainerInstance, use parent FCNT's SDT shortname or default to "m2m:fcin"
+			const char *key = get_resource_key(RT_FCIN);
+			if (target_rtnode->parent && target_rtnode->parent->ty == RT_FCNT)
+			{
+				cJSON *sn = cJSON_GetObjectItem(target_rtnode->parent->obj, "_sn");
+				if (sn && cJSON_IsString(sn))
+				{
+					key = sn->valuestring;
+				}
+				else
+				{
+					// Try to infer from cnd
+					cJSON *cnd = cJSON_GetObjectItem(target_rtnode->parent->obj, "cnd");
+					if (cnd && cJSON_IsString(cnd))
+					{
+						// Get shortname from ATTRIBUTES based on cnd
+						// For now, just use default key
+					}
+				}
+			}
+			char *debug_str = cJSON_PrintUnformatted(target_obj);
+			logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body FCIN: target_obj = %s", debug_str);
+			free(debug_str);
+			cJSON *fci_copy = cJSON_Duplicate(target_obj, true);
+			cJSON_AddItemToObject(root, key, fci_copy);
+		}
+		else {
+			cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+		}
+		break;
+	// 4
+	case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
+		pi_map = restruct_descendant_arr_to_hash(descendant_arr);
+		attach_descendant_to_target(target_obj, descendant_arr, pi_map, get_ri_rtnode(target_rtnode));
+
+		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+
+		cJSON_Delete(descendant_arr);
+		maps_free(pi_map);
+		break;
+	// 5
+	case RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES:
+		cJSON_AddItemToObject(target_obj, "ch", descendant_arr);
+		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+		break;
+	// 6
+	case RCN_CHILD_RESOURCE_REFERENCES:
+		cJSON *rrf = cJSON_CreateObject();
+		cJSON_AddItemToObject(rrf, "rrf", descendant_arr);
+		cJSON_AddItemToObject(root, "m2m:rrl", rrf);
+		break;
+	// 7
+	case RCN_ORIGINAL_RESOURCE:
+	// 추후에 확인 필요.
+		if (target_rtnode->ty < 10000)
+		{
+			handle_error(o2pt, RSC_BAD_REQUEST, "rcn 7 is not supported for non anncounced resources");
+			break;
+		}
+		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+		break;
+	// 8
+	case RCN_CHILD_RESOURCES:
+		if (target_obj) {
+			cJSON_Delete(target_obj);
+		}
+		target_obj = cJSON_CreateObject();
+		pi_map = restruct_descendant_arr_to_hash(descendant_arr);
+		attach_descendant_to_target(target_obj, descendant_arr, pi_map, get_ri_rtnode(target_rtnode));
+
+		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+		break;
+	// 11
+	case RCN_DISCOVERY_RESULT_REFERENCES:
+		cJSON_AddItemToObject(root, "m2m:uril", descendant_arr);
+		break;
+
+	// rcn 10, 12는 아직 미구현.
+	}
+
+	if (o2pt->response_pc) {
+		cJSON_Delete(o2pt->response_pc);
+	}
+	if (root) {
+		o2pt->response_pc = root;
+	}
+
+	int lim = DEFAULT_DISCOVERY_LIMIT;
+	int ofst = 0;
+	bool limited = false;
+
+	if ((pjson = cJSON_GetObjectItem(o2pt->fc, "lim")))
+	{
+		lim = pjson->valueint;
+		limited = true;
+	}
+	if ((pjson = cJSON_GetObjectItem(o2pt->fc, "ofst")))
+	{
+		ofst = pjson->valueint;
+	}
+
+	if (o2pt->cnst == CS_PARTIAL_CONTENT)
+	{
+		o2pt->cnot = ofst + lim;
+	}
+	else
+	{
+		if (limited)
+			o2pt->cnst = CS_FULL_CONTENT;
+	}
+
+	return 0;
+}
+
+cJSON *build_target_resource(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
+{
+	logger("TEST", LOG_LEVEL_DEBUG, "build_target_resource: target_rtnode->uri = %s", target_rtnode->uri);
+	// 추후에 상세 내용 중 일부만 응답하는 경우가 생길 수 있으므로 함수로 뺌, 현재는 전체를 복제하여 반환
+	return cJSON_Duplicate(target_rtnode->obj, true);
+}
+
+/* ── 해시 함수 (djb2) ── */
+static unsigned int hash_str(const char *s) {
+    unsigned int h = 5381;
+    while (*s) h = ((h << 5) + h) ^ (unsigned char)*s++;
+    return h % PI_MAP_SIZE;
+}
+
+/* ── PIMap 삽입 / 조회 ── */
+static void pimap_put(PIMap *m, const char *pi, cJSON *obj, int ty) {
+    unsigned int b = hash_str(pi);
+	PIEntry *e;
+	ChildSlot *cs;
+    // 이미 pi 엔트리 있으면 children 앞에 추가
+    for (e = m->buckets[b]; e; e = e->next) {
+        if (!strcmp(e->pi, pi)) {
+            cs = malloc(sizeof(ChildSlot));
+            cs->obj = obj;
+			cs->type = ty;
+            cs->next = e->children;
+            e->children = cs;
+            return;
+        }
+    }
+
+    // 없으면 새 PIEntry 생성
+    e  = malloc(sizeof(PIEntry));
+	cs = malloc(sizeof(ChildSlot));
+	cs->obj = obj;
+	cs->type = ty;
+	cs->next = NULL;
+    e->pi       = pi;
+    e->children = cs;
+    e->next     = m->buckets[b];
+    m->buckets[b] = e;
+}
+
+static ChildSlot* pimap_get(PIMap *m, const char *pi) {
+    unsigned int b = hash_str(pi);
+    for (PIEntry *e = m->buckets[b]; e; e = e->next)
+        if (!strcmp(e->pi, pi)) return e->children;
+    return NULL;
+}
+
+/* ── 해시맵 메모리 해제 ── */
+static void maps_free(PIMap *pi_map) {
+    for (int i = 0; i < PI_MAP_SIZE; i++) {
+        PIEntry *e = pi_map->buckets[i];
+        while (e) {
+            ChildSlot *cs = e->children;
+            while (cs) { ChildSlot *n = cs->next; free(cs); cs = n; }
+            PIEntry *n = e->next; free(e); e = n;
+        }
+    }
+}
+
+static PIMap* restruct_descendant_arr_to_hash(cJSON *descendant_arr) {
+	PIMap *pi_map = calloc(1, sizeof(PIMap));
+	cJSON *item;
+	cJSON_ArrayForEach(item, descendant_arr) {
+		int ty = (int)(cJSON_GetObjectItem(item, "ty")->valuedouble);
+		cJSON *pi = cJSON_GetObjectItem(item, "pi");
+		cJSON *obj = cJSON_GetObjectItem(item, "obj");
+
+		pimap_put(pi_map, pi->valuestring, obj, ty);
+	}
+	return pi_map;
+}
+static void attach_descendant_to_target(cJSON *parent_obj, cJSON *descendant_arr, PIMap *pi_map, const char *ri) {
+	ChildSlot *children = pimap_get(pi_map, ri);
+	char *key;
+	if (!children) return;
+
+	for (ChildSlot *cs = children; cs; cs = cs->next) {
+		key = get_resource_key(cs->type);
+		cJSON *arr = cJSON_GetObjectItem(parent_obj, key);
+
+		if (arr) {
+			cJSON* detached = cJSON_DetachItemViaPointer(descendant_arr, cs->obj);
+			cJSON_AddItemToArray(arr, detached);
+		} else {
+			arr = cJSON_CreateArray();
+			cJSON* detached = cJSON_DetachItemViaPointer(descendant_arr, cs->obj);
+			cJSON_AddItemToObject(parent_obj, key, arr);
+			cJSON_AddItemToArray(arr, detached);
+		}
+
+		attach_descendant_to_target(cs->obj, descendant_arr, pi_map, cJSON_GetObjectItem(cs->obj, "ri")->valuestring);
+	}
+	return;
+}
+
+cJSON* get_descendants_by_tree(oneM2MPrimitive* o2pt, RTNode* rtnode) {
+	return NULL;
 }
 
 int handle_csy(cJSON* grp, cJSON* mid, int csy, int i)
@@ -2878,7 +3131,7 @@ cJSON* qs_to_json(char* qs)
 
 		if (key != NULL && value != NULL)
 		{
-			// logger("UTIL", LOG_LEVEL_DEBUG, "key = %s, value = %s", key, value);
+			logger("UTIL", LOG_LEVEL_DEBUG, "key = %s, value = %s", key, value);
 			if (strstr(value, "+") != NULL)
 			{
 				ptr = strtok_r(value, "+", &tokPtr);
