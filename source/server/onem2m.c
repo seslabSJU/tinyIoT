@@ -912,16 +912,60 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
+	logger("TEST", LOG_LEVEL_DEBUG, "Retrieve oneM2M resource [%s]", target_rtnode->uri);
 	int rsc = 0;
+	int rcn = o2pt->rcn;
+	cJSON *descendant_arr = NULL;
+	cJSON *target_obj = NULL;
 	int e = check_privilege(o2pt, target_rtnode, ACOP_RETRIEVE);
 	if (e == -1)
 		return o2pt->rsc;
 
-	make_response_body(o2pt, target_rtnode);
+	// 타겟 리소스 fc 매칭 확인.
+	// if (rcn != RCN_CHILD_RESOURCE_REFERENCES && rcn != RCN_CHILD_RESOURCES) {
+	// 	if (o2pt->fc && !isResourceAptFC(o2pt, target_rtnode, o2pt->fc))
+	// 	{
+	// 		return handle_error(o2pt, RSC_NOT_FOUND, "resource not found");
+	// 	}
+	// }
+	// fc가 없거나 있는데 통과한 경우.
+
+	// target 리소스가 필요 없는 경우를 제하고 빌드.
+	if (!(rcn == RCN_CHILD_RESOURCES) && !(rcn == RCN_CHILD_RESOURCE_REFERENCES)) {
+		target_obj = build_target_resource(o2pt, target_rtnode);
+	}
+
+	// 자손 리소스가 필요한 경우 어떤 방식으로 탐색할지 결정.
+	// 현재 target이 리프노드라거나 하는 경우 반영 안됨.
+	if (rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCES || rcn == RCN_CHILD_RESOURCES)
+	{
+		descendant_arr = db_get_descendants(o2pt, target_rtnode, false);
+	} else if (rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES || rcn == RCN_CHILD_RESOURCE_REFERENCES) {
+		descendant_arr = db_get_descendants(o2pt, target_rtnode, true);
+		// if (o2pt->fc) {
+		// 	descendant_arr = db_get_descendants(o2pt, target_rtnode, false);
+		// } else {
+		// 	descendant_arr = get_descendants_by_tree(o2pt, target_rtnode);
+		// }
+	}
+	make_response_body_retrieve(o2pt, target_rtnode, target_obj, descendant_arr);
 
 	o2pt->rsc = RSC_OK;
 	return RSC_OK;
 }
+
+// int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
+// {
+// 	int rsc = 0;
+// 	int e = check_privilege(o2pt, target_rtnode, ACOP_RETRIEVE);
+// 	if (e == -1)
+// 		return o2pt->rsc;
+
+// 	make_response_body(o2pt, target_rtnode);
+
+// 	o2pt->rsc = RSC_OK;
+// 	return RSC_OK;
+// }
 
 int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
@@ -1248,23 +1292,11 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 /**
  * Discover Resources based on Filter Criteria
  */
-int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
-{
-	char *orig_to = NULL;
-	logger("MAIN", LOG_LEVEL_DEBUG, "Discover Resource %s", o2pt->to);
-	cJSON *fc = o2pt->fc;
-	cJSON *pjson = NULL, *pjson2 = NULL;
-	cJSON *acpi_obj = NULL;
-	cJSON *root = cJSON_CreateObject();
-	cJSON *uril = NULL, *list = NULL;
-	cJSON *json = NULL;
-
-	int lSize = 0;
-	if (check_privilege(o2pt, target_rtnode, ACOP_DISCOVERY) == -1)
+int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
+	// discovery 할 필요가 없는 경우 먼저 걸러줌.
+	if (check_privilege(o2pt, target_rtnode, ACOP_DISCOVERY) == -1 || target_rtnode->ty == RT_CIN)
 	{
-		uril = cJSON_CreateArray();
-		cJSON_AddItemToObject(root, "m2m:uril", uril);
-		o2pt->response_pc = root;
+		make_response_body_retrieve(o2pt, target_rtnode, NULL, NULL);
 		return RSC_OK;
 	}
 
@@ -1273,8 +1305,39 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_WARN, "Empty Filter Criteria");
 		return RSC_BAD_REQUEST;
 	}
-	orig_to = o2pt->to;
-	o2pt->to = strdup(target_rtnode->uri);
+
+	cJSON *descendant_obj = db_get_descendants(o2pt, target_rtnode, true);
+	make_response_body_retrieve(o2pt, target_rtnode, NULL, descendant_obj);
+
+	return o2pt->rsc = RSC_OK;
+}
+// int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
+// {
+// 	char *orig_to = NULL;
+// 	logger("MAIN", LOG_LEVEL_DEBUG, "Discover Resource %s", o2pt->to);
+// 	cJSON *fc = o2pt->fc;
+// 	cJSON *pjson = NULL, *pjson2 = NULL;
+// 	cJSON *acpi_obj = NULL;
+// 	cJSON *root = cJSON_CreateObject();
+// 	cJSON *uril = NULL, *list = NULL;
+// 	cJSON *json = NULL;
+
+// 	int lSize = 0;
+// 	if (check_privilege(o2pt, target_rtnode, ACOP_DISCOVERY) == -1)
+// 	{
+// 		uril = cJSON_CreateArray();
+// 		cJSON_AddItemToObject(root, "m2m:uril", uril);
+// 		o2pt->response_pc = root;
+// 		return RSC_OK;
+// 	}
+
+// 	if (!o2pt->fc)
+// 	{
+// 		logger("O2M", LOG_LEVEL_WARN, "Empty Filter Criteria");
+// 		return RSC_BAD_REQUEST;
+// 	}
+// 	orig_to = o2pt->to;
+// 	o2pt->to = strdup(target_rtnode->uri);
 
 	list = db_get_filter_criteria(o2pt);
 	if (!list)
@@ -1303,35 +1366,35 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		ofst = cJSON_GetNumberValue(ofst_obj);
 	}
 
-	if (lSize > lim)
-	{
-		logger("O2M", LOG_LEVEL_DEBUG, "limit exceeded");
-		cJSON_DeleteItemFromArray(list, lSize - 1);
-		o2pt->cnst = CS_PARTIAL_CONTENT;
-		o2pt->cnot = ofst + lim;
-	}
+// 	if (lSize > lim)
+// 	{
+// 		logger("O2M", LOG_LEVEL_DEBUG, "limit exceeded");
+// 		cJSON_DeleteItemFromArray(list, lSize - 1);
+// 		o2pt->cnst = CS_PARTIAL_CONTENT;
+// 		o2pt->cnot = ofst + lim;
+// 	}
 
-	if (o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES)
-	{
-		cJSON *rrl = cJSON_AddObjectToObject(root, "m2m:rrl");
-		cJSON_AddItemToObject(rrl, "rrf", list);
-	}
-	else
-	{
-		cJSON *uril = cJSON_CreateArray();
-		cJSON_ArrayForEach(pjson, list)
-		{
-			cJSON_AddItemToArray(uril, cJSON_GetObjectItem(pjson, "val"));
-		}
-		cJSON_AddItemToObject(root, "m2m:uril", uril);
-	}
+// 	if (o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES)
+// 	{
+// 		cJSON *rrl = cJSON_AddObjectToObject(root, "m2m:rrl");
+// 		cJSON_AddItemToObject(rrl, "rrf", list);
+// 	}
+// 	else
+// 	{
+// 		cJSON *uril = cJSON_CreateArray();
+// 		cJSON_ArrayForEach(pjson, list)
+// 		{
+// 			cJSON_AddItemToArray(uril, cJSON_GetObjectItem(pjson, "val"));
+// 		}
+// 		cJSON_AddItemToObject(root, "m2m:uril", uril);
+// 	}
 
-	o2pt->response_pc = root;
-	free(o2pt->to);
-	o2pt->to = orig_to;
+// 	o2pt->response_pc = root;
+// 	free(o2pt->to);
+// 	o2pt->to = orig_to;
 
-	return o2pt->rsc = RSC_OK;
-}
+// 	return o2pt->rsc = RSC_OK;
+// }
 
 int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {

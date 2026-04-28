@@ -22,6 +22,9 @@ bool isFCAttrValid(cJSON *fc){
 
     if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "lvl")) < 0) return false;
     if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "ofst")) < 0) return false;
+    
+    pjson = cJSON_GetObjectItem(fc, "fo");
+    if (cJSON_GetNumberValue(pjson) < 0 || cJSON_GetNumberValue(pjson) > 3) return false;
 
     if( (pjson = cJSON_GetObjectItem(fc, "ty")) ){
         if(cJSON_IsArray(pjson)){
@@ -72,12 +75,13 @@ bool isFCAttrValid(cJSON *fc){
 }
 
 bool isValidFcAttr(char* attr){
-    char *fcAttr[34] = {
-    "crb", "cra", "ms", "us", "sts", "stb", "exb", "exa", "lbl","clbl", "palb", "lbq", "ty", "chty", "pty", "sza", "szb", "cty", 
+    char *fcAttr[51] = {
+    "crb", "cra", "ms", "us", "sts", "stb", "exb", "exa", "lbl", "clbl", "palb", "lbq", "ty", "chty", "pty", "sza", "szb", "cty", 
     "atr", "catr", "patr", "fu", "lim", "smf", "fo", "cfs", "cfq", "lvl", "ofst", "arp", "gq", "ops", "la",
-    "drt"};
+    "drt", "cni", "nu", "pv", "pvs", "gn", "macp", "mid", "cr", "poa", "apn", "aei", "api", "cs", "cnf", "con",
+    "mni", "st"};
 
-    for(int i = 0 ; i < 34 ; i++){
+    for(int i = 0 ; i < 51 ; i++){
         if(!strcmp(attr, fcAttr[i])) return true;
     }
     return false;
