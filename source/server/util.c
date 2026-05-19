@@ -2299,6 +2299,7 @@ static ChildSlot* pimap_get(PIMap *m, const char *pi);
 static void maps_free(PIMap *pi_map);
 static PIMap* restruct_descendant_arr_to_hash(cJSON *descendant_arr);
 static void attach_descendant_to_target(cJSON *parent_obj, cJSON *descendant_arr, PIMap *pi_map, const char *ri);
+static void attach_orphans_to_target(cJSON *target_obj, cJSON *descendant_arr);
 
 int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJSON *target_obj, cJSON *descendant_arr) {
 	cJSON *root = cJSON_CreateObject();
@@ -2358,6 +2359,7 @@ int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJ
 	case RCN_ATTRIBUTES_AND_CHILD_RESOURCES:
 		pi_map = restruct_descendant_arr_to_hash(descendant_arr);
 		attach_descendant_to_target(target_obj, descendant_arr, pi_map, get_ri_rtnode(target_rtnode));
+		attach_orphans_to_target(target_obj, descendant_arr);
 
 		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
 
@@ -2393,8 +2395,12 @@ int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJ
 		target_obj = cJSON_CreateObject();
 		pi_map = restruct_descendant_arr_to_hash(descendant_arr);
 		attach_descendant_to_target(target_obj, descendant_arr, pi_map, get_ri_rtnode(target_rtnode));
+		attach_orphans_to_target(target_obj, descendant_arr);
 
 		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+
+		cJSON_Delete(descendant_arr);
+		maps_free(pi_map);
 		break;
 	// 11
 	case RCN_DISCOVERY_RESULT_REFERENCES:
@@ -2534,6 +2540,25 @@ static void attach_descendant_to_target(cJSON *parent_obj, cJSON *descendant_arr
 		attach_descendant_to_target(cs->obj, descendant_arr, pi_map, cJSON_GetObjectItem(cs->obj, "ri")->valuestring);
 	}
 	return;
+}
+
+static void attach_orphans_to_target(cJSON *target_obj, cJSON *descendant_arr) {
+	cJSON *item;
+	cJSON_ArrayForEach(item, descendant_arr) {
+		cJSON *obj = cJSON_GetObjectItem(item, "obj");
+		if (!obj) continue;
+		cJSON *ty_json = cJSON_GetObjectItem(item, "ty");
+		if (!ty_json) continue;
+		int ty = (int)ty_json->valuedouble;
+		char *key = get_resource_key(ty);
+		cJSON *arr = cJSON_GetObjectItem(target_obj, key);
+		cJSON *detached = cJSON_DetachItemViaPointer(item, obj);
+		if (!arr) {
+			arr = cJSON_CreateArray();
+			cJSON_AddItemToObject(target_obj, key, arr);
+		}
+		cJSON_AddItemToArray(arr, detached);
+	}
 }
 
 cJSON* get_descendants_by_tree(oneM2MPrimitive* o2pt, RTNode* rtnode) {
