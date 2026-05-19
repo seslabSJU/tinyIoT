@@ -1677,8 +1677,8 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
     int needed_res_attrs[RES_FC_MAP_LEN], needed_res_attrs_cnt = 0;
     char sql[12288];
     char first_query_buf[12288];
-    char general_where_buf[6144] = "";
-    char res_where_buf[6144] = ""; 
+    char general_where_buf[3000] = "";
+    char res_where_buf[3000] = ""; 
     char ref_cols[32];
 
     bool need_details = (rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCES ||
@@ -1737,6 +1737,7 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
     append_general_fc(general_where_buf, fc, esc_uri); // general fc 추가.
 
     PGresult *res;
+    // join X 참조 반환
     if (!need_join) {
         snprintf(sql, sizeof(sql),
             "SELECT %s "
@@ -1818,21 +1819,9 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
         
         // 참조 반환 only
         if (!need_details) {
-            if (has_res_fc) {
-                snprintf(sql, sizeof(sql),
-                    "WITH base AS ("
-                    "SELECT id, ty, uri, ri, rn "
-                    "FROM general %s), "
-                    "combined AS (",
-                    general_where_buf);
-            } else {
-                snprintf(sql, sizeof(sql),
-                    "WITH base AS ("
-                    "SELECT id, ty, uri, ri, rn "
-                    "FROM general %s ORDER BY id %s LIMIT %d), "
-                    "combined AS (",
-                    general_where_buf, sort_dir, lim+ofst);
-            }
+            snprintf(sql, sizeof(sql),
+                "WITH combined AS (");
+
             for (int i = 0; i < join_cnt; i++) {
                 int tv = join_tys[i];
                 const char *tbl = get_table_name(tv);
@@ -1840,9 +1829,10 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
                 char join_query[8000];
                 snprintf(join_query, sizeof(join_query),
                     "%sSELECT id, ty, rn, uri, ri "
-                    "FROM base JOIN %s USING(id) %s ORDER BY id %s LIMIT %d",
-                    (i > 0) ? " UNION ALL " : " ",
+                    "FROM general JOIN %s USING(id) %s %s ORDER BY id %s LIMIT %d)",
+                    (i > 0) ? " UNION ALL (" : "(",
                     tbl,
+                    general_where_buf,
                     needed_res_attrs_cnt ? res_where_buf : "",
                     sort_dir,
                     lim+ofst);
@@ -1880,45 +1870,23 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
 
         // 상세 반환
         } else {
-            if (has_res_fc) {
-                snprintf(sql, sizeof(sql),
-                    "WITH base AS ("
-                    "SELECT id, %s "
-                    "FROM general %s) "
-                    ", combined AS (",
-                    GENERAL_DETAIL_COLS, general_where_buf);
-            } else {
-                snprintf(sql, sizeof(sql),
-                    "WITH base AS ("
-                    "SELECT id, %s "
-                    "FROM general %s ORDER BY id %s LIMIT %d) "
-                    ", combined AS (",
-                    GENERAL_DETAIL_COLS, general_where_buf, sort_dir, lim+ofst);
-            }
-
+            snprintf(sql, sizeof(sql),
+                "WITH combined AS (");
             for (int i = 0; i < join_cnt; i++) {
                 int tv = join_tys[i];
                 const char *tbl = get_table_name(tv);
                 const char *detail_cols = get_detail_cols(tv);
                 char join_query[8000];
 
-                if (detail_cols) {
-                    snprintf(join_query, sizeof(join_query),
-                        "%sSELECT id, ri, pi, ty, jsonb_strip_nulls(to_jsonb(x) - 'id') as obj "
-                        "FROM (SELECT id, "GENERAL_DETAIL_COLS ", %s "
-                        "FROM base "
-                        "JOIN %s USING(id) %s ORDER BY id %s LIMIT %d) as x",  
-                        (i > 0) ? " UNION ALL " : " ",
-                        detail_cols, tbl, res_where_buf, sort_dir, lim+ofst);
-                } else {
-                    snprintf(join_query, sizeof(join_query),
-                        "%sSELECT id, ri, pi, ty, jsonb_strip_nulls(to_jsonb(x) - 'id') as obj "
-                        "FROM (SELECT id, "GENERAL_DETAIL_COLS " " 
-                        "FROM base "
-                        "JOIN %s USING(id) %s ORDER BY id %s LIMIT %d) as x",
-                        (i > 0) ? " UNION ALL " : " ",
-                        tbl, res_where_buf, sort_dir, lim+ofst);
-                }
+                
+                snprintf(join_query, sizeof(join_query),
+                    "%sSELECT id, ri, pi, ty, jsonb_strip_nulls(to_jsonb(x) - 'id') as obj "
+                    "FROM (SELECT id, "GENERAL_DETAIL_COLS ", %s "
+                    "FROM general "
+                    "JOIN %s USING(id) %s %s ORDER BY id %s LIMIT %d) as x",  
+                    (i > 0) ? " UNION ALL " : " ",
+                    detail_cols, tbl, general_where_buf, res_where_buf, sort_dir, lim+ofst);
+
                 strcat(sql, join_query);
             }
             char tail[128];
@@ -3375,12 +3343,8 @@ static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cn
         const char *attr = RES_FC_MAP[map_idx].attr;
         const char *col = RES_FC_MAP[map_idx].col;
         FcOp op = RES_FC_MAP[map_idx].fcop;
-
-        if (i > 0) {
-            snprintf(buf, sizeof(buf), " %s ", fo_ops[fo_op]);
-            strcat(sql, buf);
-        }
-        else strcat(sql, "WHERE ");
+        snprintf(buf, sizeof(buf), " %s ", fo_ops[fo_op]);
+        strcat(sql, buf);
 
         if ((val = cJSON_GetObjectItem(fc, attr))) {
             if (!strcmp(attr, "con")) {
