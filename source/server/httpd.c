@@ -17,7 +17,6 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <fcntl.h>
-#include <time.h>
 
 #define MAX_CONNECTIONS 1024
 #define BUF_SIZE 65535
@@ -391,37 +390,43 @@ void handle_http_request(HTTPRequest *req, int slotno)
     if (req->qs && strlen(req->qs) > 0)
     {
         cJSON *qs = qs_to_json(req->qs);
-        parse_qs(qs);
+        if (!parse_qs(qs)) {
+            handle_error(o2pt, RSC_BAD_REQUEST, "Invalid Query String Format");
+        }
+        logger("HTTP", LOG_LEVEL_DEBUG, "Parsed Query String: %s", cJSON_PrintUnformatted(qs));
 
         if (cJSON_GetObjectItem(qs, "drt"))
         {
             o2pt->drt = cJSON_GetObjectItem(qs, "drt")->valueint;
             if (o2pt->drt != 1 && o2pt->drt != 2) handle_error(o2pt, RSC_BAD_REQUEST, "Invalid Discovery Reesult Type (drt) value");
+            cJSON_DeleteItemFromObject(qs, "drt");
         }
         else
         {
             o2pt->drt = DRT_STRUCTURED;
         }
 
-        if (cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) == FU_DISCOVERY)
+        if (cJSON_GetObjectItem(qs, "fu"))
         {
-            o2pt->op = OP_DISCOVERY;
-            o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
-        }
-        else if(cJSON_GetNumberValue(cJSON_GetObjectItem(qs, "fu")) > FU_DISCOVERY_BASED_OPERATION) {
-            handle_error(o2pt, RSC_BAD_REQUEST, "Invalid Filter Usage (fu) value");
+            FilterUsage fu = cJSON_GetObjectItem(qs, "fu")->valueint;
+            if (fu < 1 || fu > 4) handle_error(o2pt, RSC_BAD_REQUEST, "Invalid Filter Usage (fu) value");
+            switch (fu) {
+            case FU_DISCOVERY:
+                o2pt->op = OP_DISCOVERY;
+                o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
+                break;
+            }
+            cJSON_DeleteItemFromObject(qs, "fu");
         }
 
         if (cJSON_GetObjectItem(qs, "rcn"))
         {
             o2pt->rcn = cJSON_GetObjectItem(qs, "rcn")->valueint;
+            if (o2pt->rcn < 0 || o2pt->rcn > 12) handle_error(o2pt, RSC_BAD_REQUEST, "Invalid Result Content (rcn) value");
             cJSON_DeleteItemFromObject(qs, "rcn");
         }
         o2pt->fc = qs;
     }
-
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
 
     route(o2pt);
 
