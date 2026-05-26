@@ -1590,7 +1590,7 @@ typedef enum {
     FC_OP_EXISTS          // IS NOT NULL (존재 여부 - pv, pvs)
 } FcOp;
 typedef struct {
-    const char *attr;
+    const char *short_name;
     int ty;
     const char *col;
     FcOp fcop;
@@ -1605,9 +1605,9 @@ static void fc_to_query(char *buf, int buf_size, const char* col, FcOp op, cJSON
 static const char *get_detail_cols(int ty);
 static bool has_res_specific_fc(cJSON *fc);
 static bool fc_needs_ty(int ty, int res_attrs[], int res_attrs_len);
-static void append_general_fc(char *sql, cJSON *fc, const char *esc_uri);
+static int append_general_fc(char *sql, cJSON *fc, const char *esc_uri);
 static void append_forbidden(char *sql, cJSON *forbidden);
-static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cnt);
+static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cnt, int and_flag);
 static cJSON *row_to_cjson_object(PGresult *res, int row);
 static int get_res_specific_fc_attrs(cJSON *fc, int *out_attrs);
 
@@ -1651,20 +1651,6 @@ static const ResFcMap RES_FC_MAP[] = {
     {"pv",   RT_ACP,  "pv",   FC_OP_EXISTS},
     {"pvs",  RT_ACP,  "pvs",  FC_OP_EXISTS},
 };
-
-static const ResDetailCols RES_DETAIL_COLS[] = {
-    {RT_ACP, "pv, pvs, at, aa, ast"},
-    {RT_AE, "api, aei, rr, poa, apn, srv, at, aa, ast"},
-    {RT_CNT, "cr, mni, mbs, mia, st, cni, cbs, li, oref, disr, at, aa, ast"},
-    {RT_CIN, "cs, cr, cnf, oref, con, st, at, aa, ast"},
-    {RT_CSE, "cst, csi, srt, poa, nl, ncp, srv, rr, at, aa, ast"},
-    {RT_GRP, "cr, mt, cnm, mnm, mid, macp, mtv, csy, gn, at, aa, ast"},
-    {RT_CSR, "cst, poa, cb, csi, mei, tri, rr, nl, srv, dcse, csz"},
-    {RT_SUB, "enc, exc, nu, gpi, nfu, bn, rl, sur, nct, net, cr, su, at, aa, ast"},
-    {RT_FCNT, "cnd, oref, nl, cr, at, aa, ast, st, cs, mni, mbs, mia, cni, cbs, loc, daci"},
-    {RT_FCIN, "cs, st, org, loc, at, aa, ast"},
-};
-#define GENERAL_DETAIL_COLS "ri, rn, ty, pi, ct, lt, et, lbl" 
 #define RES_FC_MAP_LEN (int)(sizeof(RES_FC_MAP) / sizeof(ResFcMap))
 #define RES_DETAIL_COLS_LEN (int)(sizeof(RES_DETAIL_COLS) / sizeof(ResDetailCols))
 
@@ -1734,16 +1720,16 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
     }
     const char *sort_dir = (DEFAULT_DISCOVERY_SORT == SORT_DESC) ? "DESC" : "ASC";
     
-    append_general_fc(general_where_buf, fc, esc_uri); // general fc 추가.
+    int and_flag = append_general_fc(general_where_buf, fc, esc_uri); // general fc 추가.
 
     PGresult *res;
     // join X 참조 반환
     if (!need_join) {
         snprintf(sql, sizeof(sql),
             "SELECT %s "
-            "FROM general %s "
+            "FROM general %s%s "
             "ORDER BY id %s LIMIT %d OFFSET %d;",
-            ref_cols, general_where_buf, sort_dir, lim, ofst);
+            ref_cols, general_where_buf, and_flag ? "": ")", sort_dir, lim, ofst);
 
         logger("DB", LOG_LEVEL_DEBUG, "desc SQL (no-join): %s", sql);
         res = PQexec(conn, sql);
@@ -1773,12 +1759,12 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
         // 1차 query
         if (has_res_fc) {
             snprintf(first_query_buf, sizeof(first_query_buf),
-                "SELECT DISTINCT ty FROM general %s;", general_where_buf);
+                "SELECT DISTINCT ty FROM general %s%s;", general_where_buf, and_flag ? "" : ")");
         } else {
             snprintf(first_query_buf, sizeof(first_query_buf),
                 "SELECT DISTINCT ty FROM "
-                "(SELECT ty FROM general %s ORDER BY id %s LIMIT %d OFFSET %d) sub;"
-                , general_where_buf, sort_dir, lim, ofst);
+                "(SELECT ty FROM general %s%s ORDER BY id %s LIMIT %d OFFSET %d) sub;"
+                , general_where_buf, and_flag ? "" : ")", sort_dir, lim, ofst);
         }
         logger("DB", LOG_LEVEL_DEBUG, "desc 1차 SQL: %s", first_query_buf);
 
@@ -1807,20 +1793,23 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
                 if (!fc_needs_ty(tv, needed_res_attrs, needed_res_attrs_cnt)) continue;
                 join_tys[join_cnt++] = tv;
             }
+            append_res_fc(res_where_buf, fc, needed_res_attrs, needed_res_attrs_cnt, and_flag);
             
-            append_res_fc(res_where_buf, fc, needed_res_attrs, needed_res_attrs_cnt);
         } else {
             for (int i = 0; i < ty_cnt; i++) {
                 join_tys[join_cnt++] = ty_vals[i];
             }
+            if (!and_flag) {
+                strcat(general_where_buf, ")");
+            }
         }
-
+        
         if (join_cnt == 0) goto cleanup;
         
         // 참조 반환 only
         if (!need_details) {
             snprintf(sql, sizeof(sql),
-                "WITH combined AS (");
+            "WITH combined AS (");
 
             for (int i = 0; i < join_cnt; i++) {
                 int tv = join_tys[i];
@@ -1875,17 +1864,17 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
             for (int i = 0; i < join_cnt; i++) {
                 int tv = join_tys[i];
                 const char *tbl = get_table_name(tv);
-                const char *detail_cols = get_detail_cols(tv);
+                // const char *detail_cols = get_detail_cols(tv);
                 char join_query[8000];
 
                 
                 snprintf(join_query, sizeof(join_query),
                     "%sSELECT id, ri, pi, ty, jsonb_strip_nulls(to_jsonb(x) - 'id') as obj "
-                    "FROM (SELECT id, "GENERAL_DETAIL_COLS ", %s "
+                    "FROM (SELECT *"
                     "FROM general "
                     "JOIN %s USING(id) %s %s ORDER BY id %s LIMIT %d) as x",  
                     (i > 0) ? " UNION ALL " : " ",
-                    detail_cols, tbl, general_where_buf, res_where_buf, sort_dir, lim+ofst);
+                    tbl, general_where_buf, res_where_buf, sort_dir, lim+ofst);
 
                 strcat(sql, join_query);
             }
@@ -3203,15 +3192,9 @@ static void fc_to_query(char *buf, int buf_size, const char* col, FcOp op, cJSON
     return;
 }
 
-static const char *get_detail_cols(int ty) {
-    for (int i = 0; i < RES_DETAIL_COLS_LEN; i++)
-        if (RES_DETAIL_COLS[i].ty == ty) return RES_DETAIL_COLS[i].cols;
-    return NULL;
-}
-
 static bool has_res_specific_fc(cJSON *fc) {
     for (int i = 0; i < RES_FC_MAP_LEN; i++)
-        if (cJSON_GetObjectItem(fc, RES_FC_MAP[i].attr)) return true;
+        if (cJSON_GetObjectItem(fc, RES_FC_MAP[i].short_name)) return true;
     return false;
 }
 
@@ -3222,18 +3205,18 @@ static bool fc_needs_ty(int ty, int res_attrs[], int res_attrs_len) {
     return false;
 }
 
-static void append_general_fc(char *sql, cJSON *fc, const char *esc_uri) {
+static int append_general_fc(char *sql, cJSON *fc, const char *esc_uri) {
     char buf[512]; cJSON *p, *ptr;
 
     int and_flag = 1;
-    int fo_op = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo")) - 1;
-    const char *fo_ops[3] = {"AND", "OR", "XOR"};
+    FilterOperation fo_op = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
+    const char *fo_ops[4] = {"","AND", "OR", "XOR"};
     
     snprintf(buf, sizeof(buf), "WHERE uri LIKE '%s/%%'", esc_uri); // uri prefix 설정
     strcat(sql, buf);
     
 
-    if (!fc) return;
+    if (!fc) and_flag;
 
     if ((p = cJSON_GetObjectItem(fc, "lvl")) && cJSON_IsNumber(p)) {
         sprintf(buf, " AND uri NOT LIKE '%s/%%", esc_uri);
@@ -3245,7 +3228,7 @@ static void append_general_fc(char *sql, cJSON *fc, const char *esc_uri) {
 #define _APPEND_TIME(attr, col, op) \
     if ((p = cJSON_GetObjectItem(fc, attr)) && cJSON_IsString(p)) { \
         char *_e = pg_escape_string_value(p->valuestring); \
-        if (_e) { sprintf(buf, " %s " col " " op " '%s'", and_flag ? "AND" : fo_ops[fo_op], _e); \
+        if (_e) { sprintf(buf, " %s " col " " op " '%s'", and_flag ? "AND (" : fo_ops[fo_op], _e); \
                   and_flag = 0; \
                   strcat(sql, buf); free(_e); } \
     }
@@ -3259,7 +3242,7 @@ static void append_general_fc(char *sql, cJSON *fc, const char *esc_uri) {
 
     /* Resource type filter */
     if ((p = cJSON_GetObjectItem(fc, "ty"))) {
-        snprintf(buf, sizeof(buf), " %s (", and_flag ? "AND" : fo_ops[fo_op]);
+        snprintf(buf, sizeof(buf), " %s (", and_flag ? "AND (" : fo_ops[fo_op]);
         and_flag = 0;
         strcat(sql, buf);
         if (cJSON_IsArray(p)) {
@@ -3278,7 +3261,7 @@ static void append_general_fc(char *sql, cJSON *fc, const char *esc_uri) {
 
     /* Label filter */
     if ((p = cJSON_GetObjectItem(fc, "lbl"))) {
-        snprintf(buf, sizeof(buf), " %s (", and_flag ? "AND" : fo_ops[fo_op]);
+        snprintf(buf, sizeof(buf), " %s (", and_flag ? "AND (" : fo_ops[fo_op]);
         and_flag = 0;
         strcat(sql, buf);
         if (cJSON_IsArray(p)) {
@@ -3297,26 +3280,16 @@ static void append_general_fc(char *sql, cJSON *fc, const char *esc_uri) {
         }
         strcat(sql, ")");
     }
+
+    return and_flag;
 }
 
-static void append_forbidden(char *sql, cJSON *forbidden) {
-    if (!forbidden) return;
-    char buf[512]; cJSON *ptr;
-    cJSON_ArrayForEach(ptr, forbidden) {
-        if (!cJSON_IsString(ptr)) continue;
-        char *e = pg_escape_string_value(cJSON_GetStringValue(ptr));
-        if (!e) continue;
-        sprintf(buf, " AND uri NOT LIKE '%s%%'", e); free(e);
-        strcat(sql, buf);
-    }
-}
-
-static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cnt) {
+static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cnt, int and_flag) {
     char buf[512] = ""; cJSON *val;
     int map_idx;
-
-    int fo_op = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo")) - 1;
-    const char *fo_ops[3] = {"AND", "OR", "XOR"};
+    
+    FilterOperation fo_op = cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
+    const char *fo_ops[4] = {"","AND", "OR", "XOR"};
 
     int *needed_res_attrs = malloc(sizeof(int)*res_attrs_cnt);
     int needed_res_attrs_cnt = 0;
@@ -3325,7 +3298,7 @@ static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cn
         int flag = 0;
         for (int j = 0; j < needed_res_attrs_cnt; j++) {
             // 같은 속성이 이미 추가되었다면
-            if (strcmp(RES_FC_MAP[res_attrs[i]].attr, RES_FC_MAP[needed_res_attrs[j]].attr) == 0) {
+            if (strcmp(RES_FC_MAP[res_attrs[i]].short_name, RES_FC_MAP[needed_res_attrs[j]].short_name) == 0) {
                 flag = 1;
                 break;
             }
@@ -3340,13 +3313,20 @@ static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cn
         buf[0] = '\0';
         
         map_idx = needed_res_attrs[i];
-        const char *attr = RES_FC_MAP[map_idx].attr;
+        const char *attr = RES_FC_MAP[map_idx].short_name;
         const char *col = RES_FC_MAP[map_idx].col;
         FcOp op = RES_FC_MAP[map_idx].fcop;
-        snprintf(buf, sizeof(buf), " %s ", fo_ops[fo_op]);
+        if (and_flag) {
+            snprintf(buf, sizeof(buf), " AND (");
+            and_flag = 0;
+        }
+        else {
+            snprintf(buf, sizeof(buf), " %s ", fo_ops[fo_op]);
+        }
         strcat(sql, buf);
 
         if ((val = cJSON_GetObjectItem(fc, attr))) {
+            // "con 연산자는 와일드 카드 *을 지원"
             if (!strcmp(attr, "con")) {
                 char *str = cJSON_GetStringValue(val);
                 for (int i = 0; i < str[i] != '\0'; i++) {
@@ -3357,6 +3337,10 @@ static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cn
             fc_to_query(buf, sizeof(buf), col, op, val);
             strcat(sql, buf);
         }
+    }
+
+    if (!and_flag) {
+        strcat(sql, ")");
     }
 
     free(needed_res_attrs);
@@ -3401,7 +3385,7 @@ static cJSON *row_to_cjson_object(PGresult *res, int row) {
 static int get_res_specific_fc_attrs(cJSON *fc, int *out_attrs) {
     int count = 0;
     for (int i = 0; i < RES_FC_MAP_LEN; i++) {
-        if (cJSON_GetObjectItem(fc, RES_FC_MAP[i].attr)) {
+        if (cJSON_GetObjectItem(fc, RES_FC_MAP[i].short_name)) {
             out_attrs[count++] = i;
         }
     }
