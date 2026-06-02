@@ -377,12 +377,23 @@ static const table_def_t table_definitions[] = {
     }
 };
 
+
 #else
 #error "PG_SCHEMA_TYPE must be either PG_SCHEMA_VARCHAR or PG_SCHEMA_TEXT"
 #endif
 
 #define TABLE_COUNT (sizeof(table_definitions) / sizeof(table_def_t))
 
+typedef struct {
+    const char *name;
+    const char *sql;
+} index_def_t;
+
+static const index_def_t index_definitions[] = {
+    {"idx_cin_id", "CREATE INDEX IF NOT EXISTS idx_cin_id ON cin(id DESC);"},
+    // Add more indexes as needed for performance optimization
+};
+#define INDEX_COUNT (sizeof(index_definitions) / sizeof(index_def_t))
 /* Helper function to execute SQL and handle errors for PostgreSQL */
 static int execute_sql_with_error_handling(const char *sql, const char *context)
 {
@@ -398,6 +409,13 @@ static int execute_sql_with_error_handling(const char *sql, const char *context)
         return 0;
     }
     PQclear(res);
+    return 1;
+}
+
+static int create_index(const index_def_t *index_def) {
+    if (!execute_sql_with_error_handling(index_def->sql, index_def->name)) {
+        return 0;
+    }
     return 1;
 }
 
@@ -440,6 +458,17 @@ int init_dbp()
     // Create all tables
     for (size_t i = 0; i < TABLE_COUNT; i++) {
         if (!create_table(&table_definitions[i])) {
+            PQexec(conn, "ROLLBACK");
+            PQfinish(conn);
+            pg_conn = NULL;
+            pg_unlock();
+            return 0;
+        }
+    }
+
+    // Create all indexes
+    for (size_t i = 0; i < INDEX_COUNT; i++) {
+        if (!create_index(&index_definitions[i])) {
             PQexec(conn, "ROLLBACK");
             PQfinish(conn);
             pg_conn = NULL;
@@ -3352,19 +3381,15 @@ static cJSON *row_to_cjson_object(PGresult *res, int row) {
     int ncols = PQnfields(res);
     char *colname, *value;
     for (int col = 0; col < ncols; col++) {
-        // id 컬럼은 응답용이 아니기 때문에 제외
         colname = PQfname(res, col);
         if (strcmp(colname, "id") == 0) continue;
 
-        // 값이 없으면 건너뜀
         value = PQgetvalue(res, row, col);
         if (!value || strlen(value) == 0) continue;
 
-        // json으로 파싱 가능한지 확인.
         cJSON *parsed = cJSON_Parse(value);
         if (parsed && (parsed->type == cJSON_Array || parsed->type == cJSON_Object)) {
             cJSON_AddItemToObject(obj, colname, parsed);
-        // 불가능한 데이터 값인 경우.
         } else {
             cJSON_Delete(parsed);
             char *endptr;
@@ -3378,6 +3403,26 @@ static cJSON *row_to_cjson_object(PGresult *res, int row) {
                 cJSON_AddStringToObject(obj, colname, value);
             }
         }
+
+        if (strcmp(colname, "obj") == 0) {
+            cJSON *child = parsed ? parsed->child : NULL;
+            cJSON *next_node = NULL;
+
+            while (child != NULL) {
+                next_node = child->next;
+
+                if (cJSON_IsString(child)) {
+                    cJSON *real_obj = cJSON_Parse(child->valuestring);
+                    
+                    if (real_obj && (real_obj->type == cJSON_Array || real_obj->type == cJSON_Object)) {
+                        const char *key_name = child->string; 
+                        cJSON_ReplaceItemInObjectCaseSensitive(parsed, key_name, real_obj);
+                    }
+                }
+                child = next_node;
+            }
+        }
+
     }
     return obj;
 }

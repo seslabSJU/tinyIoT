@@ -485,6 +485,19 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
 
     sprintf(content_length, "%ld", pc ? strlen(pc) : 0);
     sprintf(rsc, "%d", o2pt->rsc);
+    if (o2pt->op == OP_CREATE && o2pt->response_pc) {
+        char *content_location = NULL;
+        cJSON *uri_item = cJSON_GetObjectItem(o2pt->response_pc, "m2m:uri");
+        if(!uri_item && o2pt->response_pc->child) {
+            uri_item = cJSON_GetObjectItem(o2pt->response_pc->child, "uri");
+        }
+        if (uri_item && uri_item->valuestring) {
+            content_location = uri_item->valuestring;
+        }
+        if (content_location) {
+            set_header("Content-Location", content_location, response_headers);
+        }
+    } 
     if (o2pt->response_pc)
         set_header("Content-Length", content_length, response_headers);
 
