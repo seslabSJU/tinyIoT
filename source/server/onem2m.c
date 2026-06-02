@@ -1339,32 +1339,32 @@ int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
 // 	orig_to = o2pt->to;
 // 	o2pt->to = strdup(target_rtnode->uri);
 
-	list = db_get_filter_criteria(o2pt);
-	if (!list)
-	{
-		free(o2pt->to);
-		o2pt->to = orig_to;
-		cJSON_Delete(root);
-		return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB discovery fail");
-	}
-	list = filter_discovery_candidates(o2pt, list);
-	lSize = cJSON_GetArraySize(list);
-	cJSON *lim_obj = cJSON_GetObjectItem(fc, "lim");
-	cJSON *ofst_obj = cJSON_GetObjectItem(fc, "ofst");
-	int lim = INT_MAX;
-	int ofst = 0;
-	if (lim_obj)
-	{
-		lim = cJSON_GetNumberValue(lim_obj);
-	}
-	else
-	{
-		lim = DEFAULT_DISCOVERY_LIMIT;
-	}
-	if (ofst_obj)
-	{
-		ofst = cJSON_GetNumberValue(ofst_obj);
-	}
+	// list = db_get_filter_criteria(o2pt);
+	// if (!list)
+	// {
+	// 	free(o2pt->to);
+	// 	o2pt->to = orig_to;
+	// 	cJSON_Delete(root);
+	// 	return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB discovery fail");
+	// }
+	// list = filter_discovery_candidates(o2pt, list);
+	// lSize = cJSON_GetArraySize(list);
+	// cJSON *lim_obj = cJSON_GetObjectItem(fc, "lim");
+	// cJSON *ofst_obj = cJSON_GetObjectItem(fc, "ofst");
+	// int lim = INT_MAX;
+	// int ofst = 0;
+	// if (lim_obj)
+	// {
+	// 	lim = cJSON_GetNumberValue(lim_obj);
+	// }
+	// else
+	// {
+	// 	lim = DEFAULT_DISCOVERY_LIMIT;
+	// }
+	// if (ofst_obj)
+	// {
+	// 	ofst = cJSON_GetNumberValue(ofst_obj);
+	// }
 
 // 	if (lSize > lim)
 // 	{
