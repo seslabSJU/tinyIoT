@@ -1634,8 +1634,8 @@ static void fc_to_query(char *buf, int buf_size, const char* col, FcOp op, cJSON
 static const char *get_detail_cols(int ty);
 static bool has_res_specific_fc(cJSON *fc);
 static bool fc_needs_ty(int ty, int res_attrs[], int res_attrs_len);
-static int append_general_fc(char *sql, cJSON *fc, const char *esc_uri);
-static void append_forbidden(char *sql, cJSON *forbidden);
+static int append_general_fc(oneM2MPrimitive *o2pt, char *sql, cJSON *fc, const char *esc_uri, bool is_discover);
+static void append_forbidden(oneM2MPrimitive *o2pt, char *sql, cJSON *fc);
 static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cnt, int and_flag);
 static cJSON *row_to_cjson_object(PGresult *res, int row);
 static int get_res_specific_fc_attrs(cJSON *fc, int *out_attrs);
@@ -1749,7 +1749,7 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
     }
     const char *sort_dir = (DEFAULT_DISCOVERY_SORT == SORT_DESC) ? "DESC" : "ASC";
     
-    int and_flag = append_general_fc(general_where_buf, fc, esc_uri); // general fc 추가.
+    int and_flag = append_general_fc(o2pt, general_where_buf, fc, esc_uri, is_discover); // general fc 추가.
 
     PGresult *res;
     // join X 참조 반환
@@ -3234,7 +3234,7 @@ static bool fc_needs_ty(int ty, int res_attrs[], int res_attrs_len) {
     return false;
 }
 
-static int append_general_fc(char *sql, cJSON *fc, const char *esc_uri) {
+static int append_general_fc(oneM2MPrimitive *o2pt, char *sql, cJSON *fc, const char *esc_uri, bool is_discover) {
     char buf[512]; cJSON *p, *ptr;
 
     int and_flag = 1;
@@ -3243,11 +3243,16 @@ static int append_general_fc(char *sql, cJSON *fc, const char *esc_uri) {
     
     snprintf(buf, sizeof(buf), "WHERE uri LIKE '%s/%%'", esc_uri); // uri prefix 설정
     strcat(sql, buf);
-    
+    if (is_discover && cJSON_GetObjectItem(fc, "arp") == NULL) {
+        append_forbidden(o2pt, sql, fc);
+    }
+    if (cJSON_GetObjectItem(fc, "arp")) {
+        cJSON_DeleteItemFromObject(fc, "arp");
+    }
 
-    if (!fc) and_flag;
+    if (!fc) return and_flag;
 
-    if ((p = cJSON_GetObjectItem(fc, "lvl")) && cJSON_IsNumber(p)) {
+    if ((p = cJSON_GetObjectItem(fc, "lvl"))) {
         sprintf(buf, " AND uri NOT LIKE '%s/%%", esc_uri);
         strcat(sql, buf);
         for (int i = 0; i < (int)p->valuedouble; i++) strcat(sql, "/%%");
@@ -3255,7 +3260,7 @@ static int append_general_fc(char *sql, cJSON *fc, const char *esc_uri) {
     }
 
 #define _APPEND_TIME(attr, col, op) \
-    if ((p = cJSON_GetObjectItem(fc, attr)) && cJSON_IsString(p)) { \
+    if ((p = cJSON_GetObjectItem(fc, attr))) { \
         char *_e = pg_escape_string_value(p->valuestring); \
         if (_e) { sprintf(buf, " %s " col " " op " '%s'", and_flag ? "AND (" : fo_ops[fo_op], _e); \
                   and_flag = 0; \
@@ -3374,6 +3379,64 @@ static void append_res_fc(char *sql, cJSON *fc, int *res_attrs, int res_attrs_cn
 
     free(needed_res_attrs);
     return;
+}
+
+static void append_forbidden(oneM2MPrimitive *o2pt, char *sql, cJSON *fc) {
+    // Keep PostgreSQL discovery filtering aligned with the SQLite backend:
+    // exclude subtrees whose ACPs do not grant discovery privileges.
+    char buf[512];
+    cJSON *ptr, *pjson;
+    cJSON *acpiList = getNonDiscoverableAcp(o2pt, rt->cb);
+    cJSON *forbiddenURI = getForbiddenUri(acpiList);
+    if (forbiddenURI && cJSON_GetArraySize(forbiddenURI) > 0) {
+        int first_forbidden = 1;
+        cJSON_ArrayForEach(ptr, forbiddenURI) {
+            if (cJSON_IsString(ptr)) {
+                char *escaped_forbidden = pg_escape_string_value(cJSON_GetStringValue(ptr));
+                if (first_forbidden) {
+                    strcat(sql, " AND (");
+                } else {
+                    strcat(sql, " AND ");
+                }
+                sprintf(buf, "uri NOT LIKE '%s'", escaped_forbidden);
+                strcat(sql, buf);
+                free(escaped_forbidden);
+                first_forbidden = 0;
+            }
+        }
+        if (!first_forbidden) {
+            strcat(sql, ")");
+        }
+    }
+    cJSON_Delete(forbiddenURI);
+    cJSON_Delete(acpiList);
+
+    if ((pjson = cJSON_GetObjectItem(fc, "ops"))) {
+        acpiList = getNoPermAcopDiscovery(o2pt, rt->cb, pjson->valueint);
+        forbiddenURI = getForbiddenUri(acpiList);
+        if (forbiddenURI && cJSON_GetArraySize(forbiddenURI) > 0) {
+            int first_forbidden = 1;
+            cJSON_ArrayForEach(ptr, forbiddenURI) {
+                if (cJSON_IsString(ptr)) {
+                    char *escaped_forbidden = pg_escape_string_value(cJSON_GetStringValue(ptr));
+                    if (first_forbidden) {
+                        strcat(sql, " AND (");
+                    } else {
+                        strcat(sql, " AND ");
+                    }
+                    sprintf(buf, "uri NOT LIKE '%s%%'", escaped_forbidden);
+                    strcat(sql, buf);
+                    free(escaped_forbidden);
+                    first_forbidden = 0;
+                }
+            }
+            if (!first_forbidden) {
+                strcat(sql, ")");
+            }
+        }
+        cJSON_Delete(forbiddenURI);
+        cJSON_Delete(acpiList);
+    }
 }
 
 static cJSON *row_to_cjson_object(PGresult *res, int row) {
