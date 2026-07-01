@@ -520,7 +520,14 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
     req->method = op_to_method(o2pt->op);
     req->payload = strdup(nt->noti_json);
     req->payload_size = strlen(req->payload);
-    req->uri = strdup(o2pt->to);
+    if (nt && strlen(nt->target) > 0)
+    {
+        req->uri = strdup(nt->target);
+    }
+    else
+    {
+        req->uri = strdup(o2pt->to);
+    }
     req->headers = calloc(1, sizeof(header_t));
     add_header("X-M2M-Origin", "/" CSE_BASE_RI, req->headers);
     add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);

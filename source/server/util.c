@@ -3222,7 +3222,7 @@ int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson)
 		strncpy(nt->host, host, 1024);
 		nt->port = port;
 		nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
-		strncpy(nt->target, path, 256);
+		snprintf(nt->target, sizeof(nt->target), "%s", path);
 		nt->prot = prot;
 
 		switch (prot)
@@ -3362,7 +3362,7 @@ int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net)
 			strncpy(nt->host, host, 1024);
 			nt->port = port;
 			nt->noti_json = cJSON_PrintUnformatted(noti_cjson);
-			strncpy(nt->target, path, 256);
+			snprintf(nt->target, sizeof(nt->target), "%s", path);
 			nt->prot = prot;
 			switch (prot)
 			{
