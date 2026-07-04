@@ -114,30 +114,9 @@ RTNode *parse_abs_uri(oneM2MPrimitive *o2pt, char *target_uri)
         // forwarding TS 0004 7.3.2.6
         if (!csr)
         {
-            if (SERVER_TYPE == IN_CSE)
-            {
-                logger("RTM", LOG_LEVEL_ERROR, "Remote CSE not found for ABSOLUTE URI: %s", target_uri);
-                handle_error(o2pt, RSC_BAD_REQUEST, "Remote CSE not found");
-                return NULL;
-            }
-            else
-            {
-                if (rt->registrar_csr)
-                {
-                    cJSON *registrar_csr = rt->registrar_csr->obj;
-                    if (strcmp(cJSON_GetStringValue(cJSON_GetObjectItem(registrar_csr, "csi")), target_uri) != 0)
-                    {
-                        handle_error(o2pt, RSC_NOT_FOUND, "Remote CSE not found");
-                        return NULL;
-                    }
-                    csr = rt->registrar_csr;
-                }
-                else
-                {
-                    handle_error(o2pt, RSC_NOT_FOUND, "No registrar CSE configured");
-                    return NULL;
-                }
-            }
+            logger("RTM", LOG_LEVEL_ERROR, "Remote CSE not found for ABSOLUTE URI: %s", target_uri);
+            handle_error(o2pt, RSC_BAD_REQUEST, "Remote CSE not found");
+            return NULL;
         }
 
         rsc = forwarding_onem2m_resource(o2pt, csr);
@@ -190,20 +169,9 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
         // forwarding TS 0004 7.3.2.6
         if (!csr)
         {
-            if (SERVER_TYPE == IN_CSE)
-            {
-                handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
-                return NULL;
-            }
-            else
-            {
-                cJSON *registrar_csr = rt->registrar_csr->obj;
-                if (strcmp(cJSON_GetStringValue(cJSON_GetObjectItem(registrar_csr, "csi")), target_uri) != 0)
-                {
-                    handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
-                    return NULL;
-                }
-            }
+            logger("RTM", LOG_LEVEL_ERROR, "Remote CSE not found for SP_RELATIVE URI: %s", target_uri);
+            handle_error(o2pt, RSC_NOT_FOUND, "Resource Not Found");
+            return NULL;
         }
 
         rsc = forwarding_onem2m_resource(o2pt, csr);
@@ -226,8 +194,17 @@ RTNode *find_csr_rtnode_by_uri(char *uri)
     // RTNode *rtnode = rt->cb->child, *parent_rtnode = NULL;
     if (!uri)
         return NULL;
+    ResourceAddressingType RAT = checkResourceAddressingType(uri);
     char *target_uri = strdup(uri); // remove second '/'
-    char *ptr = strtok_r(target_uri + 1, "/", &uriPtr);
+    char *ptr = NULL;
+    if (RAT == SP_RELATIVE) {
+        ptr = strtok_r(target_uri + 1, "/", &uriPtr);
+    } else if (RAT == ABSOLUTE) {
+        ptr = strtok_r(target_uri + 2, "/", &uriPtr);
+    } else {
+        free(target_uri);
+        return NULL;
+    }
     if (!ptr)
         return NULL;
 
@@ -246,9 +223,12 @@ RTNode *find_csr_rtnode_by_uri(char *uri)
             if (!strcmp(cJSON_GetStringValue(dcse), target_uri))
                 break;
         }
+        if (dcse) break;
         csrlist = csrlist->next;
     }
-    return csrlist ? csrlist->rtnode : NULL;
+
+    free(target_uri);
+    return csrlist ? csrlist->rtnode : rt->registrar_csr;
 }
 
 /**
@@ -519,7 +499,7 @@ RTNode* find_rtnode_by_hybrid(char* hb)
         return NULL;
     }
 
-    ///fopt µÚ¿¡ Ãß°¡ °æ·Î°¡ ºÙÀ» ¼ö ÀÖÀ¸¹Ç·Î ºÐ¸®
+    ///fopt ï¿½Ú¿ï¿½ ï¿½ß°ï¿½ ï¿½ï¿½Î°ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ ï¿½Ð¸ï¿½
     suffix = strchr(virtual_rn, '/');
     if (suffix)
     {
@@ -535,7 +515,7 @@ RTNode* find_rtnode_by_hybrid(char* hb)
         return NULL;
     }
 
-    //2. GroupRI/fopt ¶Ç´Â GroupRI/sfop. group ÀÚÃ¼¸¦ ¹ÝÈ¯
+    //2. GroupRI/fopt ï¿½Ç´ï¿½ GroupRI/sfop. group ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½ï¿½È¯
     if (!strcmp(virtual_rn, "fopt") || !strcmp(virtual_rn, "sfop"))
     {
         if (parent_rtnode->ty == RT_GRP)
@@ -548,14 +528,14 @@ RTNode* find_rtnode_by_hybrid(char* hb)
         return NULL;
     }
 
-    //la/ol µÚ¿¡ Ãß°¡ path°¡ ºÙ´Â °æ¿ì
+    //la/ol ï¿½Ú¿ï¿½ ï¿½ß°ï¿½ pathï¿½ï¿½ ï¿½Ù´ï¿½ ï¿½ï¿½ï¿½
     if (suffix && strlen(suffix) > 0)
     {
         free(target_uri);
         return NULL;
     }
 
-    //3. ContainerRI/la ¶Ç´Â ContainerRI/ol
+    //3. ContainerRI/la ï¿½Ç´ï¿½ ContainerRI/ol
     if (parent_rtnode->ty == RT_CNT)
     {
         cJSON *cin = NULL;
@@ -580,7 +560,7 @@ RTNode* find_rtnode_by_hybrid(char* hb)
         }
     }
 
-    //4. FlexContainerRI/la ¶Ç´Â FlexContainerRI/ol
+    //4. FlexContainerRI/la ï¿½Ç´ï¿½ FlexContainerRI/ol
     if (parent_rtnode->ty == RT_FCNT)
     {
         cJSON *fcin = NULL;
@@ -605,7 +585,7 @@ RTNode* find_rtnode_by_hybrid(char* hb)
         }
     }
 
-    //5. pcu, ntsr µî ½ÇÁ¦ child RTNode·Î ¿Ã¶ó¿Í ÀÖÀ» ¼ö ÀÖ´Â virtual resource Ã³¸®
+    //5. pcu, ntsr ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ child RTNodeï¿½ï¿½ ï¿½Ã¶ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ö´ï¿½ virtual resource Ã³ï¿½ï¿½
 #if MONO_THREAD == 0
     pthread_mutex_lock(&main_lock);
 #endif
