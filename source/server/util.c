@@ -4123,76 +4123,67 @@ int create_local_csr()
 
 	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
 
-	if (res->status_code != 200)
+	if (res->status_code == 404)
 	{
 		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE is not online : %d", res->status_code);
 		free_HTTPRequest(req);
 		free_HTTPResponse(res);
 		return res->status_code;
 	}
-
-	cJSON* root = cJSON_Parse(res->payload);
-	cJSON* remote_cb = cJSON_GetObjectItem(root, get_resource_key(RT_CSE));
-
-	if (!remote_cb)
-	{
-		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE not valid");
-		free_HTTPRequest(req);
-		free_HTTPResponse(res);
-		return -1;
-	}
-
-	cJSON* pjson = NULL;
-	cJSON* remote_ri = cJSON_GetObjectItem(remote_cb, "ri");
-	cJSON* remote_rn = cJSON_GetObjectItem(remote_cb, "rn");
-	cJSON* remote_csi = cJSON_GetObjectItem(remote_cb, "csi");
-	if (!remote_rn || !remote_csi)
-	{
-		logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE not valid");
-		free_HTTPRequest(req);
-		free_HTTPResponse(res);
-		return -1;
-	}
-
+	
 	cJSON* csr = cJSON_CreateObject();
 	add_general_attribute(csr, rt->cb, RT_CSR);
 	cJSON_DeleteItemFromObject(csr, "ri");
 	cJSON_DeleteItemFromObject(csr, "rn");
-
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "cst")))
+	
+	char *cse_ri = strchr(REMOTE_CSE_ID, '/');
+	if (cse_ri) cse_ri++;
+	else cse_ri = REMOTE_CSE_ID; // is impossible but just in case
+	
+	cJSON_AddItemToObject(csr, "csi", cJSON_CreateString(REMOTE_CSE_ID));
+	cJSON_AddItemToObject(csr, "cb", cJSON_CreateString(REMOTE_CSE_ID "/" REMOTE_CSE_NAME));
+	cJSON_AddItemToObject(csr, "rn", cJSON_CreateString(cse_ri));
+	cJSON_AddItemToObject(csr, "ri", cJSON_CreateString(cse_ri));
+	cJSON *poa = cJSON_CreateArray();
+	char buffer[128] = { 0 };
+	snprintf(buffer, 128, "http://%s:%d", REMOTE_CSE_HOST, REMOTE_CSE_PORT);
+	cJSON_AddItemToArray(poa, cJSON_CreateString(buffer));
+	// ToDo: add mqtt, ws, coap poa
+	cJSON_AddItemToObject(csr, "poa", poa);
+	
+	cJSON* root = cJSON_Parse(res->payload);
+	cJSON* remote_cb = cJSON_GetObjectItem(root, get_resource_key(RT_CSE));
+	if (remote_cb)
 	{
-		cJSON_AddItemToObject(csr, "cst", cJSON_Duplicate(pjson, 1));
+		cJSON* pjson = NULL;
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "cst")))
+		{
+			cJSON_AddItemToObject(csr, "cst", cJSON_Duplicate(pjson, 1));
+		}
+		// if(pjson = cJSON_GetObjectItem(remote_cb, "rn")){
+			// }
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "dcse")))
+		{
+			cJSON_AddItemToObject(csr, "dcse", cJSON_Duplicate(pjson, 1));
+		}
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "poa")))
+		{
+			cJSON_ReplaceItemInObject(csr, "poa", cJSON_Duplicate(pjson, 1));
+		}
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "rr")))
+		{
+			cJSON_AddItemToObject(csr, "rr", cJSON_Duplicate(pjson, 1));
+		}
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "srv")))
+		{
+			cJSON_AddItemToObject(csr, "srv", cJSON_Duplicate(pjson, 1));
+		}
+	} else {
+		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE not valid");
 	}
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "ri")))
-	{
-		cJSON_AddItemToObject(csr, "ri", cJSON_Duplicate(pjson, 1));
-		cJSON_AddItemToObject(csr, "rn", cJSON_Duplicate(pjson, 1));
-	}
-	// if(pjson = cJSON_GetObjectItem(remote_cb, "rn")){
-	// }
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "dcse")))
-	{
-		cJSON_AddItemToObject(csr, "dcse", cJSON_Duplicate(pjson, 1));
-	}
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "poa")))
-	{
-		cJSON_AddItemToObject(csr, "poa", cJSON_Duplicate(pjson, 1));
-	}
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "rr")))
-	{
-		cJSON_AddItemToObject(csr, "rr", cJSON_Duplicate(pjson, 1));
-	}
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "srv")))
-	{
-		cJSON_AddItemToObject(csr, "srv", cJSON_Duplicate(pjson, 1));
-	}
-	cJSON_AddItemToObject(csr, "csi", cJSON_CreateString(remote_csi->valuestring));
-
-	sprintf(buf, "%s/%s", remote_csi->valuestring, remote_rn->valuestring);
-	cJSON_AddItemToObject(csr, "cb", cJSON_CreateString(buf));
-
+		
 	cJSON_Delete(root);
-
+		
 	// int rsc = validate_csr(o2pt, parent_rtnode, csr, OP_CREATE);
 	// if(rsc != RSC_OK){
 	// 	cJSON_Delete(root);
@@ -4200,7 +4191,7 @@ int create_local_csr()
 	// }
 
 	char* ptr = malloc(1024);
-	sprintf(ptr, "%s/%s", CSE_BASE_NAME, cJSON_GetObjectItem(csr, "rn")->valuestring);
+	sprintf(ptr, "%s/%s", CSE_BASE_NAME, cse_ri);
 	cJSON_AddItemToObject(csr, "uri", cJSON_CreateString(ptr));
 	int result = db_store_resource(csr, ptr);
 	if (result == -1)
@@ -4219,6 +4210,7 @@ int create_local_csr()
 	rt->registrar_csr = rtnode;
 
 	free_HTTPRequest(req);
+	free_HTTPResponse(res);
 	return 0;
 }
 
