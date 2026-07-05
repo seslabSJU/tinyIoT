@@ -1746,51 +1746,78 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
  * @param at announceTo string
  * @param isParent true if parent resource is parent resource
  */
-char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isParent)
+char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 {
 	extern cJSON *ATTRIBUTES;
 	char buf[256] = {0};
-	bool pannc = false;
-
+	
+	// bool pannc = false;
 	// Check Parent Resource has attribute at
-	cJSON *pat = cJSON_GetObjectItem(parent_rtnode->obj, "at");
+	// cJSON *pat = cJSON_GetObjectItem(parent_rtnode->obj, "at");
+	// pannc = false;
+	// cJSON *pjson = NULL;
 	int ty = cJSON_GetObjectItem(obj, "ty")->valueint;
-	pannc = false;
-	char *parent_target = NULL;
-	cJSON *pjson = NULL;
 	ResourceAddressingType RAT = checkResourceAddressingType(at);
+	RTNode *parent_rtnode_l = parent_rtnode;
+	char *parent_target = NULL;
+	char *csi = NULL;
+
+	// check trail slash
+	if (at[strlen(at) - 1] == '/')
+	{
+		at[strlen(at) - 1] = '\0';
+	}
+
+	// Check uri or csi
+	if (RAT == ABSOLUTE) {  
+		char *ptr = strchr(at+2, '/');
+		ptr = strchr(ptr+1,'/');
+		if (ptr) {
+			parent_target = strdup(at);
+		} else if (isSPIDLocal(at)) {
+			csi = strchr(at+2, '/');
+		} else {
+			csi = at;
+		}
+	} else if(RAT == SP_RELATIVE) {
+		char *ptr = strchr(at+1, '/');
+		if (ptr) {
+			parent_target = strdup(at);
+		} else {
+			csi = at;
+		}
+	} else {
+		return NULL;
+	}
+
+	// check parent resource has announced
+	cJSON *pjson = NULL;
+	cJSON *pat = cJSON_GetObjectItem(parent_rtnode_l->obj, "at");
 	cJSON_ArrayForEach(pjson, pat)
 	{
 		if (!strncmp(pjson->valuestring, at, strlen(at)) && pjson->valuestring[strlen(at)] == '/')
 		{
-			pannc = true;
 			parent_target = strdup(pjson->valuestring);
 			break;
 		}
 	}
 
-	if (!pannc)
+	if (parent_target == NULL)
 	{ // if parent resource has no attribute at
-		logger("UTIL", LOG_LEVEL_DEBUG, "Announcement for %s not created", parent_rtnode->uri);
-		if (parent_rtnode->parent)
+		// if obj is CIN, TSI, FCIN, then need to announce parent resource first
+		if (ty == RT_CIN || ty == RT_TSI || ty == RT_FCIN)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "Creating remote annc for %s", parent_rtnode->parent->uri);
-			parent_target = create_remote_annc(parent_rtnode->parent, parent_rtnode->obj, at, true);
-			if (!parent_target)
-			{
-				logger("UTIL", LOG_LEVEL_ERROR, "Announcement for %s not created", parent_rtnode->uri);
-				return NULL;
-			}
+			logger("UTIL", LOG_LEVEL_DEBUG, "can't create annc for CIN, TSI, FCIN without parent resource announced");
+			return NULL;
 		}
-		else
+		
+		logger("UTIL", LOG_LEVEL_DEBUG, "Creating cbA");
+		if (create_remote_cba(at, &parent_target) == -1)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "Creating cbA");
-			if (create_remote_cba(at, &parent_target) == -1)
-			{
-				logger("UTIL", LOG_LEVEL_ERROR, "Announcement for %s not created", parent_rtnode->uri);
-				return NULL;
-			}
+			logger("UTIL", LOG_LEVEL_ERROR, "cbA can't create");
+			return NULL;
 		}
+		parent_rtnode_l = rt->cb;
 	}
 
 	if (RAT == SP_RELATIVE)
@@ -1807,7 +1834,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 		cJSON *annc = cJSON_CreateObject();
 		cJSON *pjson = NULL;
 		cJSON_AddItemToObject(root, get_resource_key(ty + 10000), annc);
-		sprintf(buf, "/%s/%s/%s", CSE_BASE_RI, get_uri_rtnode(parent_rtnode), cJSON_GetObjectItem(obj, "rn")->valuestring);
+		sprintf(buf, "/%s/%s/%s", CSE_BASE_RI, parent_rtnode_l->uri, cJSON_GetObjectItem(obj, "rn")->valuestring);
 		cJSON_AddItemToObject(annc, "lnk", cJSON_CreateString(buf));
 
 		//TO-DO  acpi original에서 갖고 오거나 local policy에 따라 추가하는 것 필요)
@@ -1816,7 +1843,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 		cJSON_AddItemToObject(annc, "acpi", acpi);*/
 
 
-		char *et = get_local_time(DEFAULT_EXPIRE_TIME);
+		char *et = cJSON_GetObjectItem(obj, "et")->valuestring;
 
 		switch (ty)
 		{
@@ -1905,17 +1932,6 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isPar
 		cJSON *annc_obj = cJSON_GetObjectItem(result, get_resource_key(ty + 10000));
 		char *annc_ri = cJSON_GetObjectItem(annc_obj, "ri")->valuestring;
 		sprintf(buf, "%s/%s", at, annc_ri);
-		if (isParent)
-		{
-			cJSON *at = cJSON_GetObjectItem(obj, "at");
-			if (!at)
-			{
-				at = cJSON_CreateArray();
-				cJSON_AddItemToObject(obj, "at", at);
-			}
-			cJSON_AddItemToArray(at, cJSON_CreateString(buf));
-			db_update_resource(obj, cJSON_GetObjectItem(obj, "ri")->valuestring, ty);
-		}
 		free_o2pt(o2pt);
 		free(parent_target);
 
@@ -1942,15 +1958,7 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	if (!target_rtnode)
 	{
-		if (rt->registrar_csr)
-		{
-			logger("O2M", LOG_LEVEL_DEBUG, "local csr not found, forwarding to registrar");
-			target_rtnode = rt->registrar_csr;
-		}
-		else
-		{
-			return o2pt->rsc = RSC_NOT_FOUND;
-		}
+		return o2pt->rsc = RSC_NOT_FOUND;
 	}
 
 	if (target_rtnode->ty != RT_CSR)
@@ -1980,18 +1988,17 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		{
 			http_forwarding(o2pt, host, port);
 		}
-
 #ifdef ENABLE_MQTT
 		else if (protocol == PROT_MQTT)
 		{
-			mqtt_forwarding(o2pt, host, port, csr);
+				mqtt_forwarding(o2pt, host, port, csr);
 		}
 #endif
 
 #ifdef ENABLE_COAP
 		else if (protocol == PROT_COAP || protocol == PROT_COAPS)
 		{
-			coap_forwarding(o2pt, protocol, host, port);
+				coap_forwarding(o2pt, protocol, host, port);
 		}
 #endif
 		free(host);

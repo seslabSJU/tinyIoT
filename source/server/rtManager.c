@@ -195,12 +195,23 @@ RTNode *find_csr_rtnode_by_uri(char *uri)
     if (!uri)
         return NULL;
     ResourceAddressingType RAT = checkResourceAddressingType(uri);
-    char *target_uri = strdup(uri); // remove second '/'
+
+    char *target_uri = NULL;
     char *ptr = NULL;
     if (RAT == SP_RELATIVE) {
+        target_uri = strdup(uri);
         ptr = strtok_r(target_uri + 1, "/", &uriPtr);
     } else if (RAT == ABSOLUTE) {
-        ptr = strtok_r(target_uri + 2, "/", &uriPtr);
+        // check if the uri is absolute and starts with the local CSE SP ID
+        if (isSPIDLocal(target_uri)) {
+            ptr = strchr(uri + 2, '/');
+            target_uri = strdup(ptr);
+            ptr = strtok_r(target_uri + 1, "/", &uriPtr);
+        } else {
+            target_uri = strdup(uri);
+            ptr = strchr(target_uri+2, '/');
+            ptr = strtok_r(ptr+1, "/", &uriPtr);
+        }
     } else {
         free(target_uri);
         return NULL;
@@ -213,7 +224,8 @@ RTNode *find_csr_rtnode_by_uri(char *uri)
     while (csrlist)
     {
         // logger("UTIL", LOG_LEVEL_DEBUG, "csrlist->uri : %s", csrlist->uri);
-        if (!strcmp(csrlist->uri + strlen(CSE_BASE_NAME), target_uri))
+        char *csi = cJSON_GetObjectItem(csrlist->rtnode->obj, "csi")->valuestring;
+        if (!strcmp(csi, target_uri))
             break;
 
         cJSON *dcse_list = cJSON_GetObjectItem(csrlist->rtnode->obj, "dcse");

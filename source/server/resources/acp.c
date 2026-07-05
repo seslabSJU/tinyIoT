@@ -65,7 +65,7 @@ int create_acp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     char *at_str = NULL;
     cJSON_ArrayForEach(at, cJSON_GetObjectItem(acp, "at"))
     {
-        at_str = create_remote_annc(parent_rtnode, acp, at->valuestring, false);
+        at_str = create_remote_annc(parent_rtnode, acp, at->valuestring);
         if (!at_str)
         {
             continue;

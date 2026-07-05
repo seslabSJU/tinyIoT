@@ -4388,7 +4388,7 @@ int handle_annc_create(RTNode* parent_rtnode, cJSON* resource_obj, cJSON* at_obj
 	char* at_str = NULL;
 	cJSON_ArrayForEach(at, cJSON_GetObjectItem(resource_obj, "at"))
 	{
-		at_str = create_remote_annc(parent_rtnode, resource_obj, at->valuestring, false);
+		at_str = create_remote_annc(parent_rtnode, resource_obj, at->valuestring);
 		if (!at_str)
 		{
 			continue;
@@ -4463,7 +4463,7 @@ int handle_annc_update(RTNode* target_rtnode, cJSON* at_obj, cJSON* final_at)
 		cJSON* pjson = NULL;
 		cJSON_ArrayForEach(pjson, register_at_list)
 		{
-			at_str = create_remote_annc(target_rtnode->parent, target_rtnode->obj, pjson->valuestring, false);
+			at_str = create_remote_annc(target_rtnode->parent, target_rtnode->obj, pjson->valuestring);
 			if (!at_str)
 			{
 				continue;
