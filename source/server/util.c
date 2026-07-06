@@ -4104,10 +4104,19 @@ int register_remote_cse()
 int create_local_csr()
 {
 	char buf[256] = { 0 };
-
+	char *cse_ri = strchr(REMOTE_CSE_ID, '/');
+	if (cse_ri) cse_ri++;
+	else cse_ri = REMOTE_CSE_ID;
+	
+	snprintf(buf, sizeof(buf), "%s/%s", CSE_BASE_NAME, cse_ri);
+	if (find_rtnode(buf)) {
+		logger("MAIN", LOG_LEVEL_DEBUG, "Local CSR already exists");
+		return 0;
+	};
+	
 	HTTPRequest* req = (HTTPRequest*)malloc(sizeof(HTTPRequest));
 	HTTPResponse* res = (HTTPResponse*)malloc(sizeof(HTTPResponse));
-
+	
 	req->method = "GET";
 	req->uri = strdup("/" REMOTE_CSE_NAME);
 	req->qs = NULL;
@@ -4120,9 +4129,9 @@ int create_local_csr()
 	add_header("Accept", "application/json", req->headers);
 	// add_header("Content-Type", "application/json", req->headers);
 	add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
-
+	
 	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
-
+	
 	if (res->status_code == 404)
 	{
 		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE is not online : %d", res->status_code);
@@ -4133,15 +4142,13 @@ int create_local_csr()
 	
 	cJSON* csr = cJSON_CreateObject();
 	add_general_attribute(csr, rt->cb, RT_CSR);
+	
 	cJSON_DeleteItemFromObject(csr, "ri");
 	cJSON_DeleteItemFromObject(csr, "rn");
-	
-	char *cse_ri = strchr(REMOTE_CSE_ID, '/');
-	if (cse_ri) cse_ri++;
-	else cse_ri = REMOTE_CSE_ID; // is impossible but just in case
-	
-	cJSON_AddItemToObject(csr, "csi", cJSON_CreateString(REMOTE_CSE_ID));
-	cJSON_AddItemToObject(csr, "cb", cJSON_CreateString(REMOTE_CSE_ID "/" REMOTE_CSE_NAME));
+	snprintf(buf, sizeof(buf), "/%s", cse_ri);
+	cJSON_AddItemToObject(csr, "csi", cJSON_CreateString(buf));
+	snprintf(buf, sizeof(buf), "/%s/%s", cse_ri, REMOTE_CSE_NAME);
+	cJSON_AddItemToObject(csr, "cb", cJSON_CreateString(buf));
 	cJSON_AddItemToObject(csr, "rn", cJSON_CreateString(cse_ri));
 	cJSON_AddItemToObject(csr, "ri", cJSON_CreateString(cse_ri));
 	cJSON *poa = cJSON_CreateArray();
