@@ -1843,7 +1843,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		cJSON_AddItemToObject(annc, "acpi", acpi);*/
 
 
-		char *et = cJSON_GetObjectItem(obj, "et")->valuestring;
+		char *et = strdup(cJSON_GetObjectItem(obj, "et")->valuestring);
 
 		switch (ty)
 		{
