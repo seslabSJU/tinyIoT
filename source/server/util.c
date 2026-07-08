@@ -4419,13 +4419,44 @@ int handle_annc_update(RTNode* target_rtnode, cJSON* at_obj, cJSON* final_at)
 	// remove at which was already there
 	cJSON_ArrayForEach(new_at, at_obj)
 	{
+		// Check uri or csi
+		ResourceAddressingType RAT = checkResourceAddressingType(new_at->valuestring);
+		char* csi = NULL;
+		bool is_uri = false;
+		if (RAT == ABSOLUTE) {  
+			char *ptr = strchr(new_at->valuestring+2, '/');
+			ptr = strchr(ptr+1,'/');
+			if (ptr && ptr+1 != NULL) {
+				is_uri = true;
+			} else if (isSPIDLocal(new_at->valuestring)) {
+				csi = strchr(new_at->valuestring+2, '/');
+			} else {
+				csi = new_at->valuestring;
+			}
+		} else if(RAT == SP_RELATIVE) {
+			char *ptr = strchr(new_at->valuestring+1, '/');
+			if (ptr && ptr+1 != NULL) {
+				is_uri = true;
+			} else {
+				csi = new_at->valuestring;
+			}
+		}
+
 		cJSON_ArrayForEach(at, original_at_list)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "new_at: %s, at: %s", new_at->valuestring, at->valuestring);
-			if (checkResourceCseID(at->valuestring, new_at->valuestring))
-			{
-				// if already registered
-				break;
+			logger("UTIL", LOG_LEVEL_DEBUG, "new_at: %s, at: %s", csi, at->valuestring);
+			if (is_uri) {
+				if (strncmp(new_at->valuestring, at->valuestring, strlen(at->valuestring)) == 0)
+				{
+					// if already registered
+					break;
+				}
+			} else {
+				if (checkResourceCseID(at->valuestring, csi))
+				{
+					// if already registered
+					break;
+				}
 			}
 		}
 		if (at == NULL)
@@ -4438,9 +4469,39 @@ int handle_annc_update(RTNode* target_rtnode, cJSON* at_obj, cJSON* final_at)
 	{
 		cJSON_ArrayForEach(new_at, at_obj)
 		{
-			if (checkResourceCseID(at->valuestring, new_at->valuestring))
-			{
-				break;
+			// Check uri or csi
+			ResourceAddressingType RAT = checkResourceAddressingType(new_at->valuestring);
+			char* csi = NULL;
+			bool is_uri = false;
+			if (RAT == ABSOLUTE) {  
+				char *ptr = strchr(new_at->valuestring+2, '/');
+				ptr = strchr(ptr+1,'/');
+				if (ptr && ptr+1 != NULL) {
+					is_uri = true;
+				} else if (isSPIDLocal(new_at->valuestring)) {
+					csi = strchr(new_at->valuestring+2, '/');
+				} else {
+					csi = new_at->valuestring;
+				}
+			} else if(RAT == SP_RELATIVE) {
+				char *ptr = strchr(new_at->valuestring+1, '/');
+				if (ptr && ptr+1 != NULL) {
+					is_uri = true;
+				} else {
+					csi = new_at->valuestring;
+				}
+			}
+
+			if (is_uri) {
+				if (strncmp(new_at->valuestring, at->valuestring, strlen(at->valuestring)) == 0)
+				{
+					break;
+				}
+			} else {
+				if (checkResourceCseID(at->valuestring, csi))
+				{
+					break;
+				}
 			}
 		}
 		if (new_at == NULL)
