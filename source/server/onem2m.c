@@ -1774,17 +1774,19 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		ptr = strchr(ptr+1,'/');
 		if (ptr) {
 			parent_target = strdup(at);
+			csi = strdup(at);
+			strtok_r(csi+2, "/", &ptr);
 		} else if (isSPIDLocal(at)) {
-			csi = strchr(at+2, '/');
+			csi = strdup(strchr(at+2, '/'));
 		} else {
-			csi = at;
+			csi = strdup(at);
 		}
 	} else if(RAT == SP_RELATIVE) {
+		csi = strdup(at);
 		char *ptr = strchr(at+1, '/');
 		if (ptr) {
 			parent_target = strdup(at);
-		} else {
-			csi = at;
+			strtok_r(csi+1, "/", &ptr);
 		}
 	} else {
 		return NULL;
@@ -1795,7 +1797,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 	cJSON *pat = cJSON_GetObjectItem(parent_rtnode_l->obj, "at");
 	cJSON_ArrayForEach(pjson, pat)
 	{
-		if (!strncmp(pjson->valuestring, at, strlen(at)) && pjson->valuestring[strlen(at)] == '/')
+		if (!strncmp(pjson->valuestring, csi, strlen(csi)) && pjson->valuestring[strlen(csi)] == '/')
 		{
 			parent_target = strdup(pjson->valuestring);
 			break;
@@ -1808,17 +1810,21 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		if (ty == RT_CIN || ty == RT_TSI || ty == RT_FCIN)
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "can't create annc for CIN, TSI, FCIN without parent resource announced");
+			free(csi);
 			return NULL;
 		}
 		
 		logger("UTIL", LOG_LEVEL_DEBUG, "Creating cbA");
-		if (create_remote_cba(at, &parent_target) == -1)
+		if (create_remote_cba(csi, &parent_target) == -1)
 		{
 			logger("UTIL", LOG_LEVEL_ERROR, "cbA can't create");
+			free(csi);
 			return NULL;
 		}
 		parent_rtnode_l = rt->cb;
 	}
+
+	free(csi);
 
 	if (RAT == SP_RELATIVE)
 	{
@@ -1841,7 +1847,6 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		/*cJSON *acpi = cJSON_CreateArray();  // 현재는  넣은 상태임
 		cJSON_AddItemToArray(acpi, cJSON_CreateString("/defaultACP"));
 		cJSON_AddItemToObject(annc, "acpi", acpi);*/
-
 
 		char *et = strdup(cJSON_GetObjectItem(obj, "et")->valuestring);
 

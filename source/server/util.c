@@ -1302,6 +1302,16 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 			return 0;
 		}
 	}
+
+	// Annc shortcut
+	if (rtnode->ty > 10000 && rtnode->ty < 20000) {
+		char *lnk = cJSON_GetObjectItem(rtnode->obj, "lnk")->valuestring;
+		if ((acop == ACOP_UPDATE || acop == ACOP_DELETE) && checkResourceCseID(lnk, o2pt->fr)) {
+			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the cse of the owner of the resource");
+			return 0;
+		}
+	}
+
 	// Creator shortcut is only a default-access fallback. It must not grant
 	// CREATE on a parent or bypass explicit ACPs.
 	cJSON *cr = cJSON_GetObjectItem(rtnode->obj, "cr");
@@ -1313,6 +1323,7 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 			return 0;
 		}
 	}
+
 	// Do not let an ancestor AE owner shortcut bypass child CREATE privilege.
 	RTNode *parent = rtnode->parent;
 	while (acop != ACOP_CREATE && parent)
