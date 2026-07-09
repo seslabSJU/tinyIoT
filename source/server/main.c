@@ -344,8 +344,7 @@ int handle_onem2m_request(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 			o2pt->rcn == RCN_MODIFIED_ATTRIBUTES ||
 			o2pt->rcn == RCN_HIERARCHICAL_ADDRESS ||
 			o2pt->rcn == RCN_HIERARCHICAL_ADDRESS_ATTRIBUTES ||
-			o2pt->rcn == RCN_NOTHING ||
-			o2pt->rcn == RCN_DISCOVERY_RESULT_REFERENCES)
+			o2pt->rcn == RCN_NOTHING)
 		{
 			handle_error(o2pt, RSC_BAD_REQUEST, "requested rcn is not supported for retrieve operation");
 			break;

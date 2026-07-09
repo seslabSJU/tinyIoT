@@ -27,9 +27,6 @@ int create_ts(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int update_ts(oneM2MPrimitive *o2pt, RTNode *target_rtnode);
 int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 
-static char *get_uri_from_item(cJSON *item, int drt);
-static cJSON *build_arp_item(RTNode *node, int rcn, int drt);
-
 extern ResourceTree *rt;
 extern pthread_mutex_t main_lock;
 
@@ -915,84 +912,16 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-	logger("TEST", LOG_LEVEL_DEBUG, "Retrieve oneM2M resource [%s]", target_rtnode->uri);
 	int rsc = 0;
-	int rcn = o2pt->rcn;
-	cJSON *descendant_arr = NULL;
-	cJSON *target_obj = NULL;
 	int e = check_privilege(o2pt, target_rtnode, ACOP_RETRIEVE);
 	if (e == -1)
 		return o2pt->rsc;
 
-	// 타겟 리소스 fc 매칭 확인.
-	// if (rcn != RCN_CHILD_RESOURCE_REFERENCES && rcn != RCN_CHILD_RESOURCES) {
-	// 	if (o2pt->fc && !isResourceAptFC(o2pt, target_rtnode, o2pt->fc))
-	// 	{
-	// 		return handle_error(o2pt, RSC_NOT_FOUND, "resource not found");
-	// 	}
-	// }
-	// fc가 없거나 있는데 통과한 경우.
-
-	// target 리소스가 필요 없는 경우를 제하고 빌드.
-	if (!(rcn == RCN_CHILD_RESOURCES) && !(rcn == RCN_CHILD_RESOURCE_REFERENCES)) {
-		target_obj = build_target_resource(o2pt, target_rtnode);
-	}
-
-	char *arp_str = NULL;
-	if (o2pt->fc) {
-		cJSON *arp = cJSON_GetObjectItem(o2pt->fc, "arp");
-		if (arp) arp_str = strdup(arp->valuestring);
-	}
-	// 자손 리소스가 필요한 경우 어떤 방식으로 탐색할지 결정.
-	// 현재 target이 리프노드라거나 하는 경우 반영 안됨.
-	if (rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCES || rcn == RCN_CHILD_RESOURCES)
-	{
-		descendant_arr = db_get_descendants(o2pt, target_rtnode, false);
-	} else if (rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES || rcn == RCN_CHILD_RESOURCE_REFERENCES) {
-		descendant_arr = db_get_descendants(o2pt, target_rtnode, true);
-	}
-
-	if (arp_str) {
-		cJSON *filtered_arr = cJSON_CreateArray();
-		cJSON *item = NULL;
-		cJSON_ArrayForEach(item, descendant_arr) {
-			char *uri = get_uri_from_item(item, o2pt->drt);
-			if (!uri) continue;
-
-			char arp_uri[1024];
-			snprintf(arp_uri, sizeof(arp_uri), "%s/%s", uri, arp_str);
-			logger("O2M", LOG_LEVEL_DEBUG, "Filtering descendant with ARP URI: %s", arp_uri);
-			RTNode *found_rtnode = find_rtnode(arp_uri);
-			if (!found_rtnode) {
-				continue;
-			}
-
-			cJSON *result_item = build_arp_item(found_rtnode, o2pt->rcn, o2pt->drt);
-			if (result_item) cJSON_AddItemToArray(filtered_arr, result_item);
-		}
-		cJSON_Delete(descendant_arr);
-		descendant_arr = filtered_arr;
-		free(arp_str);
-	}
-
-	make_response_body_retrieve(o2pt, target_rtnode, target_obj, descendant_arr);
+	make_response_body(o2pt, target_rtnode);
 
 	o2pt->rsc = RSC_OK;
 	return RSC_OK;
 }
-
-// int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
-// {
-// 	int rsc = 0;
-// 	int e = check_privilege(o2pt, target_rtnode, ACOP_RETRIEVE);
-// 	if (e == -1)
-// 		return o2pt->rsc;
-
-// 	make_response_body(o2pt, target_rtnode);
-
-// 	o2pt->rsc = RSC_OK;
-// 	return RSC_OK;
-// }
 
 int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
@@ -1319,200 +1248,90 @@ int fopt_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 /**
  * Discover Resources based on Filter Criteria
  */
+int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
+{
+	char *orig_to = NULL;
+	logger("MAIN", LOG_LEVEL_DEBUG, "Discover Resource %s", o2pt->to);
+	cJSON *fc = o2pt->fc;
+	cJSON *pjson = NULL, *pjson2 = NULL;
+	cJSON *acpi_obj = NULL;
+	cJSON *root = cJSON_CreateObject();
+	cJSON *uril = NULL, *list = NULL;
+	cJSON *json = NULL;
 
-/* descendant_arr 아이템에서 URI를 추출한다. drt=2(unstructured)이면 ri_to_uri 변환. */
-static char *get_uri_from_item(cJSON *item, int drt) {
-	char *identifier = NULL;
-
-	if (cJSON_IsString(item)) {
-		identifier = item->valuestring;
-	} else {
-		/* {nm,typ,val} 형태 */
-		cJSON *obj = cJSON_GetObjectItem(item, "obj");
-		if (obj) {
-			cJSON *uri = cJSON_GetObjectItem(obj, "uri");
-			return uri->valuestring;
-		} else {
-			identifier = cJSON_GetObjectItem(item, "val")->valuestring;
-		}
-	}
-
-	if (drt == DRT_STRUCTURED) {
-		return identifier;
-	} else {
-		return ri_to_uri(identifier);
-	}
-}
-
-/* ARP로 찾은 RTNode를 원본 descendant_arr과 동일한 포맷의 cJSON 아이템으로 빌드한다. */
-static cJSON *build_arp_item(RTNode *node, int rcn, int drt) {
-	const char *ri  = get_ri_rtnode(node);
-	const char *uri = node->uri;
-	const char *id_val = (drt == DRT_STRUCTURED) ? uri : ri;
-
-	switch (rcn) {
-	case RCN_DISCOVERY_RESULT_REFERENCES:
-		return cJSON_CreateString(id_val);
-
-	case RCN_CHILD_RESOURCE_REFERENCES:
-	case RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES: {
-		cJSON *obj = cJSON_CreateObject();
-		cJSON_AddStringToObject(obj, "nm",  node->rn);
-		cJSON_AddNumberToObject(obj, "typ", node->ty);
-		cJSON_AddStringToObject(obj, "val", id_val);
-		return obj;
-	}
-
-	case RCN_CHILD_RESOURCES:
-	case RCN_ATTRIBUTES_AND_CHILD_RESOURCES: {
-		/* {ri, pi, ty, obj} 포맷 */
-		cJSON *wrapper = cJSON_CreateObject();
-		cJSON_AddStringToObject(wrapper, "ri", ri ? ri : "");
-		cJSON *pi = cJSON_GetObjectItem(node->obj, "pi");
-		cJSON_AddStringToObject(wrapper, "pi", pi ? pi->valuestring : "");
-		cJSON_AddNumberToObject(wrapper, "ty", node->ty);
-		cJSON_AddItemToObject(wrapper, "obj", cJSON_Duplicate(node->obj, true));
-		return wrapper;
-	}
-
-	default:
-		return NULL;
-	}
-}
-
-int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
-	// discovery 할 필요가 없는 경우 먼저 걸러줌.
-	
-	if (check_privilege(o2pt, target_rtnode, ACOP_DISCOVERY) == -1 || target_rtnode->ty == RT_CIN)
+	int lSize = 0;
+	if (check_privilege(o2pt, target_rtnode, ACOP_DISCOVERY) == -1)
 	{
-		make_response_body_retrieve(o2pt, target_rtnode, NULL, NULL);
+		uril = cJSON_CreateArray();
+		cJSON_AddItemToObject(root, "m2m:uril", uril);
+		o2pt->response_pc = root;
 		return RSC_OK;
 	}
-	
+
 	if (!o2pt->fc)
 	{
 		logger("O2M", LOG_LEVEL_WARN, "Empty Filter Criteria");
 		return RSC_BAD_REQUEST;
 	}
-	cJSON *arp = cJSON_GetObjectItem(o2pt->fc, "arp");
-	
-	char *arp_str = NULL;
-	if (arp) {
-		arp_str = strdup(arp->valuestring);
+	orig_to = o2pt->to;
+	o2pt->to = strdup(target_rtnode->uri);
+
+	list = db_get_filter_criteria(o2pt);
+	if (!list)
+	{
+		free(o2pt->to);
+		o2pt->to = orig_to;
+		cJSON_Delete(root);
+		return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB discovery fail");
 	}
-	
-	cJSON *descendant_arr = db_get_descendants(o2pt, target_rtnode, true);
+	list = filter_discovery_candidates(o2pt, list);
+	lSize = cJSON_GetArraySize(list);
+	cJSON *lim_obj = cJSON_GetObjectItem(fc, "lim");
+	cJSON *ofst_obj = cJSON_GetObjectItem(fc, "ofst");
+	int lim = INT_MAX;
+	int ofst = 0;
+	if (lim_obj)
+	{
+		lim = cJSON_GetNumberValue(lim_obj);
+	}
+	else
+	{
+		lim = DEFAULT_DISCOVERY_LIMIT;
+	}
+	if (ofst_obj)
+	{
+		ofst = cJSON_GetNumberValue(ofst_obj);
+	}
 
-	if (arp_str) {
-		cJSON *filtered_arr = cJSON_CreateArray();
-		cJSON *item = NULL;
-		cJSON_ArrayForEach(item, descendant_arr) {
-			char *uri = get_uri_from_item(item, o2pt->drt);
-			if (!uri) continue;
+	if (lSize > lim)
+	{
+		logger("O2M", LOG_LEVEL_DEBUG, "limit exceeded");
+		cJSON_DeleteItemFromArray(list, lSize - 1);
+		o2pt->cnst = CS_PARTIAL_CONTENT;
+		o2pt->cnot = ofst + lim;
+	}
 
-			char arp_uri[1024];
-			snprintf(arp_uri, sizeof(arp_uri), "%s/%s", uri, arp_str);
-			RTNode *found_rtnode = find_rtnode(arp_uri);
-			if (!found_rtnode || check_privilege(o2pt, found_rtnode, ACOP_DISCOVERY) == -1) {
-				continue;
-			}
-
-			cJSON *result_item = build_arp_item(found_rtnode, o2pt->rcn, o2pt->drt);
-			if (result_item) cJSON_AddItemToArray(filtered_arr, result_item);
+	if (o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES)
+	{
+		cJSON *rrl = cJSON_AddObjectToObject(root, "m2m:rrl");
+		cJSON_AddItemToObject(rrl, "rrf", list);
+	}
+	else
+	{
+		cJSON *uril = cJSON_CreateArray();
+		cJSON_ArrayForEach(pjson, list)
+		{
+			cJSON_AddItemToArray(uril, cJSON_GetObjectItem(pjson, "val"));
 		}
-		cJSON_Delete(descendant_arr);
-		descendant_arr = filtered_arr;
+		cJSON_AddItemToObject(root, "m2m:uril", uril);
 	}
 
-	free(arp_str);
-	make_response_body_retrieve(o2pt, target_rtnode, NULL, descendant_arr);
+	o2pt->response_pc = root;
+	free(o2pt->to);
+	o2pt->to = orig_to;
 
 	return o2pt->rsc = RSC_OK;
 }
-// int discover_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
-// {
-// 	char *orig_to = NULL;
-// 	logger("MAIN", LOG_LEVEL_DEBUG, "Discover Resource %s", o2pt->to);
-// 	cJSON *fc = o2pt->fc;
-// 	cJSON *pjson = NULL, *pjson2 = NULL;
-// 	cJSON *acpi_obj = NULL;
-// 	cJSON *root = cJSON_CreateObject();
-// 	cJSON *uril = NULL, *list = NULL;
-// 	cJSON *json = NULL;
-
-// 	int lSize = 0;
-// 	if (check_privilege(o2pt, target_rtnode, ACOP_DISCOVERY) == -1)
-// 	{
-// 		uril = cJSON_CreateArray();
-// 		cJSON_AddItemToObject(root, "m2m:uril", uril);
-// 		o2pt->response_pc = root;
-// 		return RSC_OK;
-// 	}
-
-// 	if (!o2pt->fc)
-// 	{
-// 		logger("O2M", LOG_LEVEL_WARN, "Empty Filter Criteria");
-// 		return RSC_BAD_REQUEST;
-// 	}
-// 	orig_to = o2pt->to;
-// 	o2pt->to = strdup(target_rtnode->uri);
-
-	// list = db_get_filter_criteria(o2pt);
-	// if (!list)
-	// {
-	// 	free(o2pt->to);
-	// 	o2pt->to = orig_to;
-	// 	cJSON_Delete(root);
-	// 	return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB discovery fail");
-	// }
-	// list = filter_discovery_candidates(o2pt, list);
-	// lSize = cJSON_GetArraySize(list);
-	// cJSON *lim_obj = cJSON_GetObjectItem(fc, "lim");
-	// cJSON *ofst_obj = cJSON_GetObjectItem(fc, "ofst");
-	// int lim = INT_MAX;
-	// int ofst = 0;
-	// if (lim_obj)
-	// {
-	// 	lim = cJSON_GetNumberValue(lim_obj);
-	// }
-	// else
-	// {
-	// 	lim = DEFAULT_DISCOVERY_LIMIT;
-	// }
-	// if (ofst_obj)
-	// {
-	// 	ofst = cJSON_GetNumberValue(ofst_obj);
-	// }
-
-// 	if (lSize > lim)
-// 	{
-// 		logger("O2M", LOG_LEVEL_DEBUG, "limit exceeded");
-// 		cJSON_DeleteItemFromArray(list, lSize - 1);
-// 		o2pt->cnst = CS_PARTIAL_CONTENT;
-// 		o2pt->cnot = ofst + lim;
-// 	}
-
-// 	if (o2pt->rcn == RCN_CHILD_RESOURCE_REFERENCES)
-// 	{
-// 		cJSON *rrl = cJSON_AddObjectToObject(root, "m2m:rrl");
-// 		cJSON_AddItemToObject(rrl, "rrf", list);
-// 	}
-// 	else
-// 	{
-// 		cJSON *uril = cJSON_CreateArray();
-// 		cJSON_ArrayForEach(pjson, list)
-// 		{
-// 			cJSON_AddItemToArray(uril, cJSON_GetObjectItem(pjson, "val"));
-// 		}
-// 		cJSON_AddItemToObject(root, "m2m:uril", uril);
-// 	}
-
-// 	o2pt->response_pc = root;
-// 	free(o2pt->to);
-// 	o2pt->to = orig_to;
-
-// 	return o2pt->rsc = RSC_OK;
-// }
 
 int notify_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
