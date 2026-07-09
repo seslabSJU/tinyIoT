@@ -79,6 +79,8 @@ char* get_lbl_rtnode(RTNode* rtnode);
 char* get_uri_rtnode(RTNode* rtnode);
 char* ri_to_uri(char* ri);
 cJSON* getResource(cJSON* root, ResourceType ty);
+cJSON* get_descendants_by_tree(oneM2MPrimitive* o2pt, RTNode* rtnode);
+cJSON* build_target_resource(oneM2MPrimitive* o2pt, RTNode* target_rtnode);
 
 // Notification
 int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode);
@@ -88,6 +90,7 @@ int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net);
 
 // rcn
 int make_response_body(oneM2MPrimitive* o2pt, RTNode* target_rtnode);
+int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJSON* target_obj, cJSON* descendant_arr);
 void build_rcn4(oneM2MPrimitive* o2pt, RTNode* rtnode, cJSON* result_obj, int ofst, int lim, int level);
 void build_rcn5(oneM2MPrimitive* o2pt, RTNode* rtnode, cJSON* result_obj, int ofst, int lim, int level);
 void build_rcn6(oneM2MPrimitive* o2pt, RTNode* rtnode, cJSON* result_obj, int ofst, int lim, int level);
