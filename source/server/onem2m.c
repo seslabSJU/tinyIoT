@@ -1505,7 +1505,8 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 					logger("O2M", LOG_LEVEL_DEBUG, "notify to nu \n%s", cJSON_Print(noti_cjson));
 					logger("O2M", LOG_LEVEL_DEBUG, "o2pt->response_pc: %p", o2pt->response_pc);
 					notify_to_nu(node->rtnode, noti_cjson, net);
-					cJSON_SetNumberValue(exc, exc->valueint - 1);
+					if (exc)
+						cJSON_SetNumberValue(exc, exc->valueint - 1);
 					break;
 				}
 			}
@@ -1548,10 +1549,12 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	if (net == NET_DELETE_OF_RESOURCE)
 	{
 		logger("O2M", LOG_LEVEL_DEBUG, "notify delete sub");
-		cJSON_AddItemToObject(nev, "sur", cJSON_CreateString(target_rtnode->uri));			
+		// TS-0004 6.3.5.13: subscriptionReference belongs to m2m:sgn, not notificationEvent
+		cJSON_AddItemToObject(sgn, "sur", cJSON_CreateString(target_rtnode->uri));
 		cJSON_AddItemToObject(sgn, "sud", cJSON_CreateBool(true));
 		notify_to_nu(target_rtnode, noti_cjson, net);
 		cJSON_DeleteItemFromObject(sgn, "sud");
+		cJSON_DeleteItemFromObject(sgn, "sur");
 	}
 	cJSON_Delete(noti_cjson);
 

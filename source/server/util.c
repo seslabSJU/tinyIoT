@@ -3181,7 +3181,10 @@ int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson)
 		logger("UTIL", LOG_LEVEL_DEBUG, "CSE_RELATIVE");
 		rtnode = find_rtnode(noti_uri);
 		if (!rtnode)
+		{
+			free_o2pt(o2pt);
 			return RSC_NOT_FOUND;
+		}
 		rsc = requestToResource(o2pt, rtnode);
 		logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource result value: %d", rsc);
 	}
@@ -3310,13 +3313,15 @@ int notify_to_nu(RTNode* sub_rtnode, cJSON* noti_cjson, int net)
 			cJSON_DeleteItemFromObject(o2pt->request_pc, "vrq");
 			rtnode = find_rtnode(noti_uri);
 			if (!rtnode) {
-				logger("UTIL", LOG_LEVEL_ERROR, "CSE_RELATIVE: find_rtnode(%s) failed", nu);
-				return RSC_NOT_FOUND;
+				logger("UTIL", LOG_LEVEL_ERROR, "CSE_RELATIVE: find_rtnode(%s) failed", noti_uri);
+				free(noti_uri);
+				continue;
 			}
 			rsc = requestToResource(o2pt, rtnode);
 			if (rsc != RSC_OK) {
 				logger("UTIL", LOG_LEVEL_ERROR, "CSE_RELATIVE: requestToResource failed (%d)", rsc);
-				return rsc;
+				free(noti_uri);
+				continue;
 			}
 		}
 		else if (rat == SP_RELATIVE)
@@ -4501,7 +4506,7 @@ ResourceAddressingType checkResourceAddressingType(char* uri)
 		return SP_RELATIVE;
 	}
 	//ws is temporary added
-	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strcmp(uri, "coap://") == 0 || strcmp(uri, "coaps://") == 0|| strncmp(uri, "wss://", 6) == 0|| strncmp(uri, "ws://", 5) == 0)
+	else if (strncmp(uri, "http://", 7) == 0 || strncmp(uri, "mqtt://", 7) == 0 || strncmp(uri, "coap://", 7) == 0 || strncmp(uri, "coaps://", 8) == 0|| strncmp(uri, "wss://", 6) == 0|| strncmp(uri, "ws://", 5) == 0)
 	{
 		return PROTOCOL_BINDING;
 	}
