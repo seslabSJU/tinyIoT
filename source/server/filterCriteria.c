@@ -10,190 +10,75 @@
 #include "jsonparser.h"
 #include "logger.h"
 
-typedef enum {
-    FC_TYPE_TIMESTAMP,
-    FC_TYPE_NON_NEG_INT,
-    FC_TYPE_POS_INT,
-    FC_TYPE_ENUM,
-    FC_TYPE_STRING,
-    FC_TYPE_INT_ARRAY,
-    FC_TYPE_STRING_ARRAY,
-    FC_TYPE_BOOLEAN
-} FcValueType;
-
-typedef struct {
-    const char   *short_name;
-    FcValueType   type;
-} FcTagDef;
-
-static const FcTagDef FC_TAG_TABLE[] = {
-    {"fu", FC_TYPE_ENUM}, // filterUsage
-    { "crb",  FC_TYPE_TIMESTAMP},  // createdBefore
-    { "cra",  FC_TYPE_TIMESTAMP},  // createdAfter
-    { "ms",   FC_TYPE_TIMESTAMP},  // modifiedSince
-    { "us",   FC_TYPE_TIMESTAMP},  // unmodifiedSince
-    { "exb",  FC_TYPE_TIMESTAMP},  // expireBefore
-    { "exa",  FC_TYPE_TIMESTAMP},  // expireAfter
-    { "sts",  FC_TYPE_POS_INT},  // stateTagSmaller
-    { "stb",  FC_TYPE_NON_NEG_INT},  // stateTagBigger
-    { "sza",  FC_TYPE_NON_NEG_INT},  // sizeAbove
-    { "szb",  FC_TYPE_POS_INT},  // sizeBelow
-    { "lbl",  FC_TYPE_STRING_ARRAY},  // labels
-    { "clbl",  FC_TYPE_STRING_ARRAY},  // childLabels
-    { "palb",  FC_TYPE_STRING_ARRAY},  // parentLabels
-    { "lbq",  FC_TYPE_STRING},  // labelsQuery
-    { "ty",   FC_TYPE_INT_ARRAY},  // resourceType
-    { "chty",  FC_TYPE_INT_ARRAY},  // childResourceType
-    { "pty",  FC_TYPE_INT_ARRAY},  // parentResourceType
-    { "cty",  FC_TYPE_STRING},  // contentType
-    { "ops", FC_TYPE_ENUM },  // operations bitmask (0~63)
-    { "fo",   FC_TYPE_ENUM},  // filterOperation
-    { "cfs",  FC_TYPE_ENUM},  // contentFilterSyntax
-    { "lim",  FC_TYPE_NON_NEG_INT},  // limit
-    { "lvl",  FC_TYPE_POS_INT},  // level
-    { "ofst", FC_TYPE_POS_INT},  // offset
-    { "cfq",  FC_TYPE_STRING},  // contentFilterQuery
-    { "arp", FC_TYPE_STRING},  // applyRelativePath
-
-    /* 추후 확인 필요 */
-    { "gq",   FC_TYPE_STRING},  // geoQuery (복합타입, 일단 STRING)
-    { "smf",  FC_TYPE_STRING},  // semanticsFilter (SPARQL)
-
-    /*atr, catr, patr 추가 필요*/
-        /* 공통 */
-    { "rn",   FC_TYPE_STRING},  // resourceName
-    { "ri",   FC_TYPE_STRING},  // resourceID
-    { "pi",   FC_TYPE_STRING},  // parentID
-    { "cr",   FC_TYPE_STRING},  // creator
-    { "or",   FC_TYPE_STRING},  // ontologyRef
-
-    /* AE */
-    { "apn",  FC_TYPE_STRING},  // appName
-    { "api",  FC_TYPE_STRING},  // App-ID
-    { "aei",  FC_TYPE_STRING},  // AE-ID
-    { "rr",   FC_TYPE_BOOLEAN},  // requestReachability
-    { "nl",   FC_TYPE_STRING},  // nodeLink
-    { "poa",  FC_TYPE_STRING},  // pointOfAccess
-
-    /* container */
-    { "mni",  FC_TYPE_NON_NEG_INT},  // maxNrOfInstances
-    { "mbs",  FC_TYPE_NON_NEG_INT},  // maxByteSize
-    { "mia",  FC_TYPE_NON_NEG_INT},  // maxInstanceAge
-    { "cni",  FC_TYPE_NON_NEG_INT},  // currentNrOfInstances
-    { "cbs",  FC_TYPE_NON_NEG_INT},  // currentByteSize
-    { "disr", FC_TYPE_BOOLEAN},  // disableRetrieval
-
-    /* contentInstance */
-    { "con",  FC_TYPE_STRING},  // content
-    { "dlc",  FC_TYPE_POS_INT},  // deletionCnt
-
-    /* flexContainer */
-    { "cnd",  FC_TYPE_STRING},  // containerDefinition
-};
-#define FC_TAG_COUNT (sizeof(FC_TAG_TABLE) / sizeof(FcTagDef))
-
 bool isFCAttrValid(cJSON *fc){
-    cJSON *item;
-    cJSON_ArrayForEach(item, fc) {
-        char *key = item->string;
-        // 나중에 포함 되도록 테이블 변경 필요        
-        if (!strcmp(key, "fo")) {
-            if (!cJSON_IsNumber(item)) {
-                return false;
-            }
-            int fo_value = cJSON_GetNumberValue(item);
-            if (fo_value < 0 || fo_value > 3) {
-                return false;
-            }
-            continue;
-        }
-            
-        else if (!strcmp(key, "ty") || !strcmp(key, "chty") || !strcmp(key, "pty")) {
-            static const int VALID_TYPES[] = {
-                RT_MIXED, RT_ACP, RT_AE, RT_CNT, RT_CIN, RT_CSE, 
-                RT_GRP, RT_MGMTOBJ, RT_NOD, RT_PCH, RT_CSR, RT_REQ, 
-                RT_SUB, RT_SMD, RT_FCNT, RT_TS, RT_TSI, RT_CRS, 
-                RT_FCIN, RT_FCNT_LA, RT_FCNT_OL, RT_TSB, RT_ACTR, 
-                RT_ACPA, RT_AEA, RT_CNTA, RT_CINA, RT_CBA, RT_GRPA, RT_FCNTA
-            };
-            static const int TOTAL_TYPES = sizeof(VALID_TYPES) / sizeof(int);
-            int val = 0;
-            int is_in = 0;
-            cJSON *array_item;
-            cJSON_ArrayForEach(array_item, item) {
-                if (!cJSON_IsNumber(array_item)) {
-                    return false;
-                }
-                val = cJSON_GetNumberValue(array_item);
-                for (int i = 0; i < TOTAL_TYPES; i++) {
-                if (VALID_TYPES[i] == val) {
-                    is_in = 1;
-                    break;
-                }
-                }
-                if (!is_in) {
+    cJSON *pjson = NULL, *ptr = NULL;
+    if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "sts")) < 0) return false;
+    if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "stb")) < 0) return false;
+    
+    if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "sza")) < 0) return false;
+    if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "szb")) < 0) return false;
+
+    if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "lim")) < 0) return false;
+
+    if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "lvl")) < 0) return false;
+    if(cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "ofst")) < 0) return false;
+
+    if( (pjson = cJSON_GetObjectItem(fc, "ty")) ){
+        if(cJSON_IsArray(pjson)){
+            cJSON_ArrayForEach(ptr, pjson){
+                if(cJSON_GetNumberValue(ptr) < 0){
                     return false;
                 }
             }
-            continue;
         }
-
-
-
-
-        for (int i = 0; i < FC_TAG_COUNT; i++) {
-            if (strcmp(key, FC_TAG_TABLE[i].short_name) != 0) {
-                continue;
-            }
-            switch (FC_TAG_TABLE[i].type) {
-                case FC_TYPE_TIMESTAMP:
-                    int read_char = 0;
-                    int year, month, day, hour, minute, second;
-                    if (sscanf(cJSON_GetStringValue(item), "%4d%2d%2dT%2d%2d%2d%n", &year, &month, &day, &hour, &minute, &second, &read_char) != 6) {
-                        return false;
-                    }
-                    if(read_char != 15) {
-                        return false;
-                    }
-
-                    char *ptr = cJSON_GetStringValue(item) + read_char;
-                    read_char = 0;
-                    if (*ptr == ',' || *ptr == '.') {
-                        ptr++;
-                    }
-                    while(isdigit(*ptr)) {
-                        ptr++;
-                        read_char++;
-                    }
-                    if (read_char > 6) {
-                        return false;
-                    }
-                    break;
-                case FC_TYPE_NON_NEG_INT:
-                    if (cJSON_GetNumberValue(item) <= 0) {
-                        return false;
-                    }
-                    break;
-                case FC_TYPE_POS_INT:
-                    if (cJSON_GetNumberValue(item) < 0) {
-                        return false;
-                    }
-                    break;
-                case FC_TYPE_ENUM:
-                case FC_TYPE_BOOLEAN:
-                case FC_TYPE_STRING:
-                case FC_TYPE_INT_ARRAY:
-                case FC_TYPE_STRING_ARRAY:
+        else if(cJSON_IsNumber(pjson)){
+            if(cJSON_GetNumberValue(pjson) < 0){
+                return false;
             }
         }
     }
-    return true;
 
+    if( (pjson = cJSON_GetObjectItem(fc, "chty")) ){
+        if(cJSON_IsArray(pjson)){
+            cJSON_ArrayForEach(ptr, pjson){
+                if(cJSON_GetNumberValue(ptr) < 0){
+                    return false;
+                }
+            }
+        }
+        else if(cJSON_IsNumber(pjson)){
+            if(cJSON_GetNumberValue(pjson) < 0){
+                return false;
+            }
+        }
+    }
+
+    if( (pjson = cJSON_GetObjectItem(fc, "pty")) ){
+        if(cJSON_IsArray(pjson)){
+            cJSON_ArrayForEach(ptr, pjson){
+                if(cJSON_GetNumberValue(ptr) < 0){
+                    return false;
+                }
+            }
+        }
+        else if(cJSON_IsNumber(pjson)){
+            if(cJSON_GetNumberValue(pjson) < 0){
+                return false;
+            }
+        }
+    }
+    
+    return true;
 }
 
 bool isValidFcAttr(char* attr){
-    for(int i = 0 ; i < FC_TAG_COUNT ; i++){
-        if(!strcmp(attr, FC_TAG_TABLE[i].short_name)) return true;
+    char *fcAttr[34] = {
+    "crb", "cra", "ms", "us", "sts", "stb", "exb", "exa", "lbl","clbl", "palb", "lbq", "ty", "chty", "pty", "sza", "szb", "cty", 
+    "atr", "catr", "patr", "fu", "lim", "smf", "fo", "cfs", "cfq", "lvl", "ofst", "arp", "gq", "ops", "la",
+    "drt"};
+
+    for(int i = 0 ; i < 34 ; i++){
+        if(!strcmp(attr, fcAttr[i])) return true;
     }
     return false;
 }
@@ -204,6 +89,11 @@ int validate_filter_criteria(oneM2MPrimitive *o2pt){
     char buf[256] = {0};
     if(!fc) return 0;
     pjson = fc->child;
+
+    //check FilterUsage == Discovery
+    // if ( cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fu")) != FU_DISCOVERY ){
+    //     return handle_error(o2pt, RSC_NOT_IMPLEMENTED, "Only filter usage DISCOVERY supported");
+    // }
 
     while(pjson != NULL){
         if(!isValidFcAttr(pjson->string)){
@@ -236,95 +126,63 @@ void parse_filter_criteria(cJSON *fc){
     }
 }
 
-bool parse_qs(cJSON *qs){
-    cJSON *pjson = NULL;
-    cJSON *ptr = NULL;
-    for (int i = 0; i < FC_TAG_COUNT; i++) {
-        if (!(pjson = cJSON_GetObjectItem(qs, FC_TAG_TABLE[i].short_name))) {
-            if (strcmp(FC_TAG_TABLE[i].short_name, "fo") == 0) {
-                cJSON_AddNumberToObject(qs, "fo", 1);
+void parse_qs(cJSON *qs){
+    char int_Attrs[15][5] = {"sts", "stb", "sza", "szb", "lim", "fo", "fu", "lvl", "ofst", "ops", "la", "pty", "chty",
+                            "drt", "rcn"};
+    cJSON *pjson = NULL, *ptr = NULL;
+    for(int i = 0 ; i < 15; i++){
+        if(pjson = cJSON_GetObjectItem(qs, int_Attrs[i])){
+            if(cJSON_IsString(pjson)){
+                cJSON_ReplaceItemInObject(qs, int_Attrs[i], cJSON_CreateNumber(atoi(cJSON_GetStringValue(pjson))));
             }
-            continue;
-        };
-        switch (FC_TAG_TABLE[i].type) {
-        case FC_TYPE_NON_NEG_INT:
-        case FC_TYPE_POS_INT:
-        case FC_TYPE_ENUM:
-            if (cJSON_IsString(pjson)) {
-                errno = 0; 
-                char *endptr = NULL;
-                long parsed_long = strtol(pjson->valuestring, &endptr, 10);
+        }
+    }
 
-                if (errno == ERANGE || parsed_long > INT_MAX || parsed_long < INT_MIN) return false; 
-                if (endptr == pjson->valuestring || *endptr != '\0') return false;
-                cJSON_ReplaceItemInObject(qs, FC_TAG_TABLE[i].short_name, cJSON_CreateNumber((int)parsed_long));
-            }
-            break;
-        case FC_TYPE_TIMESTAMP:
-        case FC_TYPE_STRING:
-            break;
-        case FC_TYPE_INT_ARRAY:
-            long parsed_long;
-            char *endptr;
-            errno = 0;
-            if (cJSON_IsArray(pjson)) {
-                cJSON_ArrayForEach(ptr, pjson) {
-                    if(cJSON_IsString(ptr)) {
-                        parsed_long = strtol(ptr->valuestring, &endptr, 10);
-                        if (errno == ERANGE || parsed_long > INT_MAX || parsed_long < INT_MIN) return false; 
-                        if (endptr == ptr->valuestring || *endptr != '\0') return false;
-
-                        if (ptr->valuestring != NULL) {
-                            free(ptr->valuestring);
-                            ptr->valuestring = NULL;
-                        }
-                        ptr->type = cJSON_Number;
-
-                        cJSON_SetIntValue(ptr, (int)parsed_long);
-                    }
+    if(pjson = cJSON_GetObjectItem(qs, "ty")){
+        if(cJSON_IsArray(pjson)){
+            cJSON_ArrayForEach(ptr, pjson){
+                if(cJSON_IsString(ptr)){
+                    cJSON_SetIntValue(ptr, atoi(ptr->valuestring));
+                    
+                    // ptr->valueint = atoi(ptr->valuestring);
+                    // ptr->type = cJSON_;
+                    // free(ptr->valuestring);
+                    // ptr->valuestring = NULL;
                 }
             }
-            else if(cJSON_IsString(pjson)){
-                ptr = cJSON_CreateArray();
-                parsed_long = strtol(pjson->valuestring, &endptr, 10);
-                if (errno == ERANGE || parsed_long > INT_MAX || parsed_long < INT_MIN) return false; 
-                if (endptr == pjson->valuestring || *endptr != '\0') return false;
-                cJSON_ReplaceItemInObject(qs, FC_TAG_TABLE[i].short_name, cJSON_CreateNumber((int)parsed_long));
-            }
-            break;
-        case FC_TYPE_STRING_ARRAY:
-            if(cJSON_IsString(pjson)){
-                ptr = cJSON_CreateArray();
-                cJSON_AddItemToArray(ptr, cJSON_CreateString(pjson->valuestring));
-                cJSON_ReplaceItemInObject(qs, FC_TAG_TABLE[i].short_name, ptr); 
-            }
+        }
+        else if(cJSON_IsString(pjson)){
+            ptr = cJSON_CreateArray();
+            cJSON_AddItemToArray(ptr, cJSON_CreateNumber(atoi(pjson->valuestring)));
+            cJSON_ReplaceItemInObject(qs, "ty", ptr);
         }
     }
 
-    if (pjson = cJSON_GetObjectItem(qs, "rcn")) {
-        if (cJSON_IsString(pjson)) {
-            errno = 0; 
-            char *endptr = NULL;
-            long parsed_long = strtol(pjson->valuestring, &endptr, 10);
-
-            if (errno == ERANGE || parsed_long > INT_MAX || parsed_long < INT_MIN) return false; 
-            if (endptr == pjson->valuestring || *endptr != '\0') return false;
-            cJSON_ReplaceItemInObject(qs, "rcn", cJSON_CreateNumber((int)parsed_long));
+    if( (pjson = cJSON_GetObjectItem(qs, "lbl")) ){
+        if(cJSON_IsString(pjson)){
+            ptr = cJSON_CreateArray();
+            cJSON_AddItemToArray(ptr, cJSON_CreateString(pjson->valuestring));
+            cJSON_ReplaceItemInObject(qs, "lbl", ptr); 
         }
     }
-    if (pjson = cJSON_GetObjectItem(qs, "drt")) {
-        if (cJSON_IsString(pjson)) {
-            errno = 0; 
-            char *endptr = NULL;
-            long parsed_long = strtol(pjson->valuestring, &endptr, 10);
-
-            if (errno == ERANGE || parsed_long > INT_MAX || parsed_long < INT_MIN) return false; 
-            if (endptr == pjson->valuestring || *endptr != '\0') return false;
-            cJSON_ReplaceItemInObject(qs, "drt", cJSON_CreateNumber((int)parsed_long));
+    if( (pjson = cJSON_GetObjectItem(qs, "clbl")) ){
+        if(cJSON_IsString(pjson)){
+            ptr = cJSON_CreateArray();
+            cJSON_AddItemToArray(ptr, cJSON_CreateString(pjson->valuestring));
+            cJSON_ReplaceItemInObject(qs, "clbl", ptr); 
+        }
+    }
+    if( (pjson = cJSON_GetObjectItem(qs, "palb")) ){
+        if(cJSON_IsString(pjson)){
+            ptr = cJSON_CreateArray();
+            cJSON_AddItemToArray(ptr, cJSON_CreateString(pjson->valuestring));
+            cJSON_ReplaceItemInObject(qs, "palb", ptr); 
         }
     }
 
-    return true;
+    if(!cJSON_GetObjectItem(qs, "fo")){
+        cJSON_AddNumberToObject(qs, "fo", 1);
+    }
 }
 
 char *fc_to_qs(cJSON *fc){
