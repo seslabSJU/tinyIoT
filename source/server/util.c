@@ -4451,13 +4451,16 @@ int handle_annc_update(RTNode* target_rtnode, cJSON* at_obj, cJSON* final_at)
 			} else {
 				csi = new_at->valuestring;
 			}
+		} else {
+			continue;
 		}
 
 		cJSON_ArrayForEach(at, original_at_list)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "new_at: %s, at: %s", csi, at->valuestring);
 			if (is_uri) {
-				if (strncmp(new_at->valuestring, at->valuestring, strlen(at->valuestring)) == 0)
+				size_t length = strlen(new_at->valuestring);
+				length = length > strlen(at->valuestring) ? length: strlen(at->valuestring);
+				if (strncmp(new_at->valuestring, at->valuestring, length) == 0)
 				{
 					// if already registered
 					break;

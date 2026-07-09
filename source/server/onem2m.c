@@ -1792,15 +1792,17 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		return NULL;
 	}
 
-	// check parent resource has announced
-	cJSON *pjson = NULL;
-	cJSON *pat = cJSON_GetObjectItem(parent_rtnode_l->obj, "at");
-	cJSON_ArrayForEach(pjson, pat)
-	{
-		if (!strncmp(pjson->valuestring, csi, strlen(csi)) && pjson->valuestring[strlen(csi)] == '/')
+	if (parent_target ==NULL) {
+		// check parent resource has announced
+		cJSON *pjson = NULL;
+		cJSON *pat = cJSON_GetObjectItem(parent_rtnode_l->obj, "at");
+		cJSON_ArrayForEach(pjson, pat)
 		{
-			parent_target = strdup(pjson->valuestring);
-			break;
+			if (!strncmp(pjson->valuestring, csi, strlen(csi)) && pjson->valuestring[strlen(csi)] == '/')
+			{
+				parent_target = strdup(pjson->valuestring);
+				break;
+			}
 		}
 	}
 
@@ -1824,8 +1826,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		parent_rtnode_l = rt->cb;
 	}
 
-	free(csi);
-
+	
 	if (RAT == SP_RELATIVE)
 	{
 		oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(sizeof(oneM2MPrimitive), 1);
@@ -1835,94 +1836,96 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		o2pt->ty = ty + 10000;
 		o2pt->rqi = strdup("create-annc");
 		o2pt->rvi = CSE_RVI;
-
+		
 		cJSON *root = cJSON_CreateObject();
 		cJSON *annc = cJSON_CreateObject();
 		cJSON *pjson = NULL;
 		cJSON_AddItemToObject(root, get_resource_key(ty + 10000), annc);
 		sprintf(buf, "/%s/%s/%s", CSE_BASE_RI, parent_rtnode_l->uri, cJSON_GetObjectItem(obj, "rn")->valuestring);
 		cJSON_AddItemToObject(annc, "lnk", cJSON_CreateString(buf));
-
+		
 		//TO-DO  acpi original에서 갖고 오거나 local policy에 따라 추가하는 것 필요)
 		/*cJSON *acpi = cJSON_CreateArray();  // 현재는  넣은 상태임
 		cJSON_AddItemToArray(acpi, cJSON_CreateString("/defaultACP"));
 		cJSON_AddItemToObject(annc, "acpi", acpi);*/
-
+		
 		char *et = strdup(cJSON_GetObjectItem(obj, "et")->valuestring);
-
+		
 		switch (ty)
 		{
-		case RT_ACP:
+			case RT_ACP:
 			if ((pjson = cJSON_Duplicate(cJSON_GetObjectItem(obj, "pv"), true)))
-				cJSON_AddItemToObject(annc, "pv", pjson);
+			cJSON_AddItemToObject(annc, "pv", pjson);
 			if ((pjson = cJSON_Duplicate(cJSON_GetObjectItem(obj, "pvs"), true)))
-				cJSON_AddItemToObject(annc, "pvs", pjson);
-
+			cJSON_AddItemToObject(annc, "pvs", pjson);
+			
 			cJSON_AddStringToObject(annc, "et", et);
 			free(et);
 			break;
-		case RT_AE:
+			case RT_AE:
 			pjson = cJSON_Duplicate(cJSON_GetObjectItem(obj, "srv"), true);
 			cJSON_AddItemToObject(annc, "srv", pjson);
-
+			
 			cJSON_AddStringToObject(annc, "et", et);
 			free(et);
 			break;
-		case RT_CNT:
+			case RT_CNT:
 			cJSON_AddStringToObject(annc, "et", et);
 			free(et);
 			break;
-		case RT_CIN:
+			case RT_CIN:
 			cJSON_AddStringToObject(annc, "et", et);
 			free(et);
 			break;
-		case RT_SUB:
+			case RT_SUB:
 			cJSON_AddStringToObject(annc, "et", et);
 			free(et);
 			break;
-		case RT_GRP:
+			case RT_GRP:
 			cJSON_AddStringToObject(annc, "et", et);
 			free(et);
 			break;
-		case RT_FCNT:
+			case RT_FCNT:
 			cJSON_AddStringToObject(annc, "et", et);
 			free(et);
 			break;
 		}
-
+		
 		cJSON *lbl = cJSON_GetObjectItem(obj, "lbl");
 		if (lbl)
-			cJSON_AddItemToObject(annc, "lbl", cJSON_Duplicate(lbl, true));
-
+		cJSON_AddItemToObject(annc, "lbl", cJSON_Duplicate(lbl, true));
+		
 		cJSON *ast = cJSON_GetObjectItem(obj, "ast");
 		if (ast)
-			cJSON_AddItemToObject(annc, "ast", cJSON_Duplicate(ast, true));
-
+		cJSON_AddItemToObject(annc, "ast", cJSON_Duplicate(ast, true));
+		
 		cJSON *aa = cJSON_GetObjectItem(obj, "aa");
 		cJSON *attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
 		cJSON_ArrayForEach(pjson, aa)
 		{
 			if (strcmp(pjson->valuestring, "lbl") == 0)
-				continue;
+			continue;
 			if (strcmp(pjson->valuestring, "ast") == 0)
-				continue;
+			continue;
 			if (strcmp(pjson->valuestring, "lnk") == 0)
-				continue;
+			continue;
 			if (!cJSON_GetObjectItem(attr, pjson->valuestring))
 			{
 				logger("UTIL", LOG_LEVEL_ERROR, "invalid attribute in aa");
+				free(csi);
 				return NULL;
 			}
 			cJSON *temp = cJSON_GetObjectItem(obj, pjson->valuestring);
 			cJSON_AddItemToObject(annc, pjson->valuestring, cJSON_Duplicate(temp, true));
 		}
-
+		
 		o2pt->request_pc = root;
 		o2pt->isForwarding = true;
 		RTNode *rtnode = find_csr_rtnode_by_uri(at);
 		if (!rtnode)
 		{
 			logger("UTIL", LOG_LEVEL_ERROR, "at target not found");
+			free(csi);
 			return NULL;
 		}
 		int rsc = 0;
@@ -1930,18 +1933,21 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		{
 			free_o2pt(o2pt);
 			logger("UTIL", LOG_LEVEL_ERROR, "Creation failed");
+			free(csi);
 			return NULL;
 		}
-
+		
 		cJSON *result = o2pt->response_pc;
 		cJSON *annc_obj = cJSON_GetObjectItem(result, get_resource_key(ty + 10000));
 		char *annc_ri = cJSON_GetObjectItem(annc_obj, "ri")->valuestring;
-		sprintf(buf, "%s/%s", at, annc_ri);
+		sprintf(buf, "%s/%s", csi, annc_ri);
 		free_o2pt(o2pt);
 		free(parent_target);
-
+		free(csi);
+		
 		return strdup(buf);
 	}
+	free(csi);
 	return NULL;
 }
 
