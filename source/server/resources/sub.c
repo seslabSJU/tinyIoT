@@ -89,6 +89,11 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         {
             continue;
         }
+        // TS-0001 10.2.11.2: URL-format targets shall not be verified
+        if (checkResourceAddressingType(pjson->valuestring) == PROTOCOL_BINDING)
+        {
+            continue;
+        }
         result = send_verification_request(o2pt->to, pjson->valuestring, noti_cjson);
         
 
@@ -136,11 +141,10 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-    char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
+    char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct", "su"};
     cJSON *pjson = NULL;
     cJSON *m2m_sub = cJSON_GetObjectItem(o2pt->request_pc, "m2m:sub");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
-    int updateAttrCnt = cJSON_GetArraySize(m2m_sub);
 
     for (int i = 0; i < invalid_key_size; i++)
     {
@@ -234,11 +238,6 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     update_resource(sub, m2m_sub);
 
     db_update_resource(m2m_sub, cJSON_GetObjectItem(sub, "ri")->valuestring, RT_SUB);
-
-    for (int i = 0; i < updateAttrCnt; i++)
-    {
-        cJSON_DeleteItemFromArray(m2m_sub, 0);
-    }
 
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;

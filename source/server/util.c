@@ -3053,7 +3053,9 @@ int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode)
 		return RSC_NOT_FOUND;
 	logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource [%s]", get_uri_rtnode(rtnode));
 	logger("UTIL", LOG_LEVEL_DEBUG, "o2pt->request_pc [%s]", cJSON_PrintUnformatted(o2pt->request_pc));
-	if (rtnode->ty == RT_AE)
+	// TS-0001 9.6.8: a Resource-ID notification target may be an AE or a CSE;
+	// the Hosting CSE uses the target's poa/rr to deliver the notification
+	if (rtnode->ty == RT_AE || rtnode->ty == RT_CSR)
 	{
 		logger("UTIL", LOG_LEVEL_DEBUG, "requestToResource AE [%s]", rtnode->rn);
 		cJSON* ae = rtnode->obj;
