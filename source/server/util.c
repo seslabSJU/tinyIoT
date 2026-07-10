@@ -1302,6 +1302,16 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 			return 0;
 		}
 	}
+
+	// Annc shortcut
+	if (rtnode->ty > 10000 && rtnode->ty < 20000) {
+		char *lnk = cJSON_GetObjectItem(rtnode->obj, "lnk")->valuestring;
+		if ((acop == ACOP_UPDATE || acop == ACOP_DELETE) && checkResourceCseID(lnk, o2pt->fr)) {
+			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the cse of the owner of the resource");
+			return 0;
+		}
+	}
+
 	// Creator shortcut is only a default-access fallback. It must not grant
 	// CREATE on a parent or bypass explicit ACPs.
 	cJSON *cr = cJSON_GetObjectItem(rtnode->obj, "cr");
@@ -1313,6 +1323,7 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 			return 0;
 		}
 	}
+
 	// Do not let an ancestor AE owner shortcut bypass child CREATE privilege.
 	RTNode *parent = rtnode->parent;
 	while (acop != ACOP_CREATE && parent)
@@ -4104,10 +4115,19 @@ int register_remote_cse()
 int create_local_csr()
 {
 	char buf[256] = { 0 };
-
+	char *cse_ri = strchr(REMOTE_CSE_ID, '/');
+	if (cse_ri) cse_ri++;
+	else cse_ri = REMOTE_CSE_ID;
+	
+	snprintf(buf, sizeof(buf), "%s/%s", CSE_BASE_NAME, cse_ri);
+	if (find_rtnode(buf)) {
+		logger("MAIN", LOG_LEVEL_DEBUG, "Local CSR already exists");
+		return 0;
+	};
+	
 	HTTPRequest* req = (HTTPRequest*)malloc(sizeof(HTTPRequest));
 	HTTPResponse* res = (HTTPResponse*)malloc(sizeof(HTTPResponse));
-
+	
 	req->method = "GET";
 	req->uri = strdup("/" REMOTE_CSE_NAME);
 	req->qs = NULL;
@@ -4120,79 +4140,68 @@ int create_local_csr()
 	add_header("Accept", "application/json", req->headers);
 	// add_header("Content-Type", "application/json", req->headers);
 	add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
-
+	
 	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
-
-	if (res->status_code != 200)
+	
+	if (res->status_code == 404)
 	{
 		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE is not online : %d", res->status_code);
 		free_HTTPRequest(req);
 		free_HTTPResponse(res);
 		return res->status_code;
 	}
-
-	cJSON* root = cJSON_Parse(res->payload);
-	cJSON* remote_cb = cJSON_GetObjectItem(root, get_resource_key(RT_CSE));
-
-	if (!remote_cb)
-	{
-		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE not valid");
-		free_HTTPRequest(req);
-		free_HTTPResponse(res);
-		return -1;
-	}
-
-	cJSON* pjson = NULL;
-	cJSON* remote_ri = cJSON_GetObjectItem(remote_cb, "ri");
-	cJSON* remote_rn = cJSON_GetObjectItem(remote_cb, "rn");
-	cJSON* remote_csi = cJSON_GetObjectItem(remote_cb, "csi");
-	if (!remote_rn || !remote_csi)
-	{
-		logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE not valid");
-		free_HTTPRequest(req);
-		free_HTTPResponse(res);
-		return -1;
-	}
-
+	
 	cJSON* csr = cJSON_CreateObject();
 	add_general_attribute(csr, rt->cb, RT_CSR);
+	
 	cJSON_DeleteItemFromObject(csr, "ri");
 	cJSON_DeleteItemFromObject(csr, "rn");
-
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "cst")))
-	{
-		cJSON_AddItemToObject(csr, "cst", cJSON_Duplicate(pjson, 1));
-	}
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "ri")))
-	{
-		cJSON_AddItemToObject(csr, "ri", cJSON_Duplicate(pjson, 1));
-		cJSON_AddItemToObject(csr, "rn", cJSON_Duplicate(pjson, 1));
-	}
-	// if(pjson = cJSON_GetObjectItem(remote_cb, "rn")){
-	// }
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "dcse")))
-	{
-		cJSON_AddItemToObject(csr, "dcse", cJSON_Duplicate(pjson, 1));
-	}
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "poa")))
-	{
-		cJSON_AddItemToObject(csr, "poa", cJSON_Duplicate(pjson, 1));
-	}
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "rr")))
-	{
-		cJSON_AddItemToObject(csr, "rr", cJSON_Duplicate(pjson, 1));
-	}
-	if ((pjson = cJSON_GetObjectItem(remote_cb, "srv")))
-	{
-		cJSON_AddItemToObject(csr, "srv", cJSON_Duplicate(pjson, 1));
-	}
-	cJSON_AddItemToObject(csr, "csi", cJSON_CreateString(remote_csi->valuestring));
-
-	sprintf(buf, "%s/%s", remote_csi->valuestring, remote_rn->valuestring);
+	snprintf(buf, sizeof(buf), "/%s", cse_ri);
+	cJSON_AddItemToObject(csr, "csi", cJSON_CreateString(buf));
+	snprintf(buf, sizeof(buf), "/%s/%s", cse_ri, REMOTE_CSE_NAME);
 	cJSON_AddItemToObject(csr, "cb", cJSON_CreateString(buf));
-
+	cJSON_AddItemToObject(csr, "rn", cJSON_CreateString(cse_ri));
+	cJSON_AddItemToObject(csr, "ri", cJSON_CreateString(cse_ri));
+	cJSON *poa = cJSON_CreateArray();
+	char buffer[128] = { 0 };
+	snprintf(buffer, 128, "http://%s:%d", REMOTE_CSE_HOST, REMOTE_CSE_PORT);
+	cJSON_AddItemToArray(poa, cJSON_CreateString(buffer));
+	// ToDo: add mqtt, ws, coap poa
+	cJSON_AddItemToObject(csr, "poa", poa);
+	
+	cJSON* root = cJSON_Parse(res->payload);
+	cJSON* remote_cb = cJSON_GetObjectItem(root, get_resource_key(RT_CSE));
+	if (remote_cb)
+	{
+		cJSON* pjson = NULL;
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "cst")))
+		{
+			cJSON_AddItemToObject(csr, "cst", cJSON_Duplicate(pjson, 1));
+		}
+		// if(pjson = cJSON_GetObjectItem(remote_cb, "rn")){
+			// }
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "dcse")))
+		{
+			cJSON_AddItemToObject(csr, "dcse", cJSON_Duplicate(pjson, 1));
+		}
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "poa")))
+		{
+			cJSON_ReplaceItemInObject(csr, "poa", cJSON_Duplicate(pjson, 1));
+		}
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "rr")))
+		{
+			cJSON_AddItemToObject(csr, "rr", cJSON_Duplicate(pjson, 1));
+		}
+		if ((pjson = cJSON_GetObjectItem(remote_cb, "srv")))
+		{
+			cJSON_AddItemToObject(csr, "srv", cJSON_Duplicate(pjson, 1));
+		}
+	} else {
+		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE not valid");
+	}
+		
 	cJSON_Delete(root);
-
+		
 	// int rsc = validate_csr(o2pt, parent_rtnode, csr, OP_CREATE);
 	// if(rsc != RSC_OK){
 	// 	cJSON_Delete(root);
@@ -4200,7 +4209,7 @@ int create_local_csr()
 	// }
 
 	char* ptr = malloc(1024);
-	sprintf(ptr, "%s/%s", CSE_BASE_NAME, cJSON_GetObjectItem(csr, "rn")->valuestring);
+	sprintf(ptr, "%s/%s", CSE_BASE_NAME, cse_ri);
 	cJSON_AddItemToObject(csr, "uri", cJSON_CreateString(ptr));
 	int result = db_store_resource(csr, ptr);
 	if (result == -1)
@@ -4219,6 +4228,7 @@ int create_local_csr()
 	rt->registrar_csr = rtnode;
 
 	free_HTTPRequest(req);
+	free_HTTPResponse(res);
 	return 0;
 }
 
@@ -4396,7 +4406,7 @@ int handle_annc_create(RTNode* parent_rtnode, cJSON* resource_obj, cJSON* at_obj
 	char* at_str = NULL;
 	cJSON_ArrayForEach(at, cJSON_GetObjectItem(resource_obj, "at"))
 	{
-		at_str = create_remote_annc(parent_rtnode, resource_obj, at->valuestring, false);
+		at_str = create_remote_annc(parent_rtnode, resource_obj, at->valuestring);
 		if (!at_str)
 		{
 			continue;
@@ -4420,13 +4430,47 @@ int handle_annc_update(RTNode* target_rtnode, cJSON* at_obj, cJSON* final_at)
 	// remove at which was already there
 	cJSON_ArrayForEach(new_at, at_obj)
 	{
+		// Check uri or csi
+		ResourceAddressingType RAT = checkResourceAddressingType(new_at->valuestring);
+		char* csi = NULL;
+		bool is_uri = false;
+		if (RAT == ABSOLUTE) {  
+			char *ptr = strchr(new_at->valuestring+2, '/');
+			ptr = strchr(ptr+1,'/');
+			if (ptr && ptr+1 != NULL) {
+				is_uri = true;
+			} else if (isSPIDLocal(new_at->valuestring)) {
+				csi = strchr(new_at->valuestring+2, '/');
+			} else {
+				csi = new_at->valuestring;
+			}
+		} else if(RAT == SP_RELATIVE) {
+			char *ptr = strchr(new_at->valuestring+1, '/');
+			if (ptr && ptr+1 != NULL) {
+				is_uri = true;
+			} else {
+				csi = new_at->valuestring;
+			}
+		} else {
+			continue;
+		}
+
 		cJSON_ArrayForEach(at, original_at_list)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "new_at: %s, at: %s", new_at->valuestring, at->valuestring);
-			if (checkResourceCseID(at->valuestring, new_at->valuestring))
-			{
-				// if already registered
-				break;
+			if (is_uri) {
+				size_t length = strlen(new_at->valuestring);
+				length = length > strlen(at->valuestring) ? length: strlen(at->valuestring);
+				if (strncmp(new_at->valuestring, at->valuestring, length) == 0)
+				{
+					// if already registered
+					break;
+				}
+			} else {
+				if (checkResourceCseID(at->valuestring, csi))
+				{
+					// if already registered
+					break;
+				}
 			}
 		}
 		if (at == NULL)
@@ -4439,9 +4483,39 @@ int handle_annc_update(RTNode* target_rtnode, cJSON* at_obj, cJSON* final_at)
 	{
 		cJSON_ArrayForEach(new_at, at_obj)
 		{
-			if (checkResourceCseID(at->valuestring, new_at->valuestring))
-			{
-				break;
+			// Check uri or csi
+			ResourceAddressingType RAT = checkResourceAddressingType(new_at->valuestring);
+			char* csi = NULL;
+			bool is_uri = false;
+			if (RAT == ABSOLUTE) {  
+				char *ptr = strchr(new_at->valuestring+2, '/');
+				ptr = strchr(ptr+1,'/');
+				if (ptr && ptr+1 != NULL) {
+					is_uri = true;
+				} else if (isSPIDLocal(new_at->valuestring)) {
+					csi = strchr(new_at->valuestring+2, '/');
+				} else {
+					csi = new_at->valuestring;
+				}
+			} else if(RAT == SP_RELATIVE) {
+				char *ptr = strchr(new_at->valuestring+1, '/');
+				if (ptr && ptr+1 != NULL) {
+					is_uri = true;
+				} else {
+					csi = new_at->valuestring;
+				}
+			}
+
+			if (is_uri) {
+				if (strncmp(new_at->valuestring, at->valuestring, strlen(at->valuestring)) == 0)
+				{
+					break;
+				}
+			} else {
+				if (checkResourceCseID(at->valuestring, csi))
+				{
+					break;
+				}
 			}
 		}
 		if (new_at == NULL)
@@ -4471,7 +4545,7 @@ int handle_annc_update(RTNode* target_rtnode, cJSON* at_obj, cJSON* final_at)
 		cJSON* pjson = NULL;
 		cJSON_ArrayForEach(pjson, register_at_list)
 		{
-			at_str = create_remote_annc(target_rtnode->parent, target_rtnode->obj, pjson->valuestring, false);
+			at_str = create_remote_annc(target_rtnode->parent, target_rtnode->obj, pjson->valuestring);
 			if (!at_str)
 			{
 				continue;

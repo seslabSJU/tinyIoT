@@ -173,7 +173,7 @@ void parse_filter_criteria(cJSON *fc);
 bool parse_qs(cJSON *qs);
 void route(oneM2MPrimitive *o2pt);
 void add_general_attribute(cJSON *root, RTNode *parent_rtnode, ResourceType ty);
-char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at, bool isParent);
+char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at);
 int create_annc(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 int update_annc(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 
