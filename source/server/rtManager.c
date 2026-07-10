@@ -632,6 +632,8 @@ RTNode *find_rtnode_by_ri(char *ri)
     if (strncmp(ri, "4-", 2) == 0)
     {
         resource = db_get_resource(ri, RT_CIN);
+        if (!resource)
+            return NULL;
         rtnode = create_rtnode(resource, RT_CIN);
         rtnode->parent = find_rtnode_by_rn(rtnode->uri);
         return rtnode;

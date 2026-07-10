@@ -66,15 +66,21 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         nu_rtnode = find_rtnode(pjson->valuestring);
         if (nu_rtnode)
         {
+            // TS-0001 9.6.8: a Resource-ID target may be an AE or a CSE;
+            // TS-0001 10.2.11.2: verification is optional and skipped for the originator
+            if (nu_rtnode->ty == RT_CSR)
+            {
+                continue;
+            }
             if (nu_rtnode->ty != RT_AE)
             {
                 handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "nu is invalid");
                 cJSON_Delete(noti_cjson);
-                cJSON_DetachItemFromObject(root, "m2m:sub");
                 cJSON_Delete(root);
                 return RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED;
             }
-            if (strcmp(cJSON_GetObjectItem(nu_rtnode->obj, "aei")->valuestring, o2pt->fr) == 0)
+            cJSON *aei = cJSON_GetObjectItem(nu_rtnode->obj, "aei");
+            if (aei && aei->valuestring && strcmp(aei->valuestring, o2pt->fr) == 0)
             {
                 continue;
             }
@@ -83,14 +89,20 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         {
             continue;
         }
+        // TS-0001 10.2.11.2: URL-format targets shall not be verified
+        if (checkResourceAddressingType(pjson->valuestring) == PROTOCOL_BINDING)
+        {
+            continue;
+        }
         result = send_verification_request(o2pt->to, pjson->valuestring, noti_cjson);
         
 
-        if (result == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE)
+        if (result == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE ||
+            result == RSC_SUBSCRIPTION_HOST_HAS_NO_PRIVILEGE)
         {
             cJSON_Delete(noti_cjson);
             cJSON_Delete(root);
-            return handle_error(o2pt, RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE, "subscription verification error");
+            return handle_error(o2pt, result, "subscription verification error");
         }
         else if (result / 1000 == 4 || result / 1000 == 5)
         {
@@ -98,8 +110,6 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
             cJSON_Delete(root);
             return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "subscription verification error");
         }
-
-        cJSON_DeleteItemFromObject(sgn, "vrq");
     }
     cJSON_Delete(noti_cjson);
     // Store to DB
@@ -131,11 +141,10 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-    char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
+    char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct", "su"};
     cJSON *pjson = NULL;
     cJSON *m2m_sub = cJSON_GetObjectItem(o2pt->request_pc, "m2m:sub");
     int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
-    int updateAttrCnt = cJSON_GetArraySize(m2m_sub);
 
     for (int i = 0; i < invalid_key_size; i++)
     {
@@ -147,27 +156,27 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     }
 
     cJSON *sub = target_rtnode->obj;
-    int result;
 
     if (validate_sub(o2pt, m2m_sub, o2pt->op) != RSC_OK)
     {
         return o2pt->rsc;
     }
 
-    cJSON *old_nu = cJSON_GetObjectItem(sub, "nu");
     cJSON *new_nu = cJSON_GetObjectItem(m2m_sub, "nu");
     if (new_nu)
     {
-        cJSON_DetachItemFromObject(sub, "nu");
-        cJSON_AddItemToObject(sub, "nu", new_nu);
-        cJSON *noti_cjson, *sgn, *nev, *rep, *nct;
+        cJSON *noti_cjson, *sgn, *nev, *rep;
+        RTNode *nu_rtnode = NULL;
         noti_cjson = cJSON_CreateObject();
         cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
         cJSON_AddItemToObject(sgn, "nev", nev = cJSON_CreateObject());
         cJSON_AddStringToObject(sgn, "cr", o2pt->fr);
         cJSON_AddNumberToObject(nev, "net", NET_CREATE_OF_DIRECT_CHILD_RESOURCE);
         cJSON_AddItemToObject(nev, "rep", rep = cJSON_CreateObject());
-        cJSON_AddItemToObject(rep, "m2m:sub", cJSON_Duplicate(sub, true));
+        cJSON *sub_rep = cJSON_Duplicate(sub, true);
+        cJSON_DeleteItemFromObject(sub_rep, "nu");
+        cJSON_AddItemToObject(sub_rep, "nu", cJSON_Duplicate(new_nu, true));
+        cJSON_AddItemToObject(rep, "m2m:sub", sub_rep);
         cJSON_AddStringToObject(sgn, "sur", target_rtnode->uri);
         cJSON_AddBoolToObject(sgn, "vrq", true);
         cJSON_ArrayForEach(pjson, new_nu)
@@ -176,18 +185,43 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
             {
                 continue;
             }
-            if (send_verification_request(o2pt->to, pjson->valuestring, noti_cjson) != RSC_OK)
+            nu_rtnode = find_rtnode(pjson->valuestring);
+            if (nu_rtnode)
+            {
+                if (nu_rtnode->ty == RT_CSR)
+                {
+                    continue;
+                }
+                if (nu_rtnode->ty != RT_AE)
+                {
+                    cJSON_Delete(noti_cjson);
+                    return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "nu is invalid");
+                }
+                cJSON *aei = cJSON_GetObjectItem(nu_rtnode->obj, "aei");
+                if (aei && aei->valuestring && !strcmp(aei->valuestring, o2pt->fr))
+                {
+                    continue;
+                }
+            }
+            // TS-0001 10.2.11.2/10.2.11.4: URL-format targets shall not be verified
+            if (checkResourceAddressingType(pjson->valuestring) == PROTOCOL_BINDING)
+            {
+                continue;
+            }
+            int result = send_verification_request(o2pt->to, pjson->valuestring, noti_cjson);
+            if (result == RSC_SUBSCRIPTION_CREATOR_HAS_NO_PRIVILEGE ||
+                result == RSC_SUBSCRIPTION_HOST_HAS_NO_PRIVILEGE)
             {
                 cJSON_Delete(noti_cjson);
-
-                cJSON_DetachItemFromObject(sub, "nu");
-                cJSON_AddItemToObject(sub, "nu", old_nu);
-                return handle_error(o2pt, RSC_SUBSCRIPTION_VERIFICATION_INITIATION_FAILED, "notification error");
+                return handle_error(o2pt, result, "subscription verification failed");
+            }
+            // TS-0001 10.2.11.2: verification is optional; only an explicit failed
+            // verification response rejects the update
+            if (result / 1000 == 4 || result / 1000 == 5)
+            {
+                logger("SUB", LOG_LEVEL_WARN, "verification not completed for %s (rsc=%d)", pjson->valuestring, result);
             }
         }
-
-        cJSON_DetachItemFromObject(sub, "nu");
-        cJSON_AddItemToObject(sub, "nu", old_nu);
         cJSON_Delete(noti_cjson);
     }
     pjson = cJSON_GetObjectItem(m2m_sub, "enc");
@@ -204,11 +238,6 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     update_resource(sub, m2m_sub);
 
     db_update_resource(m2m_sub, cJSON_GetObjectItem(sub, "ri")->valuestring, RT_SUB);
-
-    for (int i = 0; i < updateAttrCnt; i++)
-    {
-        cJSON_DeleteItemFromArray(m2m_sub, 0);
-    }
 
     make_response_body(o2pt, target_rtnode);
     o2pt->rsc = RSC_UPDATED;
@@ -317,6 +346,14 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
         if (cJSON_GetArraySize(pjson) == 0)
         {
             return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `nu` is invalid");
+        }
+        cJSON *nu_item = NULL;
+        cJSON_ArrayForEach(nu_item, pjson)
+        {
+            if (!cJSON_IsString(nu_item) || !nu_item->valuestring)
+            {
+                return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `nu` is invalid");
+            }
         }
     }
 
