@@ -4691,7 +4691,7 @@ void removeChildAnnc(RTNode* parent_rtnode, char* at)
 	}
 }
 
-void announce_to_annc(RTNode* target_rtnode)
+void announce_to_annc(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "announce_to_annc");
 	cJSON* at_list = cJSON_GetObjectItem(target_rtnode->obj, "at");
@@ -4740,6 +4740,10 @@ void announce_to_annc(RTNode* target_rtnode)
 		o2pt->isForwarding = true;
 		cJSON_ArrayForEach(at, at_list)
 		{
+			// if (checkResourceCseID(at->valuestring, o2pt->fr)) {
+			// 	logger("UTIL", LOG_LEVEL_DEBUG, "Skipping announce to %s as it is the CSE of the update request", o2pt->fr);
+			// 	continue;
+			// }
 			logger("UTIL", LOG_LEVEL_INFO, "at %s", at->valuestring);
 			if (at->valuestring[0] == '/')
 			{

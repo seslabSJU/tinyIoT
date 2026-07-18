@@ -111,7 +111,6 @@ int update_annc(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
                 }
                 else {
                     char *lnk = cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring;
-
                     oneM2MPrimitive *req = NULL;
                     o2ptcpy(&req, o2pt);
                     req->to = strdup(lnk);

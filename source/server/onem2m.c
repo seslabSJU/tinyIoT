@@ -1136,7 +1136,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		rsc = o2pt->rsc;
 	}
 #if CSE_RVI >= RVI_3
-	announce_to_annc(target_rtnode);
+	announce_to_annc(o2pt, target_rtnode);
 #endif
 	return rsc;
 }
