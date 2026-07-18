@@ -1303,13 +1303,32 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 		}
 	}
 
-	// Annc shortcut
-	if (rtnode->ty > 10000 && rtnode->ty < 20000) {
+	// Annc shortcut hosting -> remote
+	if (acop != ACOP_CREATE && rtnode->ty > 10000 && rtnode->ty < 20000) {
 		char *lnk = cJSON_GetObjectItem(rtnode->obj, "lnk")->valuestring;
 		if ((acop == ACOP_UPDATE || acop == ACOP_DELETE) && checkResourceCseID(lnk, o2pt->fr)) {
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the cse of the owner of the resource");
 			return 0;
 		}
+	}
+
+	// Annc shortcut remote -> hosting
+	{
+		cJSON *ast = cJSON_GetObjectItem(rtnode->obj, "ast");
+		if (ast) {
+			int ast_val = cJSON_GetNumberValue(ast);
+			if (acop == ACOP_UPDATE && ast_val == AST_BI_DIRECTIONAL) {
+				cJSON *at = cJSON_GetObjectItem(rtnode->obj, "at");
+				cJSON *target = NULL;
+				cJSON_ArrayForEach(target, at) {
+					if (checkResourceCseID(target->valuestring, o2pt->fr)) {
+						logger("UTIL", LOG_LEVEL_DEBUG, "originator is the cse of announced resource");
+						return 0;
+					}
+				}
+			}
+		} 
+
 	}
 
 	// Creator shortcut is only a default-access fallback. It must not grant
