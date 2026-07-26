@@ -1328,7 +1328,6 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 				}
 			}
 		} 
-
 	}
 
 	// Creator shortcut is only a default-access fallback. It must not grant
@@ -1466,6 +1465,7 @@ int check_macp_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 int get_acop(oneM2MPrimitive* o2pt, char* corigin, RTNode* rtnode)
 {
 	int acop = 0;
+	int valid_flag = 0;
 
 #ifdef ADMIN_AE_ID
 	if (!strcmp(corigin, ADMIN_AE_ID))
@@ -1482,7 +1482,7 @@ int get_acop(oneM2MPrimitive* o2pt, char* corigin, RTNode* rtnode)
 
 	cJSON* acpiArr = get_acpi_rtnode(rtnode);
 	if (!acpiArr)
-		return 0;
+		return DEFAULT_ACOP;
 	logger("UTIL", LOG_LEVEL_DEBUG, "get_acop : %s", rtnode->uri);
 
 	cJSON* acpi = NULL;
@@ -1492,9 +1492,16 @@ int get_acop(oneM2MPrimitive* o2pt, char* corigin, RTNode* rtnode)
 		if (acp)
 		{
 			acop = (acop | get_acop_origin(o2pt, corigin, acp, 0));
+			valid_flag = 1;
 		}
 	}
-	return acop;
+	
+	if (valid_flag) {
+		return acop;
+	} else {
+		return DEFAULT_ACOP;
+	}
+
 }
 
 int get_acop_macp(oneM2MPrimitive* o2pt, RTNode* rtnode)
@@ -4036,6 +4043,7 @@ int validate_acr(oneM2MPrimitive* o2pt, cJSON* acr_attr)
  */
 bool isETvalid(char* et)
 {
+	if (!et) return false;
 	char* now = get_local_time(0);
 	if (strcmp(et, now) < 0)
 	{
@@ -5021,7 +5029,7 @@ bool isExpired(RTNode* rtnode)
 		return false;
 	}
 	cJSON* et = cJSON_GetObjectItem(rtnode->obj, "et");
-	if (!et)
+	if (!et || !et->valuestring)
 	{
 		return false;
 	}

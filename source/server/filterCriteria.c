@@ -60,7 +60,7 @@ static const FcTagDef FC_TAG_TABLE[] = {
     { "smf",  FC_TYPE_STRING},  // semanticsFilter (SPARQL)
 
     /*atr, catr, patr 추가 필요*/
-        /* 공통 */
+    /* 공통 */
     { "rn",   FC_TYPE_STRING},  // resourceName
     { "ri",   FC_TYPE_STRING},  // resourceID
     { "pi",   FC_TYPE_STRING},  // parentID
@@ -84,11 +84,14 @@ static const FcTagDef FC_TAG_TABLE[] = {
     { "disr", FC_TYPE_BOOLEAN},  // disableRetrieval
 
     /* contentInstance */
-    { "con",  FC_TYPE_STRING},  // content
-    { "dlc",  FC_TYPE_POS_INT},  // deletionCnt
+    { "con",  FC_TYPE_STRING}, // content
+    { "dlc",  FC_TYPE_POS_INT}, // deletionCnt
 
     /* flexContainer */
-    { "cnd",  FC_TYPE_STRING},  // containerDefinition
+    { "cnd",  FC_TYPE_STRING}, // containerDefinition
+
+    /* annc resource */
+    { "lnk", FC_TYPE_STRING} // link
 };
 #define FC_TAG_COUNT (sizeof(FC_TAG_TABLE) / sizeof(FcTagDef))
 

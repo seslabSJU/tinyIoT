@@ -23,7 +23,9 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON *csr = cJSON_GetObjectItem(root, "m2m:csr");
 
     add_general_attribute(csr, parent_rtnode, RT_CSR);
-    cJSON_AddStringToObject(csr, "csi", o2pt->fr);
+    if (!cJSON_GetObjectItem(csr, "csi")) {
+        cJSON_AddStringToObject(csr, "csi", o2pt->fr);
+    }
     cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
     cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));
 

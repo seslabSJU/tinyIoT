@@ -72,7 +72,7 @@ void headerToLowercase(char* header);
 
 // Response
 #define HTTP_PROTOCOL_VERSION "HTTP/1.1"
-#define RESPONSE_HEADER "Connection: Close\r\nServer: tinyIoT v0.1\r\nAccept: application/json\r\nContent-Type: application/json; charset=utf-8\r\n"
+#define RESPONSE_HEADER "Connection: Close\r\nServer: tinyIoT v0.1\r\nAccept: application/json\r\nContent-Type: application/vnd.onem2m-res+json\r\n"
 #define CORS_HEADER "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-M2M-Origin, X-M2M-RI, X-M2M-RVI\r\nAccess-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS\r\nAccess-Control-Request-Methods: GET, PUT, POST, DELETE, OPTIONS\r\n"
 #ifdef CORS_HEADER
 #define DEFAULT_RESPONSE_HEADERS RESPONSE_HEADER CORS_HEADER

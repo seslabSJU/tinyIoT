@@ -817,7 +817,12 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	if (pjson)
 	{
 		cJSON *et_obj = cJSON_GetObjectItem(pjson, "et");
-		if (et_obj && !isETvalid(et_obj->valuestring))
+
+		// CB & CBA don't have "et" attribute
+		if (o2pt->ty == RT_CBA) {
+			if (et_obj) cJSON_DeleteItemFromObject(pjson, "et");
+		}
+		else if (et_obj && !isETvalid(et_obj->valuestring))
 		{
 			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
 		}
