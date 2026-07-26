@@ -44,55 +44,23 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON_AddNumberToObject(cnt, "cni", 0);
     cJSON_AddNumberToObject(cnt, "cbs", 0);
 #if CSE_RVI >= RVI_3
-    bool parent_was_announced = false; 
     cJSON *final_at = cJSON_CreateArray();
-
-    if (parent_rtnode->ty == RT_AE) //check parent resource(AE) was announced 
+    if (handle_annc_create(parent_rtnode, cnt, cJSON_GetObjectItem(cnt, "at"), final_at) == -1)
     {
-        cJSON *parent_at = cJSON_GetObjectItem(parent_rtnode->obj, "at");
-        if(parent_at && cJSON_GetArraySize(parent_at) > 0)
-        {
-            parent_was_announced = true;
-        }
+        cJSON_Delete(root);
+        cJSON_Delete(final_at);
+        return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute in `aa`");
     }
 
-    if (parent_was_announced)//when aeA is announced, cnt is also announced under aeA as cntA 
+    if (cJSON_GetArraySize(final_at) > 0)
     {
-        if (handle_annc_create(parent_rtnode, cnt, cJSON_GetObjectItem(cnt, "at"), final_at) == -1)
-        {
-            cJSON_Delete(root);
-            cJSON_Delete(final_at);
-            return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute in `aa`");
-        }
-
-        if (cJSON_GetArraySize(final_at) > 0)
-        {
-            cJSON_DeleteItemFromObject(cnt, "at");
-            cJSON_AddItemToObject(cnt, "at", final_at);
-        }
-        else
-        {
-            cJSON_Delete(final_at);
-        }
+        cJSON_DeleteItemFromObject(cnt, "at");
+        cJSON_AddItemToObject(cnt, "at", final_at);
     }
-    else//when ae is not announced, cnt is announced under cbA as cntA 
+    else
     {
-        if (handle_annc_create(parent_rtnode->parent, cnt, cJSON_GetObjectItem(cnt, "at"), final_at) == -1)
-        {
-            cJSON_Delete(root);
-            cJSON_Delete(final_at);
-            return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute in `aa`");
-        }
-
-        if (cJSON_GetArraySize(final_at) > 0)
-        {
-            cJSON_DeleteItemFromObject(cnt, "at");
-            cJSON_AddItemToObject(cnt, "at", final_at);
-        }
-        else
-        {
-            cJSON_Delete(final_at);
-        }
+        cJSON_Delete(final_at);
+        cJSON_DeleteItemFromObject(cnt, "at");
     }
 #endif
     if (rsc != RSC_OK)

@@ -4159,8 +4159,8 @@ int create_local_csr()
 		return 0;
 	};
 	
-	HTTPRequest* req = (HTTPRequest*)malloc(sizeof(HTTPRequest));
-	HTTPResponse* res = (HTTPResponse*)malloc(sizeof(HTTPResponse));
+	HTTPRequest* req = (HTTPRequest*)calloc(1, sizeof(HTTPRequest));
+	HTTPResponse* res = (HTTPResponse*)calloc(1, sizeof(HTTPResponse));
 	
 	req->method = "GET";
 	req->uri = strdup("/" REMOTE_CSE_NAME);
@@ -4248,9 +4248,11 @@ int create_local_csr()
 	int result = db_store_resource(csr, ptr);
 	if (result == -1)
 	{
-		cJSON_Delete(root);
+		cJSON_Delete(csr);
 		free(ptr);
 		ptr = NULL;
+		free_HTTPRequest(req);
+		free_HTTPResponse(res);
 		return RSC_INTERNAL_SERVER_ERROR;
 	}
 	free(ptr);
@@ -4724,6 +4726,11 @@ void announce_to_annc(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 			cJSON_AddItemToObject(resource, "lbl", cJSON_Duplicate(pjson, 1));
 		}
 		oneM2MPrimitive* o2pt = (oneM2MPrimitive*)calloc(1, sizeof(oneM2MPrimitive));
+	
+        if ((pjson = cJSON_GetObjectItem(target_rtnode->obj, "ast")))
+        {
+            cJSON_AddItemToObject(resource, "ast", cJSON_Duplicate(pjson, 1));
+        }
 
 		int count = 0;
 		cJSON* child = resource->child;
@@ -4748,10 +4755,10 @@ void announce_to_annc(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 		o2pt->isForwarding = true;
 		cJSON_ArrayForEach(at, at_list)
 		{
-			// if (checkResourceCseID(at->valuestring, o2pt->fr)) {
-			// 	logger("UTIL", LOG_LEVEL_DEBUG, "Skipping announce to %s as it is the CSE of the update request", o2pt->fr);
-			// 	continue;
-			// }
+			if (checkResourceCseID(at->valuestring, o2pt->fr)) {
+				logger("UTIL", LOG_LEVEL_DEBUG, "Skipping announce to %s as it is the CSE of the update request", o2pt->fr);
+				continue;
+			}
 			logger("UTIL", LOG_LEVEL_INFO, "at %s", at->valuestring);
 			if (at->valuestring[0] == '/')
 			{
