@@ -1858,9 +1858,10 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		cJSON_AddItemToObject(annc, "lnk", cJSON_CreateString(buf));
 		
 		//TO-DO  acpi original에서 갖고 오거나 local policy에 따라 추가하는 것 필요)
-		/*cJSON *acpi = cJSON_CreateArray();  // 현재는  넣은 상태임
-		cJSON_AddItemToArray(acpi, cJSON_CreateString("/defaultACP"));
-		cJSON_AddItemToObject(annc, "acpi", acpi);*/
+		cJSON *acpi = cJSON_GetObjectItem(obj, "acpi");
+		if (acpi) {
+			cJSON_AddItemToObject(annc, "acpi", cJSON_Duplicate(acpi, 1));
+		}
 		
 		char *et = strdup(cJSON_GetObjectItem(obj, "et")->valuestring);
 		
