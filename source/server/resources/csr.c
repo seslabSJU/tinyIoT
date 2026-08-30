@@ -130,22 +130,13 @@ int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Opera
     char *ptr = NULL;
 
     char *csi = NULL;
-    if (op == OP_CREATE)
+
     {
-        // check mandatory attribute
-        if (cJSON_GetObjectItem(csr, "cb") == NULL)
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_CSR, csr, op, &ma_error);
+        if (ma_rsc != RSC_OK)
         {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
-        }
-
-        if (cJSON_GetObjectItem(csr, "srv") == NULL)
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
-        }
-
-        if (cJSON_GetObjectItem(csr, "rr") == NULL)
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
+            return handle_error(o2pt, ma_rsc, ma_error);
         }
     }
 

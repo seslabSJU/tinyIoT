@@ -40,6 +40,46 @@ static void sanitize_fcnt_response(cJSON *copy) {
 	}
 }
 
+static const char* get_fcnt_response_key(cJSON *fcnt_obj, ResourceType ty) {
+	cJSON *cnd = cJSON_GetObjectItem(fcnt_obj, "cnd");
+	if (cnd && cJSON_IsString(cnd)) {
+		SDTDef *def = sdt_find_by_cnd(cnd->valuestring);
+		if (def && def->type) return def->type;
+	}
+	return get_resource_key(ty);
+}
+
+static const char* get_fcin_response_key(cJSON *parent_fcnt_obj) {
+	cJSON *cnd = parent_fcnt_obj ? cJSON_GetObjectItem(parent_fcnt_obj, "cnd") : NULL;
+	if (cnd && cJSON_IsString(cnd)) {
+		SDTDef *def = sdt_find_by_cnd(cnd->valuestring);
+		if (def && def->type) {
+			char inst_type[128];
+			snprintf(inst_type, sizeof(inst_type), "%sInst", def->type);
+			SDTDef *inst_def = sdt_find_by_type(inst_type);
+			if (inst_def && inst_def->type) return inst_def->type;
+		}
+	}
+	return get_resource_key(RT_FCIN);
+}
+
+static void flatten_fcnt_response(cJSON *fcnt_obj) {
+	cJSON *custom = cJSON_DetachItemFromObject(fcnt_obj, "custom_attrs");
+	if (custom && cJSON_IsObject(custom)) {
+		cJSON *item = custom->child;
+		while (item) {
+			cJSON *next = item->next;
+			if (item->string) {
+				cJSON_DetachItemViaPointer(custom, item);
+				cJSON_AddItemToObject(fcnt_obj, item->string, item);
+			}
+			item = next;
+		}
+	}
+	if (custom) cJSON_Delete(custom);
+	sanitize_fcnt_response(fcnt_obj);
+}
+
 /**
  * @brief get uri of resource with ri
  * @param ri resource identifier
@@ -2195,34 +2235,18 @@ int make_response_body(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 	case RCN_ATTRIBUTES:
 		if (target_rtnode->ty == RT_FCNT)
 		{
-			// For FlexContainer, use SDT shortname if available
-			cJSON *sn = cJSON_GetObjectItem(target_rtnode->obj, "_sn");
-			const char *key = (sn && cJSON_IsString(sn)) ? sn->valuestring : get_resource_key(target_rtnode->ty);
+			// For FlexContainer, resolve the SDT shortname from `cnd`
+			const char *key = get_fcnt_response_key(target_rtnode->obj, target_rtnode->ty);
 			cJSON *fcnt_copy = cJSON_Duplicate(target_rtnode->obj, true);
 			sanitize_fcnt_response(fcnt_copy);
 			cJSON_AddItemToObject(root, key, fcnt_copy);
 		}
 		else if (target_rtnode->ty == RT_FCIN)
 		{
-			// For FlexContainerInstance, use parent FCNT's SDT shortname or default to "m2m:fcin"
 			const char *key = get_resource_key(RT_FCIN);
 			if (target_rtnode->parent && target_rtnode->parent->ty == RT_FCNT)
 			{
-				cJSON *sn = cJSON_GetObjectItem(target_rtnode->parent->obj, "_sn");
-				if (sn && cJSON_IsString(sn))
-				{
-					key = sn->valuestring;
-				}
-				else
-				{
-					// Try to infer from cnd
-					cJSON *cnd = cJSON_GetObjectItem(target_rtnode->parent->obj, "cnd");
-					if (cnd && cJSON_IsString(cnd))
-					{
-						// Get shortname from ATTRIBUTES based on cnd
-						// For now, just use default key
-					}
-				}
+				key = get_fcin_response_key(target_rtnode->parent->obj);
 			}
 			char *debug_str = cJSON_PrintUnformatted(target_rtnode->obj);
 			logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body FCIN: target_rtnode->obj = %s", debug_str);
@@ -2309,9 +2333,8 @@ int make_response_body(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 		{
 			if (target_rtnode->ty == RT_FCNT)
 			{
-				// For FlexContainer, use SDT shortname if available
-				cJSON *sn = cJSON_GetObjectItem(target_rtnode->obj, "_sn");
-				const char *key = (sn && cJSON_IsString(sn)) ? sn->valuestring : get_resource_key(target_rtnode->ty);
+				// For FlexContainer, resolve the SDT shortname from `cnd`
+				const char *key = get_fcnt_response_key(target_rtnode->obj, target_rtnode->ty);
 				cJSON *fcnt_copy = cJSON_Duplicate(target_rtnode->obj, true);
 				sanitize_fcnt_response(fcnt_copy);
 				cJSON_AddItemToObject(root, key, fcnt_copy);
@@ -2402,6 +2425,13 @@ int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJ
 	cJSON *pjson = NULL;
 	PIMap *pi_map = NULL;
 
+	const char *target_key = get_resource_key(target_rtnode->ty);
+	if (target_rtnode->ty == RT_FCNT) {
+		target_key = get_fcnt_response_key(target_rtnode->obj, target_rtnode->ty);
+	} else if (target_rtnode->ty == RT_FCIN && target_rtnode->parent && target_rtnode->parent->ty == RT_FCNT) {
+		target_key = get_fcin_response_key(target_rtnode->parent->obj);
+	}
+
 	switch (o2pt->rcn) {
 	// 0
 	case RCN_NOTHING:
@@ -2412,43 +2442,20 @@ int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJ
 	case RCN_ATTRIBUTES:
 		if (target_rtnode->ty == RT_FCNT)
 		{
-			// For FlexContainer, use SDT shortname if available
-			cJSON *sn = cJSON_GetObjectItem(target_obj, "_sn");
-			const char *key = (sn && cJSON_IsString(sn)) ? sn->valuestring : get_resource_key(target_rtnode->ty);
 			cJSON *fcnt_copy = cJSON_Duplicate(target_obj, true);
 			sanitize_fcnt_response(fcnt_copy);
-			cJSON_AddItemToObject(root, key, fcnt_copy);
+			cJSON_AddItemToObject(root, target_key, fcnt_copy);
 		}
 		else if (target_rtnode->ty == RT_FCIN)
 		{
-			// For FlexContainerInstance, use parent FCNT's SDT shortname or default to "m2m:fcin"
-			const char *key = get_resource_key(RT_FCIN);
-			if (target_rtnode->parent && target_rtnode->parent->ty == RT_FCNT)
-			{
-				cJSON *sn = cJSON_GetObjectItem(target_rtnode->parent->obj, "_sn");
-				if (sn && cJSON_IsString(sn))
-				{
-					key = sn->valuestring;
-				}
-				else
-				{
-					// Try to infer from cnd
-					cJSON *cnd = cJSON_GetObjectItem(target_rtnode->parent->obj, "cnd");
-					if (cnd && cJSON_IsString(cnd))
-					{
-						// Get shortname from ATTRIBUTES based on cnd
-						// For now, just use default key
-					}
-				}
-			}
 			char *debug_str = cJSON_PrintUnformatted(target_obj);
 			logger("UTIL", LOG_LEVEL_DEBUG, "make_response_body FCIN: target_obj = %s", debug_str);
 			free(debug_str);
 			cJSON *fci_copy = cJSON_Duplicate(target_obj, true);
-			cJSON_AddItemToObject(root, key, fci_copy);
+			cJSON_AddItemToObject(root, target_key, fci_copy);
 		}
 		else {
-			cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+			cJSON_AddItemToObject(root, target_key, target_obj);
 		}
 		break;
 	// 4
@@ -2457,7 +2464,7 @@ int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJ
 		attach_descendant_to_target(target_obj, descendant_arr, pi_map, get_ri_rtnode(target_rtnode));
 		attach_orphans_to_target(target_obj, descendant_arr);
 
-		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+		cJSON_AddItemToObject(root, target_key, target_obj);
 
 		cJSON_Delete(descendant_arr);
 		maps_free(pi_map);
@@ -2465,7 +2472,7 @@ int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJ
 	// 5
 	case RCN_ATTRIBUTES_AND_CHILD_RESOURCE_REFERENCES:
 		cJSON_AddItemToObject(target_obj, "ch", descendant_arr);
-		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+		cJSON_AddItemToObject(root, target_key, target_obj);
 		break;
 	// 6
 	case RCN_CHILD_RESOURCE_REFERENCES:
@@ -2481,7 +2488,7 @@ int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJ
 			handle_error(o2pt, RSC_BAD_REQUEST, "rcn 7 is not supported for non anncounced resources");
 			break;
 		}
-		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+		cJSON_AddItemToObject(root, target_key, target_obj);
 		break;
 	// 8
 	case RCN_CHILD_RESOURCES:
@@ -2493,7 +2500,9 @@ int make_response_body_retrieve(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJ
 		attach_descendant_to_target(target_obj, descendant_arr, pi_map, get_ri_rtnode(target_rtnode));
 		attach_orphans_to_target(target_obj, descendant_arr);
 
-		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty), target_obj);
+		// target_obj here is a bare scaffold (rcn=8 omits the target's own attributes) —
+		// target_key was already resolved from the live tree node up front, not this.
+		cJSON_AddItemToObject(root, target_key, target_obj);
 
 		cJSON_Delete(descendant_arr);
 		maps_free(pi_map);
@@ -2620,7 +2629,15 @@ static void attach_descendant_to_target(cJSON *parent_obj, cJSON *descendant_arr
 	if (!children) return;
 
 	for (ChildSlot *cs = children; cs; cs = cs->next) {
-		key = get_resource_key(cs->type);
+		if (cs->type == RT_FCNT) {
+			flatten_fcnt_response(cs->obj);
+			key = (char*)get_fcnt_response_key(cs->obj, cs->type);
+		} else if (cs->type == RT_FCIN) {
+			flatten_fcnt_response(cs->obj);
+			key = (char*)get_fcin_response_key(parent_obj);
+		} else {
+			key = get_resource_key(cs->type);
+		}
 		cJSON *arr = cJSON_GetObjectItem(parent_obj, key);
 
 		if (arr) {
@@ -2646,7 +2663,16 @@ static void attach_orphans_to_target(cJSON *target_obj, cJSON *descendant_arr) {
 		cJSON *ty_json = cJSON_GetObjectItem(item, "ty");
 		if (!ty_json) continue;
 		int ty = (int)ty_json->valuedouble;
-		char *key = get_resource_key(ty);
+		char *key;
+		if (ty == RT_FCNT) {
+			flatten_fcnt_response(obj);
+			key = (char*)get_fcnt_response_key(obj, ty);
+		} else if (ty == RT_FCIN) {
+			flatten_fcnt_response(obj);
+			key = get_resource_key(ty);
+		} else {
+			key = get_resource_key(ty);
+		}
 		cJSON *arr = cJSON_GetObjectItem(target_obj, key);
 		cJSON *detached = cJSON_DetachItemViaPointer(item, obj);
 		if (!arr) {
@@ -3953,6 +3979,36 @@ bool is_attr_valid(cJSON* obj, ResourceType ty, char* err_msg)
 	}
 
 	return true;
+}
+
+static const char *const *get_ma_fields(ResourceType ty) {
+	for (int i = 0; MA_TABLE[i].ty != RT_MIXED; i++) {
+		if (MA_TABLE[i].ty == ty) return MA_TABLE[i].ma_fields;
+	}
+	return NULL;
+}
+
+int validate_mandatory_attrs(ResourceType ty, cJSON *obj, Operation op, char **error_msg)
+{
+	const char *const *ma_fields = get_ma_fields(ty);
+	if (!ma_fields || !obj) return RSC_OK;
+
+	for (int i = 0; ma_fields[i] != NULL; i++) {
+		cJSON *item = cJSON_GetObjectItem(obj, ma_fields[i]);
+
+		if (op == OP_CREATE) {
+			if (!item || cJSON_IsNull(item)) {
+				if (error_msg) *error_msg = "insufficient mandatory attribute(s)";
+				return RSC_BAD_REQUEST;
+			}
+		} else if (op == OP_UPDATE) {
+			if (item && cJSON_IsNull(item)) {
+				if (error_msg) *error_msg = "mandatory attribute cannot be null";
+				return RSC_BAD_REQUEST;
+			}
+		}
+	}
+	return RSC_OK;
 }
 
 /**

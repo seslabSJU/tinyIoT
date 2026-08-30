@@ -65,7 +65,7 @@ SDT_SOURCES = $(wildcard sdt_sources/*.xml)
 SDT_OUTPUTS = $(patsubst sdt_sources/%.xml,sdt_definitions/%.fcp,$(SDT_SOURCES))
 SDT_TOOL_DIR = tools
 SDT_TOOL = $(SDT_TOOL_DIR)/SDTTool.py
-SDT_PYTHON = $(HOME)/project/sdt-tool/venv/bin/python3
+SDT_PYTHON ?= python3
 SDT_SHORTNAMES = tools/shortnames.csv
 SDT_MODEL_VERSION = 5.6.0
 

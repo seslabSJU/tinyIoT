@@ -179,6 +179,15 @@ int validate_cin(oneM2MPrimitive *o2pt, cJSON *parent_cnt, cJSON *cin, Operation
     cJSON *mbs = NULL;
     cJSON *cs = NULL;
 
+    {
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_CIN, cin, op, &ma_error);
+        if (ma_rsc != RSC_OK)
+        {
+            return handle_error(o2pt, ma_rsc, ma_error);
+        }
+    }
+
     if ((pjson = cJSON_GetObjectItem(cin, "rn")))
     {
         if (!strcmp(pjson->valuestring, "la") || !strcmp(pjson->valuestring, "latest"))

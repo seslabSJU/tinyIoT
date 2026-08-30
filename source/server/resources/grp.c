@@ -133,6 +133,15 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
     char *tStr = NULL;
     cJSON *pjson = NULL;
 
+    {
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_GRP, grp, OP_CREATE, &ma_error);
+        if (ma_rsc != RSC_OK)
+        {
+            return handle_error(o2pt, ma_rsc, ma_error);
+        }
+    }
+
     int mt = 0;
     int csy = DEFAULT_CONSISTENCY_POLICY;
 
@@ -186,12 +195,6 @@ int validate_grp(oneM2MPrimitive *o2pt, cJSON *grp)
 
     cJSON *midArr = cJSON_GetObjectItem(grp, "mid");
     cJSON *mid_obj = NULL;
-
-    if (!midArr)
-    {
-        handle_error(o2pt, RSC_BAD_REQUEST, "`mid` is mandatory");
-        return RSC_BAD_REQUEST;
-    }
 
     if (midArr && !cJSON_IsArray(midArr))
     {
@@ -466,6 +469,15 @@ int validate_grp_update(oneM2MPrimitive *o2pt, cJSON *grp_old, cJSON *grp_new)
 
     int mt = 0;
     int csy = DEFAULT_CONSISTENCY_POLICY;
+
+    {
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_GRP, grp_new, OP_UPDATE, &ma_error);
+        if (ma_rsc != RSC_OK)
+        {
+            return handle_error(o2pt, ma_rsc, ma_error);
+        }
+    }
 
     pjson = cJSON_GetObjectItem(grp_new, "acpi");
     if (pjson)

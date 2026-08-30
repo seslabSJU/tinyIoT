@@ -42,6 +42,27 @@ void route(oneM2MPrimitive *o2pt);
 void stop_server(int sig);
 void log_runtime(double start);
 cJSON *ATTRIBUTES;
+
+
+static const char *AE_MA[]  = { "api", "rr", NULL };
+static const char *ACP_MA[] = { "pv", "pvs", NULL };
+static const char *SUB_MA[] = { "nu", NULL };
+static const char *GRP_MA[] = { "mid", NULL };
+static const char *CSR_MA[] = { "cb", "srv", "rr", NULL };
+static const char *CIN_MA[] = { "con", NULL };
+static const char *TSI_MA[] = { "con", "dgt", NULL };
+
+const MandatoryAttrDef MA_TABLE[] = {
+	{ RT_AE,  AE_MA },
+	{ RT_ACP, ACP_MA },
+	{ RT_SUB, SUB_MA },
+	{ RT_GRP, GRP_MA },
+	{ RT_CSR, CSR_MA },
+	{ RT_CIN, CIN_MA },
+	{ RT_TSI, TSI_MA },
+	{ RT_MIXED, NULL },
+};
+
 char *PORT = SERVER_PORT;
 int terminate = 0;
 int call_stop = 0;
