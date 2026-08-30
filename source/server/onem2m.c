@@ -29,6 +29,7 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode);
 
 static char *get_uri_from_item(cJSON *item, int drt);
 static cJSON *build_arp_item(RTNode *node, int rcn, int drt);
+static cJSON *get_request_resource_content(oneM2MPrimitive *o2pt, ResourceType ty);
 
 extern ResourceTree *rt;
 extern pthread_mutex_t main_lock;
@@ -999,6 +1000,32 @@ int retrieve_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 // 	return RSC_OK;
 // }
 
+static cJSON *get_request_resource_content(oneM2MPrimitive *o2pt, ResourceType ty)
+{
+	if (!o2pt || !o2pt->request_pc)
+	{
+		return NULL;
+	}
+
+	char *resource_key = get_resource_key(ty);
+	cJSON *resource = resource_key ? cJSON_GetObjectItem(o2pt->request_pc, resource_key) : NULL;
+	if (!resource && ty == RT_FCNT)
+	{
+		cJSON *item = o2pt->request_pc->child;
+		while (item)
+		{
+			if (item->type == cJSON_Object && item->string && strchr(item->string, ':'))
+			{
+				resource = item;
+				break;
+			}
+			item = item->next;
+		}
+	}
+
+	return resource;
+}
+
 int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
 	if(target_rtnode->ty == RT_CSE) {
@@ -1025,8 +1052,21 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	ResourceType ty = parse_object_type_cjson(o2pt->request_pc);
 	if (e != -1)
 		e = check_resource_type_equal(o2pt);
+
+	cJSON *resource_content = get_request_resource_content(o2pt, ty);
+	cJSON *new_acpi = resource_content ? cJSON_GetObjectItem(resource_content, "acpi") : NULL;
+	if (e != -1 && new_acpi && cJSON_GetArraySize(resource_content) != 1)
+	{
+		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` shall be the only attribute in an UPDATE request");
+	}
+
 	if (e != -1)
-		e = check_privilege(o2pt, target_rtnode, ACOP_UPDATE);
+	{
+		if (new_acpi)
+			e = check_acpi_update_privilege(o2pt, target_rtnode);
+		else
+			e = check_privilege(o2pt, target_rtnode, ACOP_UPDATE);
+	}
 	// if (e != -1)
 	// 	e = check_rn_duplicate(o2pt, target_rtnode->parent);
 	if (e == -1)
@@ -1040,22 +1080,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		}
 	}
 
-	cJSON *pjson = cJSON_GetObjectItem(o2pt->request_pc, get_resource_key(o2pt->ty));
-	// For FlexContainer, try to get the SDT shortname object if standard key doesn't exist
-	if (!pjson && o2pt->ty == RT_FCNT)
-	{
-		cJSON *item = o2pt->request_pc->child;
-		while (item)
-		{
-			if (item->type == cJSON_Object && item->string && strchr(item->string, ':'))
-			{
-				pjson = item;
-				break;
-			}
-			item = item->next;
-		}
-	}
-	pjson = cJSON_GetObjectItem(pjson, "et");
+	cJSON *pjson = resource_content ? cJSON_GetObjectItem(resource_content, "et") : NULL;
 	if (pjson && !isETvalid(pjson->valuestring))
 	{
 		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");

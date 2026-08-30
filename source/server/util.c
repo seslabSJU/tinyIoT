@@ -1258,12 +1258,40 @@ int check_mandatory_attributes(oneM2MPrimitive* o2pt)
  * @param acop access control operation
  * @return 0 if success, -1 if fail
  */
+static char* get_normalized_originator(oneM2MPrimitive* o2pt)
+{
+	if (!o2pt || !o2pt->fr)
+	{
+		return NULL;
+	}
+
+	if (isSPIDLocal(o2pt->fr))
+	{
+		RTNode* origin_rtnode = find_rtnode(o2pt->fr);
+		char* origin_ri = origin_rtnode ? get_ri_rtnode(origin_rtnode) : NULL;
+		if (origin_ri)
+		{
+			return origin_ri;
+		}
+	}
+
+	return o2pt->fr;
+}
+
+static int deny_privilege(oneM2MPrimitive* o2pt)
+{
+	handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "originator has no privilege");
+	return -1;
+}
+
 int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 {
-	logger("UTIL", LOG_LEVEL_DEBUG, "check_privilege : %s : %d", o2pt->fr, acop);
-	bool deny = true;
-	char* origin = NULL;
-	cJSON* acpi = NULL;
+	if (!o2pt || !rtnode || !rtnode->obj)
+	{
+		return o2pt ? deny_privilege(o2pt) : -1;
+	}
+
+	logger("UTIL", LOG_LEVEL_DEBUG, "check_privilege : %s : %d", o2pt->fr ? o2pt->fr : "(null)", acop);
 
 	RTNode* target_rtnode = rtnode;
 #ifdef ADMIN_AE_ID
@@ -1274,26 +1302,37 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 	}
 #endif
 
-	if (isSPIDLocal(o2pt->fr))
+	/* Anonymous AE registration is the only operation accepted without an Originator. */
+	if (!o2pt->fr || strlen(o2pt->fr) == 0 || !strcmp(o2pt->fr, "C"))
 	{
-		origin = get_ri_rtnode(find_rtnode(o2pt->fr));
-		if (!origin)
-			origin = o2pt->fr;
-	}
-	else
-	{
-		origin = o2pt->fr;
-	}
-	// AE/CSR self-access is a resource-specific shortcut. Do not use it
-	// to bypass ACP CREATE privileges for child resources.
-	if (acop != ACOP_CREATE && rtnode->ty == RT_AE)
-	{
-		if (origin && !strcmp(origin, get_ri_rtnode(target_rtnode)))
+		if (o2pt->op == OP_CREATE && o2pt->ty == RT_AE)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner");
 			return 0;
 		}
+		return deny_privilege(o2pt);
 	}
+
+	char* origin = get_normalized_originator(o2pt);
+	if (!origin)
+	{
+		return deny_privilege(o2pt);
+	}
+
+	/*
+	 * TS-0001 9.6.2: access to an ACP itself is governed exclusively by
+	 * that ACP's selfPrivileges.  Do not fall through to its parent policy.
+	 */
+	if (target_rtnode->ty == RT_ACP)
+	{
+		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, 1);
+		if ((pvs_acop & acop) == acop)
+		{
+			return 0;
+		}
+		return deny_privilege(o2pt);
+	}
+
+	/* CSR self-access is defined by the registration relationship. */
 	if (acop != ACOP_CREATE && rtnode->ty == RT_CSR)
 	{
 		if (origin && !strcmp(origin, cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring))
@@ -1330,69 +1369,46 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 		} 
 	}
 
-	// Creator shortcut is only a default-access fallback. It must not grant
-	// CREATE on a parent or bypass explicit ACPs.
-	cJSON *cr = cJSON_GetObjectItem(rtnode->obj, "cr");
-	if (acop != ACOP_CREATE && cr && cJSON_IsString(cr) && cJSON_GetObjectItem(rtnode->obj, "acpi") == NULL)
+	/*
+	 * Resolve the effective policy before applying owner/creator defaults.
+	 * An AE without acpi is the default-policy boundary: its creator has
+	 * unrestricted access and other Originators are denied.  A child resource
+	 * may inherit an explicit ACP from that AE, but ownership must not bypass it.
+	 */
+	RTNode* policy_rtnode = target_rtnode;
+	while (policy_rtnode && !cJSON_GetObjectItem(policy_rtnode->obj, "acpi"))
 	{
-		if (origin && !strcmp(origin, cr->valuestring))
+		if (policy_rtnode->ty == RT_AE)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the creator");
-			return 0;
-		}
-	}
-
-	// Do not let an ancestor AE owner shortcut bypass child CREATE privilege.
-	RTNode *parent = rtnode->parent;
-	while (acop != ACOP_CREATE && parent)
-	{
-		if (parent->ty == RT_AE)
-		{
-			if (origin && !strcmp(origin, get_ri_rtnode(parent)))
+			char* ae_ri = get_ri_rtnode(policy_rtnode);
+			if (ae_ri && !strcmp(origin, ae_ri))
 			{
-				logger("UTIL", LOG_LEVEL_DEBUG, "originator is the parent AE");
+				logger("UTIL", LOG_LEVEL_DEBUG, "originator is the owner under the default access policy");
 				return 0;
 			}
-			break; // Only check direct lineage to first AE ancestor
+			return deny_privilege(o2pt);
 		}
-		parent = parent->parent;
-	}
-	if (target_rtnode->ty == RT_ACP)
-	{
-		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, /* PVS */ 1);
-		//int  pv_acop = get_acop_origin(o2pt, origin, target_rtnode, /*  PV */ 0);
-		if ((pvs_acop & acop) == acop)
-		{
-			deny = false;
-		}
+		policy_rtnode = policy_rtnode->parent;
 	}
 
-	// if resource is not an AE|CSR, find acpi for all parent nodes
-	while (target_rtnode->parent && cJSON_GetObjectItem(target_rtnode->obj, "acpi") == NULL)
+	if (policy_rtnode && cJSON_GetObjectItem(policy_rtnode->obj, "acpi"))
 	{
-		target_rtnode = target_rtnode->parent;
-	}
-
-	if (o2pt->fr == NULL || strlen(o2pt->fr) == 0 || strcmp(o2pt->fr, "C") == 0)
-	{
-		if ((o2pt->op == OP_CREATE && o2pt->ty == RT_AE))
+		if ((get_acop(o2pt, origin, policy_rtnode) & acop) == acop)
 		{
 			return 0;
 		}
+		return deny_privilege(o2pt);
 	}
 
-	if ((get_acop(o2pt, origin, target_rtnode) & acop) == acop) {
-		deny = false;
-	}
-
-
-	if (deny)
+	/* No explicit or inherited ACP: apply the creator-only default policy. */
+	cJSON* cr = cJSON_GetObjectItem(target_rtnode->obj, "cr");
+	if (cr && cJSON_IsString(cr) && !strcmp(origin, cr->valuestring))
 	{
-		handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "originator has no privilege");
-		return -1;
+		logger("UTIL", LOG_LEVEL_DEBUG, "originator is the creator under the default access policy");
+		return 0;
 	}
 
-	return false;
+	return deny_privilege(o2pt);
 }
 
 static int get_acop_from_acpi_list(oneM2MPrimitive* o2pt, char* origin, cJSON* acpi_list)
@@ -1413,7 +1429,7 @@ static int get_acop_from_acpi_list(oneM2MPrimitive* o2pt, char* origin, cJSON* a
 		}
 
 		RTNode* acp = find_rtnode(acpi->valuestring);
-		if (acp)
+		if (acp && acp->ty == RT_ACP)
 		{
 			acop = (acop | get_acop_origin(o2pt, origin, acp, 0));
 		}
@@ -1488,8 +1504,12 @@ int get_acop(oneM2MPrimitive* o2pt, char* corigin, RTNode* rtnode)
 	cJSON* acpi = NULL;
 	cJSON_ArrayForEach(acpi, acpiArr)
 	{
+		if (!cJSON_IsString(acpi) || !acpi->valuestring)
+		{
+			continue;
+		}
 		RTNode* acp = find_rtnode(acpi->valuestring);
-		if (acp)
+		if (acp && acp->ty == RT_ACP)
 		{
 			acop = (acop | get_acop_origin(o2pt, corigin, acp, 0));
 			valid_flag = 1;
@@ -1737,26 +1757,65 @@ int has_privilege(oneM2MPrimitive* o2pt, char* acpi, ACOP acop)
 	return 0;
 }
 
-int has_acpi_update_privilege(oneM2MPrimitive* o2pt, char* acpi)
+int check_acpi_update_privilege(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 {
-	logger("UTIL", LOG_LEVEL_DEBUG, "has_acpi_update_privilege : %s", acpi);
-	char* origin = o2pt->fr;
-	if (!origin)
-		return 0;
-	if (!acpi)
-		return 1;
-
-	RTNode* acp = find_rtnode(acpi);
-	
-	if (!acp)
-    	return 0;
-
-	int result = get_acop_origin(o2pt, origin, acp, 1);
-	if ((result & ACOP_UPDATE) == ACOP_UPDATE)
+	if (!o2pt || !target_rtnode || !target_rtnode->obj)
 	{
-		return 1;
+		return o2pt ? deny_privilege(o2pt) : -1;
 	}
-	return 0;
+
+#ifdef ADMIN_AE_ID
+	if (o2pt->fr && !strcmp(o2pt->fr, ADMIN_AE_ID))
+	{
+		return 0;
+	}
+#endif
+
+	char* origin = get_normalized_originator(o2pt);
+	if (!origin)
+	{
+		return deny_privilege(o2pt);
+	}
+
+	cJSON* current_acpi = cJSON_GetObjectItem(target_rtnode->obj, "acpi");
+	if (!current_acpi || cJSON_IsNull(current_acpi))
+	{
+		/* No explicit current reference: use the resource's implicit/default policy. */
+		return check_privilege(o2pt, target_rtnode, ACOP_UPDATE);
+	}
+
+	if (!cJSON_IsArray(current_acpi) || cJSON_GetArraySize(current_acpi) == 0)
+	{
+		return deny_privilege(o2pt);
+	}
+
+	/*
+	 * TS-0001 authorizes an acpi change through selfPrivileges of at least
+	 * one ACP referenced before the UPDATE.  The replacement list's pv/pvs
+	 * is not an authorization input for this operation.
+	 */
+	cJSON* acpi = NULL;
+	cJSON_ArrayForEach(acpi, current_acpi)
+	{
+		if (!cJSON_IsString(acpi) || !acpi->valuestring)
+		{
+			continue;
+		}
+
+		RTNode* acp = find_rtnode(acpi->valuestring);
+		if (!acp || acp->ty != RT_ACP)
+		{
+			continue;
+		}
+
+		int pvs_acop = get_acop_origin(o2pt, origin, acp, 1);
+		if ((pvs_acop & ACOP_UPDATE) == ACOP_UPDATE)
+		{
+			return 0;
+		}
+	}
+
+	return deny_privilege(o2pt);
 }
 
 int check_rn_duplicate(oneM2MPrimitive* o2pt, RTNode* rtnode)
@@ -3900,57 +3959,51 @@ bool is_attr_valid(cJSON* obj, ResourceType ty, char* err_msg)
  * Get Request Primitive and acpi attribute and validate it.
  * @param o2pt oneM2M request primitive
  * @param acpiAttr acpi attribute cJSON object
- * @param requested_acop access control operation required on referenced ACP
- * @return 0 if valid, -1 if invalid
+ * @param op operation that carries the attribute
+ * @return RSC_OK if valid, otherwise an oneM2M error code
  */
-int validate_acpi(oneM2MPrimitive* o2pt, cJSON* acpiAttr, ACOP requested_acop)
+int validate_acpi(oneM2MPrimitive* o2pt, cJSON* acpiAttr, Operation op)
 {
-	logger("UTIL", LOG_LEVEL_DEBUG, "validate_acpi %d", requested_acop);
+	logger("UTIL", LOG_LEVEL_DEBUG, "validate_acpi %d", op);
+	/* Authorization is performed against the target resource before this structural check. */
 	if (!acpiAttr)
 	{
 		return RSC_OK;
 	}
-	if (!cJSON_IsArray(acpiAttr) || cJSON_IsNull(acpiAttr))
+	if (cJSON_IsNull(acpiAttr))
+	{
+		if (op == OP_UPDATE)
+		{
+			return RSC_OK;
+		}
+		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` is null");
+	}
+	if (!cJSON_IsArray(acpiAttr))
 	{
 		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` is in invalid form");
 	}
-	if (cJSON_IsArray(acpiAttr) && cJSON_GetArraySize(acpiAttr) == 0)
+	if (cJSON_GetArraySize(acpiAttr) == 0)
 	{
 		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` is empty");
 	}
 
 	cJSON* acpi = NULL;
-	int acop = 0;
-	char* origin = o2pt->fr;
 	cJSON_ArrayForEach(acpi, acpiAttr)
 	{
-		RTNode* acp = NULL;
-		acp = find_rtnode(acpi->valuestring);
+		if (!cJSON_IsString(acpi) || !acpi->valuestring || is_blank_string(acpi->valuestring))
+		{
+			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` contains an invalid resource identifier");
+		}
+
+		RTNode* acp = find_rtnode(acpi->valuestring);
 		if (!acp)
 		{
 			return handle_error(o2pt, RSC_BAD_REQUEST, "resource `acp` is not found");
 		}
-
-		if (!origin)
+		if (acp->ty != RT_ACP)
 		{
-			continue;
+			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` does not reference an accessControlPolicy resource");
 		}
-
-		acop = (acop | get_acop_origin(o2pt, origin, acp, 0));
-		if ((acop & requested_acop) == requested_acop)
-		{
-			break;
-		}
-	}
-#ifdef ADMIN_AE_ID
-	if (o2pt->fr && !strcmp(o2pt->fr, ADMIN_AE_ID))
-	{
-		return RSC_OK;
-	}
-#endif
-	if ((acop & requested_acop) != requested_acop)
-	{
-		return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "originator has no privilege");
 	}
 
 	return RSC_OK;
@@ -5186,15 +5239,16 @@ int validate_fcnt(oneM2MPrimitive *o2pt, cJSON *fcnt, Operation op)
 		}
 	}
 
-	if (op == OP_CREATE)
+	pjson = cJSON_GetObjectItem(fcnt, "acpi");
+	if (pjson)
 	{
-		pjson = cJSON_GetObjectItem(fcnt, "acpi");
-		if (pjson && cJSON_GetArraySize(pjson) > 0)
+		if (op == OP_UPDATE && cJSON_GetArraySize(fcnt) > 1)
 		{
-			int result = validate_acpi(o2pt, pjson, ACOP_CREATE);
-			if (result != RSC_OK)
-				return result;
+			return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` shall be the only attribute in an UPDATE request");
 		}
+		int result = validate_acpi(o2pt, pjson, op);
+		if (result != RSC_OK)
+			return result;
 	}
 
 	pjson = cJSON_GetObjectItem(fcnt, "cnd");

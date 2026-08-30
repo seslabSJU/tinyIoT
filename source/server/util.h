@@ -110,7 +110,7 @@ int validate_grp(oneM2MPrimitive* o2pt, cJSON* grp);
 int validate_grp_update(oneM2MPrimitive* o2pt, cJSON* grp_old, cJSON* grp_new);
 int validate_grp_member(cJSON* grp, cJSON* final_mid, int csy, int mt);
 int validate_csr(oneM2MPrimitive* o2pt, RTNode* parent_rtnode, cJSON* csr, Operation op);
-int validate_acpi(oneM2MPrimitive* o2pt, cJSON* acpiAttr, ACOP acop);
+int validate_acpi(oneM2MPrimitive* o2pt, cJSON* acpiAttr, Operation op);
 int validate_acr(oneM2MPrimitive* o2pt, cJSON* acr_attr);
 bool checkResourceCseID(char* resourceUri, char* cseID);
 bool isValidChildType(ResourceType parent, ResourceType child);
@@ -131,6 +131,7 @@ int check_rn_invalid(oneM2MPrimitive* o2pt, ResourceType ty);
 bool check_acpi_valid(oneM2MPrimitive* o2pt, cJSON* acpi);
 int check_csi_duplicate(char* new_csi, RTNode* rtnode);
 int check_macp_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop);
+int check_acpi_update_privilege(oneM2MPrimitive* o2pt, RTNode* target_rtnode);
 
 // etc
 char *get_local_time(int diff);
@@ -158,7 +159,6 @@ int get_acop(oneM2MPrimitive* o2pt, char* origin, RTNode* node);
 int get_acop_macp(oneM2MPrimitive* o2pt, RTNode* rtnode);
 int get_acop_origin(oneM2MPrimitive* o2pt, char* origin, RTNode* acp_rtnode, int flag);
 int has_privilege(oneM2MPrimitive* o2pt, char* acpi, ACOP acop);
-int has_acpi_update_privilege(oneM2MPrimitive* o2pt, char* acpi);
 
 ResourceType http_parse_object_type(header_t* headers);
 ResourceType coap_parse_object_type(int object_type);

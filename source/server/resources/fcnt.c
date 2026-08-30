@@ -361,9 +361,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
 	cJSON *fcnt = target_rtnode->obj;
 	int result;
-	cJSON *pjson = NULL;
-	cJSON *acpi_obj = NULL;
-	bool acpi_flag = false;
 	bool needs_fci = false;
 
 	cJSON *customAttrs = extract_custom_attributes(m2m_fcnt);
@@ -417,39 +414,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 
 	result = validate_fcnt(o2pt, m2m_fcnt, OP_UPDATE);
-
-	if (cJSON_GetObjectItem(m2m_fcnt, "acpi"))
-	{
-		cJSON_ArrayForEach(acpi_obj, cJSON_GetObjectItem(fcnt, "acpi"))
-		{
-			acpi_flag = false;
-			cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(m2m_fcnt, "acpi"))
-			{
-				if (strcmp(acpi_obj->valuestring, pjson->valuestring) != 0)
-				{
-					acpi_flag = true;
-					break;
-				}
-			}
-			if (!acpi_flag)
-			{
-				if (!has_acpi_update_privilege(o2pt, acpi_obj->valuestring))
-				{
-					if (customAttrs) cJSON_Delete(customAttrs);
-					return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "no privilege to update acpi");
-				}
-			}
-		}
-
-		if (cJSON_GetArraySize(cJSON_GetObjectItem(m2m_fcnt, "acpi")) > 0)
-		{
-			if (validate_acpi(o2pt, cJSON_GetObjectItem(m2m_fcnt, "acpi"), ACOP_UPDATE) != RSC_OK)
-			{
-				if (customAttrs) cJSON_Delete(customAttrs);
-				return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
-			}
-		}
-	}
 
 	if (result != RSC_OK)
 	{

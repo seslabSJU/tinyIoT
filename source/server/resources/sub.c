@@ -253,7 +253,11 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
     pjson = cJSON_GetObjectItem(sub, "acpi");
     if (pjson)
     {
-        int result = validate_acpi(o2pt, pjson, op_to_acop(op));
+        if (op == OP_UPDATE && cJSON_GetArraySize(sub) > 1)
+        {
+            return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `acpi` shall be the only attribute in an UPDATE request");
+        }
+        int result = validate_acpi(o2pt, pjson, op);
         if (result != RSC_OK)
             return result;
     }

@@ -123,47 +123,7 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     cJSON *cnt = target_rtnode->obj;
     int result;
-    cJSON *pjson = NULL;
-    cJSON *acpi_obj = NULL;
-    bool acpi_flag = false;
-
     result = validate_cnt(o2pt, m2m_cnt, OP_UPDATE);
-
-    // update acpi
-    if (cJSON_GetObjectItem(m2m_cnt, "acpi"))
-    {
-
-        // delete removed acpi
-        cJSON_ArrayForEach(acpi_obj, cJSON_GetObjectItem(cnt, "acpi"))
-        {
-            acpi_flag = false;
-            cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(m2m_cnt, "acpi"))
-            {
-                if (strcmp(acpi_obj->valuestring, pjson->valuestring) != 0)
-                {
-                    acpi_flag = true;
-                    break;
-                }
-            }
-            if (!acpi_flag)
-            {
-                logger("UTIL", LOG_LEVEL_INFO, "acpi %s", acpi_obj->valuestring);
-                if (!has_acpi_update_privilege(o2pt, acpi_obj->valuestring))
-                {
-                    return handle_error(o2pt, RSC_ORIGINATOR_HAS_NO_PRIVILEGE, "no privilege to update acpi");
-                }
-            }
-        }
-
-        // validate new acpi
-        if (cJSON_GetArraySize(cJSON_GetObjectItem(m2m_cnt, "acpi")) > 0)
-        {
-            if (validate_acpi(o2pt, cJSON_GetObjectItem(m2m_cnt, "acpi"), ACOP_UPDATE) != RSC_OK)
-            {
-                return handle_error(o2pt, RSC_BAD_REQUEST, "no privilege to update acpi");
-            }
-        }
-    }
 
     if (result != RSC_OK)
         return result;
@@ -228,9 +188,9 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op)
     if (op == OP_CREATE)
     {
         pjson = cJSON_GetObjectItem(cnt, "acpi");
-        if (pjson && cJSON_GetArraySize(pjson) > 0)
+        if (pjson)
         {
-            int result = validate_acpi(o2pt, pjson, ACOP_CREATE);
+            int result = validate_acpi(o2pt, pjson, op);
             if (result != RSC_OK)
                 return result;
         }
@@ -243,6 +203,12 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op)
         {
             handle_error(o2pt, RSC_BAD_REQUEST, "only attribute `acpi` is allowed when updating `acpi`");
             return RSC_BAD_REQUEST;
+        }
+        if (pjson)
+        {
+            int result = validate_acpi(o2pt, pjson, op);
+            if (result != RSC_OK)
+                return result;
         }
     }
 
