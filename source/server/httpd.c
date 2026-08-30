@@ -478,10 +478,6 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         pc = cJSON_PrintUnformatted(o2pt->response_pc);
     }
 
-    if (pc && strlen(pc) >= BUF_SIZE - 1)
-    {
-        handle_error(o2pt, RSC_NOT_ACCEPTABLE, "result size too big");
-    }
 
     sprintf(content_length, "%ld", pc ? strlen(pc) : 0);
     sprintf(rsc, "%d", o2pt->rsc);
@@ -497,9 +493,10 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         if (content_location) {
             set_header("Content-Location", content_location, response_headers);
         }
-    } 
-    if (o2pt->response_pc)
+    }
+    if (o2pt->response_pc) {
         set_header("Content-Length", content_length, response_headers);
+    }
 
     set_header("X-M2M-RSC", rsc, response_headers);
     if (o2pt->rvi != RVI_NONE)
@@ -520,15 +517,27 @@ void http_respond_to_client(oneM2MPrimitive *o2pt, int slotno)
         set_header("X-M2M-CTO", ot, response_headers);
     }
 
+    // sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
+    // if (pc)
+    // {
+    //     strncat(buf, pc, BUF_SIZE - strlen(buf) - 1);
+    //     strncat(buf, "\r\n", BUF_SIZE - strlen(buf) - 1);
+    // }
+    // logger("HTTP", LOG_LEVEL_DEBUG, "Response: \n%s", buf);
+
+    // write(clients[slotno], buf, strlen(buf));
+
     sprintf(buf, "%s %d %s\r\n%s%s\r\n", HTTP_PROTOCOL_VERSION, status_code, status_msg, DEFAULT_RESPONSE_HEADERS, response_headers);
-    if (pc)
-    {
-        strncat(buf, pc, BUF_SIZE - strlen(buf) - 1);
-        strncat(buf, "\r\n", BUF_SIZE - strlen(buf) - 1);
-    }
-    logger("HTTP", LOG_LEVEL_DEBUG, "Response: \n%s", buf);
+    logger("HTTP", LOG_LEVEL_DEBUG, "Response Header: \n%s", buf);
 
     write(clients[slotno], buf, strlen(buf));
+
+    if (pc)
+    {
+        logger("HTTP", LOG_LEVEL_DEBUG, "Response Body: \n%s", pc);
+        write(clients[slotno], pc, strlen(pc));
+        write(clients[slotno], "\r\n", 2);
+    }
 
     if (pc)
     {
@@ -608,7 +617,7 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
         req->qs = fc_to_qs(o2pt->fc);
     }
 
-    if (o2pt->ty > 0)
+    if (o2pt->ty > 0 && o2pt->op == OP_CREATE)
     {
         sprintf(buffer, "application/json;ty=%d", o2pt->ty);
         add_header("Content-Type", buffer, req->headers);

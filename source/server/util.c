@@ -1303,13 +1303,31 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 		}
 	}
 
-	// Annc shortcut
-	if (rtnode->ty > 10000 && rtnode->ty < 20000) {
+	// Annc shortcut hosting -> remote
+	if (acop != ACOP_CREATE && rtnode->ty > 10000 && rtnode->ty < 20000) {
 		char *lnk = cJSON_GetObjectItem(rtnode->obj, "lnk")->valuestring;
 		if ((acop == ACOP_UPDATE || acop == ACOP_DELETE) && checkResourceCseID(lnk, o2pt->fr)) {
 			logger("UTIL", LOG_LEVEL_DEBUG, "originator is the cse of the owner of the resource");
 			return 0;
 		}
+	}
+
+	// Annc shortcut remote -> hosting
+	{
+		cJSON *ast = cJSON_GetObjectItem(rtnode->obj, "ast");
+		if (ast) {
+			int ast_val = cJSON_GetNumberValue(ast);
+			if (acop == ACOP_UPDATE && ast_val == AST_BI_DIRECTIONAL) {
+				cJSON *at = cJSON_GetObjectItem(rtnode->obj, "at");
+				cJSON *target = NULL;
+				cJSON_ArrayForEach(target, at) {
+					if (checkResourceCseID(target->valuestring, o2pt->fr)) {
+						logger("UTIL", LOG_LEVEL_DEBUG, "originator is the cse of announced resource");
+						return 0;
+					}
+				}
+			}
+		} 
 	}
 
 	// Creator shortcut is only a default-access fallback. It must not grant
@@ -1447,6 +1465,7 @@ int check_macp_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 int get_acop(oneM2MPrimitive* o2pt, char* corigin, RTNode* rtnode)
 {
 	int acop = 0;
+	int valid_flag = 0;
 
 #ifdef ADMIN_AE_ID
 	if (!strcmp(corigin, ADMIN_AE_ID))
@@ -1463,7 +1482,7 @@ int get_acop(oneM2MPrimitive* o2pt, char* corigin, RTNode* rtnode)
 
 	cJSON* acpiArr = get_acpi_rtnode(rtnode);
 	if (!acpiArr)
-		return 0;
+		return DEFAULT_ACOP;
 	logger("UTIL", LOG_LEVEL_DEBUG, "get_acop : %s", rtnode->uri);
 
 	cJSON* acpi = NULL;
@@ -1473,9 +1492,16 @@ int get_acop(oneM2MPrimitive* o2pt, char* corigin, RTNode* rtnode)
 		if (acp)
 		{
 			acop = (acop | get_acop_origin(o2pt, corigin, acp, 0));
+			valid_flag = 1;
 		}
 	}
-	return acop;
+	
+	if (valid_flag) {
+		return acop;
+	} else {
+		return DEFAULT_ACOP;
+	}
+
 }
 
 int get_acop_macp(oneM2MPrimitive* o2pt, RTNode* rtnode)
@@ -4017,6 +4043,7 @@ int validate_acr(oneM2MPrimitive* o2pt, cJSON* acr_attr)
  */
 bool isETvalid(char* et)
 {
+	if (!et) return false;
 	char* now = get_local_time(0);
 	if (strcmp(et, now) < 0)
 	{
@@ -4132,8 +4159,8 @@ int create_local_csr()
 		return 0;
 	};
 	
-	HTTPRequest* req = (HTTPRequest*)malloc(sizeof(HTTPRequest));
-	HTTPResponse* res = (HTTPResponse*)malloc(sizeof(HTTPResponse));
+	HTTPRequest* req = (HTTPRequest*)calloc(1, sizeof(HTTPRequest));
+	HTTPResponse* res = (HTTPResponse*)calloc(1, sizeof(HTTPResponse));
 	
 	req->method = "GET";
 	req->uri = strdup("/" REMOTE_CSE_NAME);
@@ -4221,9 +4248,11 @@ int create_local_csr()
 	int result = db_store_resource(csr, ptr);
 	if (result == -1)
 	{
-		cJSON_Delete(root);
+		cJSON_Delete(csr);
 		free(ptr);
 		ptr = NULL;
+		free_HTTPRequest(req);
+		free_HTTPResponse(res);
 		return RSC_INTERNAL_SERVER_ERROR;
 	}
 	free(ptr);
@@ -4672,9 +4701,10 @@ void removeChildAnnc(RTNode* parent_rtnode, char* at)
 	}
 }
 
-void announce_to_annc(RTNode* target_rtnode)
+void announce_to_annc(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "announce_to_annc");
+	char *come_from = strdup(o2pt->fr);
 	cJSON* at_list = cJSON_GetObjectItem(target_rtnode->obj, "at");
 	cJSON* pjson;
 	if (at_list)
@@ -4697,6 +4727,11 @@ void announce_to_annc(RTNode* target_rtnode)
 			cJSON_AddItemToObject(resource, "lbl", cJSON_Duplicate(pjson, 1));
 		}
 		oneM2MPrimitive* o2pt = (oneM2MPrimitive*)calloc(1, sizeof(oneM2MPrimitive));
+	
+        if ((pjson = cJSON_GetObjectItem(target_rtnode->obj, "ast")))
+        {
+            cJSON_AddItemToObject(resource, "ast", cJSON_Duplicate(pjson, 1));
+        }
 
 		int count = 0;
 		cJSON* child = resource->child;
@@ -4709,6 +4744,7 @@ void announce_to_annc(RTNode* target_rtnode)
 		{
 			logger("UTIL", LOG_LEVEL_DEBUG, "Empty announcement update payload, skipping update");
 			cJSON_Delete(root);
+			free(come_from);
 			return;
 		}
 
@@ -4721,6 +4757,10 @@ void announce_to_annc(RTNode* target_rtnode)
 		o2pt->isForwarding = true;
 		cJSON_ArrayForEach(at, at_list)
 		{
+			if (checkResourceCseID(at->valuestring, come_from)) {
+				logger("UTIL", LOG_LEVEL_DEBUG, "Skipping announce to %s as it is the CSE of the update request", come_from);
+				continue;
+			}
 			logger("UTIL", LOG_LEVEL_INFO, "at %s", at->valuestring);
 			if (at->valuestring[0] == '/')
 			{
@@ -4998,7 +5038,7 @@ bool isExpired(RTNode* rtnode)
 		return false;
 	}
 	cJSON* et = cJSON_GetObjectItem(rtnode->obj, "et");
-	if (!et)
+	if (!et || !et->valuestring)
 	{
 		return false;
 	}

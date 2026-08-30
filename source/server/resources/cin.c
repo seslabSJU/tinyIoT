@@ -59,40 +59,23 @@ int create_cin(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         }
     }
 #if CSE_RVI >= RVI_3
-    bool parent_was_announced = false; 
     cJSON *final_at = cJSON_CreateArray();
-    cJSON *parent_at = cJSON_GetObjectItem(parent_rtnode->obj, "at");
-    if (parent_at && cJSON_GetArraySize(parent_at) > 0)
+    if (handle_annc_create(parent_rtnode, cin, cJSON_GetObjectItem(cin, "at"), final_at) == -1)
     {
-        parent_was_announced = true;
+        cJSON_Delete(root);
+        cJSON_Delete(final_at);
+        return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute in `aa`");
     }
 
-    if (parent_was_announced)
+    if (cJSON_GetArraySize(final_at) > 0)
     {
-        if (handle_annc_create(parent_rtnode, cin, cJSON_GetObjectItem(cin, "at"), final_at) == -1)
-        {
-            cJSON_Delete(root);
-            cJSON_Delete(final_at);
-            return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute in `aa`");
-        }
-
-        if (cJSON_GetArraySize(final_at) > 0)
-        {
-            cJSON_DeleteItemFromObject(cin, "at");
-            cJSON_AddItemToObject(cin, "at", final_at);
-        }
-        else
-        {
-            cJSON_DeleteItemFromObject(cin, "at");
-+           cJSON_AddItemToObject(cin, "at", final_at);
-        }
+        cJSON_DeleteItemFromObject(cin, "at");
+        cJSON_AddItemToObject(cin, "at", final_at);
     }
-    else //cin can't be announced with out cnt
+    else
     {
-        cJSON *at = cJSON_GetObjectItem(cin, "at");
-        if (at && cJSON_GetArraySize(at) > 0) {
-            handle_error(o2pt, RSC_BAD_REQUEST, "cinA can't be announced alone");
-        }
+        cJSON_Delete(final_at);
+        cJSON_DeleteItemFromObject(cin, "at");
     }
 #endif
 

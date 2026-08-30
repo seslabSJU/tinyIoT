@@ -111,10 +111,10 @@ int update_annc(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
                 }
                 else {
                     char *lnk = cJSON_GetObjectItem(target_rtnode->obj, "lnk")->valuestring;
-
-                    oneM2MPrimitive *req = calloc(1, sizeof(oneM2MPrimitive));
+                    oneM2MPrimitive *req = NULL;
                     o2ptcpy(&req, o2pt);
                     req->to = strdup(lnk);
+                    req->fr = strdup("/" CSE_BASE_RI);
                     cJSON_Delete(req->request_pc);
                     req->request_pc = cJSON_CreateObject();
                     cJSON_AddItemReferenceToObject(req->request_pc, get_resource_key(o2pt->ty - 10000), req_src);

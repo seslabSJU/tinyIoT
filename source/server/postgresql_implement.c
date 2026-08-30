@@ -221,6 +221,7 @@ static const table_def_t table_definitions[] = {
      "CREATE TABLE IF NOT EXISTS csr ( id INTEGER, "
      "cst INT, poa VARCHAR(200), cb VARCHAR(200), csi VARCHAR(200), mei VARCHAR(45), "
      "tri VARCHAR(45), rr INT, nl VARCHAR(45), srv VARCHAR(45), dcse VARCHAR(200), csz VARCHAR(100), "
+     "spi VARCHAR(45), "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"ae", 
@@ -256,6 +257,7 @@ static const table_def_t table_definitions[] = {
     {"cb", 
      "CREATE TABLE IF NOT EXISTS cb ( id INTEGER, "
      "cst INT, csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "spi VARCHAR(45), "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"cbA", 
@@ -305,6 +307,7 @@ static const table_def_t table_definitions[] = {
      "CREATE TABLE IF NOT EXISTS csr ( id INTEGER, "
      "cst INT, poa TEXT, cb TEXT, csi TEXT, mei TEXT, "
      "tri TEXT, rr INT, nl TEXT, srv TEXT, dcse TEXT, csz TEXT, "
+     "spi TEXT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"ae", 
@@ -340,6 +343,7 @@ static const table_def_t table_definitions[] = {
     {"cb", 
      "CREATE TABLE IF NOT EXISTS cb ( id INTEGER, "
      "cst INT, csi TEXT, srt TEXT, poa TEXT, nl TEXT, ncp TEXT, srv TEXT, rr INT, at TEXT, aa TEXT, ast INT, "
+     "spi TEXT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"cbA", 
