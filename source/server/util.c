@@ -1333,6 +1333,12 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 
 	logger("UTIL", LOG_LEVEL_DEBUG, "check_privilege : %s : %d", o2pt->fr ? o2pt->fr : "(null)", acop);
 
+	ACOP effective_acop = acop;
+	if (o2pt->op == OP_CREATE && o2pt->ty == RT_SUB)
+	{
+		effective_acop |= ACOP_RETRIEVE;
+	}
+
 	RTNode* target_rtnode = rtnode;
 #ifdef ADMIN_AE_ID
 	if (o2pt->fr && !strcmp(o2pt->fr, ADMIN_AE_ID))
