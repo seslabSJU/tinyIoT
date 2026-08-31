@@ -606,7 +606,11 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
         req->uri[1] = '~';
     else if (rat == ABSOLUTE)
         req->uri[1] = '_';
-    strcat(req->uri, o2pt->to);
+    // TS-0009 6.2.2.1: for ABSOLUTE, the *first* '/' of o2pt->to is
+    // replaced by "/_", not prefixed. Without the +1 here, ABSOLUTE
+    // requests end up with one extra '/' (e.g. "/_//sp/csi") and the
+    // receiving CSE rejects them ("Too many / in front of ID").
+    strcat(req->uri, (rat == ABSOLUTE) ? (o2pt->to + 1) : o2pt->to);
     req->headers = (header_t *)calloc(sizeof(header_t), 1);
     add_header("X-M2M-Origin", o2pt->fr, req->headers);
     add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
