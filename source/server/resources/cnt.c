@@ -29,6 +29,7 @@ int create_cnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         if (pjson->type == cJSON_NULL)
         {
+            cJSON_DeleteItemFromObject(cnt, "cr");
             cJSON_AddStringToObject(cnt, "cr", o2pt->fr);
         }
         else
