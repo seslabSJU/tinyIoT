@@ -292,6 +292,18 @@ static const table_def_t table_definitions[] = {
      "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
      "cs INT, st INT, org VARCHAR(200), loc TEXT, at VARCHAR(200), aa VARCHAR(100), ast INT, custom_attrs JSONB, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"ts",
+     "CREATE TABLE IF NOT EXISTS ts ( id INTEGER, "
+     "cr VARCHAR(45), mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "pei INT, peid INT, "
+     "mdd INT, mdn INT, mdt INT, mdc INT, mdlt TEXT, cnf VARCHAR(45), "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"tsi",
+     "CREATE TABLE IF NOT EXISTS tsi ( id INTEGER, "
+     "dgt TEXT, con TEXT, snr INT, cs INT, vrq INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     }
 };
 
@@ -377,6 +389,18 @@ static const table_def_t table_definitions[] = {
     {"fcin",
      "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
      "cs INT, st INT, org TEXT, loc TEXT, at TEXT, aa TEXT, ast INT, custom_attrs JSONB, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"ts",
+     "CREATE TABLE IF NOT EXISTS ts ( id INTEGER, "
+     "cr TEXT, mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "pei INT, peid INT, "
+     "mdd INT, mdn INT, mdt INT, mdc INT, mdlt TEXT, cnf TEXT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"tsi",
+     "CREATE TABLE IF NOT EXISTS tsi ( id INTEGER, "
+     "dgt TEXT, con TEXT, snr INT, cs INT, vrq INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     }
 };
@@ -552,6 +576,12 @@ char *get_table_name(ResourceType ty)
     case RT_FCIN:
         tableName = "fcin";
         break;
+    case RT_TS:
+        tableName = "ts";
+        break;
+    case RT_TSI:
+        tableName = "tsi";
+        break;
     }
     return tableName;
 }
@@ -574,8 +604,15 @@ cJSON *db_get_resource_by_uri(char *uri, ResourceType ty)
         return NULL;
     }
 
+    char *table_name = get_table_name(ty);
+    if (!table_name) {
+        logger("DB", LOG_LEVEL_ERROR, "No table name mapped for resource type %d", ty);
+        pg_unlock();
+        return NULL;
+    }
+
     sprintf(sql, "SELECT * FROM general, %s WHERE general.uri='%s' and %s.id=general.id;",
-            get_table_name(ty), uri, get_table_name(ty));
+            table_name, uri, table_name);
 
     res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -666,8 +703,15 @@ cJSON *db_get_resource(char *ri, ResourceType ty)
         return NULL;
     }
 
+    char *table_name = get_table_name(ty);
+    if (!table_name) {
+        logger("DB", LOG_LEVEL_ERROR, "No table name mapped for resource type %d", ty);
+        pg_unlock();
+        return NULL;
+    }
+
     sprintf(sql, "SELECT * FROM general, %s WHERE general.id=%s.id AND general.ri='%s';",
-            get_table_name(ty), get_table_name(ty), ri);
+            table_name, table_name, ri);
 
     res = PQexec(conn, sql);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -817,6 +861,13 @@ int db_store_resource(cJSON *obj, char *uri)
         return -1;
     }
 
+    char *table_name = get_table_name(ty);
+    if (!table_name) {
+        logger("DB", LOG_LEVEL_ERROR, "No table name mapped for resource type %d", ty);
+        pg_unlock();
+        return -1;
+    }
+
     if (pg_tx_depth == 0) {
         res = PQexec(conn, "BEGIN");
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
@@ -871,7 +922,7 @@ int db_store_resource(cJSON *obj, char *uri)
         if (i < general_cnt - 1) strcat(sql, ",");
     }
     strcat(sql, ") RETURNING id) INSERT INTO ");
-    strcat(sql, get_table_name(ty));
+    strcat(sql, table_name);
     strcat(sql, " (id, ");
 
     for (int i = 0; i < cJSON_GetArraySize(specific_attr); i++) {
@@ -1024,9 +1075,19 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
     // Update specific table
     cJSON *specific_attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
     int has_specific_updates = 0;
-    
+
+    char *table_name = get_table_name(ty);
+    if (!table_name) {
+        logger("DB", LOG_LEVEL_ERROR, "No table name mapped for resource type %d", ty);
+        free(sql);
+        if (started_tx)
+            PQexec(conn, "ROLLBACK");
+        pg_unlock();
+        return 0;
+    }
+
     sql[0] = '\0';
-    sprintf(sql, "UPDATE %s SET ", get_table_name(ty));
+    sprintf(sql, "UPDATE %s SET ", table_name);
     for (int i = 0; i < cJSON_GetArraySize(specific_attr); i++) {
         char *attr = cJSON_GetArrayItem(specific_attr, i)->string;
         if (cJSON_GetObjectItem(obj, attr)) {
@@ -1063,7 +1124,7 @@ int db_update_resource(cJSON *obj, char *ri, ResourceType ty)
 
         res = PQexec(conn, sql);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            logger("DB", LOG_LEVEL_ERROR, "Failed to update %s table: %s", get_table_name(ty), PQerrorMessage(conn));
+            logger("DB", LOG_LEVEL_ERROR, "Failed to update %s table: %s", table_name, PQerrorMessage(conn));
             PQclear(res);
             free(sql);
             if (started_tx)
@@ -1273,13 +1334,20 @@ RTNode *db_get_all_resource_as_rtnode()
         // Get resource type and fetch specific table data
         int ty = cJSON_GetObjectItem(json, "ty")->valueint;
         int id = cJSON_GetObjectItem(json, "id")->valueint;
-        
+
+        char *table_name = get_table_name(ty);
+        if (!table_name) {
+            logger("DB", LOG_LEVEL_ERROR, "No table name mapped for resource type %d", ty);
+            cJSON_Delete(json);
+            continue;
+        }
+
         char sql2[1024] = {0};
-        sprintf(sql2, "SELECT * FROM %s WHERE id=%d;", get_table_name(ty), id);
-        
+        sprintf(sql2, "SELECT * FROM %s WHERE id=%d;", table_name, id);
+
         res2 = PQexec(conn, sql2);
         if (PQresultStatus(res2) != PGRES_TUPLES_OK) {
-            logger("DB", LOG_LEVEL_ERROR, "Failed select from %s: %s", get_table_name(ty), PQerrorMessage(conn));
+            logger("DB", LOG_LEVEL_ERROR, "Failed select from %s: %s", table_name, PQerrorMessage(conn));
             PQclear(res2);
             cJSON_Delete(json);
             continue;
@@ -1844,21 +1912,27 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
             snprintf(sql, sizeof(sql),
             "WITH combined AS (");
 
+            int joined_cnt = 0;
             for (int i = 0; i < join_cnt; i++) {
                 int tv = join_tys[i];
                 const char *tbl = get_table_name(tv);
+                if (!tbl) {
+                    logger("DB", LOG_LEVEL_ERROR, "No table name mapped for resource type %d", tv);
+                    continue;
+                }
 
                 char join_query[8000];
                 snprintf(join_query, sizeof(join_query),
                     "%sSELECT id, ty, rn, uri, ri "
                     "FROM general JOIN %s USING(id) %s %s ORDER BY id %s LIMIT %d)",
-                    (i > 0) ? " UNION ALL (" : "(",
+                    (joined_cnt > 0) ? " UNION ALL (" : "(",
                     tbl,
                     general_where_buf,
                     needed_res_attrs_cnt ? res_where_buf : "",
                     sort_dir,
                     lim+ofst);
                 strcat(sql, join_query);
+                joined_cnt++;
             }
 
             char tail[128];
@@ -1894,22 +1968,28 @@ cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_di
         } else {
             snprintf(sql, sizeof(sql),
                 "WITH combined AS (");
+            int joined_cnt = 0;
             for (int i = 0; i < join_cnt; i++) {
                 int tv = join_tys[i];
                 const char *tbl = get_table_name(tv);
+                if (!tbl) {
+                    logger("DB", LOG_LEVEL_ERROR, "No table name mapped for resource type %d", tv);
+                    continue;
+                }
                 // const char *detail_cols = get_detail_cols(tv);
                 char join_query[8000];
 
-                
+
                 snprintf(join_query, sizeof(join_query),
                     "%sSELECT id, ri, pi, ty, jsonb_strip_nulls(to_jsonb(x) - 'id') as obj "
                     "FROM (SELECT *"
                     "FROM general "
-                    "JOIN %s USING(id) %s %s ORDER BY id %s LIMIT %d) as x",  
-                    (i > 0) ? " UNION ALL " : " ",
+                    "JOIN %s USING(id) %s %s ORDER BY id %s LIMIT %d) as x",
+                    (joined_cnt > 0) ? " UNION ALL " : " ",
                     tbl, general_where_buf, res_where_buf, sort_dir, lim+ofst);
 
                 strcat(sql, join_query);
+                joined_cnt++;
             }
             char tail[128];
             snprintf(tail, sizeof(tail),
