@@ -416,7 +416,14 @@ void handle_http_request(HTTPRequest *req, int slotno)
                 o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
                 break;
             }
-            cJSON_DeleteItemFromObject(qs, "fu");
+            // NOTE: 로컬 discovery 처리는 o2pt->op/o2pt->rcn만 보고
+            // fc 안의 fu 값 자체는 쓰지 않는다(main.c OP_DISCOVERY
+            // 분기 참고) — 그래서 예전엔 여기서 지웠었는데, absolute/
+            // SP-relative 주소로 forwarding되는 요청은 fc가 그대로
+            // fc_to_qs()를 거쳐 원격 CSE로 전달되므로, 여기서 지우면
+            // 원격 CSE가 discovery 의도를 알 수 있는 유일한 신호가
+            // 사라져 일반 retrieve로 오처리된다(이슈 004). 그래서
+            // fu는 지우지 않고 fc에 남겨 forwarding 시 함께 전달한다.
         }
 
         if (cJSON_GetObjectItem(qs, "rcn"))
