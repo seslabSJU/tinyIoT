@@ -29,6 +29,7 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     {
         if (pjson->type == cJSON_NULL)
         {
+            cJSON_DeleteItemFromObject(grp, "cr");
             cJSON_AddStringToObject(grp, "cr", o2pt->fr);
         }
         else
