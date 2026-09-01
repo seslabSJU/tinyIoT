@@ -467,6 +467,36 @@ RTNode *find_rtnode_by_rn(char *rn)
                 }
             }
         }
+        else if (parent_rtnode->ty == RT_TS)
+        {
+            cJSON *tsi = NULL;
+
+            if (!strtok_r(NULL, "/", &target_ptr))
+            { // if next '/' doesn't exist
+                if (!strcmp(ptr, "la") || !strcmp(ptr, "latest"))
+                {
+                    flag = 0;
+                }
+                else if (!strcmp(ptr, "ol") || !strcmp(ptr, "oldest"))
+                {
+                    flag = 1;
+                }
+
+                if (flag == 0 || flag == 1)
+                {
+                    tsi = db_get_tsi_laol(parent_rtnode, flag);
+                }
+                else
+                {
+                    tsi = db_get_resource_by_uri(rn, RT_TSI);
+                }
+                if (tsi)
+                {
+                    rtnode = create_rtnode(tsi, RT_TSI);
+                    rtnode->parent = parent_rtnode;
+                }
+            }
+        }
     }
 #if MONO_THREAD == 0
     pthread_mutex_unlock(&main_lock);
@@ -588,6 +618,31 @@ RTNode* find_rtnode_by_hybrid(char* hb)
             if (fcin)
             {
                 rtnode = create_rtnode(fcin, RT_FCIN);
+                if (rtnode)
+                    rtnode->parent = parent_rtnode;
+            }
+
+            free(target_uri);
+            return rtnode;
+        }
+    }
+
+    //4b. TimeSeriesRI/la �Ǵ� TimeSeriesRI/ol
+    if (parent_rtnode->ty == RT_TS)
+    {
+        cJSON *tsi = NULL;
+
+        if (!strcmp(virtual_rn, "la") || !strcmp(virtual_rn, "latest"))
+            flag = 0;
+        else if (!strcmp(virtual_rn, "ol") || !strcmp(virtual_rn, "oldest"))
+            flag = 1;
+
+        if (flag == 0 || flag == 1)
+        {
+            tsi = db_get_tsi_laol(parent_rtnode, flag);
+            if (tsi)
+            {
+                rtnode = create_rtnode(tsi, RT_TSI);
                 if (rtnode)
                     rtnode->parent = parent_rtnode;
             }
