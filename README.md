@@ -60,15 +60,15 @@ tinyIoT is committed to maintaining high standards in technology implementation
  
 # What features are supported in tinyIoT?
 - Registration of IoT 
-- Supporting Resources: cseBase, ACP, AE, CNT, CIN, SUB, GRP, CSR, cbA, acpA, aeA, cntA, cinA
+- Supporting Resources: cseBase, ACP, AE, CNT, CIN, SUB, FCNT, FCIN, TS, TSI, GRP, CSR, cbA, acpA, aeA, cntA, cinA
 - CRUD operations for supporting resources 
 - CSE Types: IN-CSE, MN-CSE
 - Access Control: ACP resource based privilege scanning
 - Subscription and Notification: support subscription creation/verification/transfer flow
 - Group management: midlist management and fopt support
 - Discovery: DesiredResultIdType (DRT) supported with filter criteria 
-- Announcement: Uni-directional support(BI-directional is under development)
-- Protocol Bindings: HTTP, MQTT (CoAP & Websocket will be added)
+- Announcement: Uni-directional, Bi-directional support
+- Protocol Bindings: HTTP, MQTT, Websocket, CoAP(under development)
 - Database: SQLite and PostgreSQL   
 <br><br>
 
