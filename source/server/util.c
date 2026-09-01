@@ -4475,8 +4475,11 @@ int create_remote_cba(char* poa, char** cbA_url)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "create_remote_cba");
 
-	// If we already created a CBA for this CSE (cached in rt->cb.at), reuse
-	// its URL instead of sending another create request.
+	const char* cba_rn = CSE_BASE_RI "_cba";
+	char structured_buf[1024] = { 0 };
+	sprintf(structured_buf, "%s/%s", poa, cba_rn);
+
+	cJSON* stale_at_item = NULL;
 	{
 		cJSON* existing_at = cJSON_GetObjectItem(rt->cb->obj, "at");
 		cJSON* at_item = NULL;
@@ -4486,13 +4489,54 @@ int create_remote_cba(char* poa, char** cbA_url)
 			if (cJSON_IsString(at_item) && at_item->valuestring &&
 				!strncmp(at_item->valuestring, poa, poa_len) && at_item->valuestring[poa_len] == '/')
 			{
-				*cbA_url = strdup(at_item->valuestring);
-				logger("UTIL", LOG_LEVEL_DEBUG, "cbA already cached / target: %s", *cbA_url);
-				return 0;
+				oneM2MPrimitive* vo2pt = (oneM2MPrimitive*)calloc(sizeof(oneM2MPrimitive), 1);
+				vo2pt->fr = strdup("/" CSE_BASE_RI);
+				vo2pt->to = strdup(structured_buf);
+				vo2pt->op = OP_RETRIEVE;
+				vo2pt->rqi = strdup("verify-cba");
+				vo2pt->rvi = CSE_RVI;
+				int vrsc = forwarding_onem2m_resource(vo2pt, find_csr_rtnode_by_uri(poa));
+
+				if (vrsc == RSC_OK)
+				{
+					char* fresh_url = NULL;
+					cJSON* body = vo2pt->response_pc ? cJSON_GetObjectItem(vo2pt->response_pc, get_resource_key(RT_CBA)) : NULL;
+					cJSON* ri_item = body ? cJSON_GetObjectItem(body, "ri") : NULL;
+					if (ri_item && cJSON_IsString(ri_item))
+					{
+						char fresh_buf[1024] = { 0 };
+						sprintf(fresh_buf, "%s/%s", poa, ri_item->valuestring);
+						fresh_url = strdup(fresh_buf);
+					}
+					else
+					{
+						fresh_url = strdup(at_item->valuestring);
+					}
+					free_o2pt(vo2pt);
+
+					if (!strcmp(fresh_url, at_item->valuestring))
+					{
+						*cbA_url = fresh_url;
+						logger("UTIL", LOG_LEVEL_DEBUG, "cbA verified alive / target: %s", *cbA_url);
+						return 0;
+					}
+
+					logger("UTIL", LOG_LEVEL_DEBUG, "cbA alive but ri changed, updating cache: %s -> %s", at_item->valuestring, fresh_url);
+					*cbA_url = fresh_url;
+					stale_at_item = at_item;
+					break;
+				}
+				free_o2pt(vo2pt);
+
+				logger("UTIL", LOG_LEVEL_WARN, "cached cbA is stale (rsc %d), recreating: %s", vrsc, at_item->valuestring);
+				stale_at_item = at_item;
+				break;
 			}
 		}
 	}
 
+	if (!*cbA_url)
+	{
 	Protocol prot = 0;
 	char* host = NULL;
 	int port = 0;
@@ -4518,19 +4562,26 @@ int create_remote_cba(char* poa, char** cbA_url)
 		cJSON* root = cJSON_CreateObject();
 		cJSON* cba = cJSON_CreateObject();
 		cJSON_AddItemToObject(root, get_resource_key(RT_CBA), cba);
+		cJSON_AddStringToObject(cba, "rn", cba_rn);
 		cJSON_AddItemToObject(cba, "lnk", cJSON_CreateString("/" CSE_BASE_RI "/" CSE_BASE_NAME));
 		cJSON* srv = cJSON_Duplicate(cJSON_GetObjectItem(rt->cb->obj, "srv"), true);
 		cJSON_AddItemToObject(cba, "srv", srv);
 		// cJSON_AddItemToObject(cba, "ty", cJSON_CreateNumber(RT_CBA));
 
 		o2pt->request_pc = root;
-		if (forwarding_onem2m_resource(o2pt, csr) >= 4000)
+		int crsc = forwarding_onem2m_resource(o2pt, csr);
+		if (crsc >= 4000 && crsc != RSC_CONFLICT)
 		{
 			free_o2pt(o2pt);
 			logger("UTIL", LOG_LEVEL_ERROR, "Creation failed");
 			return -1;
 		}
-		if (o2pt->response_pc)
+		if (crsc == RSC_CONFLICT)
+		{
+			logger("UTIL", LOG_LEVEL_DEBUG, "cbA rn already exists remotely, reusing deterministic address");
+			*cbA_url = strdup(structured_buf);
+		}
+		else if (o2pt->response_pc)
 		{
 			// logger("UTIL", LOG_LEVEL_DEBUG, "cba_target: %s", cJSON_PrintUnformatted(result));
 			root = cJSON_GetObjectItem(o2pt->response_pc, get_resource_key(RT_CBA));
@@ -4551,12 +4602,23 @@ int create_remote_cba(char* poa, char** cbA_url)
 	{
 		logger("UTIL", LOG_LEVEL_ERROR, "poa is invalid");
 	}
+	} // end if (!*cbA_url) — recreate block
+
+	if (!*cbA_url)
+	{
+		return -1;
+	}
 
 	cJSON* at = cJSON_GetObjectItem(rt->cb->obj, "at");
 	if (!at)
 	{
 		at = cJSON_CreateArray();
 		cJSON_AddItemToObject(rt->cb->obj, "at", at);
+	}
+	if (stale_at_item)
+	{
+		cJSON_DetachItemViaPointer(at, stale_at_item);
+		cJSON_Delete(stale_at_item);
 	}
 	cJSON_AddItemToArray(at, cJSON_CreateString(*cbA_url));
 	db_update_resource(rt->cb->obj, CSE_BASE_RI, RT_CSE);

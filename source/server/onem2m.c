@@ -1830,7 +1830,17 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		return NULL;
 	}
 
-	if (parent_target ==NULL) {
+	if (parent_target == NULL && parent_rtnode_l == rt->cb)
+	{
+		if (create_remote_cba(csi, &parent_target) == -1)
+		{
+			logger("UTIL", LOG_LEVEL_ERROR, "cbA can't create");
+			free(csi);
+			return NULL;
+		}
+	}
+	else if (parent_target == NULL)
+	{
 		// check parent resource has announced
 		cJSON *pjson = NULL;
 		cJSON *pat = cJSON_GetObjectItem(parent_rtnode_l->obj, "at");
