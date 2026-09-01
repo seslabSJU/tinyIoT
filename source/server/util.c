@@ -4474,6 +4474,25 @@ int update_remote_csr_dcse()
 int create_remote_cba(char* poa, char** cbA_url)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "create_remote_cba");
+
+	// If we already created a CBA for this CSE (cached in rt->cb.at), reuse
+	// its URL instead of sending another create request.
+	{
+		cJSON* existing_at = cJSON_GetObjectItem(rt->cb->obj, "at");
+		cJSON* at_item = NULL;
+		size_t poa_len = strlen(poa);
+		cJSON_ArrayForEach(at_item, existing_at)
+		{
+			if (cJSON_IsString(at_item) && at_item->valuestring &&
+				!strncmp(at_item->valuestring, poa, poa_len) && at_item->valuestring[poa_len] == '/')
+			{
+				*cbA_url = strdup(at_item->valuestring);
+				logger("UTIL", LOG_LEVEL_DEBUG, "cbA already cached / target: %s", *cbA_url);
+				return 0;
+			}
+		}
+	}
+
 	Protocol prot = 0;
 	char* host = NULL;
 	int port = 0;
