@@ -1371,7 +1371,7 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 	if (target_rtnode->ty == RT_ACP)
 	{
 		int pvs_acop = get_acop_origin(o2pt, origin, target_rtnode, 1);
-		if ((pvs_acop & acop) == acop)
+		if ((pvs_acop & effective_acop) == effective_acop)
 		{
 			return 0;
 		}
@@ -1439,7 +1439,7 @@ int check_privilege(oneM2MPrimitive* o2pt, RTNode* rtnode, ACOP acop)
 
 	if (policy_rtnode && cJSON_GetObjectItem(policy_rtnode->obj, "acpi"))
 	{
-		if ((get_acop(o2pt, origin, policy_rtnode) & acop) == acop)
+		if ((get_acop(o2pt, origin, policy_rtnode) & effective_acop) == effective_acop)
 		{
 			return 0;
 		}
