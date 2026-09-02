@@ -81,7 +81,7 @@ The resource model, request primitives, response status codes, protocol bindings
 Requests received through a protocol binding are converted into a common oneM2M primitive and passed to the central request router. The router applies authorization and dispatches the request to the appropriate resource, discovery, group, notification, forwarding, or announcement handler.
 
 ```text
-HTTP / MQTT / CoAP / ebSocket
+HTTP / MQTT / CoAP / WebSocket
           |
           v
 Protocol binding and primitive parsing
