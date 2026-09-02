@@ -53,8 +53,7 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     // (0..1) and verificationRequest(vrq) is an independent top-level
     // field. A verification request only checks reachability, so it
     // shall not carry net/rep (which describe an actual resource
-    // change) -- matches ACME's sendVerificationRequest() which sends
-    // only vrq/sur/cr. See issues/012.
+    // change).
     cJSON *noti_cjson, *sgn, *nct;
     RTNode *nu_rtnode;
     noti_cjson = cJSON_CreateObject();
@@ -171,8 +170,7 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         // (0..1) and verificationRequest(vrq) is an independent top-level
         // field. A verification request only checks reachability, so it
         // shall not carry net/rep (which describe an actual resource
-        // change) -- matches ACME's sendVerificationRequest() which sends
-        // only vrq/sur/cr. See issues/012.
+        // change).
         cJSON *noti_cjson, *sgn;
         RTNode *nu_rtnode = NULL;
         noti_cjson = cJSON_CreateObject();
