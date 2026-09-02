@@ -187,31 +187,24 @@ int validate_acp(oneM2MPrimitive *o2pt, cJSON *acp, Operation op)
         return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
     }
 
+    {
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_ACP, acp, op, &ma_error);
+        if (ma_rsc != RSC_OK)
+        {
+            return handle_error(o2pt, ma_rsc, ma_error);
+        }
+    }
+
     if (op == OP_CREATE)
     {
         pjson = cJSON_GetObjectItem(acp, "pv");
-        if (!pjson)
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
-        }
-        if (cJSON_IsNull(pjson))
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "null `pv` is not allowed");
-        }
         if (validate_acp_acr(o2pt, pjson, "pv", false) != RSC_OK)
         {
             return o2pt->rsc;
         }
 
         pjson = cJSON_GetObjectItem(acp, "pvs");
-        if (!pjson)
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
-        }
-        else if (cJSON_IsNull(pjson))
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "null `pvs` is not allowed");
-        }
         if (validate_acp_acr(o2pt, pjson, "pvs", true) != RSC_OK)
         {
             return o2pt->rsc;
@@ -222,10 +215,6 @@ int validate_acp(oneM2MPrimitive *o2pt, cJSON *acp, Operation op)
         pjson = cJSON_GetObjectItem(acp, "pv");
         if (pjson)
         {
-            if (cJSON_IsNull(pjson))
-            {
-                return handle_error(o2pt, RSC_BAD_REQUEST, "empty `pv` is not allowed");
-            }
             if (validate_acp_acr(o2pt, pjson, "pv", false) != RSC_OK)
             {
                 return o2pt->rsc;
@@ -235,10 +224,6 @@ int validate_acp(oneM2MPrimitive *o2pt, cJSON *acp, Operation op)
         pjson = cJSON_GetObjectItem(acp, "pvs");
         if (pjson)
         {
-            if (cJSON_IsNull(pjson))
-            {
-                return handle_error(o2pt, RSC_BAD_REQUEST, "empty `pvs` is not allowed");
-            }
             if (validate_acp_acr(o2pt, pjson, "pvs", true) != RSC_OK)
             {
                 return o2pt->rsc;

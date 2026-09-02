@@ -169,6 +169,15 @@ int validate_cnt(oneM2MPrimitive *o2pt, cJSON *cnt, Operation op)
             return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
     }
 
+    {
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_CNT, cnt, op, &ma_error);
+        if (ma_rsc != RSC_OK)
+        {
+            return handle_error(o2pt, ma_rsc, ma_error);
+        }
+    }
+
     pjson = cJSON_GetObjectItem(cnt, "rn");
     if (pjson)
     {

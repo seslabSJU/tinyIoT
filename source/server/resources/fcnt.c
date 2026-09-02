@@ -399,7 +399,13 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 					cJSON *existing_item = cJSON_GetObjectItem(existing_custom, item->string);
 					if (existing_item)
 					{
-						if (item->type != existing_item->type)
+						/* cJSON_True/cJSON_False are distinct type constants but both
+						 * represent the same "boolean" kind, so compare normalized kinds
+						 * instead of raw type bits to avoid false positives when a
+						 * boolean attribute's value flips between create and update. */
+						int item_kind = (item->type == cJSON_True) ? cJSON_False : item->type;
+						int existing_kind = (existing_item->type == cJSON_True) ? cJSON_False : existing_item->type;
+						if (item_kind != existing_kind)
 						{
 							cJSON_Delete(existing_custom);
 							cJSON_Delete(customAttrs);

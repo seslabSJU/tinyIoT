@@ -104,8 +104,16 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
     cJSON *p_con = cJSON_GetObjectItem(tsi, "con");
     cJSON *p_dgt = cJSON_GetObjectItem(tsi, "dgt");
     cJSON *p_snr = cJSON_GetObjectItem(tsi, "snr");
-    if (!p_con) { cJSON_Delete(tsi); cJSON_Delete(root); return handle_error(o2pt, RSC_BAD_REQUEST, "con missing"); }
-    if (!p_dgt) { cJSON_Delete(tsi); cJSON_Delete(root); return handle_error(o2pt, RSC_BAD_REQUEST, "dgt missing"); }
+
+    {
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_TSI, tsi, OP_CREATE, &ma_error);
+        if (ma_rsc != RSC_OK)
+        {
+            cJSON_Delete(tsi); cJSON_Delete(root);
+            return handle_error(o2pt, ma_rsc, ma_error);
+        }
+    }
 
     cJSON_DeleteItemFromObject(tsi, "cs");
 

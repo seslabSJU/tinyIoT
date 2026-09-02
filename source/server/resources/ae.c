@@ -197,14 +197,19 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
         return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `aei` is not allowed");
     }
 
+    {
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_AE, ae, op, &ma_error);
+        if (ma_rsc != RSC_OK)
+        {
+            return handle_error(o2pt, ma_rsc, ma_error);
+        }
+    }
+
     if (op == OP_CREATE)
     {
 
         pjson = cJSON_GetObjectItem(ae, "api");
-        if (!pjson)
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
-        }
         ptr = pjson->valuestring;
         if (o2pt->rvi <= RVI_3)
         {
@@ -220,11 +225,6 @@ int validate_ae(oneM2MPrimitive *o2pt, cJSON *ae, Operation op)
             {
                 return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `api` prefix is invalid");
             }
-        }
-        pjson = cJSON_GetObjectItem(ae, "rr");
-        if (!pjson)
-        {
-            return handle_error(o2pt, RSC_BAD_REQUEST, "insufficient mandatory attribute(s)");
         }
     }
 

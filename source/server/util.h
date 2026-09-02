@@ -98,8 +98,16 @@ void build_rcn8(oneM2MPrimitive* o2pt, RTNode* rtnode, cJSON* result_obj, int of
 void build_child_structure(oneM2MPrimitive* o2pt, RTNode* rtnode, cJSON* result_obj, int* ofst, int* lim, int level, int rcn);
 void get_child_references(oneM2MPrimitive* o2pt, RTNode* rtnode, cJSON* result_obj, int* ofst, int* lim, int level, int rcn);
 
+typedef struct {
+	ResourceType ty;
+	const char *const *ma_fields;
+} MandatoryAttrDef;
+
+extern const MandatoryAttrDef MA_TABLE[];
+
 // validation
 bool is_attr_valid(cJSON* obj, ResourceType ty, char* err_msg);
+int validate_mandatory_attrs(ResourceType ty, cJSON* obj, Operation op, char** error_msg);
 bool is_valid_acr(cJSON* acr);
 int validate_ae(oneM2MPrimitive* o2pt, cJSON* ae, Operation op);
 int validate_cnt(oneM2MPrimitive* o2pt, cJSON* cnt, Operation op);

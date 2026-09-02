@@ -19,6 +19,15 @@ extern pthread_mutex_t main_lock;
 extern void delete_oldest_tsi(RTNode *parent);
 
 int validate_ts(oneM2MPrimitive *o2pt, cJSON *ts, Operation op) {
+    {
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_TS, ts, op, &ma_error);
+        if (ma_rsc != RSC_OK)
+        {
+            return handle_error(o2pt, ma_rsc, ma_error);
+        }
+    }
+
     char *attrs[] = {"pei", "peid", "mni", "mbs", "mdn", "mdt"};
     for(int i = 0; i < 6; i++) {
         cJSON *p = cJSON_GetObjectItem(ts, attrs[i]);

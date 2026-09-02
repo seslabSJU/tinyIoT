@@ -250,6 +250,15 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
     cJSON *enc, *net, *nct;
     char *ptr = NULL;
 
+    {
+        char *ma_error = NULL;
+        int ma_rsc = validate_mandatory_attrs(RT_SUB, sub, op, &ma_error);
+        if (ma_rsc != RSC_OK)
+        {
+            return handle_error(o2pt, ma_rsc, ma_error);
+        }
+    }
+
     pjson = cJSON_GetObjectItem(sub, "acpi");
     if (pjson)
     {

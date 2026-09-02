@@ -1830,7 +1830,17 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		return NULL;
 	}
 
-	if (parent_target ==NULL) {
+	if (parent_target == NULL && parent_rtnode_l == rt->cb)
+	{
+		if (create_remote_cba(csi, &parent_target) == -1)
+		{
+			logger("UTIL", LOG_LEVEL_ERROR, "cbA can't create");
+			free(csi);
+			return NULL;
+		}
+	}
+	else if (parent_target == NULL)
+	{
 		// check parent resource has announced
 		cJSON *pjson = NULL;
 		cJSON *pat = cJSON_GetObjectItem(parent_rtnode_l->obj, "at");
@@ -1879,7 +1889,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		cJSON *annc = cJSON_CreateObject();
 		cJSON *pjson = NULL;
 		cJSON_AddItemToObject(root, get_resource_key(ty + 10000), annc);
-		sprintf(buf, "/%s/%s/%s", CSE_BASE_RI, parent_rtnode_l->uri, cJSON_GetObjectItem(obj, "rn")->valuestring);
+		sprintf(buf, "/%s/%s/%s", CSE_BASE_RI, parent_rtnode->uri, cJSON_GetObjectItem(obj, "rn")->valuestring);
 		cJSON_AddItemToObject(annc, "lnk", cJSON_CreateString(buf));
 		
 		//TO-DO  acpi original에서 갖고 오거나 local policy에 따라 추가하는 것 필요)
