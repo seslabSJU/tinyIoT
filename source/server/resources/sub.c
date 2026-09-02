@@ -49,15 +49,17 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON *rn = cJSON_GetObjectItem(sub, "rn");
     sprintf(ptr, "%s/%s", get_uri_rtnode(parent_rtnode), rn->valuestring);
 
-    cJSON *noti_cjson, *sgn, *nev, *rep, *nct;
+    // TS-0004 Table 6.3.5.13-1: notificationEvent(net+rep) is optional
+    // (0..1) and verificationRequest(vrq) is an independent top-level
+    // field. A verification request only checks reachability, so it
+    // shall not carry net/rep (which describe an actual resource
+    // change) -- matches ACME's sendVerificationRequest() which sends
+    // only vrq/sur/cr. See issues/012.
+    cJSON *noti_cjson, *sgn, *nct;
     RTNode *nu_rtnode;
     noti_cjson = cJSON_CreateObject();
     cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
-    cJSON_AddItemToObject(sgn, "nev", nev = cJSON_CreateObject());
-    cJSON_AddNumberToObject(nev, "net", NET_CREATE_OF_DIRECT_CHILD_RESOURCE);
-    cJSON_AddItemToObject(nev, "rep", rep = cJSON_CreateObject());
     cJSON_AddStringToObject(sgn, "cr", o2pt->fr);
-    cJSON_AddItemReferenceToObject(rep, "m2m:sub", sub);
     cJSON_AddStringToObject(sgn, "sur", ptr);
     cJSON_AddBoolToObject(sgn, "vrq", true);
     cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(sub, "nu"))
@@ -165,18 +167,17 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
     cJSON *new_nu = cJSON_GetObjectItem(m2m_sub, "nu");
     if (new_nu)
     {
-        cJSON *noti_cjson, *sgn, *nev, *rep;
+        // TS-0004 Table 6.3.5.13-1: notificationEvent(net+rep) is optional
+        // (0..1) and verificationRequest(vrq) is an independent top-level
+        // field. A verification request only checks reachability, so it
+        // shall not carry net/rep (which describe an actual resource
+        // change) -- matches ACME's sendVerificationRequest() which sends
+        // only vrq/sur/cr. See issues/012.
+        cJSON *noti_cjson, *sgn;
         RTNode *nu_rtnode = NULL;
         noti_cjson = cJSON_CreateObject();
         cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
-        cJSON_AddItemToObject(sgn, "nev", nev = cJSON_CreateObject());
         cJSON_AddStringToObject(sgn, "cr", o2pt->fr);
-        cJSON_AddNumberToObject(nev, "net", NET_CREATE_OF_DIRECT_CHILD_RESOURCE);
-        cJSON_AddItemToObject(nev, "rep", rep = cJSON_CreateObject());
-        cJSON *sub_rep = cJSON_Duplicate(sub, true);
-        cJSON_DeleteItemFromObject(sub_rep, "nu");
-        cJSON_AddItemToObject(sub_rep, "nu", cJSON_Duplicate(new_nu, true));
-        cJSON_AddItemToObject(rep, "m2m:sub", sub_rep);
         cJSON_AddStringToObject(sgn, "sur", target_rtnode->uri);
         cJSON_AddBoolToObject(sgn, "vrq", true);
         cJSON_ArrayForEach(pjson, new_nu)
