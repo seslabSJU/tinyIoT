@@ -416,7 +416,13 @@ void handle_http_request(HTTPRequest *req, int slotno)
                 o2pt->rcn = RCN_DISCOVERY_RESULT_REFERENCES;
                 break;
             }
-            cJSON_DeleteItemFromObject(qs, "fu");
+            // NOTE: keep fu in fc instead of deleting it here. Local
+            // discovery only reads o2pt->op/o2pt->rcn (see main.c's
+            // OP_DISCOVERY branch), but forwarded requests pass fc
+            // through fc_to_qs() to the remote CSE as-is — deleting fu
+            // here would strip the only signal telling the remote CSE
+            // this is a discovery request, causing it to be misprocessed
+            // as a plain retrieve (issue 004).
         }
 
         if (cJSON_GetObjectItem(qs, "rcn"))
