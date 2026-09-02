@@ -14,6 +14,12 @@
 int init_dbp();
 int close_dbp();
 
+#ifdef UPPERTESTER
+// Delete every stored oneM2M resource (all backend tables). Schema is kept.
+// Returns 1 on success, 0 on failure. Used by the Upper Tester "Reset" command.
+int db_reset_all();
+#endif
+
 int db_store_resource(cJSON *obj, char *uri);
 int db_update_resource(cJSON *obj, char *ri, ResourceType ty);
 cJSON *db_get_resource(char *ri, ResourceType ty);

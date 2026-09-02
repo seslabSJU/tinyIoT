@@ -103,7 +103,6 @@ static ssize_t cmdline_read_key(char *arg, unsigned char **buf, size_t maxlen)
 
 int main(int argc, char **argv)
 {
-	bool initialBoot = false;
 	signal(SIGINT, stop_server);
 	logger_init();
 
@@ -188,8 +187,6 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	initialBoot = init_server();
-
 	int sdt_count = sdt_init("./sdt_definitions");
 	if (sdt_count > 0) {
 		logger("MAIN", LOG_LEVEL_INFO, "Loaded %d SDT definitions", sdt_count);
@@ -197,30 +194,10 @@ int main(int argc, char **argv)
 		logger("MAIN", LOG_LEVEL_WARN, "No SDT definitions loaded");
 	}
 
-	init_resource_tree();
-
-	if (initialBoot)
+	if (!bootstrap_cse())
 	{
-		cJSON *acp = cJSON_CreateObject();
-		init_acp(acp);
-		db_store_resource(acp, CSE_BASE_NAME "/defaultACP");
-		RTNode *acp_rtnode = create_rtnode(acp, RT_ACP);
-		add_child_resource_tree(rt->cb, acp_rtnode);
-	}
-
-	if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
-	{
-		if (register_remote_cse() != 0)
-		{
-			logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE registration failed");
-			return 0;
-		}
-
-		if (create_local_csr())
-		{
-			logger("MAIN", LOG_LEVEL_ERROR, "Local CSR creation failed");
-			return 0;
-		}
+		logger("MAIN", LOG_LEVEL_ERROR, "CSE bootstrap failed");
+		return 0;
 	}
 
 #ifdef ENABLE_MQTT
@@ -265,12 +242,14 @@ void route(oneM2MPrimitive *o2pt)
 
 	start = (double)clock() / CLOCKS_PER_SEC; // runtime check - start
 
-	// if (o2pt->op == OP_UPPERTESTER)
-	// {
-	// 	handle_uppertester_procedure(o2pt);
-	// 	log_runtime(start);
-	// 	return;
-	// }
+#ifdef UPPERTESTER
+	if (o2pt->op == OP_UPPERTESTER)
+	{
+		handle_uppertester_procedure(o2pt);
+		log_runtime(start);
+		return;
+	}
+#endif
 
 	RTNode *target_rtnode = get_rtnode(o2pt);
 

@@ -333,9 +333,12 @@ void handle_http_request(HTTPRequest *req, int slotno)
     }
 
 #ifdef UPPERTESTER
-    if (!strcmp(o2pt->to, UPPERTESTER_URI))
+    char *utcmd = search_header(req->headers, UPPERTESTER_CMD_HEADER);
+    if (utcmd || (o2pt->to && !strcmp(o2pt->to, UPPERTESTER_URI)))
     {
         o2pt->op = OP_UPPERTESTER;
+        if (utcmd)
+            o2pt->utcmd = strdup(utcmd);
     }
     else
     {

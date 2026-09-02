@@ -1263,6 +1263,84 @@ bool init_server()
 	return setup;
 }
 
+bool bootstrap_cse()
+{
+	bool initialBoot = init_server();
+
+	init_resource_tree();
+
+	if (initialBoot)
+	{
+		cJSON *acp = cJSON_CreateObject();
+		init_acp(acp);
+		db_store_resource(acp, CSE_BASE_NAME "/defaultACP");
+		RTNode *acp_rtnode = create_rtnode(acp, RT_ACP);
+		add_child_resource_tree(rt->cb, acp_rtnode);
+	}
+
+	if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
+	{
+		if (register_remote_cse() != 0)
+		{
+			logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE registration failed");
+			return false;
+		}
+		if (create_local_csr())
+		{
+			logger("UTIL", LOG_LEVEL_ERROR, "Local CSR creation failed");
+			return false;
+		}
+	}
+
+	return true;
+}
+
+#ifdef UPPERTESTER
+int reset_cse()
+{
+	logger("UTIL", LOG_LEVEL_INFO, "reset_cse: bringing CSE back to factory state");
+
+#if MONO_THREAD == 0
+	pthread_mutex_lock(&main_lock);
+#endif
+
+	// 1) Drop the in-memory resource tree (mirrors stop_server teardown).
+	if (rt)
+	{
+		free_all_nodelist(rt->csr_list);
+		if (rt->cb)
+			free_rtnode(rt->cb);   // recursively frees CSEBase and all descendants
+		free(rt);
+		rt = NULL;
+	}
+
+	// 2) Wipe every stored resource.
+	if (!db_reset_all())
+	{
+#if MONO_THREAD == 0
+		pthread_mutex_unlock(&main_lock);
+#endif
+		logger("UTIL", LOG_LEVEL_ERROR, "reset_cse: db_reset_all failed");
+		return -1;
+	}
+
+	// 3) Rebuild from scratch (init_server sees an empty DB -> initialBoot path).
+	bool ok = bootstrap_cse();
+
+#if MONO_THREAD == 0
+	pthread_mutex_unlock(&main_lock);
+#endif
+
+	if (!ok)
+	{
+		logger("UTIL", LOG_LEVEL_ERROR, "reset_cse: bootstrap_cse failed");
+		return -1;
+	}
+	logger("UTIL", LOG_LEVEL_INFO, "reset_cse: done");
+	return 0;
+}
+#endif
+
 int result_parse_uri(oneM2MPrimitive* o2pt, RTNode* rtnode)
 {
 	if (!rtnode)
@@ -3066,6 +3144,8 @@ void free_o2pt(oneM2MPrimitive* o2pt)
 		cJSON_Delete(o2pt->response_pc);
 	if (o2pt->mqtt_origin)
 		free(o2pt->mqtt_origin);
+	if (o2pt->utcmd)
+		free(o2pt->utcmd);
 
 	memset(o2pt, 0, sizeof(oneM2MPrimitive));
 	free(o2pt);

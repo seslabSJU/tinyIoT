@@ -529,6 +529,30 @@ int close_dbp()
     return 1;
 }
 
+#ifdef UPPERTESTER
+int db_reset_all()
+{
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    // FK cascade removes rows from every child table; RESTART IDENTITY resets ids.
+    PGresult *res = PQexec(conn, "TRUNCATE TABLE general RESTART IDENTITY CASCADE;");
+    int ok = (PQresultStatus(res) == PGRES_COMMAND_OK);
+    if (!ok)
+        logger("DB", LOG_LEVEL_ERROR, "db_reset_all failed: %s", PQerrorMessage(conn));
+    PQclear(res);
+    pg_unlock();
+
+    if (ok)
+        logger("DB", LOG_LEVEL_INFO, "db_reset_all: all resources deleted");
+    return ok ? 1 : 0;
+}
+#endif
+
 char *get_table_name(ResourceType ty)
 {
     char *tableName = NULL;

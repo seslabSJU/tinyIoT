@@ -78,6 +78,7 @@ typedef struct _o
 	int cnot;			// Content Offset
 	cJSON *fc;			// Filter Criteria
 	int drt;			// Discovery Result Type
+	char *utcmd;			// Upper Tester command (X-M2M-UTCMD), e.g. "Reset"; NULL otherwise
 } oneM2MPrimitive;
 
 typedef struct _n

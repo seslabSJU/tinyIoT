@@ -65,11 +65,13 @@
 // 0 → multi-thread, 1 → mono-thread
 #define MONO_THREAD 0
 
-// Upper Tester : under development
-// #define UPPERTESTER
+//#define UPPERTESTER
 
 #ifdef UPPERTESTER
+// Reserved target URI that routes a request to the Upper Tester handler.
 #define UPPERTESTER_URI "__ut__"
+// HTTP header carrying a special Upper Tester command (TS-0019 table 5.4.4.2.2-2).
+#define UPPERTESTER_CMD_HEADER "x-m2m-utcmd"
 #endif
 
 #define MAX_PAYLOAD_SIZE 65536
