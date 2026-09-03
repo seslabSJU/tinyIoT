@@ -556,6 +556,13 @@ int sdt_validate_fcnt(const char *shortname, const char *cnd, cJSON *custom_attr
 
     if (def->cnd && strlen(def->cnd) > 0) {
         if (strcmp(def->cnd, cnd) != 0) {
+            /* A CND which is not registered cannot be used to validate the
+             * representation.  A registered CND for another specialization,
+             * on the other hand, means that the representation is invalid. */
+            if (!sdt_find_by_cnd(cnd)) {
+                *error = "Schema not found for containerDefinition";
+                return RSC_SPECIALIZATION_SCHEMA_NOT_FOUND;
+            }
             *error = "Mismatch between shortname and containerDefinition";
             return RSC_BAD_REQUEST;
         }

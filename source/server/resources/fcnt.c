@@ -440,13 +440,6 @@ int update_fcnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	cJSON_AddItemToObject(m2m_fcnt, "lt", cJSON_CreateString(lt));
 	free(lt);
 
-	cJSON *st_obj = cJSON_GetObjectItem(target_rtnode->obj, "st");
-	if (st_obj && cJSON_IsNumber(st_obj))
-	{
-		int current_st = st_obj->valueint;
-		cJSON_AddNumberToObject(m2m_fcnt, "st", current_st + 1);
-	}
-
 	if (customAttrs)
 	{
 		cJSON *existing_custom = extract_custom_attributes(target_rtnode->obj);

@@ -2125,7 +2125,7 @@ int check_resource_type_invalid(oneM2MPrimitive* o2pt)
 {
 	if (o2pt->ty == RT_MIXED)
 	{
-		handle_error(o2pt, RSC_BAD_REQUEST, "resource type can't be 0(Mixed)");
+		handle_error(o2pt, RSC_BAD_REQUEST, "resource type is missing or invalid");
 		return -1;
 	}
 	else if (o2pt->ty == RT_CSE)
@@ -5393,6 +5393,10 @@ int validate_shortname_cnd(const char *shortname, const char *cnd, char **error_
 
 	if (def->cnd && strlen(def->cnd) > 0) {
 		if (strcmp(def->cnd, cnd) != 0) {
+			if (!sdt_find_by_cnd(cnd)) {
+				*error_msg = "Schema not found for containerDefinition";
+				return RSC_SPECIALIZATION_SCHEMA_NOT_FOUND;
+			}
 			*error_msg = "Mismatch between shortname and containerDefinition";
 			return RSC_BAD_REQUEST;
 		}
