@@ -1042,7 +1042,7 @@ void add_csrlist(RTNode *csr)
     }
     pnode->next = calloc(sizeof(NodeList), 1);
     pnode->next->rtnode = csr;
-    pnode->next->uri = csr->uri;
+    pnode->next->uri = strdup(csr->uri);
     pnode->next->next = NULL;
 #if MONO_THREAD == 0
     pthread_mutex_unlock(&csr_lock);

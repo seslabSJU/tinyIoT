@@ -11,6 +11,19 @@
 
 bool init_server();
 
+// Build the CSE from scratch: (re)create the resource tree, seed the CSEBase and
+// default ACP on first boot, and register with the registrar CSE for MN/ASN-CSE.
+// Returns false on a fatal init failure. Used by main() at startup.
+bool bootstrap_cse();
+
+#ifdef UPPERTESTER
+// Tear the CSE down to factory state and rebuild it via bootstrap_cse():
+// wipes every stored resource and the in-memory tree, then re-seeds CSEBase +
+// default ACP. Implements the TS-0019 Upper Tester "Reset" command.
+// Returns 0 on success, -1 on failure. Takes main_lock internally.
+int reset_cse();
+#endif
+
 void set_o2pt_rsc(oneM2MPrimitive* o2pt, int rsc);
 void o2ptcpy(oneM2MPrimitive** dest, oneM2MPrimitive* src);
 void free_o2pt(oneM2MPrimitive* o2pt);

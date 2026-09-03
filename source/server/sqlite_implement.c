@@ -295,6 +295,30 @@ int close_dbp()
     return 1;
 }
 
+#ifdef UPPERTESTER
+int db_reset_all()
+{
+    char *err_msg = NULL;
+    int rc;
+
+    sqlite_lock();
+    // FK cascade removes rows from every child table.
+    rc = sqlite3_exec(db,
+                      "PRAGMA foreign_keys = ON; DELETE FROM general;",
+                      NULL, NULL, &err_msg);
+    sqlite_unlock();
+
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "db_reset_all failed: %s",
+               err_msg ? err_msg : "unknown error");
+        sqlite3_free(err_msg);
+        return 0;
+    }
+    logger("DB", LOG_LEVEL_INFO, "db_reset_all: all resources deleted");
+    return 1;
+}
+#endif
+
 char *get_table_name(ResourceType ty)
 {
     char *tableName = NULL;
