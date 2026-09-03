@@ -9,7 +9,7 @@
     {
         "type"  : "m2m:gis",
         "lname" : "genericInterworkingService",
-		"cnd"   : "",	// cnd is undefined
+		"cnd"   : "org.onem2m.genericInterworkingService",
         "attributes" : [
             { "sname" : "gisn", "lname" : "serviceName",          "type" : "string", "car" : "01", "oc" : "M", "ou" : "NP", "od" : "O", "annc"  : "OA" },
             { "sname" : "giip", "lname" : "inputDataPointLinks",  "type" : "list",   "car" : "01", "oc" : "O", "ou" : "O",  "od" : "O", "annc"  : "OA" },
@@ -23,7 +23,7 @@
     {
         "type"  : "m2m:gisA",
         "lname" : "genericInterworkingServiceAnnc",
-		"cnd"   : "",	// cnd is undefined
+		"cnd"   : "org.onem2m.genericInterworkingService",
         "attributes" : [
             { "sname" : "gisn", "lname" : "serviceName",          "type" : "string", "car" : "1",  "oc" : "M", "ou" : "NP", "od" : "O", "annc"  : "OA" },
             { "sname" : "giip", "lname" : "inputDataPointLinks",  "type" : "list",   "car" : "01", "oc" : "O", "ou" : "O",  "od" : "O", "annc"  : "OA" },
@@ -39,7 +39,7 @@
     {
         "type"  : "m2m:gio",
         "lname" : "genericInterworkingOperationInstance",
-		"cnd"   : "",	// cnd is undefined
+		"cnd"   : "org.onem2m.genericInterworkingOperationInstance",
         "attributes" : [
             { "sname" : "gion", "lname" : "operationName",        "type" : "string", "car" : "1",  "oc" : "M", "ou" : "NP", "od" : "O", "annc"  : "OA" },
             { "sname" : "giip", "lname" : "inputDataPointLinks",  "type" : "list",   "car" : "01", "oc" : "O", "ou" : "O",  "od" : "O", "annc"  : "OA" },
@@ -52,7 +52,7 @@
     {
         "type"  : "m2m:gioA",
         "lname" : "genericInterworkingOperationInstanceAnnc",
-		"cnd"   : "",	// cnd is undefined
+		"cnd"   : "org.onem2m.genericInterworkingOperationInstance",
         "attributes" : [
             { "sname" : "gion",  "lname" : "operationName",        "type" : "string", "car" : "1",  "oc" : "M", "ou" : "NP", "od" : "O", "annc"  : "OA" },
             { "sname" : "giip",  "lname" : "inputDataPointLinks",  "type" : "list",   "car" : "01", "oc" : "O", "ou" : "O",  "od" : "O", "annc"  : "OA" },
