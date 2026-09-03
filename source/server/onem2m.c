@@ -54,6 +54,7 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_ACPA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_AEA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CNTA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_GRPA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CINA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CBA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_FCNT));

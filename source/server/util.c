@@ -175,6 +175,9 @@ ResourceType http_parse_object_type(header_t* headers)
 	case 10005:
 		ty = RT_CBA;
 		break;
+	case 10009:
+		ty = RT_GRPA;
+		break;
 	default:
 		ty = RT_MIXED;
 		break;
@@ -390,6 +393,8 @@ ResourceType parse_object_type_cjson(cJSON* cjson)
 		ty = RT_AEA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:cnta"))
 		ty = RT_CNTA;
+	else if (cJSON_GetObjectItem(cjson, "m2m:grpa"))
+		ty = RT_GRPA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:cina"))
 		ty = RT_CINA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:fcnt"))
@@ -470,6 +475,9 @@ char* resource_identifier(ResourceType ty, char* ct)
 		break;
 	case RT_CNTA:
 		strcpy(ri, "10003-");
+		break;
+	case RT_GRPA:
+		strcpy(ri, "10009-");
 		break;
 	case RT_CINA:
 		strcpy(ri, "10004-");
@@ -3309,6 +3317,8 @@ cJSON* getResource(cJSON* root, ResourceType ty)
 		return cJSON_GetObjectItem(root, "m2m:cinA");
 	case RT_CNTA:
 		return cJSON_GetObjectItem(root, "m2m:cntA");
+	case RT_GRPA:
+		return cJSON_GetObjectItem(root, "m2m:grpA");
 	case RT_FCNT:
 	{
 		cJSON *res = cJSON_GetObjectItem(root, "m2m:fcnt");
