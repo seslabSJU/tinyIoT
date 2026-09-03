@@ -3091,6 +3091,7 @@ void o2ptcpy(oneM2MPrimitive** dest, oneM2MPrimitive* src)
 		(*dest)->ip = strdup(src->ip);
 	(*dest)->rvi = src->rvi;
 	(*dest)->rcn = src->rcn;
+	(*dest)->rcn_explicit = src->rcn_explicit;
 	(*dest)->ty = src->ty;
 	(*dest)->op = src->op;
 	(*dest)->isFopt = src->isFopt;

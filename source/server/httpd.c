@@ -428,7 +428,10 @@ void handle_http_request(HTTPRequest *req, int slotno)
         if (cJSON_GetObjectItem(qs, "rcn"))
         {
             o2pt->rcn = cJSON_GetObjectItem(qs, "rcn")->valueint;
-            if (o2pt->rcn < 0 || o2pt->rcn > 12) handle_error(o2pt, RSC_BAD_REQUEST, "Invalid Result Content (rcn) value");
+            if (o2pt->rcn < 0 || o2pt->rcn > 12)
+                handle_error(o2pt, RSC_BAD_REQUEST, "Invalid Result Content (rcn) value");
+            else
+                o2pt->rcn_explicit = true;
             cJSON_DeleteItemFromObject(qs, "rcn");
         }
         o2pt->fc = qs;
@@ -592,6 +595,26 @@ int http_notify(oneM2MPrimitive *o2pt, char *host, int port, NotiTarget *nt)
     return rsc;
 }
 
+static int append_query_parameter(char **query, const char *key, const char *value)
+{
+    if (!query || !key || !value)
+        return -1;
+
+    size_t current_len = *query ? strlen(*query) : 0;
+    size_t append_len = (current_len ? 1 : 0) + strlen(key) + 1 + strlen(value);
+    char *resized = realloc(*query, current_len + append_len + 1);
+    if (!resized)
+        return -1;
+
+    if (current_len == 0)
+        resized[0] = '\0';
+
+    snprintf(resized + current_len, append_len + 1, "%s%s=%s",
+             current_len ? "&" : "", key, value);
+    *query = resized;
+    return 0;
+}
+
 void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
 {
     logger("HTTP", LOG_LEVEL_DEBUG, "http_forwarding %s:%d", host, port);
@@ -625,6 +648,20 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
     if (o2pt->fc)
     {
         req->qs = fc_to_qs(o2pt->fc);
+    }
+
+    if (o2pt->rcn_explicit)
+    {
+        char rcn[16];
+        snprintf(rcn, sizeof(rcn), "%d", o2pt->rcn);
+        if (append_query_parameter(&req->qs, "rcn", rcn) != 0)
+        {
+            logger("HTTP", LOG_LEVEL_ERROR, "Failed to preserve rcn while forwarding");
+            o2pt->rsc = RSC_INTERNAL_SERVER_ERROR;
+            free_HTTPRequest(req);
+            free_HTTPResponse(res);
+            return;
+        }
     }
 
     if (o2pt->ty > 0 && o2pt->op == OP_CREATE)

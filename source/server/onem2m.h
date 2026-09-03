@@ -63,6 +63,7 @@ typedef struct _o
 	cJSON *request_pc;	// Primitive Content
 	cJSON *response_pc; // Primitive Content
 	int rcn;			// Result Content
+	bool rcn_explicit;	// Result Content was explicitly provided by the originator
 	int rsc;			// Result Code
 	int coap_rsc;		// CoAP Result Code
 	int ty;				// Resource Type
