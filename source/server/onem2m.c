@@ -605,15 +605,17 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 
 	cJSON_ArrayForEach(at, at_list)
 	{
-		oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
-		o2pt->op = OP_DELETE;
-		o2pt->to = strdup(at->valuestring);
-		o2pt->fr = "/" CSE_BASE_RI;
-		o2pt->ty = RT_AE;
-		o2pt->rqi = strdup("deannounce");
-		o2pt->isForwarding = true;
+		oneM2MPrimitive *deannc_o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+		deannc_o2pt->op = OP_DELETE;
+		deannc_o2pt->to = strdup(at->valuestring);
+		deannc_o2pt->fr = strdup("/" CSE_BASE_RI);
+		deannc_o2pt->ty = rtnode->ty + 10000;
+		deannc_o2pt->rqi = strdup("deannounce");
+		deannc_o2pt->rvi = CSE_RVI;
+		deannc_o2pt->isForwarding = true;
 
-		forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
+		forwarding_onem2m_resource(deannc_o2pt, find_csr_rtnode_by_uri(at->valuestring));
+		free_o2pt(deannc_o2pt);
 	}
 
 	if ((rtnode->ty == RT_CNT || rtnode->ty == RT_FCNT) && rtnode->parent && rtnode->parent->ty == RT_FCNT)
@@ -1157,7 +1159,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	case RT_CNTA:
 	case RT_CINA:
 	case RT_GRPA:
-		update_annc(o2pt, target_rtnode);
+		rsc = update_annc(o2pt, target_rtnode);
 		break;
 #endif
 
@@ -1166,7 +1168,8 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		rsc = o2pt->rsc;
 	}
 #if CSE_RVI >= RVI_3
-	announce_to_annc(o2pt, target_rtnode);
+	if (rsc < RSC_BAD_REQUEST)
+		announce_to_annc(o2pt, target_rtnode);
 #endif
 	return rsc;
 }
@@ -1974,6 +1977,8 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		if (!rtnode)
 		{
 			logger("UTIL", LOG_LEVEL_ERROR, "at target not found");
+			free_o2pt(o2pt);
+			free(parent_target);
 			free(csi);
 			return NULL;
 		}
@@ -1982,6 +1987,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		{
 			free_o2pt(o2pt);
 			logger("UTIL", LOG_LEVEL_ERROR, "Creation failed");
+			free(parent_target);
 			free(csi);
 			return NULL;
 		}
@@ -1996,6 +2002,7 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		
 		return strdup(buf);
 	}
+	free(parent_target);
 	free(csi);
 	return NULL;
 }
