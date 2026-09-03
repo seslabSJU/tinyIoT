@@ -2125,7 +2125,7 @@ int check_resource_type_invalid(oneM2MPrimitive* o2pt)
 {
 	if (o2pt->ty == RT_MIXED)
 	{
-		handle_error(o2pt, RSC_BAD_REQUEST, "resource type can't be 0(Mixed)");
+		handle_error(o2pt, RSC_BAD_REQUEST, "resource type is missing or invalid");
 		return -1;
 	}
 	else if (o2pt->ty == RT_CSE)

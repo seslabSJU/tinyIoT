@@ -260,6 +260,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
     oneM2MPrimitive *o2pt = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
     cJSON *fcjson = NULL;
     char *header = NULL;
+    bool has_resource_type = false;
 
     if (req->payload && strlen(req->payload) > 0)
     {
@@ -301,6 +302,7 @@ void handle_http_request(HTTPRequest *req, int slotno)
     {
         if (strstr(header, "ty="))
         {
+            has_resource_type = true;
             o2pt->ty = atoi(strstr(header, "ty=") + 3);
         }
         else
@@ -375,8 +377,10 @@ void handle_http_request(HTTPRequest *req, int slotno)
 
     if (o2pt->op == OP_CREATE)
     {
-        // o2pt->ty = http_parse_object_type(req->headers);
-        if (o2pt->ty == 0)
+        cJSON *sgn = o2pt->request_pc
+            ? cJSON_GetObjectItem(o2pt->request_pc, "m2m:sgn")
+            : NULL;
+        if (!has_resource_type && cJSON_IsObject(sgn))
         {
             o2pt->op = OP_NOTIFY;
         }
