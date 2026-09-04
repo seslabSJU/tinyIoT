@@ -4388,14 +4388,12 @@ int create_local_csr()
 	cJSON* csr = cJSON_CreateObject();
 	add_general_attribute(csr, rt->cb, RT_CSR);
 	
-	cJSON_DeleteItemFromObject(csr, "ri");
 	cJSON_DeleteItemFromObject(csr, "rn");
 	snprintf(buf, sizeof(buf), "/%s", cse_ri);
 	cJSON_AddItemToObject(csr, "csi", cJSON_CreateString(buf));
 	snprintf(buf, sizeof(buf), "/%s/%s", cse_ri, REMOTE_CSE_NAME);
 	cJSON_AddItemToObject(csr, "cb", cJSON_CreateString(buf));
 	cJSON_AddItemToObject(csr, "rn", cJSON_CreateString(cse_ri));
-	cJSON_AddItemToObject(csr, "ri", cJSON_CreateString(cse_ri));
 	cJSON *poa = cJSON_CreateArray();
 	char buffer[128] = { 0 };
 	snprintf(buffer, 128, "http://%s:%d", REMOTE_CSE_HOST, REMOTE_CSE_PORT);
