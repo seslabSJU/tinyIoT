@@ -40,6 +40,27 @@ int create_grp(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         }
     }
 
+#if CSE_RVI >= RVI_3
+    cJSON *final_at = cJSON_CreateArray();
+    if (handle_annc_create(parent_rtnode, grp, cJSON_GetObjectItem(grp, "at"), final_at) == -1)
+    {
+        cJSON_Delete(root);
+        cJSON_Delete(final_at);
+        return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute in `aa`");
+    }
+
+    if (cJSON_GetArraySize(final_at) > 0)
+    {
+        cJSON_DeleteItemFromObject(grp, "at");
+        cJSON_AddItemToObject(grp, "at", final_at);
+    }
+    else
+    {
+        cJSON_Delete(final_at);
+        cJSON_DeleteItemFromObject(grp, "at");
+    }
+#endif
+
     cJSON_AddItemToObject(grp, "cnm", cJSON_CreateNumber(cJSON_GetArraySize(cJSON_GetObjectItem(grp, "mid"))));
 
     o2pt->rsc = RSC_CREATED;
@@ -94,6 +115,17 @@ int update_grp(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         o2pt->rsc = rsc;
         return rsc;
     }
+
+#if CSE_RVI >= RVI_3
+    cJSON *at = NULL;
+    if ((at = cJSON_GetObjectItem(m2m_grp, "at")))
+    {
+        cJSON *final_at = cJSON_CreateArray();
+        handle_annc_update(target_rtnode, at, final_at);
+        cJSON_DeleteItemFromObject(m2m_grp, "at");
+        cJSON_AddItemToObject(m2m_grp, "at", final_at);
+    }
+#endif
 
     if ((pjson = cJSON_GetObjectItem(m2m_grp, "mid")))
     {

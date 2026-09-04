@@ -140,7 +140,7 @@ int update_annc(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     update_resource(target_rtnode->obj, req_src);
 
-    result = db_update_resource(req_src, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, RT_AEA);
+    result = db_update_resource(req_src, cJSON_GetObjectItem(target_rtnode->obj, "ri")->valuestring, target_rtnode->ty);
 
     make_response_body(o2pt, target_rtnode);
 

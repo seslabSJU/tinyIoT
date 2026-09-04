@@ -8,7 +8,6 @@
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
-extern RTNode *registrar_csr;
 
 int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
@@ -59,9 +58,12 @@ int create_ae(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     }
     if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
     {
-        if (!strcmp(o2pt->fr, "/S"))
+        if (!strcmp(o2pt->fr, "/S") && rt->registrar_csr)
         {
-            cJSON_AddItemToArray(cJSON_GetObjectItem(ae, "at"), cJSON_CreateString(cJSON_GetObjectItem(registrar_csr->obj, "csi")->valuestring));
+            cJSON *reg_csi = cJSON_GetObjectItem(rt->registrar_csr->obj, "csi");
+            cJSON *ae_at = cJSON_GetObjectItem(ae, "at");
+            if (reg_csi && ae_at)
+                cJSON_AddItemToArray(ae_at, cJSON_CreateString(reg_csi->valuestring));
         }
     }
 #if CSE_RVI >= RVI_3

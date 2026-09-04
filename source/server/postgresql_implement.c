@@ -271,9 +271,14 @@ static const table_def_t table_definitions[] = {
      "api VARCHAR(45), lnk VARCHAR(100), aei VARCHAR(200), rr INT, poa VARCHAR(255), apn VARCHAR(100), srv VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
-    {"cntA", 
+    {"cntA",
      "CREATE TABLE IF NOT EXISTS cntA ( id INTEGER, "
      "lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"grpA",
+     "CREATE TABLE IF NOT EXISTS grpA ( id INTEGER, "
+     "lnk VARCHAR(100), cr VARCHAR(45), mt INT, cnm INT, mnm INT, mid TEXT, macp TEXT, mtv INT, csy INT, gn VARCHAR(30), at VARCHAR(200), aa VARCHAR(100), ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"cinA",
@@ -369,9 +374,14 @@ static const table_def_t table_definitions[] = {
      "api TEXT, lnk TEXT, aei TEXT, rr INT, poa TEXT, apn TEXT, srv TEXT, at TEXT, aa TEXT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
-    {"cntA", 
+    {"cntA",
      "CREATE TABLE IF NOT EXISTS cntA ( id INTEGER, "
      "lnk TEXT, cr TEXT, mni INT, mbs INT, st INT, cni INT, cbs INT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
+    {"grpA",
+     "CREATE TABLE IF NOT EXISTS grpA ( id INTEGER, "
+     "lnk TEXT, cr TEXT, mt INT, cnm INT, mnm INT, mid TEXT, macp TEXT, mtv INT, csy INT, gn TEXT, at TEXT, aa TEXT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"cinA",
@@ -590,6 +600,9 @@ char *get_table_name(ResourceType ty)
         break;
     case RT_CNTA:
         tableName = "cntA";
+        break;
+    case RT_GRPA:
+        tableName = "grpA";
         break;
     case RT_CINA:
         tableName = "cinA";

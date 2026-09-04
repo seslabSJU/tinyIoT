@@ -131,6 +131,7 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 
     cJSON_AddNumberToObject(m2m_cnt, "st", cJSON_GetObjectItem(cnt, "st")->valueint + 1);
 
+#if CSE_RVI >= RVI_3
     cJSON *at = NULL;
     if ((at = cJSON_GetObjectItem(m2m_cnt, "at")))
     {
@@ -139,6 +140,7 @@ int update_cnt(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         cJSON_DeleteItemFromObject(m2m_cnt, "at");
         cJSON_AddItemToObject(m2m_cnt, "at", final_at);
     }
+#endif
 
     cJSON_AddItemToObject(m2m_cnt, "lt", cJSON_CreateString(get_local_time(0)));
 

@@ -175,6 +175,9 @@ ResourceType http_parse_object_type(header_t* headers)
 	case 10005:
 		ty = RT_CBA;
 		break;
+	case 10009:
+		ty = RT_GRPA;
+		break;
 	default:
 		ty = RT_MIXED;
 		break;
@@ -337,6 +340,9 @@ char* get_resource_key(ResourceType ty)
 	case RT_FCIN:
 		key = "m2m:fcin";
 		break;
+	case RT_GRPA:
+		key = "m2m:grpA";
+		break;
 	default:
 		key = "general";
 		break;
@@ -387,6 +393,8 @@ ResourceType parse_object_type_cjson(cJSON* cjson)
 		ty = RT_AEA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:cnta"))
 		ty = RT_CNTA;
+	else if (cJSON_GetObjectItem(cjson, "m2m:grpa"))
+		ty = RT_GRPA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:cina"))
 		ty = RT_CINA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:fcnt"))
@@ -467,6 +475,9 @@ char* resource_identifier(ResourceType ty, char* ct)
 		break;
 	case RT_CNTA:
 		strcpy(ri, "10003-");
+		break;
+	case RT_GRPA:
+		strcpy(ri, "10009-");
 		break;
 	case RT_CINA:
 		strcpy(ri, "10004-");
@@ -3306,6 +3317,8 @@ cJSON* getResource(cJSON* root, ResourceType ty)
 		return cJSON_GetObjectItem(root, "m2m:cinA");
 	case RT_CNTA:
 		return cJSON_GetObjectItem(root, "m2m:cntA");
+	case RT_GRPA:
+		return cJSON_GetObjectItem(root, "m2m:grpA");
 	case RT_FCNT:
 	{
 		cJSON *res = cJSON_GetObjectItem(root, "m2m:fcnt");
@@ -4556,9 +4569,16 @@ int create_remote_cba(char* poa, char** cbA_url)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "create_remote_cba");
 
+	RTNode *csr = find_csr_rtnode_by_uri(poa);
+	if (!csr)
+	{
+		logger("UTIL", LOG_LEVEL_ERROR, "csr not found");
+		return -1;
+	}
+
 	const char* cba_rn = CSE_BASE_RI "_cba";
 	char structured_buf[1024] = { 0 };
-	sprintf(structured_buf, "%s/%s", poa, cba_rn);
+	sprintf(structured_buf, "%s/%s", cJSON_GetObjectItem(csr->obj, "cb")->valuestring, cba_rn);
 
 	cJSON* stale_at_item = NULL;
 	{
@@ -4576,7 +4596,7 @@ int create_remote_cba(char* poa, char** cbA_url)
 				vo2pt->op = OP_RETRIEVE;
 				vo2pt->rqi = strdup("verify-cba");
 				vo2pt->rvi = CSE_RVI;
-				int vrsc = forwarding_onem2m_resource(vo2pt, find_csr_rtnode_by_uri(poa));
+				int vrsc = forwarding_onem2m_resource(vo2pt, csr);
 
 				if (vrsc == RSC_OK)
 				{
@@ -4626,12 +4646,6 @@ int create_remote_cba(char* poa, char** cbA_url)
 	ResourceAddressingType rat = checkResourceAddressingType(poa);
 	if (rat == SP_RELATIVE)
 	{
-		RTNode* csr = find_csr_rtnode_by_uri(poa);
-		if (!csr)
-		{
-			logger("UTIL", LOG_LEVEL_ERROR, "csr not found");
-			return -1;
-		}
 		oneM2MPrimitive* o2pt = (oneM2MPrimitive*)calloc(sizeof(oneM2MPrimitive), 1);
 		o2pt->fr = strdup("/" CSE_BASE_RI);
 		o2pt->to = strdup(cJSON_GetObjectItem(csr->obj, "cb")->valuestring);
