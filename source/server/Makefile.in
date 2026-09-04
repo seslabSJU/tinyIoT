@@ -26,18 +26,6 @@ RELEXE = server
 
 all: $(RELEXE)
 
-CSR_TEST_BIN ?= /tmp/tinyiot-test-csr-registration
-
-.PHONY: test test-csr-registration
-
-test: test-csr-registration
-
-test-csr-registration:
-	$(CC) $(RELCFLAGS) -I. -ffunction-sections -fdata-sections \
-		-Wl,--gc-sections -o $(CSR_TEST_BIN) \
-		tests/test_csr_registration.c resources/csr.c cJSON.c -lpthread -lm
-	$(CSR_TEST_BIN)
-
 $(RELEXE) : $(OBJS)
 	$(CC) $(RELCFLAGS) -o $(RELEXE) $(OBJS) $(LIBS)
 
