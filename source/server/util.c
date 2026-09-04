@@ -2048,34 +2048,6 @@ int check_aei_duplicate(oneM2MPrimitive* o2pt, RTNode* rtnode)
 	return 0;
 }
 
-int check_csi_duplicate(char* new_csi, RTNode* rtnode)
-{
-	if (!rtnode || new_csi == NULL)
-		return 0;
-
-#if MONO_THREAD == 0
-	pthread_mutex_lock(&main_lock);
-#endif
-	RTNode* child = rtnode->child;
-
-	while (child)
-	{
-		if (!strcmp(get_ri_rtnode(child), new_csi))
-		{
-#if MONO_THREAD == 0
-			pthread_mutex_unlock(&main_lock);
-#endif
-			return -1;
-		}
-		child = child->sibling_right;
-	}
-#if MONO_THREAD == 0
-	pthread_mutex_unlock(&main_lock);
-#endif
-
-	return 0;
-}
-
 int check_payload_empty(oneM2MPrimitive* o2pt)
 {
 	if (!o2pt->request_pc)

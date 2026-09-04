@@ -7,6 +7,39 @@
 
 extern ResourceTree *rt;
 extern cJSON *ATTRIBUTES;
+extern pthread_mutex_t main_lock;
+
+int check_csi_duplicate(char *new_csi, RTNode *parent_rtnode)
+{
+    if (!parent_rtnode || !new_csi)
+        return 0;
+
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&main_lock);
+#endif
+
+    RTNode *child = parent_rtnode->child;
+    while (child)
+    {
+        if (child->ty == RT_CSR)
+        {
+            cJSON *csi = cJSON_GetObjectItem(child->obj, "csi");
+            if (cJSON_IsString(csi) && !strcmp(csi->valuestring, new_csi))
+            {
+#if MONO_THREAD == 0
+                pthread_mutex_unlock(&main_lock);
+#endif
+                return -1;
+            }
+        }
+        child = child->sibling_right;
+    }
+
+#if MONO_THREAD == 0
+    pthread_mutex_unlock(&main_lock);
+#endif
+    return 0;
+}
 
 int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 {
@@ -23,11 +56,17 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     cJSON *csr = cJSON_GetObjectItem(root, "m2m:csr");
 
     add_general_attribute(csr, parent_rtnode, RT_CSR);
-    if (!cJSON_GetObjectItem(csr, "csi")) {
-        cJSON_AddStringToObject(csr, "csi", o2pt->fr);
+    if (!o2pt->fr || !o2pt->fr[0])
+    {
+        cJSON_Delete(root);
+        return handle_error(o2pt, RSC_BAD_REQUEST, "missing originator");
     }
-    cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
-    cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));
+
+    // TS-0001 10.1.1.2.1: the Receiver assigns CSE-ID from the From parameter.
+    // resourceName and resourceID keep the generic CREATE handling performed by
+    // add_general_attribute(): preserve a supplied rn and assign a unique ri.
+    cJSON_DeleteItemFromObject(csr, "csi");
+    cJSON_AddStringToObject(csr, "csi", o2pt->fr);
 
     int rsc = validate_csr(o2pt, parent_rtnode, csr, OP_CREATE);
     if (rsc != 0)
@@ -35,11 +74,6 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         cJSON_Delete(root);
         return rsc;
     }
-
-    /*add_general_attribute(csr, parent_rtnode, RT_CSR);
-    cJSON_AddStringToObject(csr, "csi", o2pt->fr);
-    cJSON_ReplaceItemInObject(csr, "rn", cJSON_CreateString(o2pt->fr[0] == '/' ? o2pt->fr + 1 : o2pt->fr));
-    cJSON_ReplaceItemInObject(csr, "ri", cJSON_Duplicate(cJSON_GetObjectItem(csr, "rn"), 1));*/
 
     o2pt->rsc = RSC_CREATED;
 
@@ -83,9 +117,9 @@ int create_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 
 int update_csr(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 {
-    char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct"};
+    char invalid_key[][8] = {"ty", "pi", "ri", "rn", "ct", "csi"};
     cJSON *m2m_csr = cJSON_GetObjectItem(o2pt->request_pc, "m2m:csr");
-    int invalid_key_size = sizeof(invalid_key) / (8 * sizeof(char));
+    int invalid_key_size = sizeof(invalid_key) / sizeof(invalid_key[0]);
 
     int updateAttrCnt = cJSON_GetArraySize(m2m_csr);
 
@@ -171,7 +205,7 @@ int validate_csr(oneM2MPrimitive *o2pt, RTNode *parent_rtnode, cJSON *csr, Opera
         csi = pjson->valuestring;
         if (check_csi_duplicate(csi, parent_rtnode) == -1)
         {
-            handle_error(o2pt, RSC_OPERATION_NOT_ALLOWED, "originator has already registered");
+            handle_error(o2pt, RSC_ORIGINATOR_HAS_ALREADY_REGISTERD, "originator has already registered");
             return o2pt->rsc;
         }
     }
