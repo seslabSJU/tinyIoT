@@ -60,7 +60,18 @@ void detach_subs(RTNode* parent, RTNode* sub);
 int handle_annc_create(RTNode* parent_rtnode, cJSON* resource_obj, cJSON* at_obj, cJSON* final_at);
 int handle_annc_update(RTNode* target_rtnode, cJSON* at_obj, cJSON* final_at);
 
-void announce_to_annc(oneM2MPrimitive* o2pt, RTNode* target_rtnode);
+// Fill `dst` (the <...>Annc object under construction) with the attributes to
+// announce for `src` (the original resource of type `ty`): all Mandatory-Announced
+// attributes plus every Optionally-Announced attribute listed in `src`.aa.
+// Returns 0 on success, -1 if `src`.aa lists an attribute not announceable for `ty`.
+int build_annc_attrs(cJSON* dst, cJSON* src, ResourceType ty);
+
+// Propagate a resource UPDATE to its announced copies: Mandatory-Announced attributes
+// changed by this update, current Optionally-Announced attributes, and OA attributes
+// dropped from `aa` (sent as null). `prev_aa` (the `aa` value before the update) and
+// `upd_body` (the update request content) are snapshots taken before the resource
+// handler ran; either may be NULL.
+void announce_to_annc(oneM2MPrimitive* o2pt, RTNode* target_rtnode, cJSON* prev_aa, cJSON* upd_body);
 int create_remote_cba(char* poa, char** cbA_url);
 int deregister_remote_cba(char* cbA_url);
 int deregister_remote_annc(RTNode* target_rtnode, cJSON* delete_at_list);

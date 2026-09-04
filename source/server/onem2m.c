@@ -1089,6 +1089,11 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `et` is invalid");
 	}
 
+#if CSE_RVI >= RVI_3
+	cJSON *prev_aa = cJSON_Duplicate(cJSON_GetObjectItem(target_rtnode->obj, "aa"), 1);
+	cJSON *upd_body_snap = cJSON_Duplicate(getResource(o2pt->request_pc, target_rtnode->ty), 1);
+#endif
+
 	switch (ty)
 	{
 	case RT_AE:
@@ -1170,7 +1175,9 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	}
 #if CSE_RVI >= RVI_3
 	if (rsc < RSC_BAD_REQUEST)
-		announce_to_annc(o2pt, target_rtnode);
+		announce_to_annc(o2pt, target_rtnode, prev_aa, upd_body_snap);
+	cJSON_Delete(prev_aa);
+	cJSON_Delete(upd_body_snap);
 #endif
 	return rsc;
 }
@@ -1896,82 +1903,17 @@ char *create_remote_annc(RTNode *parent_rtnode, cJSON *obj, char *at)
 		sprintf(buf, "/%s/%s/%s", CSE_BASE_RI, parent_rtnode->uri, cJSON_GetObjectItem(obj, "rn")->valuestring);
 		cJSON_AddItemToObject(annc, "lnk", cJSON_CreateString(buf));
 		
-		//TO-DO  acpi original에서 갖고 오거나 local policy에 따라 추가하는 것 필요)
-		cJSON *acpi = cJSON_GetObjectItem(obj, "acpi");
-		if (acpi) {
-			cJSON_AddItemToObject(annc, "acpi", cJSON_Duplicate(acpi, 1));
-		}
-		
-		char *et = strdup(cJSON_GetObjectItem(obj, "et")->valuestring);
-		
-		switch (ty)
+		// Mandatory-Announced + Optionally-Announced (aa) attributes.
+		if (build_annc_attrs(annc, obj, ty) != 0)
 		{
-			case RT_ACP:
-			if ((pjson = cJSON_Duplicate(cJSON_GetObjectItem(obj, "pv"), true)))
-			cJSON_AddItemToObject(annc, "pv", pjson);
-			if ((pjson = cJSON_Duplicate(cJSON_GetObjectItem(obj, "pvs"), true)))
-			cJSON_AddItemToObject(annc, "pvs", pjson);
-			
-			cJSON_AddStringToObject(annc, "et", et);
-			free(et);
-			break;
-			case RT_AE:
-			pjson = cJSON_Duplicate(cJSON_GetObjectItem(obj, "srv"), true);
-			cJSON_AddItemToObject(annc, "srv", pjson);
-			
-			cJSON_AddStringToObject(annc, "et", et);
-			free(et);
-			break;
-			case RT_CNT:
-			cJSON_AddStringToObject(annc, "et", et);
-			free(et);
-			break;
-			case RT_CIN:
-			cJSON_AddStringToObject(annc, "et", et);
-			free(et);
-			break;
-			case RT_SUB:
-			cJSON_AddStringToObject(annc, "et", et);
-			free(et);
-			break;
-			case RT_GRP:
-			cJSON_AddStringToObject(annc, "et", et);
-			free(et);
-			break;
-			case RT_FCNT:
-			cJSON_AddStringToObject(annc, "et", et);
-			free(et);
-			break;
+			logger("UTIL", LOG_LEVEL_ERROR, "invalid attribute in aa");
+			free_o2pt(o2pt);
+			cJSON_Delete(root);
+			free(parent_target);
+			free(csi);
+			return NULL;
 		}
-		
-		cJSON *lbl = cJSON_GetObjectItem(obj, "lbl");
-		if (lbl)
-		cJSON_AddItemToObject(annc, "lbl", cJSON_Duplicate(lbl, true));
-		
-		cJSON *ast = cJSON_GetObjectItem(obj, "ast");
-		if (ast)
-		cJSON_AddItemToObject(annc, "ast", cJSON_Duplicate(ast, true));
-		
-		cJSON *aa = cJSON_GetObjectItem(obj, "aa");
-		cJSON *attr = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
-		cJSON_ArrayForEach(pjson, aa)
-		{
-			if (strcmp(pjson->valuestring, "lbl") == 0)
-			continue;
-			if (strcmp(pjson->valuestring, "ast") == 0)
-			continue;
-			if (strcmp(pjson->valuestring, "lnk") == 0)
-			continue;
-			if (!cJSON_GetObjectItem(attr, pjson->valuestring))
-			{
-				logger("UTIL", LOG_LEVEL_ERROR, "invalid attribute in aa");
-				free(csi);
-				return NULL;
-			}
-			cJSON *temp = cJSON_GetObjectItem(obj, pjson->valuestring);
-			cJSON_AddItemToObject(annc, pjson->valuestring, cJSON_Duplicate(temp, true));
-		}
-		
+
 		o2pt->request_pc = root;
 		o2pt->isForwarding = true;
 		RTNode *rtnode = find_csr_rtnode_by_uri(at);

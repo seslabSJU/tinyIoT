@@ -4569,6 +4569,9 @@ int create_remote_cba(char* poa, char** cbA_url)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "create_remote_cba");
 
+	// `poa` is the SP-relative CSE-ID of the *target* hosting CSE (e.g. "/cse2").
+	// `csr` is only the next routing hop and may be a transit CSE (matched via its
+	// `dcse`); the request still has to be addressed to the *final* target.
 	RTNode *csr = find_csr_rtnode_by_uri(poa);
 	if (!csr)
 	{
@@ -4576,9 +4579,16 @@ int create_remote_cba(char* poa, char** cbA_url)
 		return -1;
 	}
 
+	// Address the target CSE's <CSEBase> with the reserved "-" shortcut (TS-0001
+	// structured addressing) so we never need to learn its resourceName: every
+	// CSE on the path resolves "/<cse-id>/-" to that CSE's own <CSEBase>.
+	char target_cb[512] = { 0 };
+	snprintf(target_cb, sizeof(target_cb), "%s/-", poa);
+
 	const char* cba_rn = CSE_BASE_RI "_cba";
+	// Deterministic structured address of our <CSEBaseAnnc> under the target <CSEBase>.
 	char structured_buf[1024] = { 0 };
-	sprintf(structured_buf, "%s/%s", cJSON_GetObjectItem(csr->obj, "cb")->valuestring, cba_rn);
+	sprintf(structured_buf, "%s/%s", target_cb, cba_rn);
 
 	cJSON* stale_at_item = NULL;
 	{
@@ -4592,42 +4602,28 @@ int create_remote_cba(char* poa, char** cbA_url)
 			{
 				oneM2MPrimitive* vo2pt = (oneM2MPrimitive*)calloc(sizeof(oneM2MPrimitive), 1);
 				vo2pt->fr = strdup("/" CSE_BASE_RI);
-				vo2pt->to = strdup(structured_buf);
+				vo2pt->to = strdup(structured_buf);  // stable rn-based address of the cbA
 				vo2pt->op = OP_RETRIEVE;
 				vo2pt->rqi = strdup("verify-cba");
 				vo2pt->rvi = CSE_RVI;
 				int vrsc = forwarding_onem2m_resource(vo2pt, csr);
 
+				free_o2pt(vo2pt);
+
 				if (vrsc == RSC_OK)
 				{
-					char* fresh_url = NULL;
-					cJSON* body = vo2pt->response_pc ? cJSON_GetObjectItem(vo2pt->response_pc, get_resource_key(RT_CBA)) : NULL;
-					cJSON* ri_item = body ? cJSON_GetObjectItem(body, "ri") : NULL;
-					if (ri_item && cJSON_IsString(ri_item))
+					// cbA is alive at its (stable) structured address
+					if (!strcmp(structured_buf, at_item->valuestring))
 					{
-						char fresh_buf[1024] = { 0 };
-						sprintf(fresh_buf, "%s/%s", poa, ri_item->valuestring);
-						fresh_url = strdup(fresh_buf);
-					}
-					else
-					{
-						fresh_url = strdup(at_item->valuestring);
-					}
-					free_o2pt(vo2pt);
-
-					if (!strcmp(fresh_url, at_item->valuestring))
-					{
-						*cbA_url = fresh_url;
+						*cbA_url = strdup(structured_buf);
 						logger("UTIL", LOG_LEVEL_DEBUG, "cbA verified alive / target: %s", *cbA_url);
 						return 0;
 					}
-
-					logger("UTIL", LOG_LEVEL_DEBUG, "cbA alive but ri changed, updating cache: %s -> %s", at_item->valuestring, fresh_url);
-					*cbA_url = fresh_url;
+					logger("UTIL", LOG_LEVEL_DEBUG, "cbA alive, normalising cached address: %s -> %s", at_item->valuestring, structured_buf);
+					*cbA_url = strdup(structured_buf);
 					stale_at_item = at_item;
 					break;
 				}
-				free_o2pt(vo2pt);
 
 				logger("UTIL", LOG_LEVEL_WARN, "cached cbA is stale (rsc %d), recreating: %s", vrsc, at_item->valuestring);
 				stale_at_item = at_item;
@@ -4642,13 +4638,12 @@ int create_remote_cba(char* poa, char** cbA_url)
 	char* host = NULL;
 	int port = 0;
 	char* path = NULL;
-	char buf[1024] = { 0 };
 	ResourceAddressingType rat = checkResourceAddressingType(poa);
 	if (rat == SP_RELATIVE)
 	{
 		oneM2MPrimitive* o2pt = (oneM2MPrimitive*)calloc(sizeof(oneM2MPrimitive), 1);
 		o2pt->fr = strdup("/" CSE_BASE_RI);
-		o2pt->to = strdup(cJSON_GetObjectItem(csr->obj, "cb")->valuestring);
+		o2pt->to = strdup(target_cb);  // create under the target CSE's <CSEBase>, not the next hop
 		o2pt->op = OP_CREATE;
 		o2pt->ty = RT_CBA;
 		o2pt->rqi = strdup("create-cba");
@@ -4661,6 +4656,10 @@ int create_remote_cba(char* poa, char** cbA_url)
 		cJSON_AddItemToObject(cba, "lnk", cJSON_CreateString("/" CSE_BASE_RI "/" CSE_BASE_NAME));
 		cJSON* srv = cJSON_Duplicate(cJSON_GetObjectItem(rt->cb->obj, "srv"), true);
 		cJSON_AddItemToObject(cba, "srv", srv);
+		// CSEBase has no expirationTime; synthesise one so <CSEBaseAnnc> carries the MA `et`.
+		char* cba_et = get_local_time(DEFAULT_EXPIRE_TIME);
+		cJSON_AddStringToObject(cba, "et", cba_et);
+		free(cba_et);
 		// cJSON_AddItemToObject(cba, "ty", cJSON_CreateNumber(RT_CBA));
 
 		o2pt->request_pc = root;
@@ -4678,10 +4677,8 @@ int create_remote_cba(char* poa, char** cbA_url)
 		}
 		else if (o2pt->response_pc)
 		{
-			// logger("UTIL", LOG_LEVEL_DEBUG, "cba_target: %s", cJSON_PrintUnformatted(result));
-			root = cJSON_GetObjectItem(o2pt->response_pc, get_resource_key(RT_CBA));
-			sprintf(buf, "%s/%s", poa, cJSON_GetObjectItem(root, "ri")->valuestring);
-			*cbA_url = strdup(buf);
+			// Created; address it by its stable structured path (rn is deterministic).
+			*cbA_url = strdup(structured_buf);
 		}
 		else
 		{
@@ -4992,79 +4989,187 @@ void removeChildAnnc(RTNode* parent_rtnode, char* at)
 	}
 }
 
-void announce_to_annc(oneM2MPrimitive* o2pt, RTNode* target_rtnode)
+static bool annc_attr_excluded(const char *n)
+{
+	static const char *ex[] = { "rn", "ri", "pi", "ct", "lt", "ty", "uri", "at", "aa", "lnk", NULL };
+	for (int i = 0; ex[i]; i++)
+		if (!strcmp(ex[i], n)) return true;
+	return false;
+}
+
+// Common (universal/common) Mandatory-Announced attributes, for every announced resource.
+static const char *ANNC_COMMON_MA[] = { "et", "lbl", "acpi", "ast", "srv", NULL };
+
+// Per-type Mandatory-Announced attributes that MA_TABLE (a create-mandatory list) does
+// not carry — e.g. server-generated identities, group state.
+static const char *const *extra_annc_ma(ResourceType ty)
+{
+	static const char *AE_X[]  = { "aei", NULL };
+	static const char *GRP_X[] = { "mt", "cnm", "mnm", "csy", NULL };
+	switch (ty)
+	{
+	case RT_AE:  return AE_X;
+	case RT_GRP: return GRP_X;
+	default:     return NULL;
+	}
+}
+
+// Mandatory-Announced attribute for resource type `ty`?
+// Common MA + per-type MA from MA_TABLE + per-type extras.
+static bool annc_attr_is_ma(ResourceType ty, const char *n)
+{
+	for (int i = 0; ANNC_COMMON_MA[i]; i++)
+		if (!strcmp(ANNC_COMMON_MA[i], n)) return true;
+
+	const char *const *ma = get_ma_fields(ty);
+	for (int i = 0; ma && ma[i]; i++)
+		if (!strcmp(ma[i], n)) return true;
+
+	const char *const *xma = extra_annc_ma(ty);
+	for (int i = 0; xma && xma[i]; i++)
+		if (!strcmp(xma[i], n)) return true;
+
+	return false;
+}
+
+// Valid Optionally-Announced attribute for `ty`? (a real attribute of the type or
+// a common attribute, not excluded, not already Mandatory-Announced)
+static bool annc_attr_is_oa(ResourceType ty, const char *n)
+{
+	if (annc_attr_excluded(n) || annc_attr_is_ma(ty, n)) return false;
+	cJSON *ta = cJSON_GetObjectItem(ATTRIBUTES, get_resource_key(ty));
+	cJSON *ga = cJSON_GetObjectItem(ATTRIBUTES, "general");
+	return (ta && cJSON_GetObjectItem(ta, n)) || (ga && cJSON_GetObjectItem(ga, n));
+}
+
+// Copy `name` from `src` to `dst` (deep, once) if present on `src`.
+static void annc_copy(cJSON *dst, cJSON *src, const char *name)
+{
+	cJSON *v;
+	if (!cJSON_GetObjectItem(dst, name) && (v = cJSON_GetObjectItem(src, name)))
+		cJSON_AddItemToObject(dst, name, cJSON_Duplicate(v, true));
+}
+
+int build_annc_attrs(cJSON *dst, cJSON *src, ResourceType ty)
+{
+	// Mandatory-Announced: copy every MA attribute present on the original.
+	for (int i = 0; ANNC_COMMON_MA[i]; i++)
+		annc_copy(dst, src, ANNC_COMMON_MA[i]);
+
+	const char *const *ma = get_ma_fields(ty);
+	for (int i = 0; ma && ma[i]; i++)
+		annc_copy(dst, src, ma[i]);
+
+	const char *const *xma = extra_annc_ma(ty);
+	for (int i = 0; xma && xma[i]; i++)
+		annc_copy(dst, src, xma[i]);
+
+	// Optionally-Announced: copy every attribute listed in `aa` (validate first).
+	cJSON *a;
+	cJSON_ArrayForEach(a, cJSON_GetObjectItem(src, "aa"))
+	{
+		if (!cJSON_IsString(a) || !a->valuestring) continue;
+		const char *n = a->valuestring;
+		if (annc_attr_excluded(n) || annc_attr_is_ma(ty, n)) continue; // MA already handled; be lenient
+		if (!annc_attr_is_oa(ty, n))
+		{
+			logger("UTIL", LOG_LEVEL_ERROR, "aa: '%s' is not an announceable attribute of type %d", n, ty);
+			return -1;
+		}
+		annc_copy(dst, src, n);
+	}
+	return 0;
+}
+
+void announce_to_annc(oneM2MPrimitive *o2pt, RTNode *target_rtnode, cJSON *prev_aa, cJSON *upd_body)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "announce_to_annc");
-	char *come_from = strdup(o2pt->fr);
-	cJSON* at_list = cJSON_GetObjectItem(target_rtnode->obj, "at");
-	cJSON* pjson;
-	if (at_list)
+
+	ResourceType ty = target_rtnode->ty;
+	if (ty >= 10000) // an announced resource is never itself re-announced
+		return;
+
+	cJSON *at_list = cJSON_GetObjectItem(target_rtnode->obj, "at");
+	if (!at_list || cJSON_GetArraySize(at_list) == 0)
+		return;
+
+	cJSON *src = target_rtnode->obj;                    // post-update values
+	cJSON *new_aa = cJSON_GetObjectItem(src, "aa");
+	cJSON *it, *v;
+
+	cJSON *resource = cJSON_CreateObject();
+
+	// (1) Mandatory-Announced attributes changed by this UPDATE -> new value.
+	// `upd_body` is the update request content captured before the resource
+	// handler consumed it.
+	cJSON_ArrayForEach(it, upd_body)
 	{
-		cJSON* at = NULL;
-		cJSON* aa_list = cJSON_GetObjectItem(target_rtnode->obj, "aa");
-		cJSON* aa = NULL;
-		cJSON* root = cJSON_CreateObject();
-		cJSON* resource = cJSON_CreateObject();
-		cJSON_AddItemToObject(root, get_resource_key(target_rtnode->ty + 10000), resource);
-		cJSON_ArrayForEach(aa, aa_list)
-		{
-			if ((pjson = cJSON_GetObjectItem(target_rtnode->obj, aa->valuestring)))
-			{
-				cJSON_AddItemToObject(resource, aa->valuestring, cJSON_Duplicate(pjson, 1));
-			}
-		}
-		if ((pjson = cJSON_GetObjectItem(target_rtnode->obj, "lbl")))
-		{
-			cJSON_AddItemToObject(resource, "lbl", cJSON_Duplicate(pjson, 1));
-		}
-		oneM2MPrimitive* o2pt = (oneM2MPrimitive*)calloc(1, sizeof(oneM2MPrimitive));
-	
-        if ((pjson = cJSON_GetObjectItem(target_rtnode->obj, "ast")))
-        {
-            cJSON_AddItemToObject(resource, "ast", cJSON_Duplicate(pjson, 1));
-        }
-
-		int count = 0;
-		cJSON* child = resource->child;
-		while (child)
-		{
-			count++;
-			child = child->next;
-		}
-		if (count == 0)
-		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "Empty announcement update payload, skipping update");
-			cJSON_Delete(root);
-			free(come_from);
-			return;
-		}
-
-		o2pt->op = OP_UPDATE;
-		o2pt->fr = strdup("/" CSE_BASE_RI);
-		o2pt->ty = target_rtnode->ty + 10000;
-		o2pt->rvi = CSE_RVI;
-		o2pt->rqi = strdup("update_announce");
-		o2pt->request_pc = root;
-		o2pt->isForwarding = true;
-		cJSON_ArrayForEach(at, at_list)
-		{
-			if (checkResourceCseID(at->valuestring, come_from)) {
-				logger("UTIL", LOG_LEVEL_DEBUG, "Skipping announce to %s as it is the CSE of the update request", come_from);
-				continue;
-			}
-			logger("UTIL", LOG_LEVEL_INFO, "at %s", at->valuestring);
-			if (at->valuestring[0] == '/')
-			{
-				o2pt->to = strdup(at->valuestring);
-				forwarding_onem2m_resource(o2pt, find_csr_rtnode_by_uri(at->valuestring));
-				free(o2pt->to);
-				o2pt->to = NULL;
-			}
-		}
-		o2pt->request_pc = NULL;
-		free_o2pt(o2pt);
-		cJSON_Delete(root);
+		if (!it->string || annc_attr_excluded(it->string)) continue;
+		if (annc_attr_is_ma(ty, it->string) && (v = cJSON_GetObjectItem(src, it->string)))
+			cJSON_AddItemToObject(resource, it->string, cJSON_Duplicate(v, true));
 	}
+
+	// (2) currently Optionally-Announced attributes (in aa) -> current value, or
+	//     null when this update deleted them from the original (`{"attr": null}`)
+	cJSON_ArrayForEach(it, new_aa)
+	{
+		if (!cJSON_IsString(it) || !it->valuestring) continue;
+		if (!annc_attr_is_oa(ty, it->valuestring)) continue;
+		if (cJSON_GetObjectItem(resource, it->valuestring)) continue;
+		if ((v = cJSON_GetObjectItem(src, it->valuestring)))
+			cJSON_AddItemToObject(resource, it->valuestring, cJSON_Duplicate(v, true));
+		else if (cJSON_IsNull(cJSON_GetObjectItem(upd_body, it->valuestring)))
+			cJSON_AddItemToObject(resource, it->valuestring, cJSON_CreateNull());
+	}
+
+	// (3) Optionally-Announced attributes removed from aa -> delete on the annc (null)
+	cJSON_ArrayForEach(it, prev_aa)
+	{
+		if (!cJSON_IsString(it) || !it->valuestring) continue;
+		if (cJSON_getArrayIdx(new_aa, it->valuestring) != -1) continue; // still announced
+		if (cJSON_GetObjectItem(resource, it->valuestring)) continue;
+		cJSON_AddItemToObject(resource, it->valuestring, cJSON_CreateNull());
+	}
+
+	if (cJSON_GetArraySize(resource) == 0)
+	{
+		logger("UTIL", LOG_LEVEL_DEBUG, "announce_to_annc: nothing to propagate");
+		cJSON_Delete(resource);
+		return;
+	}
+
+	cJSON *root = cJSON_CreateObject();
+	cJSON_AddItemToObject(root, get_resource_key(ty + 10000), resource);
+
+	char *come_from = strdup(o2pt->fr ? o2pt->fr : "");
+	oneM2MPrimitive *req = (oneM2MPrimitive *)calloc(1, sizeof(oneM2MPrimitive));
+	req->op = OP_UPDATE;
+	req->fr = strdup("/" CSE_BASE_RI);
+	req->ty = ty + 10000;
+	req->rvi = CSE_RVI;
+	req->rqi = strdup("update_announce");
+	req->request_pc = root;
+	req->isForwarding = true;
+
+	cJSON *at;
+	cJSON_ArrayForEach(at, at_list)
+	{
+		if (!cJSON_IsString(at) || at->valuestring[0] != '/') continue;
+		if (checkResourceCseID(at->valuestring, come_from))
+		{
+			logger("UTIL", LOG_LEVEL_DEBUG, "Skipping announce back to originator CSE %s", come_from);
+			continue;
+		}
+		logger("UTIL", LOG_LEVEL_INFO, "announce update -> %s", at->valuestring);
+		req->to = strdup(at->valuestring);
+		forwarding_onem2m_resource(req, find_csr_rtnode_by_uri(at->valuestring));
+		free(req->to);
+		req->to = NULL;
+	}
+	req->request_pc = NULL;
+	free_o2pt(req);
+	cJSON_Delete(root);
+	free(come_from);
 }
 
 /**
