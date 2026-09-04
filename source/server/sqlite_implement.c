@@ -188,6 +188,12 @@ static const table_def_t table_definitions[] = {
      "lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
+    {"tsA",
+     "CREATE TABLE IF NOT EXISTS tsA ( id INTEGER, "
+     "lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "pei INT, peid INT, mdd INT, mdn INT, mdt INT, cnf VARCHAR(45), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
     {"fcin",
      "CREATE TABLE IF NOT EXISTS fcin ( id INTEGER, "
      "cs INT, st INT, org VARCHAR(200), loc TEXT, at VARCHAR(200), aa VARCHAR(100), ast INT, custom_attrs TEXT, "
@@ -205,6 +211,7 @@ static const table_def_t table_definitions[] = {
      "cr VARCHAR(45), mni INT, mbs INT, mia INT, cni INT, cbs INT, "
      "pei INT, peid INT, "
      "mdd INT, mdn INT, mdt INT, mdc INT, mdlt TEXT, cnf VARCHAR(45),"
+     "at VARCHAR(200), aa VARCHAR(100), ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"tsi",
@@ -370,6 +377,9 @@ char *get_table_name(ResourceType ty)
         break;
     case RT_GRPA:
         tableName = "grpA";
+        break;
+    case RT_TSA:
+        tableName = "tsA";
         break;
     case RT_CINA:
         tableName = "cinA";

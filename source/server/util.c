@@ -178,6 +178,9 @@ ResourceType http_parse_object_type(header_t* headers)
 	case 10009:
 		ty = RT_GRPA;
 		break;
+	case 10029:
+		ty = RT_TSA;
+		break;
 	default:
 		ty = RT_MIXED;
 		break;
@@ -343,6 +346,9 @@ char* get_resource_key(ResourceType ty)
 	case RT_GRPA:
 		key = "m2m:grpA";
 		break;
+	case RT_TSA:
+		key = "m2m:tsA";
+		break;
 	default:
 		key = "general";
 		break;
@@ -395,6 +401,8 @@ ResourceType parse_object_type_cjson(cJSON* cjson)
 		ty = RT_CNTA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:grpa"))
 		ty = RT_GRPA;
+	else if (cJSON_GetObjectItem(cjson, "m2m:tsa"))
+		ty = RT_TSA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:cina"))
 		ty = RT_CINA;
 	else if (cJSON_GetObjectItem(cjson, "m2m:fcnt"))
@@ -478,6 +486,9 @@ char* resource_identifier(ResourceType ty, char* ct)
 		break;
 	case RT_GRPA:
 		strcpy(ri, "10009-");
+		break;
+	case RT_TSA:
+		strcpy(ri, "10029-");
 		break;
 	case RT_CINA:
 		strcpy(ri, "10004-");
@@ -3319,6 +3330,8 @@ cJSON* getResource(cJSON* root, ResourceType ty)
 		return cJSON_GetObjectItem(root, "m2m:cntA");
 	case RT_GRPA:
 		return cJSON_GetObjectItem(root, "m2m:grpA");
+	case RT_TSA:
+		return cJSON_GetObjectItem(root, "m2m:tsA");
 	case RT_FCNT:
 	{
 		cJSON *res = cJSON_GetObjectItem(root, "m2m:fcnt");
@@ -4363,8 +4376,14 @@ int create_local_csr()
 	else cse_ri = REMOTE_CSE_ID;
 	
 	snprintf(buf, sizeof(buf), "%s/%s", CSE_BASE_NAME, cse_ri);
-	if (find_rtnode(buf)) {
+	RTNode* existing_csr = find_rtnode(buf);
+	if (existing_csr) {
+		// On restart the registrar CSR is restored from DB by init_resource_tree(),
+		// which does not populate rt->registrar_csr. Set it here so the upstream
+		// routing fallback (find_csr_rtnode_by_uri) and update_remote_csr_dcse()
+		// keep working after a restart.
 		logger("MAIN", LOG_LEVEL_DEBUG, "Local CSR already exists");
+		rt->registrar_csr = existing_csr;
 		return 0;
 	};
 	
@@ -4561,6 +4580,24 @@ int update_remote_csr_dcse()
 }
 
 /**
+ * @brief Build "<cse-id>/<ri>" from a <CSEBaseAnnc> response body.
+ *        The value stored in `at` must be the address that uses the ri the
+ *        hosting CSE actually assigned, not our deterministic structured URI
+ *        (which is only used to *locate* the resource).
+ * @return heap string, or NULL when the response carries no ri
+ */
+static char* cba_url_from_response(const char* poa, cJSON* response_pc)
+{
+	cJSON* c = cJSON_GetObjectItem(response_pc, get_resource_key(RT_CBA));
+	cJSON* ri = c ? cJSON_GetObjectItem(c, "ri") : NULL;
+	if (!ri || !cJSON_IsString(ri) || !ri->valuestring)
+		return NULL;
+	char buf[1024] = { 0 };
+	snprintf(buf, sizeof(buf), "%s/%s", poa, ri->valuestring);
+	return strdup(buf);
+}
+
+/**
  * @brief create remote cse
  * @param poa poa of remote cse(SP_RELATIVE)
  * @param cse_name name of remote cse
@@ -4569,23 +4606,17 @@ int create_remote_cba(char* poa, char** cbA_url)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "create_remote_cba");
 
-	// `poa` is the SP-relative CSE-ID of the *target* hosting CSE (e.g. "/cse2").
-	// `csr` is only the next routing hop and may be a transit CSE (matched via its
-	// `dcse`); the request still has to be addressed to the *final* target.
 	RTNode *csr = find_csr_rtnode_by_uri(poa);
 	if (!csr)
 	{
 		logger("UTIL", LOG_LEVEL_ERROR, "csr not found");
 		return -1;
 	}
-
-	// Address the target CSE's <CSEBase> with the reserved "-" shortcut (TS-0001
-	// structured addressing) so we never need to learn its resourceName: every
-	// CSE on the path resolves "/<cse-id>/-" to that CSE's own <CSEBase>.
+	
 	char target_cb[512] = { 0 };
 	snprintf(target_cb, sizeof(target_cb), "%s/-", poa);
-
 	const char* cba_rn = CSE_BASE_RI "_cba";
+	
 	// Deterministic structured address of our <CSEBaseAnnc> under the target <CSEBase>.
 	char structured_buf[1024] = { 0 };
 	sprintf(structured_buf, "%s/%s", target_cb, cba_rn);
@@ -4600,34 +4631,37 @@ int create_remote_cba(char* poa, char** cbA_url)
 			if (cJSON_IsString(at_item) && at_item->valuestring &&
 				!strncmp(at_item->valuestring, poa, poa_len) && at_item->valuestring[poa_len] == '/')
 			{
-				oneM2MPrimitive* vo2pt = (oneM2MPrimitive*)calloc(sizeof(oneM2MPrimitive), 1);
-				vo2pt->fr = strdup("/" CSE_BASE_RI);
-				vo2pt->to = strdup(structured_buf);  // stable rn-based address of the cbA
-				vo2pt->op = OP_RETRIEVE;
-				vo2pt->rqi = strdup("verify-cba");
-				vo2pt->rvi = CSE_RVI;
-				int vrsc = forwarding_onem2m_resource(vo2pt, csr);
+				// Trust the cached `at` value; do not round-trip to the remote CSE.
+				*cbA_url = strdup(at_item->valuestring);
+				logger("UTIL", LOG_LEVEL_DEBUG, "cbA cached / target: %s", *cbA_url);
+				return 0;
 
-				free_o2pt(vo2pt);
-
-				if (vrsc == RSC_OK)
-				{
-					// cbA is alive at its (stable) structured address
-					if (!strcmp(structured_buf, at_item->valuestring))
-					{
-						*cbA_url = strdup(structured_buf);
-						logger("UTIL", LOG_LEVEL_DEBUG, "cbA verified alive / target: %s", *cbA_url);
-						return 0;
-					}
-					logger("UTIL", LOG_LEVEL_DEBUG, "cbA alive, normalising cached address: %s -> %s", at_item->valuestring, structured_buf);
-					*cbA_url = strdup(structured_buf);
-					stale_at_item = at_item;
-					break;
-				}
-
-				logger("UTIL", LOG_LEVEL_WARN, "cached cbA is stale (rsc %d), recreating: %s", vrsc, at_item->valuestring);
-				stale_at_item = at_item;
-				break;
+				// -- disabled: verify the cbA still exists remotely before reusing it --
+				// oneM2MPrimitive* vo2pt = (oneM2MPrimitive*)calloc(sizeof(oneM2MPrimitive), 1);
+				// vo2pt->fr = strdup("/" CSE_BASE_RI);
+				// vo2pt->to = strdup(structured_buf);   // stable rn-based address, not the cached ri
+				// vo2pt->op = OP_RETRIEVE;
+				// vo2pt->rqi = strdup("verify-cba");
+				// vo2pt->rvi = CSE_RVI;
+				// int vrsc = forwarding_onem2m_resource(vo2pt, csr);
+				//
+				// if (vrsc == RSC_OK)
+				// {
+				// 	char* alive_url = cba_url_from_response(poa, vo2pt->response_pc);
+				// 	free_o2pt(vo2pt);
+				// 	if (alive_url && !strcmp(alive_url, at_item->valuestring))
+				// 	{
+				// 		*cbA_url = alive_url;
+				// 		return 0;
+				// 	}
+				// 	if (alive_url)
+				// 		*cbA_url = alive_url;
+				// 	stale_at_item = at_item;
+				// 	break;
+				// }
+				// free_o2pt(vo2pt);
+				// stale_at_item = at_item;
+				// break;
 			}
 		}
 	}
@@ -4643,7 +4677,8 @@ int create_remote_cba(char* poa, char** cbA_url)
 	{
 		oneM2MPrimitive* o2pt = (oneM2MPrimitive*)calloc(sizeof(oneM2MPrimitive), 1);
 		o2pt->fr = strdup("/" CSE_BASE_RI);
-		o2pt->to = strdup(target_cb);  // create under the target CSE's <CSEBase>, not the next hop
+		o2pt->to = strdup(target_cb); // using unstructured poa
+		logger("UTIL", LOG_LEVEL_DEBUG, "create_remote_cba: %s", o2pt->to);
 		o2pt->op = OP_CREATE;
 		o2pt->ty = RT_CBA;
 		o2pt->rqi = strdup("create-cba");
@@ -4664,25 +4699,20 @@ int create_remote_cba(char* poa, char** cbA_url)
 
 		o2pt->request_pc = root;
 		int crsc = forwarding_onem2m_resource(o2pt, csr);
-		if (crsc >= 4000 && crsc != RSC_CONFLICT)
-		{
-			free_o2pt(o2pt);
-			logger("UTIL", LOG_LEVEL_ERROR, "Creation failed");
-			return -1;
-		}
 		if (crsc == RSC_CONFLICT)
 		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "cbA rn already exists remotely, reusing deterministic address");
+			// Already exists remotely; address it by its stable structured path.
+			logger("UTIL", LOG_LEVEL_DEBUG, "cbA already exists remotely, using structured address");
 			*cbA_url = strdup(structured_buf);
 		}
-		else if (o2pt->response_pc)
+		else if (crsc < 4000)
 		{
-			// Created; address it by its stable structured path (rn is deterministic).
-			*cbA_url = strdup(structured_buf);
+			// Newly created: store the address built from the ri the hosting CSE assigned.
+			*cbA_url = cba_url_from_response(poa, o2pt->response_pc);
 		}
 		else
 		{
-			logger("UTIL", LOG_LEVEL_ERROR, "%s", cJSON_GetErrorPtr());
+			logger("UTIL", LOG_LEVEL_ERROR, "cbA creation failed (rsc %d)", crsc);
 		}
 		free_o2pt(o2pt);
 	}
@@ -5403,11 +5433,15 @@ bool isValidChildType(ResourceType parent, ResourceType child)
 			return true;
 		break;
 	case RT_AEA:
-		if (child == RT_SUB || child == RT_CNT || child == RT_CNTA || child == RT_GRP || child == RT_GRPA || child == RT_ACP || child == RT_ACPA)
+		if (child == RT_SUB || child == RT_CNT || child == RT_CNTA || child == RT_GRP || child == RT_GRPA || child == RT_ACP || child == RT_ACPA || child == RT_TS || child == RT_TSA)
 			return true;
 		break;
 	case RT_CNTA:
-		if (child == RT_CNT || child == RT_CNTA || child == RT_CIN || child == RT_CINA || child == RT_SUB)
+		if (child == RT_CNT || child == RT_CNTA || child == RT_CIN || child == RT_CINA || child == RT_SUB || child == RT_TS || child == RT_TSA)
+			return true;
+		break;
+	case RT_TSA:
+		if (child == RT_SUB)
 			return true;
 		break;
 	case RT_CBA:

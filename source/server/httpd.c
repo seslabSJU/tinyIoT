@@ -690,7 +690,27 @@ void http_forwarding(oneM2MPrimitive *o2pt, char *host, int port)
         req->payload = NULL;
         req->payload_size = 0;
     }
+
+    {
+        char *fwd_ct = search_header(req->headers, "Content-Type");
+        logger("HTTP", LOG_LEVEL_DEBUG,
+               "\x1b[35m[FWD >>] %s http://%s:%d%s%s%s  Origin:%s RI:%s CT:%s\x1b[0m\n%s",
+               req->method, host, port, req->uri,
+               req->qs ? "?" : "", req->qs ? req->qs : "",
+               o2pt->fr ? o2pt->fr : "-", o2pt->rqi ? o2pt->rqi : "-",
+               fwd_ct ? fwd_ct : "-",
+               req->payload ? req->payload : "(no body)");
+    }
+
     send_http_request(host, port, req, res);
+
+    logger("HTTP", LOG_LEVEL_DEBUG,
+           "\x1b[35m[FWD <<] %s http://%s:%d%s  http=%d rsc=%s\x1b[0m\n%s",
+           req->method, host, port, req->uri,
+           res->status_code,
+           search_header(res->headers, "x-m2m-rsc") ? search_header(res->headers, "x-m2m-rsc") : "-",
+           res->payload ? res->payload : "(no body)");
+
     char *rsc = search_header(res->headers, "x-m2m-rsc");
     if (rsc)
         o2pt->rsc = atoi(rsc);
