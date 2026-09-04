@@ -258,7 +258,14 @@ RTNode *find_rtnode(char *addr)
     RTNode *rtnode = NULL;
     if (strcmp(addr, CSE_BASE_NAME) == 0 || strcmp(addr, "-") == 0)
     {
-        return rt->cb;
+#if MONO_THREAD == 0
+        pthread_mutex_lock(&main_lock);
+#endif
+        rtnode = rt->cb;
+#if MONO_THREAD == 0
+        pthread_mutex_unlock(&main_lock);
+#endif
+        return rtnode;
     }
 
     if ((strncmp(addr, CSE_BASE_NAME, strlen(CSE_BASE_NAME)) == 0 && addr[strlen(CSE_BASE_NAME)] == '/') || (addr[0] == '-' && addr[1] == '/'))
@@ -355,21 +362,25 @@ RTNode *get_remote_resource(char *address, int *rsc)
  */
 RTNode *find_rtnode_by_rn(char *rn)
 {
-    RTNode *rtnode = rt->cb, *parent_rtnode = NULL;
+    RTNode *rtnode, *parent_rtnode = NULL;
     char *target_uri = strdup(rn);
     char *target_ptr;
     char *ptr = strtok_r(target_uri, "/", &target_ptr);
     if (!ptr)
+    {
+        free(target_uri);
         return NULL;
+    }
+#if MONO_THREAD == 0
+    pthread_mutex_lock(&main_lock);
+#endif
+    rtnode = rt->cb;
     if (!strcmp(ptr, "-"))
     {
         logger("RTM", LOG_LEVEL_DEBUG, "root node -");
         rtnode = rt->cb->child;
         ptr = strtok_r(NULL, "/", &target_ptr);
     }
-#if MONO_THREAD == 0
-    pthread_mutex_lock(&main_lock);
-#endif
     while (ptr)
     {
         while (rtnode)
