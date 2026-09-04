@@ -224,6 +224,7 @@ typedef enum
 	RT_CBA = 10005,
 	RT_GRPA = 10009,
 	RT_FCNTA = 10028,
+	RT_TSA = 10029,
 } ResourceType;
 
 typedef enum

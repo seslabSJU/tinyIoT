@@ -240,6 +240,7 @@ RTNode *find_csr_rtnode_by_uri(char *uri)
     }
 
     free(target_uri);
+    logger("UTIL", LOG_LEVEL_DEBUG, "find_csr_rtnode_by_uri: %s", rt->registrar_csr ? rt->registrar_csr->uri : "NULL");
     return csrlist ? csrlist->rtnode : rt->registrar_csr;
 }
 

@@ -55,6 +55,7 @@ void init_cse(cJSON *cse)
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_AEA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CNTA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_GRPA));
+	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_TSA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CINA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_CBA));
 	cJSON_AddItemToArray(srt, cJSON_CreateNumber(RT_FCNT));
@@ -905,6 +906,7 @@ int create_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 	case RT_CNTA:
 	case RT_CINA:
 	case RT_GRPA:
+	case RT_TSA:
 		logger("O2M", LOG_LEVEL_INFO, "Create ANNC");
 		rsc = create_annc(o2pt, parent_rtnode);
 		break;
@@ -1165,6 +1167,7 @@ int update_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	case RT_CNTA:
 	case RT_CINA:
 	case RT_GRPA:
+	case RT_TSA:
 		rsc = update_annc(o2pt, target_rtnode);
 		break;
 #endif
@@ -1964,10 +1967,9 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 	char *path = NULL;
 	char buf[256] = {0};
 
-	logger("O2M", LOG_LEVEL_DEBUG, "Forwarding Resource");
-
 	if (!target_rtnode)
 	{
+		logger("O2M", LOG_LEVEL_ERROR, "Forwarding: no next-hop CSR for to=%s", o2pt->to ? o2pt->to : "-");
 		return o2pt->rsc = RSC_NOT_FOUND;
 	}
 
@@ -1976,6 +1978,11 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		logger("O2M", LOG_LEVEL_ERROR, "target_rtnode is not CSR");
 		return o2pt->rsc = RSC_NOT_FOUND;
 	}
+
+	logger("O2M", LOG_LEVEL_DEBUG, "Forwarding: op=%d to=%s fr=%s via CSR %s (csi %s)",
+		   o2pt->op, o2pt->to ? o2pt->to : "-", o2pt->fr ? o2pt->fr : "-",
+		   target_rtnode->uri ? target_rtnode->uri : "-",
+		   cJSON_GetObjectItem(target_rtnode->obj, "csi") ? cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring : "-");
 
 	if (checkResourceAddressingType(o2pt->fr) == CSE_RELATIVE)
 	{

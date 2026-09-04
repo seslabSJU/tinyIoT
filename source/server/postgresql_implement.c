@@ -286,6 +286,12 @@ static const table_def_t table_definitions[] = {
      "lnk VARCHAR(100), cs INT, cr VARCHAR(45), cnf VARCHAR(45), st VARCHAR(45), con TEXT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
+    {"tsA",
+     "CREATE TABLE IF NOT EXISTS tsA ( id INTEGER, "
+     "lnk VARCHAR(100), cr VARCHAR(45), mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "pei INT, peid INT, mdd INT, mdn INT, mdt INT, cnf VARCHAR(45), ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
     {"fcnt",
      "CREATE TABLE IF NOT EXISTS fcnt ( id INTEGER, "
      "cnd VARCHAR(255), oref VARCHAR(100), nl VARCHAR(45), cr VARCHAR(45), at VARCHAR(200), aa VARCHAR(100), ast INT, "
@@ -303,6 +309,7 @@ static const table_def_t table_definitions[] = {
      "cr VARCHAR(45), mni INT, mbs INT, mia INT, cni INT, cbs INT, "
      "pei INT, peid INT, "
      "mdd INT, mdn INT, mdt INT, mdc INT, mdlt TEXT, cnf VARCHAR(45), "
+     "at VARCHAR(200), aa VARCHAR(100), ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"tsi",
@@ -389,6 +396,12 @@ static const table_def_t table_definitions[] = {
      "lnk TEXT, cs INT, cr TEXT, cnf TEXT, st TEXT, con TEXT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
+    {"tsA",
+     "CREATE TABLE IF NOT EXISTS tsA ( id INTEGER, "
+     "lnk TEXT, cr TEXT, mni INT, mbs INT, mia INT, cni INT, cbs INT, "
+     "pei INT, peid INT, mdd INT, mdn INT, mdt INT, cnf TEXT, ast INT, "
+     "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
+    },
     {"fcnt",
      "CREATE TABLE IF NOT EXISTS fcnt ( id INTEGER, "
      "cnd TEXT, oref TEXT, nl TEXT, cr TEXT, at TEXT, aa TEXT, ast INT, "
@@ -406,6 +419,7 @@ static const table_def_t table_definitions[] = {
      "cr TEXT, mni INT, mbs INT, mia INT, cni INT, cbs INT, "
      "pei INT, peid INT, "
      "mdd INT, mdn INT, mdt INT, mdc INT, mdlt TEXT, cnf TEXT, "
+     "at TEXT, aa TEXT, ast INT, "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"tsi",
@@ -603,6 +617,9 @@ char *get_table_name(ResourceType ty)
         break;
     case RT_GRPA:
         tableName = "grpA";
+        break;
+    case RT_TSA:
+        tableName = "tsA";
         break;
     case RT_CINA:
         tableName = "cinA";

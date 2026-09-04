@@ -117,7 +117,7 @@ bool isFCAttrValid(cJSON *fc){
                 RT_GRP, RT_MGMTOBJ, RT_NOD, RT_PCH, RT_CSR, RT_REQ, 
                 RT_SUB, RT_SMD, RT_FCNT, RT_TS, RT_TSI, RT_CRS, 
                 RT_FCIN, RT_FCNT_LA, RT_FCNT_OL, RT_TSB, RT_ACTR, 
-                RT_ACPA, RT_AEA, RT_CNTA, RT_CINA, RT_CBA, RT_GRPA, RT_FCNTA
+                RT_ACPA, RT_AEA, RT_CNTA, RT_CINA, RT_CBA, RT_GRPA, RT_FCNTA, RT_TSA
             };
             static const int TOTAL_TYPES = sizeof(VALID_TYPES) / sizeof(int);
             int val = 0;
