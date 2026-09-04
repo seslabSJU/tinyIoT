@@ -71,6 +71,18 @@ SDT_MODEL_VERSION = 5.6.0
 
 all: sdt $(RELEXE)
 
+CSR_TEST_BIN ?= /tmp/tinyiot-test-csr-registration
+
+.PHONY: test test-csr-registration
+
+test: test-csr-registration
+
+test-csr-registration:
+	$(CC) $(RELCFLAGS) $(CFLAGS) -I. -ffunction-sections -fdata-sections \
+		-Wl,--gc-sections -o $(CSR_TEST_BIN) \
+		tests/test_csr_registration.c resources/csr.c cJSON.c -lpthread -lm
+	$(CSR_TEST_BIN)
+
 # 빌드 타겟
 $(RELEXE) : $(OBJS)
 	$(CC) $(RELCFLAGS) $(CFLAGS) -o $(RELEXE) $(OBJS) $(LIBS) $(LDFLAGS)
