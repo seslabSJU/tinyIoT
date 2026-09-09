@@ -38,15 +38,17 @@ int db_tsi_get_max_snr(const char *ts_ri);
 int db_tsi_get_min_snr(const char *ts_ri);
 int db_tsi_check_snr_dup(const char *ts_ri, int snr);
 int db_tsi_check_dgt_dup(const char *ts_ri, const char *dgt);
-// Latest dataGenerationTime stored under a TS, or NULL when it holds no instances.
-// Caller must free() the returned string.
-char *db_tsi_get_last_dgt(const char *ts_ri);
+// Creation time of the first instance stored under a TS (lowest snr), or NULL when
+// it holds no instances. Caller must free() the returned string.
+char *db_tsi_get_first_ct(const char *ts_ri);
 
 // TS missing-data tracking fields
 int db_ts_get_mdc(const char *ts_ri);
 int db_ts_set_mdc(const char *ts_ri, int mdc);
 // Set TS.mdc and append one timestamp string into TS.mdlt (best-effort per DB backend)
 int db_ts_set_mdc_and_append_mdlt(const char *ts_ri, int mdc, const char *time_str);
+// Clear the stored TS.mdlt so the attribute is absent again after a reload.
+int db_ts_clear_mdlt(const char *ts_ri);
 
 // general table fields
 int db_general_set_lt(const char *ri, const char *lt);

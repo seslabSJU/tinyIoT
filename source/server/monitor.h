@@ -6,5 +6,7 @@ typedef enum {
     MDC_SRC_TSI_GAP        = 2
 } mdc_source_t;
 
-void notify_missing_data(RTNode *ts_node, int current_mdc, mdc_source_t src);
+// `new_count` is how many missing data points this event added; they are the newest
+// entries of the <timeSeries> mdlt attribute.
+void notify_missing_data(RTNode *ts_node, int current_mdc, int new_count, mdc_source_t src);
 void *monitor_serve(void *arg);

@@ -3682,6 +3682,16 @@ int requestToResource(oneM2MPrimitive* o2pt, RTNode* rtnode)
 	return rsc;
 }
 
+char *make_subscription_reference(const char *ri)
+{
+	if (!ri) return NULL;
+	size_t n = strlen(ri) + strlen(CSE_BASE_RI) + 3;
+	char *sur = (char *)malloc(n);
+	if (!sur) return NULL;
+	snprintf(sur, n, "/%s/%s", CSE_BASE_RI, ri);
+	return sur;
+}
+
 int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson)
 {
 	logger("UTIL", LOG_LEVEL_DEBUG, "send_verification_request");

@@ -2536,18 +2536,18 @@ int db_tsi_check_snr_dup(const char *ts_ri, int snr)
     return exists;
 }
 
-// dgt uses the fixed-width oneM2M timestamp format, so lexical ordering is
-// chronological ordering.
-char *db_tsi_get_last_dgt(const char *ts_ri)
+// Arrival time of the first data point: the general.ct of the instance with the
+// lowest sequenceNr.
+char *db_tsi_get_first_ct(const char *ts_ri)
 {
     if (!ts_ri) return NULL;
     sqlite3_mutex_enter(sqlite3_db_mutex(db));
 
     const char *sql =
-        "SELECT tsi.dgt "
+        "SELECT general.ct "
         "FROM tsi JOIN general ON tsi.id = general.id "
-        "WHERE general.pi = ? AND tsi.dgt IS NOT NULL "
-        "ORDER BY tsi.dgt DESC LIMIT 1;";
+        "WHERE general.pi = ? "
+        "ORDER BY tsi.snr ASC LIMIT 1;";
 
     sqlite3_stmt *stmt = NULL;
     char *dgt = NULL;
@@ -2701,6 +2701,28 @@ int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str)
 
     if (stmt) sqlite3_finalize(stmt);
     free(new_mdlt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return ok;
+}
+
+int db_ts_clear_mdlt(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    const char *sql =
+        "UPDATE ts SET mdlt = NULL "
+        "WHERE id = (SELECT id FROM general WHERE ri = ?);";
+
+    sqlite3_stmt *stmt = NULL;
+    int ok = 0;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ts_ri, -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_DONE) ok = 1;
+    }
+
+    if (stmt) sqlite3_finalize(stmt);
     sqlite3_mutex_leave(sqlite3_db_mutex(db));
     return ok;
 }

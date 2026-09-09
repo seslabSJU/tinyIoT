@@ -129,6 +129,11 @@ bool is_valid_acr(cJSON* acr);
 int validate_ae(oneM2MPrimitive* o2pt, cJSON* ae, Operation op);
 int validate_cnt(oneM2MPrimitive* o2pt, cJSON* cnt, Operation op);
 int validate_cin(oneM2MPrimitive* o2pt, cJSON* parent_cnt, cJSON* cin, Operation op);
+// contentInfo: <media type>:<encoding type>[:<content security>]
+bool validate_cnf(const char *cnf);
+// TS-0004 6.3.5.13 subscriptionReference: the subscription addressed in its
+// unstructured, SP-relative form (/<CSE-ID>/<resource ID>). Caller frees.
+char *make_subscription_reference(const char *ri);
 int validate_sub(oneM2MPrimitive* o2pt, cJSON* sub, Operation op);
 int validate_acp(oneM2MPrimitive* o2pt, cJSON* acp, Operation op);
 int validate_grp(oneM2MPrimitive* o2pt, cJSON* grp);

@@ -18,6 +18,25 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     add_general_attribute(sub, parent_rtnode, RT_SUB);
 
     int rsc = validate_sub(o2pt, sub, OP_CREATE);
+
+    // Missing data is only detected on a <timeSeries>, so net=8 is meaningless anywhere
+    // else. validate_sub() has no access to the parent, so the check lives here.
+    if (rsc == RSC_OK && parent_rtnode && parent_rtnode->ty != RT_TS)
+    {
+        cJSON *enc_chk = cJSON_GetObjectItem(sub, "enc");
+        cJSON *net_chk = enc_chk ? cJSON_GetObjectItem(enc_chk, "net") : NULL;
+        cJSON *net_it = NULL;
+        cJSON_ArrayForEach(net_it, net_chk)
+        {
+            if (cJSON_IsNumber(net_it) && (int)cJSON_GetNumberValue(net_it) == NET_REPORT_ON_MISSING_DATA_POINTS)
+            {
+                handle_error(o2pt, RSC_BAD_REQUEST, "`net` 8 is only allowed under a <timeSeries> resource");
+                cJSON_Delete(root);
+                return o2pt->rsc;
+            }
+        }
+    }
+
     if (cJSON_GetObjectItem(sub, "nct") == NULL)
         cJSON_AddNumberToObject(sub, "nct", NCT_ALL_ATTRIBUTES);
 
@@ -59,7 +78,13 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
     noti_cjson = cJSON_CreateObject();
     cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
     cJSON_AddStringToObject(sgn, "cr", o2pt->fr);
-    cJSON_AddStringToObject(sgn, "sur", ptr);
+    {
+        cJSON *sub_ri_obj = cJSON_GetObjectItem(sub, "ri");
+        char *sur = (sub_ri_obj && cJSON_IsString(sub_ri_obj))
+                        ? make_subscription_reference(sub_ri_obj->valuestring) : NULL;
+        cJSON_AddStringToObject(sgn, "sur", sur ? sur : ptr);
+        free(sur);
+    }
     cJSON_AddBoolToObject(sgn, "vrq", true);
     cJSON_ArrayForEach(pjson, cJSON_GetObjectItem(sub, "nu"))
     {
@@ -90,11 +115,10 @@ int create_sub(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
         {
             continue;
         }
-        // TS-0001 10.2.11.2: URL-format targets shall not be verified
-        if (checkResourceAddressingType(pjson->valuestring) == PROTOCOL_BINDING)
-        {
-            continue;
-        }
+        // A URL-format notificationURI is verified like any other target: the
+        // verification request is what proves the endpoint is reachable, and the
+        // conformance tests expect it. send_verification_request() dispatches
+        // PROTOCOL_BINDING targets over their own binding.
         result = send_verification_request(o2pt->to, pjson->valuestring, noti_cjson);
         
 
@@ -176,7 +200,11 @@ int update_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         noti_cjson = cJSON_CreateObject();
         cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn = cJSON_CreateObject());
         cJSON_AddStringToObject(sgn, "cr", o2pt->fr);
-        cJSON_AddStringToObject(sgn, "sur", target_rtnode->uri);
+        {
+            char *sur = make_subscription_reference(get_ri_rtnode(target_rtnode));
+            cJSON_AddStringToObject(sgn, "sur", sur ? sur : target_rtnode->uri);
+            free(sur);
+        }
         cJSON_AddBoolToObject(sgn, "vrq", true);
         cJSON_ArrayForEach(pjson, new_nu)
         {
@@ -343,7 +371,24 @@ int validate_sub(oneM2MPrimitive *o2pt, cJSON *sub, Operation op)
                 }
                 break;
             case NET_REPORT_ON_MISSING_DATA_POINTS:
-                return handle_error(o2pt, RSC_BAD_REQUEST, "`net` NET_REPORT_ON_MISSING_DATA_POINTS is not supported");
+                // Missing-data notifications carry a timeSeriesNotification, so this is
+                // the only notificationContentType that can represent them.
+                if (nct_val != NCT_TIMESERIES_NOTIFICATION)
+                {
+                    return handle_error(o2pt, RSC_BAD_REQUEST,
+                                        "`nct` must be 5 (timeSeries notification) for `net` 8");
+                }
+                // `enc.md.num` is what the Hosting CSE counts against; without it no
+                // notification can ever be emitted.
+                {
+                    cJSON *md = cJSON_GetObjectItem(enc, "md");
+                    cJSON *md_num = md ? cJSON_GetObjectItem(md, "num") : NULL;
+                    if (!md || !md_num || !cJSON_IsNumber(md_num) || cJSON_GetNumberValue(md_num) <= 0)
+                    {
+                        return handle_error(o2pt, RSC_BAD_REQUEST,
+                                            "`enc/md/num` is required for `net` 8");
+                    }
+                }
                 break;
             }
         }

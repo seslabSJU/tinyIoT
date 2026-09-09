@@ -24,6 +24,7 @@ extern int terminate;
 typedef struct _ts_miss_throttle_entry {
     char ri[256];
     long long last_gen_us;
+    long long total_missing;
     struct _ts_miss_throttle_entry *next;
 } ts_miss_throttle_entry_t;
 
@@ -63,17 +64,67 @@ static int should_throttle_missing(const char *ri, long long now_us, long long p
     return 0;
 }
 
+// Running total of missing data points ever detected for a TS. mdlt only keeps the
+// most recent `mdn` of them, so it cannot serve as the progress marker that decides
+// which points a given subscription has already been told about.
+static long long ts_add_missing_total(const char *ri, int n) {
+    if (!ri || n <= 0) return 0;
+    ts_miss_throttle_entry_t *e = g_ts_miss_throttle;
+    while (e) {
+        if (strcmp(e->ri, ri) == 0) { e->total_missing += n; return e->total_missing; }
+        e = e->next;
+    }
+    e = (ts_miss_throttle_entry_t *)calloc(1, sizeof(ts_miss_throttle_entry_t));
+    if (!e) return 0;
+    strncpy(e->ri, ri, sizeof(e->ri) - 1);
+    e->total_missing = n;
+    e->next = g_ts_miss_throttle;
+    g_ts_miss_throttle = e;
+    return e->total_missing;
+}
+
 typedef struct _sub_md_notify_throttle_entry {
     char ri[256];
-    long long last_notify_ts_us;     
-    long long pending_reserve_us;   
-    int pending;                    
+    long long last_notify_ts_us;
+    long long pending_reserve_us;
+    int pending;
+    long long reported;             // missing data points already notified to this sub
     struct _sub_md_notify_throttle_entry *next;
 } sub_md_notify_throttle_entry_t;
 
 
 static sub_md_notify_throttle_entry_t *g_sub_md_notify_throttle = NULL;
 static pthread_mutex_t g_sub_md_notify_lock = PTHREAD_MUTEX_INITIALIZER;
+
+// How many missing data points this subscription has already been notified about.
+static long long md_get_reported(const char *sub_ri) {
+    if (!sub_ri) return 0;
+    long long v = 0;
+    pthread_mutex_lock(&g_sub_md_notify_lock);
+    for (sub_md_notify_throttle_entry_t *e = g_sub_md_notify_throttle; e; e = e->next) {
+        if (strcmp(e->ri, sub_ri) == 0) { v = e->reported; break; }
+    }
+    pthread_mutex_unlock(&g_sub_md_notify_lock);
+    return v;
+}
+
+static void md_add_reported(const char *sub_ri, int n) {
+    if (!sub_ri || n <= 0) return;
+    pthread_mutex_lock(&g_sub_md_notify_lock);
+    sub_md_notify_throttle_entry_t *e = g_sub_md_notify_throttle;
+    while (e) {
+        if (strcmp(e->ri, sub_ri) == 0) { e->reported += n; pthread_mutex_unlock(&g_sub_md_notify_lock); return; }
+        e = e->next;
+    }
+    e = (sub_md_notify_throttle_entry_t *)calloc(1, sizeof(sub_md_notify_throttle_entry_t));
+    if (e) {
+        strncpy(e->ri, sub_ri, sizeof(e->ri) - 1);
+        e->reported = n;
+        e->next = g_sub_md_notify_throttle;
+        g_sub_md_notify_throttle = e;
+    }
+    pthread_mutex_unlock(&g_sub_md_notify_lock);
+}
 
 static int md_notify_try_begin(const char *sub_ri, long long event_us, long long dur_us) {
     if (!sub_ri || dur_us <= 0) return 0;
@@ -332,7 +383,7 @@ void ts_mdc_update_db_with_mdlt(const char *ts_ri, int val, const char *time_str
     cJSON_Delete(ts);
 }
 
-void notify_missing_data(RTNode *ts_node, int current_mdc, mdc_source_t src) {
+void notify_missing_data(RTNode *ts_node, int current_mdc, int new_count, mdc_source_t src) {
     if (!ts_node || !ts_node->child) return;
 
 #if 1
@@ -343,6 +394,9 @@ void notify_missing_data(RTNode *ts_node, int current_mdc, mdc_source_t src) {
         return;
     }
 
+    // Advance the TS-wide running total once per event, before visiting the subscriptions.
+    const char *ts_ri_for_total = get_ri_rtnode(ts_node);
+    long long ts_total = ts_add_missing_total(ts_ri_for_total, new_count > 0 ? new_count : 1);
 
     RTNode *child = ts_node->child;
     while (child) {
@@ -410,14 +464,28 @@ void notify_missing_data(RTNode *ts_node, int current_mdc, mdc_source_t src) {
             }
 
 
-            // Suppress notification until BOTH missing-data count and missing timestamps reach the threshold
-            if (threshold > 0 && (current_mdc < threshold || mdlt_len < threshold)) {
+            // Notify once `md.num` data points have gone missing since this subscription
+            // was last notified. The count is tracked per subscription against the TS-wide
+            // running total; mdc/mdlt are resource attributes bounded by mdn and must not
+            // be used as the notification counter.
+            const char *sub_ri_for_progress = get_ri_rtnode(child);
+            long long reported = md_get_reported(sub_ri_for_progress);
+            long long pending  = ts_total - reported;
+
+            if (pending < threshold) {
                 logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "Missing-data notify suppressed: subRi=%s mdc=%d mdlt_len=%d < threshold=%d",
-                       get_ri_rtnode(child), current_mdc, mdlt_len, threshold);
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "Missing-data notify not ready: will wait until mdc>=thr AND mdlt_len>=thr for subRi=%s",
-                       get_ri_rtnode(child));
+                       "Missing-data notify suppressed: subRi=%s pending=%lld < md.num=%d (ts_total=%lld reported=%lld)",
+                       sub_ri_for_progress, pending, threshold, ts_total, reported);
+                child = child->sibling_right;
+                continue;
+            }
+
+            // The points to report are the oldest `threshold` still-pending entries of mdlt.
+            int batch_start = mdlt_len - (int)pending;
+            if (batch_start < 0) batch_start = 0;          // older entries already dropped by mdn
+            int batch_len = threshold;
+            if (batch_start + batch_len > mdlt_len) batch_len = mdlt_len - batch_start;
+            if (batch_len <= 0) {
                 child = child->sibling_right;
                 continue;
             }
@@ -495,16 +563,17 @@ void notify_missing_data(RTNode *ts_node, int current_mdc, mdc_source_t src) {
                 cJSON *tsn = cJSON_CreateObject();
                 cJSON_AddItemToObject(rep, "m2m:tsn", tsn);
 
-                // Report mdc as the notification threshold.
-                cJSON_AddNumberToObject(tsn, "mdc", threshold);
-
-                // Include mdlt array in the notification (deep copy)
-                if (ts_mdlt && cJSON_IsArray(ts_mdlt)) {
-                    cJSON *mdltCopy = cJSON_Duplicate(ts_mdlt, 1);
-                    if (mdltCopy) {
-                        cJSON_AddItemToObject(tsn, "mdlt", mdltCopy);
+                // A notification carries only the data points that went missing since the
+                // previous one for this subscription, not the whole mdlt attribute.
+                cJSON *mdltBatch = cJSON_CreateArray();
+                for (int bi = 0; bi < batch_len; bi++) {
+                    cJSON *item = cJSON_GetArrayItem(ts_mdlt, batch_start + bi);
+                    if (item && cJSON_IsString(item) && item->valuestring) {
+                        cJSON_AddItemToArray(mdltBatch, cJSON_CreateString(item->valuestring));
                     }
                 }
+                cJSON_AddNumberToObject(tsn, "mdc", cJSON_GetArraySize(mdltBatch));
+                cJSON_AddItemToObject(tsn, "mdlt", mdltBatch);
 
                 // Send missing-data notification via existing infrastructure (util.c)
                 int sent_ok_any = 0;
@@ -523,38 +592,15 @@ void notify_missing_data(RTNode *ts_node, int current_mdc, mdc_source_t src) {
                     md_notify_finish(sub_ri_s, sent_ok_any);
                 }
 
-                // Reset missing-data tracking after notification so that subsequent notifications
-                // are emitted only after the next full threshold batch.
+                // Only this subscription's progress marker advances. mdc/mdlt are
+                // <timeSeries> attributes bounded by mdn - sending a notification does
+                // not clear them, otherwise a second subscription would lose the history
+                // and mdn would never be reached.
+                md_add_reported(sub_ri_for_progress, batch_len);
                 logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "Resetting TS missing-data tracking after notification: tsRi=%s",
-                       get_ri_rtnode(ts_node));
-                if (threshold > 0 && ts_node && ts_node->obj) {
-                    // In-memory reset
-                    cJSON *mdcObj = cJSON_GetObjectItem(ts_node->obj, "mdc");
-                    if (mdcObj && cJSON_IsNumber(mdcObj)) {
-                        cJSON_SetNumberValue(mdcObj, 0);
-                    } else {
-                        cJSON_ReplaceItemInObject(ts_node->obj, "mdc", cJSON_CreateNumber(0));
-                    }
-
-                    cJSON *mdltObj = cJSON_GetObjectItem(ts_node->obj, "mdlt");
-                    if (mdltObj && cJSON_IsArray(mdltObj)) {
-                        // Clear array items
-                        while (cJSON_GetArraySize(mdltObj) > 0) {
-                            cJSON_DeleteItemFromArray(mdltObj, 0);
-                        }
-                    } else {
-                        cJSON_ReplaceItemInObject(ts_node->obj, "mdlt", cJSON_CreateArray());
-                    }
-
-                    // Persist the reset via the DB manager (backend-agnostic)
-                    const char *ts_ri = get_ri_rtnode(ts_node);
-                    if (ts_ri) {
-                        db_update_resource(ts_node->obj, (char *)ts_ri, RT_TS);
-                        logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                               "Persisted reset to DB: tsRi=%s", ts_ri);
-                    }
-                }
+                       "Missing-data notify sent: subRi=%s batch=%d reported=%lld/%lld",
+                       sub_ri_for_progress, batch_len,
+                       md_get_reported(sub_ri_for_progress), ts_total);
 
                 cJSON_Delete(noti_cjson);
             }
@@ -662,7 +708,7 @@ static void traverse_and_check_ts_missing(RTNode *node, long long now_us) {
                     set_last_gen_us_for_ri(ri, now_us);
 
                     pthread_mutex_unlock(&main_lock);
-                    if (should_notify) notify_missing_data(node, after_mdc, MDC_SRC_MONITOR_TIMEOUT);
+                    if (should_notify) notify_missing_data(node, after_mdc, 1, MDC_SRC_MONITOR_TIMEOUT);
                 }
             }
         }

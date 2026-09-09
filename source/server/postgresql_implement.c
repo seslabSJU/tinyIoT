@@ -3137,9 +3137,9 @@ int db_tsi_check_snr_dup(const char *ts_ri, int snr)
     return exists;
 }
 
-// dgt uses the fixed-width oneM2M timestamp format, so lexical ordering is
-// chronological ordering.
-char *db_tsi_get_last_dgt(const char *ts_ri)
+// Arrival time of the first data point: the general.ct of the instance with the
+// lowest sequenceNr.
+char *db_tsi_get_first_ct(const char *ts_ri)
 {
     if (!ts_ri) return NULL;
     char *dgt = NULL;
@@ -3154,9 +3154,9 @@ char *db_tsi_get_last_dgt(const char *ts_ri)
     char *escaped_ts_ri = pg_escape_string_value(ts_ri);
     char sql[512];
     snprintf(sql, sizeof(sql),
-             "SELECT tsi.dgt FROM tsi JOIN general ON tsi.id = general.id "
-             "WHERE general.pi = '%s' AND tsi.dgt IS NOT NULL "
-             "ORDER BY tsi.dgt DESC LIMIT 1;",
+             "SELECT general.ct FROM tsi JOIN general ON tsi.id = general.id "
+             "WHERE general.pi = '%s' "
+             "ORDER BY tsi.snr ASC LIMIT 1;",
              escaped_ts_ri);
     free(escaped_ts_ri);
 
@@ -3246,6 +3246,31 @@ int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str)
 
     free(escaped_ts_ri);
     free(escaped_time);
+
+    PGresult *r = PQexec(conn, sql);
+    int ok = (r && PQresultStatus(r) == PGRES_COMMAND_OK);
+    if (r) PQclear(r);
+    pg_unlock();
+    return ok;
+}
+
+int db_ts_clear_mdlt(const char *ts_ri)
+{
+    if (!ts_ri) return 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ts_ri = pg_escape_string_value(ts_ri);
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "UPDATE ts SET mdlt = NULL WHERE id = (SELECT id FROM general WHERE ri = '%s');",
+             escaped_ts_ri);
+    free(escaped_ts_ri);
 
     PGresult *r = PQexec(conn, sql);
     int ok = (r && PQresultStatus(r) == PGRES_COMMAND_OK);

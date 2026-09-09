@@ -1703,7 +1703,11 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
         }
         cJSON *enc = cJSON_GetObjectItem(subContainer, "enc");
 		exc = cJSON_GetObjectItem(node->rtnode->obj, "exc");
-		cJSON_AddStringToObject(sgn, "sur", node->rtnode->uri);
+		{
+			char *sur = make_subscription_reference(get_ri_rtnode(node->rtnode));
+			cJSON_AddStringToObject(sgn, "sur", sur ? sur : node->rtnode->uri);
+			free(sur);
+		}
 
 		if (node->rtnode->obj && (nct = cJSON_GetObjectItem(node->rtnode->obj, "nct")))
 		{
@@ -1797,7 +1801,11 @@ int notify_via_sub(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		if (su && cJSON_IsString(su) && su->valuestring)
 		{
 			logger("O2M", LOG_LEVEL_DEBUG, "notify delete sub");
-			cJSON_AddItemToObject(sgn, "sur", cJSON_CreateString(target_rtnode->uri));
+			{
+				char *sur = make_subscription_reference(get_ri_rtnode(target_rtnode));
+				cJSON_AddItemToObject(sgn, "sur", cJSON_CreateString(sur ? sur : target_rtnode->uri));
+				free(sur);
+			}
 			cJSON_AddItemToObject(sgn, "sud", cJSON_CreateBool(true));
 			send_verification_request(o2pt->to, su->valuestring, noti_cjson);
 			cJSON_DeleteItemFromObject(sgn, "sud");

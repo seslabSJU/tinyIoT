@@ -14,7 +14,7 @@
 #include <pthread.h>      
 
 extern pthread_mutex_t main_lock;
-extern void notify_missing_data(RTNode *ts_node, int current_mdc, mdc_source_t src);
+extern void notify_missing_data(RTNode *ts_node, int current_mdc, int new_count, mdc_source_t src);
 
 
 long long parse_time_to_us_tsi(char *s) {
@@ -130,16 +130,13 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
         cJSON_Delete(tsi); cJSON_Delete(root); return handle_error(o2pt, RSC_CONFLICT, "dgt dup");
     }
 
-    // Missing-data detection compares this data point against the previous one, so
-    // capture the latest existing dataGenerationTime before this instance is stored.
-    char *prev_dgt = db_tsi_get_last_dgt(get_ri_rtnode(parent_rtnode));
 
     int cs = strlen(p_con->valuestring);
     cJSON_AddNumberToObject(tsi, "cs", cs);
 
     cJSON *p_obj = parent_rtnode->obj;
     int mbs = cJSON_GetObjectItem(p_obj, "mbs")->valueint;
-    if (cs > mbs) { free(prev_dgt); cJSON_Delete(tsi); cJSON_Delete(root); return handle_error(o2pt, RSC_NOT_ACCEPTABLE, "mbs exceed"); }
+    if (cs > mbs) { cJSON_Delete(tsi); cJSON_Delete(root); return handle_error(o2pt, RSC_NOT_ACCEPTABLE, "mbs exceed"); }
 
     int current_cni = 0;
     int current_cbs = 0;
@@ -160,12 +157,12 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
     if (p_snr) {
         if (!cJSON_IsNumber(p_snr)) {
-            free(prev_dgt); cJSON_Delete(tsi); cJSON_Delete(root);
+            cJSON_Delete(tsi); cJSON_Delete(root);
             return handle_error(o2pt, RSC_BAD_REQUEST, "snr invalid");
         }
         snr = (int)cJSON_GetNumberValue(p_snr);
         if (snr < 0) {
-            free(prev_dgt); cJSON_Delete(tsi); cJSON_Delete(root);
+            cJSON_Delete(tsi); cJSON_Delete(root);
             return handle_error(o2pt, RSC_BAD_REQUEST, "snr invalid");
         }
     } else {
@@ -189,7 +186,7 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
     sprintf(uri, "%s/%s", get_uri_rtnode(parent_rtnode), cJSON_GetObjectItem(tsi, "rn")->valuestring);
 
     if (db_store_resource(tsi, uri) != 1) {
-        free(prev_dgt); free(uri); cJSON_Delete(tsi); cJSON_Delete(root);
+        free(uri); cJSON_Delete(tsi); cJSON_Delete(root);
         return handle_error(o2pt, RSC_INTERNAL_SERVER_ERROR, "DB fail");
     }
 
@@ -203,29 +200,44 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
 
     logger("TSI_TRACE", LOG_LEVEL_DEBUG, "Checking MDD conditions for TS [%s]", get_ri_rtnode(parent_rtnode));
 
+    // Arrival time of the first instance under this TS - the anchor of the periodic
+    // grid. Read after storing, so the very first instance anchors on itself.
+    char *anchor_ct = db_tsi_get_first_ct(get_ri_rtnode(parent_rtnode));
+
     if (mdd && cJSON_IsTrue(mdd) && pei && pei->valueint > 0) {
         bool need_notify = false;
         int notify_mdc = 0;
+        int notify_new = 0;
 
         pthread_mutex_lock(&main_lock);
 
         long long t_curr_dgt = parse_time_to_us_tsi(p_dgt->valuestring);
-        long long t_prev_dgt = prev_dgt ? parse_time_to_us_tsi(prev_dgt) : 0;
         long long pei_us  = (long long)pei->valueint * 1000;
         long long peid_us = (peid_obj) ? (long long)peid_obj->valueint * 1000 : 0;
 
-        // A data point is expected every `pei` after the previous one, within `peid`
-        // tolerance. Anchor on the previous data point's dataGenerationTime: the AE
-        // owns that clock, so anchoring on a server-side timestamp (the <timeSeries>
-        // creation time) marked every instance as missing whenever the two clocks
-        // did not happen to coincide.
+        // Data points are expected on a periodic grid: one every `pei`, each within
+        // `peid` of its slot. The grid is anchored on when data actually started
+        // flowing - the arrival time of the first instance - not on when the
+        // <timeSeries> resource happened to be created. With the resource's own ct as
+        // the anchor, any delay between creating the <timeSeries> and sending the
+        // first instance shifted the whole grid and marked every instance as missing.
+        int base_snr = db_tsi_get_min_snr(get_ri_rtnode(parent_rtnode));
+        long long t_anchor = t_curr_dgt;
+        if (anchor_ct) {
+            t_anchor = parse_time_to_us_tsi(anchor_ct);
+        }
+        if (t_anchor <= 0) t_anchor = t_curr_dgt;
+
+        long long expected = t_anchor + (long long)(snr - base_snr) * pei_us;
+        long long lower = expected - peid_us;
+        long long upper = expected + peid_us;
+
         int missed = 0;
-        if (t_prev_dgt > 0 && t_curr_dgt > t_prev_dgt) {
-            long long delta = t_curr_dgt - t_prev_dgt;
-            if (delta > pei_us + peid_us) {
-                missed = (int)((delta + peid_us) / pei_us) - 1;
-                if (missed < 1) missed = 1;
-            }
+        if (t_curr_dgt < lower) {
+            // The very first instance defines the grid, so it can never be early.
+            if (snr != base_snr) missed = 1;
+        } else if (t_curr_dgt > upper) {
+            missed = 1;
         }
 
         if (missed > 0) {
@@ -237,14 +249,15 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
                 mdlt = cJSON_GetObjectItem(p_obj, "mdlt");
             }
 
-            // Record the dataGenerationTime each missing data point would have had.
-            for (int k = 1; k <= missed; k++) {
+            // Record the dataGenerationTime the missing data point would have had,
+            // i.e. its slot on the grid - not the time the gap happened to be noticed.
+            {
                 char md_time[64];
-                us_to_iso8601_tsi(t_prev_dgt + (long long)k * pei_us, md_time);
+                us_to_iso8601_tsi(expected, md_time);
                 cJSON_AddItemToArray(mdlt, cJSON_CreateString(md_time));
                 logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "Missing data point detected for TS [%s]: dgt=%s",
-                       get_ri_rtnode(parent_rtnode), md_time);
+                       "Missing data point for TS [%s]: expected dgt=%s, received=%s",
+                       get_ri_rtnode(parent_rtnode), md_time, p_dgt->valuestring);
             }
 
             // mdlt holds at most mdn entries; the oldest are dropped to make room for
@@ -265,14 +278,15 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
             // db_update_resource() below persists mdc and mdlt from p_obj.
             need_notify = true;
             notify_mdc = new_mdc;
+            notify_new = missed;
         }
         pthread_mutex_unlock(&main_lock);
 
         if (need_notify) {
-            notify_missing_data(parent_rtnode, notify_mdc, MDC_SRC_TSI_GAP);
+            notify_missing_data(parent_rtnode, notify_mdc, notify_new, MDC_SRC_TSI_GAP);
         }
     }
-    free(prev_dgt);
+    free(anchor_ct);
 
     char *new_lt_final = get_local_time(0);
     if (cJSON_GetObjectItem(p_obj, "lt")) {

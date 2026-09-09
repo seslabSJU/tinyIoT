@@ -35,10 +35,6 @@ int validate_ts(oneM2MPrimitive *o2pt, cJSON *ts, Operation op) {
             return handle_error(o2pt, RSC_BAD_REQUEST, "negative value not allowed");
         }
     }
-
-#if CSE_RVI >= RVI_3
-    validate_aa(o2pt, ts, RT_TS);
-#endif
     return RSC_OK;
 }
 
@@ -89,16 +85,19 @@ int create_ts(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
         cJSON_Delete(root);
         return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute type : cnf");
     }
+    // contentInfo carries a media type and an encoding type, so a bare media type
+    // such as "application/wrong" is not a valid value.
+    if (cnf_item && cJSON_IsString(cnf_item) && !validate_cnf(cnf_item->valuestring)) {
+        cJSON_Delete(root);
+        return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `cnf` is invalid");
+    }
     
     cJSON_DeleteItemFromObject(ts, "mdc");
     cJSON_DeleteItemFromObject(ts, "cni");
     cJSON_DeleteItemFromObject(ts, "cbs");
     cJSON_DeleteItemFromObject(ts, "mdlt");
     cJSON_AddNumberToObject(ts, "mdc", 0);
-    // mdlt is a read-only, server-maintained attribute just like mdc. Initialise it
-    // to an empty list instead of leaving it absent until the first missing-data
-    // event, so a freshly created <timeSeries> already exposes it.
-    cJSON_AddItemToObject(ts, "mdlt", cJSON_CreateArray());
+    // mdlt stays absent until the first missing data point is recorded.
     cJSON_AddNumberToObject(ts, "cni", 0);
     cJSON_AddNumberToObject(ts, "cbs", 0);
 
@@ -157,6 +156,12 @@ int update_ts(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
     if (cnf_item && !cJSON_IsString(cnf_item)) {
         cJSON_Delete(root);
         return handle_error(o2pt, RSC_BAD_REQUEST, "invalid attribute type : cnf");
+    }
+    // contentInfo carries a media type and an encoding type, so a bare media type
+    // such as "application/wrong" is not a valid value.
+    if (cnf_item && cJSON_IsString(cnf_item) && !validate_cnf(cnf_item->valuestring)) {
+        cJSON_Delete(root);
+        return handle_error(o2pt, RSC_BAD_REQUEST, "attribute `cnf` is invalid");
     }
 
     cJSON *cur_mdd_obj = cJSON_GetObjectItem(target_rtnode->obj, "mdd");
@@ -258,20 +263,26 @@ int update_ts(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
         cJSON *mdc = cJSON_GetObjectItem(target_rtnode->obj, "mdc");
         if(mdc) cJSON_SetNumberValue(mdc, 0);
         else cJSON_AddNumberToObject(target_rtnode->obj, "mdc", 0);
-        // Clear mdlt to an empty list rather than removing the attribute. Removing it
-        // also meant db_update_resource() never emitted the column, leaving a stale
+        // Drop mdlt, and clear the stored column too: db_update_resource() only emits
+        // attributes present on the object, so removing it in memory alone left a stale
         // mdlt in the DB that reappeared on the next restart with mdc already reset.
         cJSON *mdlt = cJSON_GetObjectItem(target_rtnode->obj, "mdlt");
-        if (mdlt) cJSON_ReplaceItemInObject(target_rtnode->obj, "mdlt", cJSON_CreateArray());
-        else cJSON_AddItemToObject(target_rtnode->obj, "mdlt", cJSON_CreateArray());
+        if (mdlt) cJSON_DeleteItemFromObject(target_rtnode->obj, "mdlt");
+        db_ts_clear_mdlt(ri);
         char *now = get_local_time(0);
         cJSON_ReplaceItemInObject(target_rtnode->obj, "lt", cJSON_CreateString(now));
         free(now);
     }
 
 #if CSE_RVI >= RVI_3
-    validate_aa(o2pt, ts, RT_TS);
-    process_annc_at_update(target_rtnode, ts);
+    cJSON *at = NULL;
+    if ((at = cJSON_GetObjectItem(ts, "at")))
+    {
+        cJSON *final_at = cJSON_CreateArray();
+        handle_annc_update(target_rtnode, at, final_at);
+        cJSON_DeleteItemFromObject(ts, "at");
+        cJSON_AddItemToObject(ts, "at", final_at);
+    }
 #endif
 
     update_resource(target_rtnode->obj, ts);
