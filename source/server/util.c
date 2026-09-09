@@ -4962,11 +4962,19 @@ void process_annc_at_update(RTNode *target_rtnode, cJSON *body)
 
 	if (cJSON_IsNull(at))
 	{
-		cJSON *tmp = cJSON_CreateArray();
-		handle_annc_update(target_rtnode, at, tmp);  
-		cJSON_Delete(tmp);
-		if (!cJSON_GetObjectItem(target_rtnode->obj, "at"))
-			cJSON_DeleteItemFromObject(body, "at");   
+		cJSON *kept = cJSON_CreateArray();
+		handle_annc_update(target_rtnode, at, kept);
+		if (cJSON_GetArraySize(kept) > 0)
+		{
+			cJSON_DeleteItemFromObject(body, "at");
+			cJSON_AddItemToObject(body, "at", kept);
+		}
+		else
+		{
+			cJSON_Delete(kept);
+			if (!cJSON_GetObjectItem(target_rtnode->obj, "at"))
+				cJSON_DeleteItemFromObject(body, "at");
+		}
 		return;
 	}
 
