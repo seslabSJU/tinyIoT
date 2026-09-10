@@ -3254,6 +3254,33 @@ int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str)
     return ok;
 }
 
+int db_clear_attribute(const char *ri, ResourceType ty, const char *attr)
+{
+    if (!ri || !attr) return 0;
+    char *table_name = get_table_name(ty);
+    if (!table_name) return 0;
+
+    pg_lock();
+    PGconn *conn = get_pg_conn();
+    if (!conn) {
+        pg_unlock();
+        return 0;
+    }
+
+    char *escaped_ri = pg_escape_string_value(ri);
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "UPDATE %s SET %s = NULL WHERE id = (SELECT id FROM general WHERE ri = '%s');",
+             table_name, attr, escaped_ri);
+    free(escaped_ri);
+
+    PGresult *r = PQexec(conn, sql);
+    int ok = (r && PQresultStatus(r) == PGRES_COMMAND_OK);
+    if (r) PQclear(r);
+    pg_unlock();
+    return ok;
+}
+
 int db_ts_clear_mdlt(const char *ts_ri)
 {
     if (!ts_ri) return 0;

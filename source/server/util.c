@@ -4973,7 +4973,29 @@ void process_annc_at_update(RTNode *target_rtnode, cJSON *body)
 	cJSON *final_at = cJSON_CreateArray();
 	handle_annc_update(target_rtnode, at, final_at);
 	cJSON_DeleteItemFromObject(body, "at");
-	cJSON_AddItemToObject(body, "at", final_at);
+	if (cJSON_GetArraySize(final_at) > 0)
+	{
+		cJSON_AddItemToObject(body, "at", final_at);
+	}
+	else
+	{
+		// Nothing ended up announced - every requested target was de-announced,
+		// or none could be reached. announceTo then has no value to hold, and an
+		// empty array is not that: it is a present attribute claiming the
+		// resource is announced to nowhere, and it stuck in the stored resource
+		// and in every later RETRIEVE. Every CREATE path already drops the
+		// attribute in this case; update must do the same. A JSON null is how
+		// this code base spells "remove it": update_resource() deletes the
+		// attribute from the stored resource and db_update_resource() writes
+		// SQL NULL, so the column cannot resurrect it after a restart.
+		cJSON_Delete(final_at);
+		cJSON_AddItemToObject(body, "at", cJSON_CreateNull());
+		// The null covers callers that persist the update body. update_ts()
+		// persists the resource object instead, and by then update_resource()
+		// has removed `at` from it, so the column would never be written and
+		// the old announcement list would come back on the next start-up.
+		db_clear_attribute(get_ri_rtnode(target_rtnode), target_rtnode->ty, "at");
+	}
 }
 
 /**
@@ -5058,7 +5080,18 @@ void removeChildAnnc(RTNode* parent_rtnode, char* at)
 					cJSON_AddItemToArray(new_at, cJSON_CreateString(pjson->valuestring));
 				}
 				cJSON_DeleteItemFromObject(cin->obj, "at");
-				cJSON_AddItemToObject(cin->obj, "at", new_at);
+				// The last announcement to this CSE just went away: announceTo
+				// has nothing left to hold, so the attribute goes rather than
+				// staying behind as an empty array.
+				if (cJSON_GetArraySize(new_at) > 0)
+				{
+					cJSON_AddItemToObject(cin->obj, "at", new_at);
+				}
+				else
+				{
+					cJSON_Delete(new_at);
+					db_clear_attribute(cJSON_GetObjectItem(cin->obj, "ri")->valuestring, cin->ty, "at");
+				}
 				db_update_resource(cin->obj, cJSON_GetObjectItem(cin->obj, "ri")->valuestring, cin->ty);
 				cin = cin->sibling_right;
 			}
@@ -5082,7 +5115,15 @@ void removeChildAnnc(RTNode* parent_rtnode, char* at)
 			cJSON_AddItemToArray(new_at, cJSON_CreateString(pjson->valuestring));
 		}
 		cJSON_DeleteItemFromObject(rtnode->obj, "at");
-		cJSON_AddItemToObject(rtnode->obj, "at", new_at);
+		if (cJSON_GetArraySize(new_at) > 0)
+		{
+			cJSON_AddItemToObject(rtnode->obj, "at", new_at);
+		}
+		else
+		{
+			cJSON_Delete(new_at);
+			db_clear_attribute(cJSON_GetObjectItem(rtnode->obj, "ri")->valuestring, rtnode->ty, "at");
+		}
 		db_update_resource(rtnode->obj, cJSON_GetObjectItem(rtnode->obj, "ri")->valuestring, rtnode->ty);
 		rtnode = rtnode->sibling_right;
 	}

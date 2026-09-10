@@ -49,6 +49,11 @@ int db_ts_set_mdc(const char *ts_ri, int mdc);
 int db_ts_set_mdc_and_append_mdlt(const char *ts_ri, int mdc, const char *time_str);
 // Clear the stored TS.mdlt so the attribute is absent again after a reload.
 int db_ts_clear_mdlt(const char *ts_ri);
+// Set one stored attribute back to SQL NULL. db_update_resource() only writes
+// attributes that are present on the object it is handed, so deleting an
+// attribute in memory leaves the old value in the database, where it reappears
+// on the next start-up. Callers that remove an attribute use this to clear it.
+int db_clear_attribute(const char *ri, ResourceType ty, const char *attr);
 
 // general table fields
 int db_general_set_lt(const char *ri, const char *lt);

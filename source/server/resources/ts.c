@@ -283,14 +283,9 @@ int update_ts(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
     }
 
 #if CSE_RVI >= RVI_3
-    cJSON *at = NULL;
-    if ((at = cJSON_GetObjectItem(ts, "at")))
-    {
-        cJSON *final_at = cJSON_CreateArray();
-        handle_annc_update(target_rtnode, at, final_at);
-        cJSON_DeleteItemFromObject(ts, "at");
-        cJSON_AddItemToObject(ts, "at", final_at);
-    }
+    // Shared with every other announceable resource rather than inlined here:
+    // this copy also had no handling for `at: null` (de-announce everything).
+    process_annc_at_update(target_rtnode, ts);
 #endif
 
     update_resource(target_rtnode->obj, ts);
