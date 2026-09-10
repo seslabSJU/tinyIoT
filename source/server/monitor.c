@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 extern pthread_mutex_t main_lock;
+extern ResourceTree *rt;
 extern volatile int terminate;
 
 typedef struct _ts_miss_throttle_entry {
@@ -118,6 +119,16 @@ void ts_md_clear_all(void) {
         free(e);
     }
     pthread_mutex_unlock(&g_ts_miss_throttle_lock);
+}
+
+// Whether any <timeSeries> is being watched at all. Nothing is armed until an
+// instance arrives, so on a CSE with no active time series the monitoring tick
+// can return immediately.
+static int ts_md_any_armed(void) {
+    pthread_mutex_lock(&g_ts_md_cursor_lock);
+    int any = (g_ts_md_cursor != NULL);
+    pthread_mutex_unlock(&g_ts_md_cursor_lock);
+    return any;
 }
 
 // If a data point is overdue for `ri`, report the dataGenerationTime it should
@@ -693,26 +704,30 @@ void *monitor_serve(void *arg) {
     logger("MONITOR", LOG_LEVEL_INFO, "TS Monitoring Thread Started (in-memory traversal)");
 
     while (!terminate) {
-        long long now_us = wallclock_now_us();
-        char *now_str = get_local_time(0);
+        // Nothing is armed until a <timeSeriesInstance> arrives, so a CSE with
+        // no active time series does no work here and, importantly, writes no
+        // log lines: this runs twice a second, and looking the root up through
+        // find_rtnode() on every tick used to bury the log in two DEBUG lines
+        // per tick whether or not there was anything to check.
+        if (!ts_md_any_armed()) {
+            usleep(500000);
+            continue;
+        }
 
-        // Start traversal from the CSE base node (CSE_BASE_RI) if available.
-        // This avoids any dependency on a ResourceTree wrapper header.
-        //
+        long long now_us = wallclock_now_us();
+
         // The whole walk runs under main_lock. Request threads add and free
-        // RTNodes and their cJSON objects under that same lock, so looking up
-        // the root and then walking it unlocked would hand this thread pointers
-        // a concurrent DELETE can free underneath it - reachable from ordinary
-        // traffic, since the walk happens twice a second. main_lock is
-        // recursive, so the nested acquisition further down is fine.
+        // RTNodes and their cJSON objects under that same lock, so walking the
+        // tree unlocked would hand this thread pointers a concurrent DELETE can
+        // free underneath it. main_lock is recursive, so the nested acquisition
+        // further down is fine. rt->cb is read directly rather than looked up:
+        // under the lock it is the same node, without the per-tick logging.
         pthread_mutex_lock(&main_lock);
-        RTNode *root = find_rtnode(CSE_BASE_RI);
-        if (root) {
-            traverse_and_check_ts_missing(root, now_us);
+        if (rt && rt->cb) {
+            traverse_and_check_ts_missing(rt->cb, now_us);
         }
         pthread_mutex_unlock(&main_lock);
 
-        free(now_str);
         usleep(500000);
     }
 
