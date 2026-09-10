@@ -4987,21 +4987,8 @@ void process_annc_at_update(RTNode *target_rtnode, cJSON *body)
 	}
 	else
 	{
-		// Nothing ended up announced - every requested target was de-announced,
-		// or none could be reached. announceTo then has no value to hold, and an
-		// empty array is not that: it is a present attribute claiming the
-		// resource is announced to nowhere, and it stuck in the stored resource
-		// and in every later RETRIEVE. Every CREATE path already drops the
-		// attribute in this case; update must do the same. A JSON null is how
-		// this code base spells "remove it": update_resource() deletes the
-		// attribute from the stored resource and db_update_resource() writes
-		// SQL NULL, so the column cannot resurrect it after a restart.
 		cJSON_Delete(final_at);
 		cJSON_AddItemToObject(body, "at", cJSON_CreateNull());
-		// The null covers callers that persist the update body. update_ts()
-		// persists the resource object instead, and by then update_resource()
-		// has removed `at` from it, so the column would never be written and
-		// the old announcement list would come back on the next start-up.
 		db_clear_attribute(get_ri_rtnode(target_rtnode), target_rtnode->ty, "at");
 	}
 }
