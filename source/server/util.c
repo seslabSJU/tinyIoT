@@ -19,6 +19,7 @@
 #include "onem2mTypes.h"
 #include "config.h"
 #include "dbmanager.h"
+#include "monitor.h"
 #include "jsonparser.h"
 #include "mqttClient.h"
 #include "coap.h"
@@ -255,12 +256,21 @@ ResourceType coap_parse_object_type(int object_type)
 	return ty;
 }
 
+// oneM2M absolute timestamps carry no timezone offset and are UTC
+// (TS-0004 clause 6.3.3, m2m:timestamp). This used to format with localtime()
+// while every parser reads timestamps back with timegm(), so on a CSE not
+// running in UTC each stored ct/lt/et came back offset by the local UTC offset:
+// missing-data detection compared `now` against an `lt` hours in the future and
+// so never fired, and a client-supplied et was compared against a local-time now.
+// Seconds and nanoseconds now come from a single clock reading, so the
+// millisecond part always belongs to the second it is appended to.
 char* get_local_time(int diff)
 {
-	time_t t = time(NULL) - diff;
-	struct tm tm = *localtime(&t);
 	struct timespec specific_time;
-	clock_gettime(0, &specific_time);
+	clock_gettime(CLOCK_REALTIME, &specific_time);
+	time_t t = specific_time.tv_sec - diff;
+	struct tm tm;
+	gmtime_r(&t, &tm);
 
 	char year[16], mon[16], day[16], hour[16], minute[16], sec[16], millsec[16];
 
@@ -1334,6 +1344,10 @@ int reset_cse()
 #if MONO_THREAD == 0
 	pthread_mutex_lock(&main_lock);
 #endif
+
+	// 0) Forget missing-data detection state; the resources it refers to are
+	//    about to be freed.
+	ts_md_clear_all();
 
 	// 1) Drop the in-memory resource tree (mirrors stop_server teardown).
 	if (rt)

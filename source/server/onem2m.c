@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include "onem2m.h"
 #include "dbmanager.h"
+#include "monitor.h"
 #include "httpd.h"
 #include "mqttClient.h"
 #include "onem2mTypes.h"
@@ -332,7 +333,10 @@ int update_cnt_cin(RTNode *cnt_rtnode, RTNode *cin_rtnode, int sign)
                 cJSON *ct = cJSON_GetObjectItem(child->obj, "ct");
                 struct tm tmv = {0};
                 strptime(ct->valuestring, "%Y%m%dT%H%M%S", &tmv);
-                time_t created = mktime(&tmv);
+                // ct is UTC (see get_local_time), so it must be converted back
+                // with timegm(); mktime() re-applied the local UTC offset and
+                // made every <cin> look older or younger than it is by that much.
+                time_t created = timegm(&tmv);
                 if (difftime(now, created) > mia->valueint) {
 					if (exp_cnt < 128){
 						expired[exp_cnt++] = child;
@@ -538,8 +542,10 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		}
 		break;
 	case RT_TS:
-		// TS-specific delete hook (children are already handled recursively above).
-		// Kept for completeness so TS deletion can have explicit cleanup if needed.
+		// Drop the missing-data detection state. Without this the monitoring
+		// thread keeps an armed deadline and a running total for a resource
+		// that no longer exists, and both lists grow for the life of the process.
+		ts_md_disarm(get_ri_rtnode(rtnode));
 		break;
 	case RT_TSI:
 		// When deleting a TSI, update the parent TS aggregate counters (cni/cbs) and lt.

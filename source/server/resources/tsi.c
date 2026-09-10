@@ -11,6 +11,7 @@
 #include "../config.h"
 #include "../jsonparser.h"
 #include "../monitor.h"
+#include <sys/time.h>
 #include <pthread.h>      
 
 extern pthread_mutex_t main_lock;
@@ -232,12 +233,18 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
         long long lower = expected - peid_us;
         long long upper = expected + peid_us;
 
+        // The instance that starts a series defines the grid, so it is never off
+        // it - in either direction. Only the early side used to be excluded,
+        // which made an AE whose clock ran ahead of the CSE's report a missing
+        // data point for the very instance that started the series. "Starts a
+        // series" is whether the monitoring cursor has been armed yet rather
+        // than snr == base_snr, because a sender may reuse sequence numbers.
+        int series_started = ts_md_is_armed(get_ri_rtnode(parent_rtnode));
         int missed = 0;
         if (t_curr_dgt < lower) {
-            // The very first instance defines the grid, so it can never be early.
             if (snr != base_snr) missed = 1;
         } else if (t_curr_dgt > upper) {
-            missed = 1;
+            if (series_started) missed = 1;
         }
 
         if (missed > 0) {
@@ -273,13 +280,34 @@ int create_tsi(oneM2MPrimitive *o2pt, RTNode *parent_rtnode) {
             int new_mdc = cJSON_GetArraySize(mdlt);
             cJSON *mdc_obj = cJSON_GetObjectItem(p_obj, "mdc");
             if (mdc_obj && cJSON_IsNumber(mdc_obj)) cJSON_SetNumberValue(mdc_obj, new_mdc);
-            else cJSON_ReplaceItemInObject(p_obj, "mdc", cJSON_CreateNumber(new_mdc));
+            else if (mdc_obj) cJSON_ReplaceItemInObject(p_obj, "mdc", cJSON_CreateNumber(new_mdc));
+            else cJSON_AddNumberToObject(p_obj, "mdc", new_mdc);
 
             // db_update_resource() below persists mdc and mdlt from p_obj.
             need_notify = true;
             notify_mdc = new_mdc;
             notify_new = missed;
         }
+        // Hand the monitoring thread the slot that comes next, so a sender that
+        // simply stops is noticed instead of the CSE waiting forever for an
+        // instance to compare against. The deadline is on this CSE's clock -
+        // pei plus the mdt grace period from now - while the timestamp recorded
+        // if it expires is the next slot on the grid, which is what
+        // TS-0018 TP/oneM2M/CSE/TS/001 expects to read back from missingDataList.
+        {
+            cJSON *mdt_obj = cJSON_GetObjectItem(p_obj, "mdt");
+            long long grace_us = (mdt_obj && cJSON_IsNumber(mdt_obj) &&
+                                  cJSON_GetNumberValue(mdt_obj) > 0)
+                                     ? (long long)cJSON_GetNumberValue(mdt_obj) * 1000
+                                     : peid_us;
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            long long now_us = (long long)tv.tv_sec * 1000000LL + tv.tv_usec;
+            ts_md_arm(get_ri_rtnode(parent_rtnode),
+                      now_us + pei_us + grace_us,
+                      expected + pei_us);
+        }
+
         pthread_mutex_unlock(&main_lock);
 
         if (need_notify) {

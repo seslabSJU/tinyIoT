@@ -16,52 +16,128 @@
 #include <unistd.h>
 
 extern pthread_mutex_t main_lock;
-extern int terminate;
+extern volatile int terminate;
 
-// Throttle missing-data generation per TS to avoid generating multiple missing periods
-// in a short time window (e.g., when lt is far behind). This aligns behavior with
-// unit tests that expect at most one missing period to be generated per pei interval.
 typedef struct _ts_miss_throttle_entry {
     char ri[256];
-    long long last_gen_us;
     long long total_missing;
     struct _ts_miss_throttle_entry *next;
 } ts_miss_throttle_entry_t;
 
 static ts_miss_throttle_entry_t *g_ts_miss_throttle = NULL;
+static void ts_forget_missing_total(const char *ri);
+// notify_missing_data() now runs on both the monitoring thread and the request
+// threads that create a <timeSeriesInstance>, so this list needs its own lock;
+// two concurrent head-inserts otherwise lose an entry, and a lost running total
+// makes `pending` go negative and silences that subscription for good.
+static pthread_mutex_t g_ts_miss_throttle_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static long long get_last_gen_us_for_ri(const char *ri) {
-    ts_miss_throttle_entry_t *e = g_ts_miss_throttle;
-    while (e) {
-        if (strcmp(e->ri, ri) == 0) return e->last_gen_us;
-        e = e->next;
+// Per-<timeSeries> missing-data cursor: armed by every arriving
+// <timeSeriesInstance>, consumed by the monitoring thread.
+//
+// The two timestamps deliberately live on different clocks. `deadline_us` is the
+// CSE's own wall clock - the instant at which a data point stops being merely
+// late and counts as missing, i.e. pei + mdt after the sender last spoke.
+// `expected_dgt_us` is on the sending AE's clock - the dataGenerationTime the
+// missing instance would have carried, which is what TS-0018
+// TP/oneM2M/CSE/TS/001 expects to find in missingDataList. Deriving both from one
+// value would make an AE whose clock is offset from the CSE's either detected at
+// the wrong moment or recorded with timestamps that are not its own.
+typedef struct _ts_md_cursor {
+    char ri[256];
+    long long deadline_us;
+    long long expected_dgt_us;
+    struct _ts_md_cursor *next;
+} ts_md_cursor_t;
+
+static ts_md_cursor_t *g_ts_md_cursor = NULL;
+static pthread_mutex_t g_ts_md_cursor_lock = PTHREAD_MUTEX_INITIALIZER;
+
+void ts_md_arm(const char *ri, long long deadline_us, long long expected_dgt_us) {
+    if (!ri) return;
+    pthread_mutex_lock(&g_ts_md_cursor_lock);
+    ts_md_cursor_t *e = g_ts_md_cursor;
+    while (e && strcmp(e->ri, ri) != 0) e = e->next;
+    if (!e) {
+        e = (ts_md_cursor_t *)calloc(1, sizeof(ts_md_cursor_t));
+        if (!e) { pthread_mutex_unlock(&g_ts_md_cursor_lock); return; }
+        strncpy(e->ri, ri, sizeof(e->ri) - 1);
+        e->next = g_ts_md_cursor;
+        g_ts_md_cursor = e;
     }
-    return 0;
+    e->deadline_us = deadline_us;
+    e->expected_dgt_us = expected_dgt_us;
+    pthread_mutex_unlock(&g_ts_md_cursor_lock);
 }
 
-static void set_last_gen_us_for_ri(const char *ri, long long v) {
-    ts_miss_throttle_entry_t *e = g_ts_miss_throttle;
-    while (e) {
-        if (strcmp(e->ri, ri) == 0) {
-            e->last_gen_us = v;
-            return;
-        }
-        e = e->next;
+// Forget a <timeSeries>'s detection state. Used when missingDataDetect changes,
+// so a stale deadline cannot fire the moment detection is switched back on.
+void ts_md_disarm(const char *ri) {
+    if (!ri) return;
+    pthread_mutex_lock(&g_ts_md_cursor_lock);
+    ts_md_cursor_t *prev = NULL, *e = g_ts_md_cursor;
+    while (e && strcmp(e->ri, ri) != 0) { prev = e; e = e->next; }
+    if (e) {
+        if (prev) prev->next = e->next;
+        else g_ts_md_cursor = e->next;
+        free(e);
     }
-    // not found -> create
-    e = (ts_miss_throttle_entry_t *)calloc(1, sizeof(ts_miss_throttle_entry_t));
-    if (!e) return;
-    strncpy(e->ri, ri, sizeof(e->ri) - 1);
-    e->last_gen_us = v;
-    e->next = g_ts_miss_throttle;
-    g_ts_miss_throttle = e;
+    pthread_mutex_unlock(&g_ts_md_cursor_lock);
+    ts_forget_missing_total(ri);
 }
 
-static int should_throttle_missing(const char *ri, long long now_us, long long pei_us) {
+// Whether any instance has arrived for this <timeSeries> yet, i.e. whether there
+// is already a grid to measure the next one against.
+int ts_md_is_armed(const char *ri) {
+    if (!ri) return 0;
+    int found = 0;
+    pthread_mutex_lock(&g_ts_md_cursor_lock);
+    for (ts_md_cursor_t *e = g_ts_md_cursor; e; e = e->next) {
+        if (strcmp(e->ri, ri) == 0) { found = 1; break; }
+    }
+    pthread_mutex_unlock(&g_ts_md_cursor_lock);
+    return found;
+}
+
+// Drop all missing-data state. The upper tester's reset frees and rebuilds the
+// whole resource tree, which would otherwise leave armed deadlines and running
+// totals behind for resources that no longer exist.
+void ts_md_clear_all(void) {
+    pthread_mutex_lock(&g_ts_md_cursor_lock);
+    while (g_ts_md_cursor) {
+        ts_md_cursor_t *e = g_ts_md_cursor;
+        g_ts_md_cursor = e->next;
+        free(e);
+    }
+    pthread_mutex_unlock(&g_ts_md_cursor_lock);
+
+    pthread_mutex_lock(&g_ts_miss_throttle_lock);
+    while (g_ts_miss_throttle) {
+        ts_miss_throttle_entry_t *e = g_ts_miss_throttle;
+        g_ts_miss_throttle = e->next;
+        free(e);
+    }
+    pthread_mutex_unlock(&g_ts_miss_throttle_lock);
+}
+
+// If a data point is overdue for `ri`, report the dataGenerationTime it should
+// have carried and move the cursor on by one period, so the next point falls due
+// a period later and a single call reports at most one missing point.
+static int ts_md_take_due(const char *ri, long long now_us, long long pei_us,
+                          long long *expected_dgt_us) {
     if (!ri || pei_us <= 0) return 0;
-    long long last = get_last_gen_us_for_ri(ri);
-    if (last > 0 && (now_us - last) < pei_us) return 1;
-    return 0;
+    int due = 0;
+    pthread_mutex_lock(&g_ts_md_cursor_lock);
+    ts_md_cursor_t *e = g_ts_md_cursor;
+    while (e && strcmp(e->ri, ri) != 0) e = e->next;
+    if (e && e->deadline_us > 0 && now_us >= e->deadline_us) {
+        *expected_dgt_us = e->expected_dgt_us;
+        e->deadline_us += pei_us;
+        e->expected_dgt_us += pei_us;
+        due = 1;
+    }
+    pthread_mutex_unlock(&g_ts_md_cursor_lock);
+    return due;
 }
 
 // Running total of missing data points ever detected for a TS. mdlt only keeps the
@@ -69,18 +145,35 @@ static int should_throttle_missing(const char *ri, long long now_us, long long p
 // which points a given subscription has already been told about.
 static long long ts_add_missing_total(const char *ri, int n) {
     if (!ri || n <= 0) return 0;
+    long long total = 0;
+    pthread_mutex_lock(&g_ts_miss_throttle_lock);
     ts_miss_throttle_entry_t *e = g_ts_miss_throttle;
-    while (e) {
-        if (strcmp(e->ri, ri) == 0) { e->total_missing += n; return e->total_missing; }
-        e = e->next;
+    while (e && strcmp(e->ri, ri) != 0) e = e->next;
+    if (!e) {
+        e = (ts_miss_throttle_entry_t *)calloc(1, sizeof(ts_miss_throttle_entry_t));
+        if (e) {
+            strncpy(e->ri, ri, sizeof(e->ri) - 1);
+            e->next = g_ts_miss_throttle;
+            g_ts_miss_throttle = e;
+        }
     }
-    e = (ts_miss_throttle_entry_t *)calloc(1, sizeof(ts_miss_throttle_entry_t));
-    if (!e) return 0;
-    strncpy(e->ri, ri, sizeof(e->ri) - 1);
-    e->total_missing = n;
-    e->next = g_ts_miss_throttle;
-    g_ts_miss_throttle = e;
-    return e->total_missing;
+    if (e) { e->total_missing += n; total = e->total_missing; }
+    pthread_mutex_unlock(&g_ts_miss_throttle_lock);
+    return total;
+}
+
+// Forget a <timeSeries>'s running total, so a deleted resource does not leave
+// its counter on the list for the lifetime of the process.
+static void ts_forget_missing_total(const char *ri) {
+    if (!ri) return;
+    pthread_mutex_lock(&g_ts_miss_throttle_lock);
+    ts_miss_throttle_entry_t *prev = NULL, *e = g_ts_miss_throttle;
+    while (e && strcmp(e->ri, ri) != 0) { prev = e; e = e->next; }
+    if (e) {
+        if (prev) prev->next = e->next; else g_ts_miss_throttle = e->next;
+        free(e);
+    }
+    pthread_mutex_unlock(&g_ts_miss_throttle_lock);
 }
 
 typedef struct _sub_md_notify_throttle_entry {
@@ -350,39 +443,6 @@ void us_to_iso8601_monitor(long long us, char *buf) {
             t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, micro);
 }
 
-// Update TS.mdc and append a timestamp to TS.mdlt via the DB manager API.
-// This avoids embedding PostgreSQL-specific SQL in resource/monitor logic.
-void ts_mdc_update_db_with_mdlt(const char *ts_ri, int val, const char *time_str) {
-    if (!ts_ri || !time_str) return;
-
-    // Fetch TS object from DB (independent of the backend)
-    cJSON *ts = db_get_resource((char *)ts_ri, RT_TS);
-    if (!ts) return;
-
-    // Update mdc
-    cJSON *mdcObj = cJSON_GetObjectItem(ts, "mdc");
-    if (mdcObj && cJSON_IsNumber(mdcObj)) {
-        cJSON_SetNumberValue(mdcObj, val);
-    } else {
-        cJSON_ReplaceItemInObject(ts, "mdc", cJSON_CreateNumber(val));
-    }
-
-    // Ensure mdlt is an array and append time_str
-    cJSON *mdltObj = cJSON_GetObjectItem(ts, "mdlt");
-    if (!mdltObj || !cJSON_IsArray(mdltObj)) {
-        cJSON_ReplaceItemInObject(ts, "mdlt", cJSON_CreateArray());
-        mdltObj = cJSON_GetObjectItem(ts, "mdlt");
-    }
-    if (mdltObj && cJSON_IsArray(mdltObj)) {
-        cJSON_AddItemToArray(mdltObj, cJSON_CreateString(time_str));
-    }
-
-    // Persist changes through dbmanager
-    db_update_resource(ts, (char *)ts_ri, RT_TS);
-
-    cJSON_Delete(ts);
-}
-
 void notify_missing_data(RTNode *ts_node, int current_mdc, int new_count, mdc_source_t src) {
     if (!ts_node || !ts_node->child) return;
 
@@ -629,7 +689,6 @@ static void traverse_and_check_ts_missing(RTNode *node, long long now_us) {
 
         if (mdd) {
             cJSON *peiObj = cJSON_GetObjectItem(node->obj, "pei");
-            cJSON *ltObj  = cJSON_GetObjectItem(node->obj, "lt");
             cJSON *mdcObj = cJSON_GetObjectItem(node->obj, "mdc");
 
             long long pei_us = 0;
@@ -638,83 +697,70 @@ static void traverse_and_check_ts_missing(RTNode *node, long long now_us) {
                 pei_us = (long long)peiObj->valuedouble * 1000LL;
             }
 
-            const char *lt_str = (ltObj && cJSON_IsString(ltObj)) ? ltObj->valuestring : NULL;
-            long long lt_us = lt_str ? parse_time_monitor_us((char *)lt_str) : 0;
+            const char *ri = get_ri_rtnode(node);
+            long long expected_dgt_us = 0;
 
-            int cur_mdc = 0;
-            if (mdcObj && cJSON_IsNumber(mdcObj)) cur_mdc = (int)mdcObj->valuedouble;
+            // The cursor is armed by the last instance that arrived, so an
+            // untouched <timeSeries> - one that has never received an instance -
+            // reports nothing rather than counting missing points from creation.
+            if (ri && pei_us > 0 && ts_md_take_due(ri, now_us, pei_us, &expected_dgt_us)) {
+                pthread_mutex_lock(&main_lock);
 
-            if (pei_us > 0 && lt_us > 0) {
-                long long diff = now_us - lt_us;
-                long long tolerance_us = 2000000LL; // 2 seconds
+                // TP/oneM2M/CSE/TS/001 asks for the dataGenerationTime of the
+                // missing data point, so record the timestamp the instance would
+                // have carried, not the moment its absence was noticed. lt is
+                // left alone: it is the resource's lastModifiedTime and nothing
+                // about the resource has been modified by the data not arriving.
+                char md_time[64];
+                us_to_iso8601_monitor(expected_dgt_us, md_time);
 
-                if (diff > (pei_us + tolerance_us)) {
-                    const char *ri = get_ri_rtnode(node);
-                    if (!ri) goto traverse_children;
-
-                    // Throttle to avoid generating multiple missing periods in a short window.
-                    if (should_throttle_missing(ri, now_us, pei_us)) goto traverse_children;
-
-                    pthread_mutex_lock(&main_lock);
-
-                    // Increment by exactly one missing period per cycle.
-                    int missed_count = 1;
-
-                    // Next expected timestamp: lt + 1 period
-                    char new_lt_str[64];
-                    us_to_iso8601_monitor(lt_us + pei_us, new_lt_str);
-
-                    (void)cur_mdc;
-                    (void)missed_count;
-
-                    // Update lt
-                    if (ltObj && cJSON_IsString(ltObj)) {
-                        cJSON_SetValuestring(ltObj, new_lt_str);
-                    } else {
-                        cJSON_ReplaceItemInObject(node->obj, "lt", cJSON_CreateString(new_lt_str));
-                    }
-
-                    // Append to mdlt
-                    cJSON *mdlt = cJSON_GetObjectItem(node->obj, "mdlt");
-                    if (!mdlt || !cJSON_IsArray(mdlt)) {
-                        cJSON_ReplaceItemInObject(node->obj, "mdlt", cJSON_CreateArray());
-                        mdlt = cJSON_GetObjectItem(node->obj, "mdlt");
-                    }
-                    cJSON_AddItemToArray(mdlt, cJSON_CreateString(new_lt_str));
-
-                    // mdlt keeps at most mdn entries, oldest first out, and mdc
-                    // reports its current size - same rule as the TSI-gap path.
-                    cJSON *mdn_obj = cJSON_GetObjectItem(node->obj, "mdn");
-                    int mdn = (mdn_obj && cJSON_IsNumber(mdn_obj)) ? (int)cJSON_GetNumberValue(mdn_obj) : 0;
-                    if (mdn > 0) {
-                        while (cJSON_GetArraySize(mdlt) > mdn) {
-                            cJSON_DeleteItemFromArray(mdlt, 0);
-                        }
-                    }
-
-                    int after_mdc = cJSON_GetArraySize(mdlt);
-                    if (mdcObj && cJSON_IsNumber(mdcObj)) {
-                        cJSON_SetNumberValue(mdcObj, after_mdc);
-                    } else {
-                        cJSON_ReplaceItemInObject(node->obj, "mdc", cJSON_CreateNumber(after_mdc));
-                    }
-
-                    // Persist via DB manager (backend-agnostic)
-                    db_update_resource(node->obj, (char *)ri, RT_TS);
-
-                    // Notify subscriptions (same behavior as PostgreSQL path)
-                    int should_notify = 1;
-
-                    set_last_gen_us_for_ri(ri, now_us);
-
-                    pthread_mutex_unlock(&main_lock);
-                    if (should_notify) notify_missing_data(node, after_mdc, 1, MDC_SRC_MONITOR_TIMEOUT);
+                // mdlt is absent until the first missing point, and
+                // cJSON_ReplaceItemInObject() is a no-op on a key that does not
+                // exist yet - so the array has to be added, not replaced, or
+                // every entry is silently dropped and mdc stays at zero.
+                cJSON *mdlt = cJSON_GetObjectItem(node->obj, "mdlt");
+                if (!mdlt) {
+                    mdlt = cJSON_AddArrayToObject(node->obj, "mdlt");
+                } else if (!cJSON_IsArray(mdlt)) {
+                    cJSON_ReplaceItemInObject(node->obj, "mdlt", cJSON_CreateArray());
+                    mdlt = cJSON_GetObjectItem(node->obj, "mdlt");
                 }
+                cJSON_AddItemToArray(mdlt, cJSON_CreateString(md_time));
+
+                // mdlt keeps at most mdn entries, oldest first out, and mdc
+                // reports its current size - same rule as the TSI-gap path.
+                cJSON *mdn_obj = cJSON_GetObjectItem(node->obj, "mdn");
+                int mdn = (mdn_obj && cJSON_IsNumber(mdn_obj)) ? (int)cJSON_GetNumberValue(mdn_obj) : 0;
+                if (mdn > 0) {
+                    while (cJSON_GetArraySize(mdlt) > mdn) {
+                        cJSON_DeleteItemFromArray(mdlt, 0);
+                    }
+                }
+
+                int after_mdc = cJSON_GetArraySize(mdlt);
+                if (mdcObj && cJSON_IsNumber(mdcObj)) {
+                    cJSON_SetNumberValue(mdcObj, after_mdc);
+                } else if (mdcObj) {
+                    cJSON_ReplaceItemInObject(node->obj, "mdc", cJSON_CreateNumber(after_mdc));
+                } else {
+                    // Replace is a no-op on an absent key, which would leave a
+                    // grown mdlt with no mdc to describe it.
+                    cJSON_AddNumberToObject(node->obj, "mdc", after_mdc);
+                }
+
+                logger("TSI_TRACE", LOG_LEVEL_DEBUG,
+                       "Missing data point for TS [%s] detected on timeout: expected dgt=%s, mdc=%d",
+                       ri, md_time, after_mdc);
+
+                // Persist via DB manager (backend-agnostic)
+                db_update_resource(node->obj, (char *)ri, RT_TS);
+
+                pthread_mutex_unlock(&main_lock);
+                notify_missing_data(node, after_mdc, 1, MDC_SRC_MONITOR_TIMEOUT);
             }
         }
     }
 
-traverse_children:
     // Traverse children first, then siblings
     if (node->child) traverse_and_check_ts_missing(node->child, now_us);
     if (node->sibling_right) traverse_and_check_ts_missing(node->sibling_right, now_us);
@@ -731,10 +777,19 @@ void *monitor_serve(void *arg) {
 
         // Start traversal from the CSE base node (CSE_BASE_RI) if available.
         // This avoids any dependency on a ResourceTree wrapper header.
+        //
+        // The whole walk runs under main_lock. Request threads add and free
+        // RTNodes and their cJSON objects under that same lock, so looking up
+        // the root and then walking it unlocked would hand this thread pointers
+        // a concurrent DELETE can free underneath it - reachable from ordinary
+        // traffic, since the walk happens twice a second. main_lock is
+        // recursive, so the nested acquisition further down is fine.
+        pthread_mutex_lock(&main_lock);
         RTNode *root = find_rtnode(CSE_BASE_RI);
         if (root) {
             traverse_and_check_ts_missing(root, now_us);
         }
+        pthread_mutex_unlock(&main_lock);
 
         free(now_str);
         usleep(500000);
