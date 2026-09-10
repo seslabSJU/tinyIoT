@@ -508,6 +508,9 @@ int delete_process(oneM2MPrimitive *o2pt, RTNode *rtnode)
 		update_fcnt_fcin(rtnode->parent, rtnode, -1);
 		break;
 	case RT_SUB:
+		// Report whatever missing data points this subscription was still
+		// counting towards its md.num threshold before it goes away.
+		ts_md_flush_sub(rtnode);
 		detach_subs(rtnode->parent, rtnode);
 		break;
 	case RT_CSR:

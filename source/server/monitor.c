@@ -162,6 +162,18 @@ static long long ts_add_missing_total(const char *ri, int n) {
     return total;
 }
 
+// The running total as it currently stands, without changing it.
+static long long ts_get_missing_total(const char *ri) {
+    if (!ri) return 0;
+    long long v = 0;
+    pthread_mutex_lock(&g_ts_miss_throttle_lock);
+    for (ts_miss_throttle_entry_t *e = g_ts_miss_throttle; e; e = e->next) {
+        if (strcmp(e->ri, ri) == 0) { v = e->total_missing; break; }
+    }
+    pthread_mutex_unlock(&g_ts_miss_throttle_lock);
+    return v;
+}
+
 // Forget a <timeSeries>'s running total, so a deleted resource does not leave
 // its counter on the list for the lifetime of the process.
 static void ts_forget_missing_total(const char *ri) {
@@ -176,180 +188,117 @@ static void ts_forget_missing_total(const char *ri) {
     pthread_mutex_unlock(&g_ts_miss_throttle_lock);
 }
 
+// Per-subscription missing-data notification state.
+//
+// TS-0001 clause 10.2.39 makes the missingData condition a window, not a
+// cooldown: notify once `number` data points have gone missing within
+// `duration`, and if the window runs out short of that number, send nothing and
+// start counting again (TS-0018 TP/oneM2M/CSE/TS/003 and TP/004). This used to
+// be implemented as a minimum delay between notifications, applied only to
+// missing points found by the monitoring thread and skipped entirely for those
+// found when an instance arrived - which made the two detection paths behave
+// differently for the same subscription.
+//
+// `reported` is how many of the <timeSeries>'s missing points this subscription
+// has already accounted for, whether notified or discarded with an expired
+// window. It is counted against a TS-wide running total rather than against
+// mdc/mdlt, which are resource attributes capped at mdn and would lose history.
 typedef struct _sub_md_notify_throttle_entry {
     char ri[256];
-    long long last_notify_ts_us;
-    long long pending_reserve_us;
-    int pending;
-    long long reported;             // missing data points already notified to this sub
+    long long reported;
+    long long window_start_us;      // 0 when no window is open
     struct _sub_md_notify_throttle_entry *next;
 } sub_md_notify_throttle_entry_t;
-
 
 static sub_md_notify_throttle_entry_t *g_sub_md_notify_throttle = NULL;
 static pthread_mutex_t g_sub_md_notify_lock = PTHREAD_MUTEX_INITIALIZER;
 
-// How many missing data points this subscription has already been notified about.
-static long long md_get_reported(const char *sub_ri) {
-    if (!sub_ri) return 0;
-    long long v = 0;
-    pthread_mutex_lock(&g_sub_md_notify_lock);
-    for (sub_md_notify_throttle_entry_t *e = g_sub_md_notify_throttle; e; e = e->next) {
-        if (strcmp(e->ri, sub_ri) == 0) { v = e->reported; break; }
+// Caller must hold g_sub_md_notify_lock.
+static sub_md_notify_throttle_entry_t *md_entry(const char *sub_ri, int create) {
+    sub_md_notify_throttle_entry_t *e = g_sub_md_notify_throttle;
+    while (e && strcmp(e->ri, sub_ri) != 0) e = e->next;
+    if (!e && create) {
+        e = (sub_md_notify_throttle_entry_t *)calloc(1, sizeof(sub_md_notify_throttle_entry_t));
+        if (e) {
+            strncpy(e->ri, sub_ri, sizeof(e->ri) - 1);
+            e->next = g_sub_md_notify_throttle;
+            g_sub_md_notify_throttle = e;
+        }
     }
-    pthread_mutex_unlock(&g_sub_md_notify_lock);
-    return v;
+    return e;
 }
 
-static void md_add_reported(const char *sub_ri, int n) {
-    if (!sub_ri || n <= 0) return;
+// Account for `new_count` freshly detected missing data points against one
+// subscription and decide whether that subscription should be notified now.
+//
+// Returns how many points to report (0 for none) and, when that is non-zero,
+// writes the running total this subscription stood at beforehand to
+// *out_reported_before, which is what locates the batch inside mdlt.
+//
+// The whole decision happens under one lock: both the monitoring thread and the
+// request thread that creates a <timeSeriesInstance> can arrive here for the
+// same subscription, and a read-then-update would let both send the same batch.
+static int md_window_take(const char *sub_ri, long long ts_total, int new_count,
+                          int num, long long dur_us, long long now_us,
+                          long long *out_reported_before) {
+    if (!sub_ri || num <= 0) return 0;
+    int batch = 0;
+
     pthread_mutex_lock(&g_sub_md_notify_lock);
-    sub_md_notify_throttle_entry_t *e = g_sub_md_notify_throttle;
-    while (e) {
-        if (strcmp(e->ri, sub_ri) == 0) { e->reported += n; pthread_mutex_unlock(&g_sub_md_notify_lock); return; }
-        e = e->next;
-    }
-    e = (sub_md_notify_throttle_entry_t *)calloc(1, sizeof(sub_md_notify_throttle_entry_t));
+    sub_md_notify_throttle_entry_t *e = md_entry(sub_ri, 1);
     if (e) {
-        strncpy(e->ri, sub_ri, sizeof(e->ri) - 1);
-        e->reported = n;
-        e->next = g_sub_md_notify_throttle;
-        g_sub_md_notify_throttle = e;
-    }
-    pthread_mutex_unlock(&g_sub_md_notify_lock);
-}
-
-static int md_notify_try_begin(const char *sub_ri, long long event_us, long long dur_us) {
-    if (!sub_ri || dur_us <= 0) return 0;
-    logger("TSI_TRACE", LOG_LEVEL_DEBUG, "md_notify_try_begin: subRi=%s event_us=%lld dur_us=%lld", sub_ri, event_us, dur_us);
-
-    pthread_mutex_lock(&g_sub_md_notify_lock);
-    sub_md_notify_throttle_entry_t *e = g_sub_md_notify_throttle;
-    while (e) {
-        if (strcmp(e->ri, sub_ri) == 0) {
-            logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                   "md_notify_try_begin: found entry subRi=%s last_notify_ts_us=%lld pending=%d pending_reserve_us=%lld",
-                   sub_ri, e->last_notify_ts_us, e->pending, e->pending_reserve_us);
-
-            if (e->pending) {
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG, "md_notify_try_begin: subRi=%s is pending -> waiting", sub_ri);
-                pthread_mutex_unlock(&g_sub_md_notify_lock);
-
-                // Wait up to ~1s in small steps for the in-flight send to complete.
-                // After it completes, re-run the checks (including md.dur) in a fresh attempt.
-                for (int k = 0; k < 20; ++k) {
-                    usleep(50000); // 50ms
-                    pthread_mutex_lock(&g_sub_md_notify_lock);
-                    sub_md_notify_throttle_entry_t *e2 = g_sub_md_notify_throttle;
-                    while (e2) {
-                        if (strcmp(e2->ri, sub_ri) == 0) break;
-                        e2 = e2->next;
-                    }
-                    if (!e2) {
-                        // Entry disappeared; fail open.
-                        pthread_mutex_unlock(&g_sub_md_notify_lock);
-                        return 0;
-                    }
-                    if (!e2->pending) {
-                        // In-flight finished; fall through by restarting the whole function.
-                        pthread_mutex_unlock(&g_sub_md_notify_lock);
-                        logger("TSI_TRACE", LOG_LEVEL_DEBUG, "md_notify_try_begin: subRi=%s pending cleared -> retry", sub_ri);
-                        return md_notify_try_begin(sub_ri, event_us, dur_us);
-                    }
-                    pthread_mutex_unlock(&g_sub_md_notify_lock);
-                }
-
-                // Still pending after waiting: suppress to avoid duplicates.
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG, "md_notify_try_begin: subRi=%s still pending after wait -> suppress", sub_ri);
-                return 1;
-            }
-            // Implement md.dur as a COOLDOWN between notifications.
-            // Allow the first notification immediately when threshold is reached.
-            if (e->last_notify_ts_us > 0) {
-                long long elapsed = event_us - e->last_notify_ts_us;
-                if (elapsed < 0) elapsed = 0;
+        if (e->window_start_us > 0 && dur_us > 0 &&
+            (now_us - e->window_start_us) > dur_us) {
+            // The window closed without reaching `num`. Those points are not
+            // reported and are not carried into the next window.
+            long long discarded = (ts_total - new_count) - e->reported;
+            if (discarded > 0) {
                 logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "md_notify_try_begin: subRi=%s cooldown elapsed_us=%lld (event_us=%lld - last=%lld)",
-                       sub_ri, elapsed, event_us, e->last_notify_ts_us);
-                if (elapsed < dur_us) {
-                    logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                           "md_notify_try_begin: subRi=%s suppressed by md.dur cooldown (elapsed_us=%lld < dur_us=%lld)",
-                           sub_ri, elapsed, dur_us);
-                    pthread_mutex_unlock(&g_sub_md_notify_lock);
-                    return 1;
-                }
-            } else {
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "md_notify_try_begin: subRi=%s no last_notify_ts_us -> allow first notify", sub_ri);
+                       "Missing-data window expired: subRi=%s discarded=%lld (num=%d dur_us=%lld)",
+                       sub_ri, discarded, num, dur_us);
+                e->reported = ts_total - new_count;
             }
-            // Allow and mark pending.
-            e->pending = 1;
-            e->pending_reserve_us = event_us;
-            logger("TSI_TRACE", LOG_LEVEL_DEBUG, "md_notify_try_begin: subRi=%s ALLOW -> set pending=1 reserve=%lld", sub_ri, event_us);
-            pthread_mutex_unlock(&g_sub_md_notify_lock);
-            return 0;
+            e->window_start_us = 0;
         }
-        e = e->next;
-    }
 
-    // Not found -> create and mark pending.
-    e = (sub_md_notify_throttle_entry_t *)calloc(1, sizeof(sub_md_notify_throttle_entry_t));
-    if (!e) {
-        pthread_mutex_unlock(&g_sub_md_notify_lock);
-        return 0; // fail open
+        if (e->window_start_us == 0) e->window_start_us = now_us;
+
+        long long pending = ts_total - e->reported;
+        if (pending >= num) {
+            if (out_reported_before) *out_reported_before = e->reported;
+            e->reported += num;
+            e->window_start_us = 0;     // a fresh window opens on the next point
+            batch = num;
+        }
     }
-    strncpy(e->ri, sub_ri, sizeof(e->ri) - 1);
-    e->last_notify_ts_us = 0;
-    e->pending = 1;
-    e->pending_reserve_us = event_us;
-    e->next = g_sub_md_notify_throttle;
-    g_sub_md_notify_throttle = e;
-    logger("TSI_TRACE", LOG_LEVEL_DEBUG, "md_notify_try_begin: new entry subRi=%s last_notify_ts_us=0 ALLOW -> set pending=1 reserve=%lld", sub_ri, event_us);
     pthread_mutex_unlock(&g_sub_md_notify_lock);
-    return 0;
+    return batch;
 }
 
-// Finish a missing-data notification attempt.
-// Always clears the pending flag. If sent_ok is non-zero, updates last_notify_ts_us.
-static void md_notify_finish(const char *sub_ri, int sent_ok) {
+// Points counted for this subscription but not yet notified.
+static long long md_pending(const char *sub_ri, long long ts_total) {
+    if (!sub_ri) return 0;
+    long long pending = 0;
+    pthread_mutex_lock(&g_sub_md_notify_lock);
+    sub_md_notify_throttle_entry_t *e = md_entry(sub_ri, 0);
+    pending = ts_total - (e ? e->reported : 0);
+    pthread_mutex_unlock(&g_sub_md_notify_lock);
+    return pending < 0 ? 0 : pending;
+}
+
+// Forget a subscription's state; called when the <subscription> goes away.
+static void md_forget(const char *sub_ri) {
     if (!sub_ri) return;
-    logger("TSI_TRACE", LOG_LEVEL_DEBUG, "md_notify_finish: subRi=%s sent_ok=%d", sub_ri, sent_ok);
-
     pthread_mutex_lock(&g_sub_md_notify_lock);
-    sub_md_notify_throttle_entry_t *e = g_sub_md_notify_throttle;
-    while (e) {
-        if (strcmp(e->ri, sub_ri) == 0) {
-            logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                   "md_notify_finish: before update subRi=%s last_notify_ts_us=%lld pending=%d pending_reserve_us=%lld",
-                   sub_ri, e->last_notify_ts_us, e->pending, e->pending_reserve_us);
-            if (sent_ok) {
-                // Commit the reserved TS-time as the last successful notify timestamp.
-                e->last_notify_ts_us = e->pending_reserve_us;
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "md_notify_finish: sent_ok=1 -> commit last_notify_ts_us=%lld for subRi=%s",
-                       e->last_notify_ts_us, sub_ri);
-            } else {
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "md_notify_finish: sent_ok=0 -> keep last_notify_ts_us=%lld for subRi=%s",
-                       e->last_notify_ts_us, sub_ri);
-            }
-
-            e->pending_reserve_us = 0;
-            e->pending = 0;
-
-            logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                   "md_notify_finish: after update subRi=%s last_notify_ts_us=%lld pending=%d pending_reserve_us=%lld",
-                   sub_ri, e->last_notify_ts_us, e->pending, e->pending_reserve_us);
-            pthread_mutex_unlock(&g_sub_md_notify_lock);
-            return;
-        }
-        e = e->next;
+    sub_md_notify_throttle_entry_t *prev = NULL, *e = g_sub_md_notify_throttle;
+    while (e && strcmp(e->ri, sub_ri) != 0) { prev = e; e = e->next; }
+    if (e) {
+        if (prev) prev->next = e->next; else g_sub_md_notify_throttle = e->next;
+        free(e);
     }
     pthread_mutex_unlock(&g_sub_md_notify_lock);
 }
 
-// Parse oneM2M duration string of the form "PT<seconds>S" into microseconds.
-// Supports fractional seconds (e.g., "PT10.0S"). Returns 0 on parse failure.
 static long long parse_md_dur_to_us(const char *dur) {
     if (!dur) return 0;
     // Expected: PT<value>S
@@ -377,27 +326,6 @@ static long long wallclock_now_us(void) {
     gettimeofday(&tv, NULL);
     return (long long)tv.tv_sec * 1000000LL + (long long)tv.tv_usec;
 }
-
-// Determine a TS-based timestamp (microseconds) for missing-data notification cooldown.
-// Uses the last entry in TS.mdlt (format: YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSS,ffffff).
-// Falls back to wall-clock time if mdlt is missing/empty or cannot be parsed.
-static long long current_md_event_us(cJSON *ts_mdlt) {
-    if (ts_mdlt && cJSON_IsArray(ts_mdlt)) {
-        int n = cJSON_GetArraySize(ts_mdlt);
-        if (n > 0) {
-            cJSON *last = cJSON_GetArrayItem(ts_mdlt, n - 1);
-            if (last && cJSON_IsString(last) && last->valuestring) {
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG, "current_md_event_us: using mdlt last='%s'", last->valuestring);
-                long long t = parse_time_monitor_us((char *)last->valuestring);
-                if (t > 0) return t;
-            }
-        }
-    }
-    logger("TSI_TRACE", LOG_LEVEL_DEBUG, "current_md_event_us: mdlt missing/empty -> fallback to wallclock");
-    return wallclock_now_us();
-}
-
-
 
 long long parse_time_monitor(char *s) {
     if (!s || strlen(s) < 15) return 0;
@@ -441,6 +369,50 @@ void us_to_iso8601_monitor(long long us, char *buf) {
     struct tm *t = gmtime(&sec); // UTC 기준 변환
     sprintf(buf, "%04d%02d%02dT%02d%02d%02d,%06d",
             t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, micro);
+}
+
+// Build and send one missingData notification (m2m:tsn) for `sub_child`,
+// carrying entries [batch_start, batch_start + batch_len) of the parent
+// <timeSeries>'s mdlt. A notification reports only the points that went missing
+// since the previous one for this subscription, not the whole mdlt attribute.
+static void md_send_notification(RTNode *sub_child, cJSON *ts_mdlt,
+                                 int batch_start, int batch_len) {
+    if (!sub_child || !ts_mdlt || batch_len <= 0) return;
+
+    cJSON *noti_cjson = cJSON_CreateObject();
+    cJSON *sgn = cJSON_CreateObject();
+    cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn);
+
+    char *sur = make_subscription_reference(get_ri_rtnode(sub_child));
+    if (sur) {
+        cJSON_AddStringToObject(sgn, "sur", sur);
+        free(sur);
+    }
+
+    cJSON *nev = cJSON_CreateObject();
+    cJSON_AddItemToObject(sgn, "nev", nev);
+    cJSON_AddNumberToObject(nev, "net", NET_REPORT_ON_MISSING_DATA_POINTS);
+    cJSON *rep = cJSON_CreateObject();
+    cJSON_AddItemToObject(nev, "rep", rep);
+    cJSON *tsn = cJSON_CreateObject();
+    cJSON_AddItemToObject(rep, "m2m:tsn", tsn);
+
+    cJSON *mdltBatch = cJSON_CreateArray();
+    for (int bi = 0; bi < batch_len; bi++) {
+        cJSON *item = cJSON_GetArrayItem(ts_mdlt, batch_start + bi);
+        if (item && cJSON_IsString(item) && item->valuestring) {
+            cJSON_AddItemToArray(mdltBatch, cJSON_CreateString(item->valuestring));
+        }
+    }
+    cJSON_AddNumberToObject(tsn, "mdc", cJSON_GetArraySize(mdltBatch));
+    cJSON_AddItemToObject(tsn, "mdlt", mdltBatch);
+
+    int rsc = notify_to_nu(sub_child, noti_cjson, NET_REPORT_ON_MISSING_DATA_POINTS);
+    logger("TSI_TRACE", LOG_LEVEL_DEBUG,
+           "Missing-data notification result: subRi=%s batch=%d rsc=%d",
+           get_ri_rtnode(sub_child), batch_len, rsc);
+
+    cJSON_Delete(noti_cjson);
 }
 
 void notify_missing_data(RTNode *ts_node, int current_mdc, int new_count, mdc_source_t src) {
@@ -524,149 +496,40 @@ void notify_missing_data(RTNode *ts_node, int current_mdc, int new_count, mdc_so
             }
 
 
-            // Notify once `md.num` data points have gone missing since this subscription
-            // was last notified. The count is tracked per subscription against the TS-wide
-            // running total; mdc/mdlt are resource attributes bounded by mdn and must not
-            // be used as the notification counter.
-            const char *sub_ri_for_progress = get_ri_rtnode(child);
-            long long reported = md_get_reported(sub_ri_for_progress);
-            long long pending  = ts_total - reported;
+            // md.dur is the window the md.num points have to fall inside.
+            long long dur_us = 0;
+            if (enc) {
+                cJSON *md = cJSON_GetObjectItem(enc, "md");
+                cJSON *dur = md ? cJSON_GetObjectItem(md, "dur") : NULL;
+                if (dur && cJSON_IsString(dur) && dur->valuestring) {
+                    dur_us = parse_md_dur_to_us(dur->valuestring);
+                }
+            }
 
-            if (pending < threshold) {
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "Missing-data notify suppressed: subRi=%s pending=%lld < md.num=%d (ts_total=%lld reported=%lld)",
-                       sub_ri_for_progress, pending, threshold, ts_total, reported);
+            const char *sub_ri_for_progress = get_ri_rtnode(child);
+            const char *sub_ri_s = sub_ri_for_progress;
+            long long reported_before = 0;
+            int batch_len = md_window_take(sub_ri_for_progress, ts_total, new_count > 0 ? new_count : 1,
+                                           threshold, dur_us, wallclock_now_us(), &reported_before);
+            if (batch_len <= 0) {
                 child = child->sibling_right;
                 continue;
             }
 
-            // The points to report are the oldest `threshold` still-pending entries of mdlt.
-            int batch_start = mdlt_len - (int)pending;
+            // The points to report are the oldest still-pending entries of mdlt.
+            int batch_start = mdlt_len - (int)(ts_total - reported_before);
             if (batch_start < 0) batch_start = 0;          // older entries already dropped by mdn
-            int batch_len = threshold;
             if (batch_start + batch_len > mdlt_len) batch_len = mdlt_len - batch_start;
             if (batch_len <= 0) {
                 child = child->sibling_right;
                 continue;
             }
 
-            // NOTE on md.dur semantics for this codebase/tests:
-            // The ACME unit tests for missing-data notifications triggered by TSI gaps
-            // (MDC_SRC_TSI_GAP) expect notifications to be sent as soon as the threshold
-            // (md.num) is reached, and then again after the next threshold batch.
-            // They do NOT apply md.dur as a cooldown in that case.
-            //
-            // Therefore, apply md.dur throttling ONLY for monitor-timeout based missing
-            // data generation (MDC_SRC_MONITOR_TIMEOUT). For TSI-gap based missing data,
-            // ignore md.dur.
-
-            long long dur_us = 0;
-            const char *sub_ri_s = NULL;
-            int md_begin_called = 0;
-
-            // Resolve subscription ri once (used for throttling and logs)
-            cJSON *sub_ri_obj2 = cJSON_GetObjectItem(subObj, "ri");
-            if (sub_ri_obj2 && cJSON_IsString(sub_ri_obj2) && sub_ri_obj2->valuestring) {
-                sub_ri_s = sub_ri_obj2->valuestring;
-            }
-
-            if (src == MDC_SRC_MONITOR_TIMEOUT && enc && sub_ri_s) {
-                // Read md.dur (if present) and apply as cooldown between notifications.
-                cJSON *md = cJSON_GetObjectItem(enc, "md");
-                if (md) {
-                    cJSON *dur = cJSON_GetObjectItem(md, "dur");
-                    if (dur && cJSON_IsString(dur) && dur->valuestring) {
-                        dur_us = parse_md_dur_to_us(dur->valuestring);
-                    }
-                }
-
-                if (dur_us > 0) {
-                    // Use TS-time for cooldown so tests that advance TS time without real waiting behave correctly.
-                    long long event_us_for_md = current_md_event_us(ts_mdlt);
-                    logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                           "Missing-data notify timing: subRi=%s event_us=%lld dur_us=%lld (src=%d)",
-                           sub_ri_s, event_us_for_md, dur_us, (int)src);
-
-                    md_begin_called = 1;
-                    if (md_notify_try_begin(sub_ri_s, event_us_for_md, dur_us)) {
-                        logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                               "Missing-data notify suppressed by md.dur cooldown: subRi=%s (mdc=%d mdlt_len=%d thr=%d)",
-                               sub_ri_s, current_mdc, mdlt_len, threshold);
-                        child = child->sibling_right;
-                        continue;
-                    }
-                }
-            }
-
             if (nu && cJSON_IsArray(nu)) {
-                cJSON *noti_cjson = cJSON_CreateObject();
-                cJSON *sgn = cJSON_GetObjectItem(noti_cjson, "m2m:sgn");
-                if (!sgn) {
-                    sgn = cJSON_CreateObject();
-                    cJSON_AddItemToObject(noti_cjson, "m2m:sgn", sgn);
-                }
-                // oneM2M notifications should include the subscription reference (sur)
-                cJSON *sub_ri = NULL;
-                cJSON *sub_ri_obj = cJSON_GetObjectItem(subObj, "ri");
-                if (sub_ri_obj && cJSON_IsString(sub_ri_obj) && sub_ri_obj->valuestring) {
-                    sub_ri = sub_ri_obj;
-                }
-                if (!cJSON_GetObjectItem(sgn, "sur") && sub_ri) {
-                    cJSON_AddStringToObject(sgn, "sur", sub_ri->valuestring);
-                }
-                cJSON *nev = cJSON_CreateObject();
-                cJSON_AddItemToObject(sgn, "nev", nev);
-                cJSON_AddNumberToObject(nev, "net", 8);
-                cJSON *rep = cJSON_CreateObject();
-                cJSON_AddItemToObject(nev, "rep", rep);
-
-                cJSON *tsn = cJSON_CreateObject();
-                cJSON_AddItemToObject(rep, "m2m:tsn", tsn);
-
-                // A notification carries only the data points that went missing since the
-                // previous one for this subscription, not the whole mdlt attribute.
-                cJSON *mdltBatch = cJSON_CreateArray();
-                for (int bi = 0; bi < batch_len; bi++) {
-                    cJSON *item = cJSON_GetArrayItem(ts_mdlt, batch_start + bi);
-                    if (item && cJSON_IsString(item) && item->valuestring) {
-                        cJSON_AddItemToArray(mdltBatch, cJSON_CreateString(item->valuestring));
-                    }
-                }
-                cJSON_AddNumberToObject(tsn, "mdc", cJSON_GetArraySize(mdltBatch));
-                cJSON_AddItemToObject(tsn, "mdlt", mdltBatch);
-
-                // Send missing-data notification via existing infrastructure (util.c)
-                int sent_ok_any = 0;
-                int rsc = notify_to_nu(child, noti_cjson, 8);
+                md_send_notification(child, ts_mdlt, batch_start, batch_len);
                 logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "Missing-data notification result: subRi=%s rsc=%d",
-                       sub_ri_s ? sub_ri_s : get_ri_rtnode(child), rsc);
-                if (rsc == 2000) sent_ok_any = 1;
-
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "Missing-data notification send summary: subRi=%s sent_ok_any=%d",
-                       sub_ri_s ? sub_ri_s : get_ri_rtnode(child), sent_ok_any);
-
-                // Finish throttle bookkeeping only if we actually began throttling.
-                if (md_begin_called && sub_ri_s) {
-                    md_notify_finish(sub_ri_s, sent_ok_any);
-                }
-
-                // Only this subscription's progress marker advances. mdc/mdlt are
-                // <timeSeries> attributes bounded by mdn - sending a notification does
-                // not clear them, otherwise a second subscription would lose the history
-                // and mdn would never be reached.
-                md_add_reported(sub_ri_for_progress, batch_len);
-                logger("TSI_TRACE", LOG_LEVEL_DEBUG,
-                       "Missing-data notify sent: subRi=%s batch=%d reported=%lld/%lld",
-                       sub_ri_for_progress, batch_len,
-                       md_get_reported(sub_ri_for_progress), ts_total);
-
-                cJSON_Delete(noti_cjson);
-            }
-            // Finish throttle bookkeeping only if we actually began throttling.
-            if (md_begin_called && sub_ri_s && !(nu && cJSON_IsArray(nu))) {
-                md_notify_finish(sub_ri_s, 0);
+                       "Missing-data notify sent: subRi=%s batch=%d of ts_total=%lld",
+                       sub_ri_for_progress, batch_len, ts_total);
             }
         }
         child = child->sibling_right;
@@ -676,6 +539,64 @@ void notify_missing_data(RTNode *ts_node, int current_mdc, int new_count, mdc_so
 
 
 // Traverse the in-memory resource tree and apply missing-data logic for TS resources.
+// TS-0018 TP/oneM2M/CSE/TS/005: deleting a missing-data <subscription> flushes
+// the points it has collected but not yet reported, so a subscriber that stops
+// listening still learns about the gap it was counting towards. The notification
+// carries however many are outstanding, which is by definition fewer than
+// enc/md/num - had it reached num, it would already have been sent.
+//
+// This is separate from the subscription-deletion notification sent to
+// subscriberURI: that one reports that the <subscription> went away, this one
+// reports missing data.
+void ts_md_flush_sub(RTNode *sub_rtnode) {
+    if (!sub_rtnode || sub_rtnode->ty != RT_SUB || !sub_rtnode->obj) return;
+
+    const char *sub_ri = get_ri_rtnode(sub_rtnode);
+    RTNode *ts_node = sub_rtnode->parent;
+    if (!sub_ri) return;
+
+    if (!ts_node || ts_node->ty != RT_TS || !ts_node->obj) {
+        md_forget(sub_ri);
+        return;
+    }
+
+    // Only subscriptions that asked for missing-data notifications.
+    cJSON *enc = cJSON_GetObjectItem(sub_rtnode->obj, "enc");
+    cJSON *net = enc ? cJSON_GetObjectItem(enc, "net") : NULL;
+    int net_has_8 = 0;
+    if (net && cJSON_IsArray(net)) {
+        cJSON *v = NULL;
+        cJSON_ArrayForEach(v, net) {
+            if (cJSON_IsNumber(v) && (int)cJSON_GetNumberValue(v) == NET_REPORT_ON_MISSING_DATA_POINTS) {
+                net_has_8 = 1;
+                break;
+            }
+        }
+    }
+    cJSON *nu = cJSON_GetObjectItem(sub_rtnode->obj, "nu");
+    if (!net_has_8 || !nu || !cJSON_IsArray(nu)) {
+        md_forget(sub_ri);
+        return;
+    }
+
+    long long ts_total = ts_get_missing_total(get_ri_rtnode(ts_node));
+    long long pending = md_pending(sub_ri, ts_total);
+
+    cJSON *ts_mdlt = cJSON_GetObjectItem(ts_node->obj, "mdlt");
+    int mdlt_len = (ts_mdlt && cJSON_IsArray(ts_mdlt)) ? cJSON_GetArraySize(ts_mdlt) : 0;
+
+    if (pending > 0 && mdlt_len > 0) {
+        int batch_len = (pending > mdlt_len) ? mdlt_len : (int)pending;
+        int batch_start = mdlt_len - batch_len;
+        logger("TSI_TRACE", LOG_LEVEL_DEBUG,
+               "Missing-data final notify on <sub> delete: subRi=%s pending=%lld batch=%d",
+               sub_ri, pending, batch_len);
+        md_send_notification(sub_rtnode, ts_mdlt, batch_start, batch_len);
+    }
+
+    md_forget(sub_ri);
+}
+
 static void traverse_and_check_ts_missing(RTNode *node, long long now_us) {
     if (!node) return;
 

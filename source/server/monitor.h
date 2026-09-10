@@ -19,4 +19,7 @@ void *monitor_serve(void *arg);
 void ts_md_arm(const char *ri, long long deadline_us, long long expected_dgt_us);
 void ts_md_disarm(const char *ri);
 void ts_md_clear_all(void);
+// Flush a missing-data <subscription>'s outstanding points before it is deleted
+// (TS-0018 TP/oneM2M/CSE/TS/005) and drop its notification state.
+void ts_md_flush_sub(RTNode *sub_rtnode);
 int ts_md_is_armed(const char *ri);
