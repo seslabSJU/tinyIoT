@@ -176,7 +176,12 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		}
 		else
 		{
+			// Nothing was announced, so the requested `at` must not be stored:
+			// every other resource type drops the attribute here, and keeping
+			// the requested list would advertise announcements that were never
+			// made.
 			cJSON_Delete(final_at);
+			cJSON_DeleteItemFromObject(fcnt, "at");
 		}
 	}
 	else
@@ -196,7 +201,12 @@ int create_fcnt(oneM2MPrimitive *o2pt, RTNode *parent_rtnode)
 		}
 		else
 		{
+			// Nothing was announced, so the requested `at` must not be stored:
+			// every other resource type drops the attribute here, and keeping
+			// the requested list would advertise announcements that were never
+			// made.
 			cJSON_Delete(final_at);
+			cJSON_DeleteItemFromObject(fcnt, "at");
 		}
 	}
 #endif

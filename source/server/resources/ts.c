@@ -14,6 +14,7 @@
 #include "../dbmanager.h"
 #include "../config.h"
 #include "../jsonparser.h"
+#include "../monitor.h"
 
 extern pthread_mutex_t main_lock; 
 extern void delete_oldest_tsi(RTNode *parent);
@@ -259,6 +260,13 @@ int update_ts(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
     }
 
     cJSON *mdd = cJSON_GetObjectItem(ts, "mdd");
+    if (mdd) {
+        // Detection restarts from the next instance whichever way mdd is being
+        // switched, so drop the pending deadline the monitoring thread holds.
+        // Without this, turning detection off and back on lets a deadline armed
+        // before the pause fire immediately afterwards.
+        ts_md_disarm(ri);
+    }
     if (mdd && (cJSON_IsTrue(mdd) || mdd->valueint == 1)) {
         cJSON *mdc = cJSON_GetObjectItem(target_rtnode->obj, "mdc");
         if(mdc) cJSON_SetNumberValue(mdc, 0);
@@ -275,14 +283,9 @@ int update_ts(oneM2MPrimitive *o2pt, RTNode *target_rtnode) {
     }
 
 #if CSE_RVI >= RVI_3
-    cJSON *at = NULL;
-    if ((at = cJSON_GetObjectItem(ts, "at")))
-    {
-        cJSON *final_at = cJSON_CreateArray();
-        handle_annc_update(target_rtnode, at, final_at);
-        cJSON_DeleteItemFromObject(ts, "at");
-        cJSON_AddItemToObject(ts, "at", final_at);
-    }
+    // Shared with every other announceable resource rather than inlined here:
+    // this copy also had no handling for `at: null` (de-announce everything).
+    process_annc_at_update(target_rtnode, ts);
 #endif
 
     update_resource(target_rtnode->obj, ts);

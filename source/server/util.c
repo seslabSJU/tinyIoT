@@ -19,6 +19,7 @@
 #include "onem2mTypes.h"
 #include "config.h"
 #include "dbmanager.h"
+#include "monitor.h"
 #include "jsonparser.h"
 #include "mqttClient.h"
 #include "coap.h"
@@ -255,12 +256,21 @@ ResourceType coap_parse_object_type(int object_type)
 	return ty;
 }
 
+// oneM2M absolute timestamps carry no timezone offset and are UTC
+// (TS-0004 clause 6.3.3, m2m:timestamp). This used to format with localtime()
+// while every parser reads timestamps back with timegm(), so on a CSE not
+// running in UTC each stored ct/lt/et came back offset by the local UTC offset:
+// missing-data detection compared `now` against an `lt` hours in the future and
+// so never fired, and a client-supplied et was compared against a local-time now.
+// Seconds and nanoseconds now come from a single clock reading, so the
+// millisecond part always belongs to the second it is appended to.
 char* get_local_time(int diff)
 {
-	time_t t = time(NULL) - diff;
-	struct tm tm = *localtime(&t);
 	struct timespec specific_time;
-	clock_gettime(0, &specific_time);
+	clock_gettime(CLOCK_REALTIME, &specific_time);
+	time_t t = specific_time.tv_sec - diff;
+	struct tm tm;
+	gmtime_r(&t, &tm);
 
 	char year[16], mon[16], day[16], hour[16], minute[16], sec[16], millsec[16];
 
@@ -1334,6 +1344,10 @@ int reset_cse()
 #if MONO_THREAD == 0
 	pthread_mutex_lock(&main_lock);
 #endif
+
+	// 0) Forget missing-data detection state; the resources it refers to are
+	//    about to be freed.
+	ts_md_clear_all();
 
 	// 1) Drop the in-memory resource tree (mirrors stop_server teardown).
 	if (rt)
@@ -4959,7 +4973,29 @@ void process_annc_at_update(RTNode *target_rtnode, cJSON *body)
 	cJSON *final_at = cJSON_CreateArray();
 	handle_annc_update(target_rtnode, at, final_at);
 	cJSON_DeleteItemFromObject(body, "at");
-	cJSON_AddItemToObject(body, "at", final_at);
+	if (cJSON_GetArraySize(final_at) > 0)
+	{
+		cJSON_AddItemToObject(body, "at", final_at);
+	}
+	else
+	{
+		// Nothing ended up announced - every requested target was de-announced,
+		// or none could be reached. announceTo then has no value to hold, and an
+		// empty array is not that: it is a present attribute claiming the
+		// resource is announced to nowhere, and it stuck in the stored resource
+		// and in every later RETRIEVE. Every CREATE path already drops the
+		// attribute in this case; update must do the same. A JSON null is how
+		// this code base spells "remove it": update_resource() deletes the
+		// attribute from the stored resource and db_update_resource() writes
+		// SQL NULL, so the column cannot resurrect it after a restart.
+		cJSON_Delete(final_at);
+		cJSON_AddItemToObject(body, "at", cJSON_CreateNull());
+		// The null covers callers that persist the update body. update_ts()
+		// persists the resource object instead, and by then update_resource()
+		// has removed `at` from it, so the column would never be written and
+		// the old announcement list would come back on the next start-up.
+		db_clear_attribute(get_ri_rtnode(target_rtnode), target_rtnode->ty, "at");
+	}
 }
 
 /**
@@ -5044,7 +5080,18 @@ void removeChildAnnc(RTNode* parent_rtnode, char* at)
 					cJSON_AddItemToArray(new_at, cJSON_CreateString(pjson->valuestring));
 				}
 				cJSON_DeleteItemFromObject(cin->obj, "at");
-				cJSON_AddItemToObject(cin->obj, "at", new_at);
+				// The last announcement to this CSE just went away: announceTo
+				// has nothing left to hold, so the attribute goes rather than
+				// staying behind as an empty array.
+				if (cJSON_GetArraySize(new_at) > 0)
+				{
+					cJSON_AddItemToObject(cin->obj, "at", new_at);
+				}
+				else
+				{
+					cJSON_Delete(new_at);
+					db_clear_attribute(cJSON_GetObjectItem(cin->obj, "ri")->valuestring, cin->ty, "at");
+				}
 				db_update_resource(cin->obj, cJSON_GetObjectItem(cin->obj, "ri")->valuestring, cin->ty);
 				cin = cin->sibling_right;
 			}
@@ -5068,7 +5115,15 @@ void removeChildAnnc(RTNode* parent_rtnode, char* at)
 			cJSON_AddItemToArray(new_at, cJSON_CreateString(pjson->valuestring));
 		}
 		cJSON_DeleteItemFromObject(rtnode->obj, "at");
-		cJSON_AddItemToObject(rtnode->obj, "at", new_at);
+		if (cJSON_GetArraySize(new_at) > 0)
+		{
+			cJSON_AddItemToObject(rtnode->obj, "at", new_at);
+		}
+		else
+		{
+			cJSON_Delete(new_at);
+			db_clear_attribute(cJSON_GetObjectItem(rtnode->obj, "ri")->valuestring, rtnode->ty, "at");
+		}
 		db_update_resource(rtnode->obj, cJSON_GetObjectItem(rtnode->obj, "ri")->valuestring, rtnode->ty);
 		rtnode = rtnode->sibling_right;
 	}

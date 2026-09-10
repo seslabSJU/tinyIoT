@@ -2705,6 +2705,30 @@ int db_ts_update_mdc_with_mdlt(const char *ts_ri, int val, const char *time_str)
     return ok;
 }
 
+int db_clear_attribute(const char *ri, ResourceType ty, const char *attr)
+{
+    if (!ri || !attr) return 0;
+    char *table_name = get_table_name(ty);
+    if (!table_name) return 0;
+
+    sqlite3_mutex_enter(sqlite3_db_mutex(db));
+
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+             "UPDATE %s SET %s = NULL WHERE id = (SELECT id FROM general WHERE ri = ?);",
+             table_name, attr);
+
+    sqlite3_stmt *stmt = NULL;
+    int ok = 0;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ri, -1, SQLITE_TRANSIENT);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    }
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite3_mutex_leave(sqlite3_db_mutex(db));
+    return ok;
+}
+
 int db_ts_clear_mdlt(const char *ts_ri)
 {
     if (!ts_ri) return 0;

@@ -16,6 +16,7 @@
 #include "util.h"
 #include "config.h"
 #include "onem2mTypes.h"
+#include "monitor.h"
 
 #ifdef ENABLE_MQTT
 #include "mqttClient.h"
@@ -118,8 +119,16 @@ const AnncAttrDef ANNC_ATTR_TABLE[] = {
 };
 
 char *PORT = SERVER_PORT;
-int terminate = 0;
+volatile int terminate = 0;
 int call_stop = 0;
+
+// <timeSeries> missing-data monitoring. monitor_serve() has been in the tree
+// since the resource was added but nothing ever started it, so a missing data
+// point could only ever be noticed when a later <timeSeriesInstance> arrived to
+// compare against. TS-0018 TP/oneM2M/CSE/TS/001 sends a single instance and then
+// waits, which needs exactly this elapsed-time detection.
+pthread_t ts_monitor;
+int ts_monitor_thread_id = -1;
 
 #ifdef ENABLE_MQTT
 pthread_t mqtt;
@@ -275,6 +284,15 @@ int main(int argc, char **argv)
 	}
 #endif
 
+	ts_monitor_thread_id = pthread_create(&ts_monitor, NULL, monitor_serve, NULL);
+	if (ts_monitor_thread_id != 0)
+	{
+		// Not fatal: the CSE still serves requests, it just cannot notice a
+		// missing data point until the next instance arrives.
+		logger("MAIN", LOG_LEVEL_ERROR, "TS monitoring thread create error");
+		ts_monitor_thread_id = -1;
+	}
+
 	serve_forever(PORT); // main oneM2M operation logic in void route()
 
 #ifdef ENABLE_MQTT
@@ -288,6 +306,12 @@ int main(int argc, char **argv)
 #ifdef ENABLE_COAP
 	pthread_join(coap, NULL);
 #endif
+
+	if (ts_monitor_thread_id == 0)
+	{
+		terminate = 1;
+		pthread_join(ts_monitor, NULL);
+	}
 
 	return 0;
 }
@@ -505,6 +529,16 @@ void stop_server(int sig)
 		pthread_detach(coap);
 	}
 #endif
+	// The monitoring thread walks the resource tree and writes to the database,
+	// so it has to be stopped before either is torn down below. It checks
+	// `terminate` every 500 ms.
+	if (ts_monitor_thread_id == 0)
+	{
+		logger("MAIN", LOG_LEVEL_INFO, "Stopping TS monitoring...");
+		terminate = 1;
+		pthread_join(ts_monitor, NULL);
+	}
+
 	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");
 	close_dbp();
 	logger("MAIN", LOG_LEVEL_INFO, "Cleaning ResourceTree...");

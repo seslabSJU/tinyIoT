@@ -45,7 +45,7 @@
 
 
 /* thread signal */
-extern int terminate;
+extern volatile int terminate;
 
 /* Local Variables */
 static MqttClient mClient;
