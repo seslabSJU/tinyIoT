@@ -3555,6 +3555,7 @@ int send_verification_request(char* to, char* noti_uri, cJSON* noti_cjson)
 	if (rat == CSE_RELATIVE)
 	{
 		logger("UTIL", LOG_LEVEL_DEBUG, "CSE_RELATIVE");
+		o2pt->to = strdup(noti_uri);
 		rtnode = find_rtnode(noti_uri);
 		if (!rtnode)
 		{
