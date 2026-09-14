@@ -7,7 +7,7 @@
 </div>
 
 <p align="center">
-  Get started with oneM2M service projects using <b>tinyIoT</b>, a lightweight oneM2M service-layer platform. 🎮
+  Get started with oneM2M service projects using <b>tinyIoT</b>, a lightweight oneM2M service-layer platform.
 </p>
 
 <p align="center">
@@ -80,31 +80,6 @@ The resource model, request primitives, response status codes, protocol bindings
 
 Requests received through a protocol binding are converted into a common oneM2M primitive and passed to the central request router. The router applies authorization and dispatches the request to the appropriate resource, discovery, group, notification, forwarding, or announcement handler.
 
-```text
-HTTP / MQTT / CoAP / WebSocket
-          |
-          v
-Protocol binding and primitive parsing
-          |
-          v
-oneM2M request router
-          |
-          +---- ACP-based authorization
-          |
-          +---- Resource handlers
-          |
-          +---- Discovery and group fan-out
-          |
-          +---- Subscription notification
-          |
-          +---- CSE-to-CSE forwarding and announcement
-          |
-          v
-SQLite or PostgreSQL
-
-CoAP binding: under development
-```
-
 The main implementation is located in `source/server`:
 
 ```text
@@ -116,11 +91,15 @@ source/server/
 ├── coap.c                    CoAP binding under development
 ├── filterCriteria.c          Discovery filter processing
 ├── rtManager.c               In-memory resource tree
+├── monitor.c                 Time series missing-data monitoring thread
+├── upperTester.c             Upper Tester interface for conformance testing
 ├── sqlite_implement.c        SQLite backend
 ├── postgresql_implement.c    PostgreSQL backend
 ├── websocket/                WebSocket integration
 ├── resources/                Resource-specific handlers
 ├── sdt_definitions/          FlexContainer specialization profiles
+├── sdt_sources/              Custom SDT XML sources for conversion
+├── tests/                    Standalone validation tests
 └── config.h                  Server configuration
 ```
 
@@ -129,16 +108,30 @@ source/server/
 - **Registration**: AE registration and remoteCSE registration for MN-CSE deployments
 - **CSE types**: Infrastructure Node CSE (IN-CSE) and Middle Node CSE (MN-CSE)
 - **Resources**: cseBase, ACP, AE, CNT, CIN, SUB, FCNT, FCIN, TS, TSI, GRP, and CSR
-- **Announced resources**: cbA, acpA, aeA, cntA, cinA
+- **Announced resources**: cbA, acpA, aeA, cntA, cinA, grpA, fcntA, and tsA
 - **Resource operations**: Create, Retrieve, Update, and Delete subject to the lifecycle rules of each resource type
 - **Access control**: ACP pv/pvs, acpi, originator and ACOP evaluation, group macp
 - **Subscription and notification**: notification URI verification, subscription updates, resource and direct-child event notifications, and subscription deletion notifications
 - **Group management**: mid validation, member type checking, consistency strategy (csy), nested groups, macp, and fan-OutPoint (fopt) requests
 - **Discovery**: structured and unstructured identifiers, filter criteria, result limiting, level and offset processing, and applyRelativePath handling
-- **Announcement**: remote announce/de-announce flows and Uni-direxctional, Bi-directional announcement
+- **Announcement**: remote announce/de-announce flows and Uni-directional, Bi-directional announcement
+- **Time series**: periodic interval (pei/peid) validation, missing-data detection (mdd, mdt, mdn), missingDataList and missingDataCount maintenance, and m2m:tsn missingData notifications
 - **CSE-to-CSE operations**: remoteCSE registration, forwarding, and remote notification delivery
 - **Protocol bindings**: HTTP, MQTT, WebSocket, CoAP(under development)
 - **Databases**: SQLite and PostgreSQL
+
+## Not supported
+
+The following resource types have no create, retrieve, update, or delete handler. Their type
+constants exist in the codebase and appear in discovery filter type lists, but no resource of
+these types can be created.
+
+- **pollingChannel**: request delivery to entities that cannot accept incoming connections
+- **node**: device node representation
+- **mgmtObj**: device management objects such as battery, memory, and firmware
+- **request**: resource representation of a non-blocking request
+- **semanticDescriptor**: semantic annotation and semantic query support
+- **Later-release resources**: crossResourceSubscription, timeSeriesBase, and action
 
 ## Resource operation overview
 
@@ -346,7 +339,7 @@ Install and start a compatible MQTT broker such as Mosquitto, then enable MQTT i
 #define ENABLE_MQTT
 
 #define MQTT_HOST "127.0.0.1"
-#define MQTT_QOS MQTT_QOS_0
+#define MQTT_QOS MQTT_QOS_1
 #define MQTT_CLIENT_ID "TinyIoT"
 #define MQTT_USERNAME "your-mqtt-user"
 #define MQTT_PASSWORD "your-mqtt-password"
