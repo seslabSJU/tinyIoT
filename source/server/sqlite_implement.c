@@ -125,6 +125,7 @@ static const table_def_t table_definitions[] = {
      "CREATE TABLE IF NOT EXISTS csr ( id INTEGER, "
      "cst INT, poa VARCHAR(200), cb VARCHAR(200), csi VARCHAR(200), mei VARCHAR(45), "
      "tri VARCHAR(45), rr INT, nl VARCHAR(45), srv VARCHAR(45), dcse VARCHAR(200), csz VARCHAR(100), "
+     "spi VARCHAR(45), "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"ae", 
@@ -160,6 +161,7 @@ static const table_def_t table_definitions[] = {
     {"cb", 
      "CREATE TABLE IF NOT EXISTS cb ( id INTEGER, "
      "cst INT, csi VARCHAR(45), srt VARCHAR(100), poa VARCHAR(200), nl VARCHAR(45), ncp VARCHAR(45), srv VARCHAR(45), rr INT, at VARCHAR(200), aa VARCHAR(100), ast INT, "
+     "spi VARCHAR(45), "
      "CONSTRAINT fk_id FOREIGN KEY (id) REFERENCES general(id) ON DELETE CASCADE );"
     },
     {"acpA",
@@ -2801,4 +2803,415 @@ char *db_ts_get_mdlt_json(const char *ts_ri)
     if (stmt) sqlite3_finalize(stmt);
     sqlite3_mutex_leave(sqlite3_db_mutex(db));
     return out;
+}
+
+/* ===========================================================================
+ * db_get_descendants – SQLite port of the PostgreSQL implementation
+ * ===========================================================================*/
+
+typedef enum {
+    DESC_OP_EQ,
+    DESC_OP_LT,
+    DESC_OP_GE,
+    DESC_OP_CONTAINS,
+    DESC_OP_IN_ARRAY,
+    DESC_OP_EXISTS
+} DescFcOp;
+
+typedef struct {
+    const char *short_name;
+    int ty;
+    const char *col;
+    DescFcOp op;
+} DescFcMap;
+
+/* Resource-type → comparison operators and column mappings */
+static const DescFcMap DESC_FC_MAP[] = {
+    /* cin */
+    {"cty", RT_CIN, "cnf", DESC_OP_EQ},
+    {"sza", RT_CIN, "cs",  DESC_OP_GE},
+    {"szb", RT_CIN, "cs",  DESC_OP_LT},
+    {"con", RT_CIN, "con", DESC_OP_CONTAINS},
+    {"cnf", RT_CIN, "cnf", DESC_OP_EQ},
+    {"cs",  RT_CIN, "cs",  DESC_OP_EQ},
+    {"cr",  RT_CIN, "cr",  DESC_OP_CONTAINS},
+    {"sts", RT_CIN, "st",  DESC_OP_LT},
+    {"stb", RT_CIN, "st",  DESC_OP_GE},
+    {"st",  RT_CIN, "st",  DESC_OP_EQ},
+
+    /* cnt */
+    {"sts", RT_CNT, "st",  DESC_OP_LT},
+    {"stb", RT_CNT, "st",  DESC_OP_GE},
+    {"st",  RT_CNT, "st",  DESC_OP_EQ},
+    {"mni", RT_CNT, "mni", DESC_OP_EQ},
+    {"cni", RT_CNT, "cni", DESC_OP_EQ},
+    {"cr",  RT_CNT, "cr",  DESC_OP_CONTAINS},
+
+    /* ae */
+    {"api", RT_AE, "api", DESC_OP_EQ},
+    {"aei", RT_AE, "aei", DESC_OP_EQ},
+    {"apn", RT_AE, "apn", DESC_OP_CONTAINS},
+    {"poa", RT_AE, "poa", DESC_OP_IN_ARRAY},
+
+    /* grp */
+    {"mid",  RT_GRP, "mid",  DESC_OP_IN_ARRAY},
+    {"macp", RT_GRP, "macp", DESC_OP_IN_ARRAY},
+    {"gn",   RT_GRP, "gn",   DESC_OP_CONTAINS},
+
+    /* sub */
+    {"nu", RT_SUB, "nu", DESC_OP_IN_ARRAY},
+
+    /* acp */
+    {"pv",  RT_ACP, "pv",  DESC_OP_EXISTS},
+    {"pvs", RT_ACP, "pvs", DESC_OP_EXISTS},
+
+    /* annc */
+    {"lnk", RT_ACPA,  "lnk", DESC_OP_CONTAINS},
+    {"lnk", RT_AEA,   "lnk", DESC_OP_CONTAINS},
+    {"lnk", RT_CNTA,  "lnk", DESC_OP_CONTAINS},
+    {"lnk", RT_CINA,  "lnk", DESC_OP_CONTAINS},
+    {"lnk", RT_CBA,   "lnk", DESC_OP_CONTAINS},
+    {"lnk", RT_GRPA,  "lnk", DESC_OP_CONTAINS},
+    {"lnk", RT_FCNTA, "lnk", DESC_OP_CONTAINS},
+    {"lnk", RT_TSA,   "lnk", DESC_OP_CONTAINS},
+};
+#define DESC_FC_MAP_LEN (int)(sizeof(DESC_FC_MAP) / sizeof(DescFcMap))
+
+/* Escape single quotes for use in an SQL string literal. Caller frees. */
+static char *desc_escape(const char *s)
+{
+    if (!s) return strdup("");
+    size_t len = strlen(s), q = 0;
+    for (size_t i = 0; i < len; i++)
+        if (s[i] == '\'') q++;
+    char *out = malloc(len + q + 1);
+    char *p = out;
+    for (size_t i = 0; i < len; i++) {
+        *p++ = s[i];
+        if (s[i] == '\'') *p++ = '\'';
+    }
+    *p = '\0';
+    return out;
+}
+
+static void desc_strcat(char **sql, size_t *cap, const char *s)
+{
+    size_t need = strlen(*sql) + strlen(s) + 1;
+    if (need > *cap) {
+        while (*cap < need) *cap *= 2;
+        *sql = realloc(*sql, *cap);
+    }
+    strcat(*sql, s);
+}
+
+static void desc_append_forbidden(oneM2MPrimitive *o2pt, char **sql, size_t *cap, cJSON *fc)
+{
+    char buf[512];
+    cJSON *ptr, *pjson;
+    cJSON *acpiList = getNonDiscoverableAcp(o2pt, rt->cb);
+    cJSON *forbiddenURI = getForbiddenUri(acpiList);
+    cJSON_ArrayForEach(ptr, forbiddenURI) {
+        if (!cJSON_IsString(ptr)) continue;
+        char *e = desc_escape(ptr->valuestring);
+        snprintf(buf, sizeof(buf), " AND uri NOT LIKE '%s'", e);
+        desc_strcat(sql, cap, buf);
+        free(e);
+    }
+    cJSON_Delete(forbiddenURI);
+    cJSON_Delete(acpiList);
+
+    if ((pjson = cJSON_GetObjectItem(fc, "ops"))) {
+        acpiList = getNoPermAcopDiscovery(o2pt, rt->cb, pjson->valueint);
+        forbiddenURI = getForbiddenUri(acpiList);
+        cJSON_ArrayForEach(ptr, forbiddenURI) {
+            if (!cJSON_IsString(ptr)) continue;
+            char *e = desc_escape(ptr->valuestring);
+            snprintf(buf, sizeof(buf), " AND uri NOT LIKE '%s%%'", e);
+            desc_strcat(sql, cap, buf);
+            free(e);
+        }
+        cJSON_Delete(forbiddenURI);
+        cJSON_Delete(acpiList);
+    }
+}
+
+/* Appends one filter-criteria condition, joining with AND for the first and fo for the rest. */
+static void desc_open_cond(char **sql, size_t *cap, int *first, const char *fo_str)
+{
+    if (*first) {
+        desc_strcat(sql, cap, " AND (");
+        *first = 0;
+    } else {
+        desc_strcat(sql, cap, " ");
+        desc_strcat(sql, cap, fo_str);
+        desc_strcat(sql, cap, " ");
+    }
+}
+
+/* Builds the WHERE clause on the general table. Returns a malloc'd string. */
+static char *desc_build_general_where(oneM2MPrimitive *o2pt, cJSON *fc, const char *esc_uri, bool is_discover, const char *fo_str)
+{
+    size_t cap = 1024;
+    char *sql = calloc(1, cap);
+    char buf[512];
+    cJSON *p, *ptr;
+    int first = 1;
+
+    snprintf(buf, sizeof(buf), "WHERE uri LIKE '%s/%%'", esc_uri);
+    desc_strcat(&sql, &cap, buf);
+
+    if (is_discover && !cJSON_GetObjectItem(fc, "arp"))
+        desc_append_forbidden(o2pt, &sql, &cap, fc);
+    if (cJSON_GetObjectItem(fc, "arp"))
+        cJSON_DeleteItemFromObject(fc, "arp");
+
+    if ((p = cJSON_GetObjectItem(fc, "lvl")) && cJSON_IsNumber(p)) {
+        snprintf(buf, sizeof(buf), " AND uri NOT LIKE '%s/%%", esc_uri);
+        desc_strcat(&sql, &cap, buf);
+        for (int i = 0; i < p->valueint; i++)
+            desc_strcat(&sql, &cap, "/%");
+        desc_strcat(&sql, &cap, "'");
+    }
+
+    static const struct { const char *attr; const char *col; const char *op; } time_fc[] = {
+        {"cra", "ct", ">"}, {"crb", "ct", "<="},
+        {"exa", "et", ">"}, {"exb", "et", "<="},
+        {"ms",  "lt", ">"}, {"us",  "lt", "<="},
+    };
+    for (int i = 0; i < (int)(sizeof(time_fc) / sizeof(time_fc[0])); i++) {
+        if ((p = cJSON_GetObjectItem(fc, time_fc[i].attr)) && cJSON_IsString(p)) {
+            char *e = desc_escape(p->valuestring);
+            desc_open_cond(&sql, &cap, &first, fo_str);
+            snprintf(buf, sizeof(buf), "%s %s '%s'", time_fc[i].col, time_fc[i].op, e);
+            desc_strcat(&sql, &cap, buf);
+            free(e);
+        }
+    }
+
+    if ((p = cJSON_GetObjectItem(fc, "ty"))) {
+        desc_open_cond(&sql, &cap, &first, fo_str);
+        desc_strcat(&sql, &cap, "(");
+        if (cJSON_IsArray(p)) {
+            int f = 1;
+            cJSON_ArrayForEach(ptr, p) {
+                snprintf(buf, sizeof(buf), "%sty = %d", f ? "" : " OR ", (int)ptr->valuedouble);
+                desc_strcat(&sql, &cap, buf);
+                f = 0;
+            }
+            if (f) desc_strcat(&sql, &cap, "1=1");
+        } else {
+            snprintf(buf, sizeof(buf), "ty = %d", (int)p->valuedouble);
+            desc_strcat(&sql, &cap, buf);
+        }
+        desc_strcat(&sql, &cap, ")");
+    }
+
+    if ((p = cJSON_GetObjectItem(fc, "lbl"))) {
+        desc_open_cond(&sql, &cap, &first, fo_str);
+        desc_strcat(&sql, &cap, "(");
+        int f = 1;
+        cJSON *single = cJSON_IsArray(p) ? NULL : p;
+        cJSON *iter = cJSON_IsArray(p) ? p->child : single;
+        for (; iter; iter = single ? NULL : iter->next) {
+            if (!cJSON_IsString(iter)) continue;
+            char *e = desc_escape(iter->valuestring);
+            snprintf(buf, sizeof(buf), "%slbl LIKE '%%\"%s\"%%'", f ? "" : " OR ", e);
+            desc_strcat(&sql, &cap, buf);
+            free(e);
+            f = 0;
+        }
+        if (f) desc_strcat(&sql, &cap, "1=1");
+        desc_strcat(&sql, &cap, ")");
+    }
+
+    if (!first) desc_strcat(&sql, &cap, ")");
+    return sql;
+}
+
+/* Builds the resource-specific conditions for one resource type. Returns a malloc'd string ("" if none). */
+static char *desc_build_res_where(cJSON *fc, int ty, const char *fo_str)
+{
+    size_t cap = 512;
+    char *sql = calloc(1, cap);
+    char buf[1024];
+    int first = 1;
+
+    for (int i = 0; i < DESC_FC_MAP_LEN; i++) {
+        const DescFcMap *m = &DESC_FC_MAP[i];
+        if (m->ty != ty) continue;
+        cJSON *val = cJSON_GetObjectItem(fc, m->short_name);
+        if (!val) continue;
+
+        buf[0] = '\0';
+        if (m->op == DESC_OP_EXISTS) {
+            snprintf(buf, sizeof(buf), "%s IS NOT NULL", m->col);
+        } else if (cJSON_IsString(val) && val->valuestring[0] != '\0') {
+            char *e = desc_escape(val->valuestring);
+            if (!strcmp(m->short_name, "con") || !strcmp(m->short_name, "lnk")) {
+                /* con/lnk support the '*' wildcard */
+                for (char *c = e; *c; c++)
+                    if (*c == '*') *c = '%';
+            }
+            switch (m->op) {
+            case DESC_OP_CONTAINS: snprintf(buf, sizeof(buf), "%s LIKE '%%%s%%'", m->col, e); break;
+            case DESC_OP_IN_ARRAY: snprintf(buf, sizeof(buf), "%s LIKE '%%\"%s\"%%'", m->col, e); break;
+            case DESC_OP_LT:       snprintf(buf, sizeof(buf), "%s < '%s'", m->col, e); break;
+            case DESC_OP_GE:       snprintf(buf, sizeof(buf), "%s >= '%s'", m->col, e); break;
+            default:               snprintf(buf, sizeof(buf), "%s = '%s'", m->col, e); break;
+            }
+            free(e);
+        } else if (cJSON_IsNumber(val)) {
+            int num = (int)val->valuedouble;
+            switch (m->op) {
+            case DESC_OP_LT: snprintf(buf, sizeof(buf), "%s < %d", m->col, num); break;
+            case DESC_OP_GE: snprintf(buf, sizeof(buf), "%s >= %d", m->col, num); break;
+            default:         snprintf(buf, sizeof(buf), "%s = %d", m->col, num); break;
+            }
+        }
+        if (buf[0] == '\0') continue;
+
+        desc_open_cond(&sql, &cap, &first, fo_str);
+        desc_strcat(&sql, &cap, buf);
+    }
+    if (!first) desc_strcat(&sql, &cap, ")");
+    return sql;
+}
+
+static bool desc_has_res_fc(cJSON *fc)
+{
+    for (int i = 0; i < DESC_FC_MAP_LEN; i++)
+        if (cJSON_GetObjectItem(fc, DESC_FC_MAP[i].short_name)) return true;
+    return false;
+}
+
+static bool desc_fc_needs_ty(cJSON *fc, int ty)
+{
+    for (int i = 0; i < DESC_FC_MAP_LEN; i++)
+        if (DESC_FC_MAP[i].ty == ty && cJSON_GetObjectItem(fc, DESC_FC_MAP[i].short_name)) return true;
+    return false;
+}
+
+cJSON *db_get_descendants(oneM2MPrimitive *o2pt, RTNode *target_node, bool is_discover)
+{
+    logger("DB", LOG_LEVEL_DEBUG, "call db_get_descendants");
+    if (!o2pt || !target_node) return NULL;
+
+    cJSON *fc = o2pt->fc;
+    int rcn = o2pt->rcn;
+    cJSON *result = cJSON_CreateArray();
+    if (!fc) return result;
+
+    bool need_details = (rcn == RCN_ATTRIBUTES_AND_CHILD_RESOURCES ||
+                         rcn == RCN_CHILD_RESOURCES);
+    bool has_res_fc = desc_has_res_fc(fc);
+
+    int lim = DEFAULT_DISCOVERY_LIMIT + 1; // +1 to detect whether more results exist
+    int ofst = 0;
+    cJSON *p;
+    if ((p = cJSON_GetObjectItem(fc, "lim")) && cJSON_IsNumber(p)) {
+        int req_lim = (int)p->valuedouble;
+        lim = (req_lim > DEFAULT_DISCOVERY_LIMIT) ? req_lim : DEFAULT_DISCOVERY_LIMIT + 1;
+    }
+    if ((p = cJSON_GetObjectItem(fc, "ofst")) && cJSON_IsNumber(p))
+        ofst = (int)p->valuedouble;
+    const char *sort_dir = (DEFAULT_DISCOVERY_SORT == SORT_DESC) ? "DESC" : "ASC";
+
+    int fo = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(fc, "fo"));
+    const char *fo_str = (fo == FO_OR) ? "OR" : "AND";
+
+    char *esc_uri = desc_escape(target_node->uri);
+    char *general_where = desc_build_general_where(o2pt, fc, esc_uri, is_discover, fo_str);
+    free(esc_uri);
+
+    size_t cap = 4096;
+    char *sql = calloc(1, cap);
+    char buf[512];
+    sqlite3_stmt *stmt = NULL;
+    int rc;
+
+    sqlite_lock();
+
+    if (!has_res_fc) {
+        desc_strcat(&sql, &cap, "SELECT id, ty, rn, ri, uri FROM general ");
+        desc_strcat(&sql, &cap, general_where);
+    } else {
+        /* Collect the resource types present, then join each with its own table */
+        char *ty_sql = malloc(strlen(general_where) + 64);
+        sprintf(ty_sql, "SELECT DISTINCT ty FROM general %s;", general_where);
+        rc = sqlite3_prepare_v2(db, ty_sql, -1, &stmt, NULL);
+        free(ty_sql);
+        if (rc != SQLITE_OK) {
+            logger("DB", LOG_LEVEL_ERROR, "desc ty query failed: %s", sqlite3_errmsg(db));
+            goto cleanup;
+        }
+        int joined = 0;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int ty = sqlite3_column_int(stmt, 0);
+            if (!desc_fc_needs_ty(fc, ty)) continue;
+            char *tbl = get_table_name(ty);
+            if (!tbl) continue;
+            char *res_where = desc_build_res_where(fc, ty, fo_str);
+            snprintf(buf, sizeof(buf), "%sSELECT id, ty, rn, ri, uri FROM general JOIN %s USING(id) ",
+                     joined ? " UNION ALL " : "", tbl);
+            desc_strcat(&sql, &cap, buf);
+            desc_strcat(&sql, &cap, general_where);
+            desc_strcat(&sql, &cap, res_where);
+            free(res_where);
+            joined++;
+        }
+        sqlite3_finalize(stmt);
+        stmt = NULL;
+        if (joined == 0) goto cleanup;
+    }
+
+    {
+        char *inner = sql;
+        size_t cap2 = strlen(inner) + 256;
+        sql = calloc(1, cap2);
+        snprintf(sql, cap2, "SELECT ri, ty, rn, uri FROM (%s) ORDER BY id %s LIMIT %d OFFSET %d;",
+                 inner, sort_dir, lim, ofst);
+        free(inner);
+    }
+    logger("DB", LOG_LEVEL_DEBUG, "desc SQL: %s", sql);
+
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        logger("DB", LOG_LEVEL_ERROR, "desc query failed: %s", sqlite3_errmsg(db));
+        goto cleanup;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *ri  = (const char *)sqlite3_column_text(stmt, 0);
+        int ty          = sqlite3_column_int(stmt, 1);
+        const char *rn  = (const char *)sqlite3_column_text(stmt, 2);
+        const char *uri = (const char *)sqlite3_column_text(stmt, 3);
+        const char *id_val = (o2pt->drt == DRT_STRUCTURED) ? uri : ri;
+
+        if (need_details) {
+            cJSON *obj = db_get_resource((char *)ri, ty);
+            if (!obj) continue;
+            cJSON *pi = cJSON_GetObjectItem(obj, "pi");
+            cJSON *item = cJSON_CreateObject();
+            cJSON_AddStringToObject(item, "ri", ri ? ri : "");
+            cJSON_AddStringToObject(item, "pi", cJSON_IsString(pi) ? pi->valuestring : "");
+            cJSON_AddNumberToObject(item, "ty", ty);
+            cJSON_AddItemToObject(item, "obj", obj);
+            cJSON_AddItemToArray(result, item);
+        } else if (rcn == RCN_DISCOVERY_RESULT_REFERENCES) {
+            cJSON_AddItemToArray(result, cJSON_CreateString(id_val ? id_val : ""));
+        } else {
+            cJSON *item = cJSON_CreateObject();
+            cJSON_AddStringToObject(item, "nm", rn ? rn : "");
+            cJSON_AddNumberToObject(item, "typ", ty);
+            cJSON_AddStringToObject(item, "val", id_val ? id_val : "");
+            cJSON_AddItemToArray(result, item);
+        }
+    }
+
+cleanup:
+    if (stmt) sqlite3_finalize(stmt);
+    sqlite_unlock();
+    free(sql);
+    free(general_where);
+    return result;
 }
